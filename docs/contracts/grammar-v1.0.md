@@ -37,6 +37,8 @@ values are sets of selected IDs and can be read with `has`.
 | `4d6kh3`, `4d6kl1` | Keep highest/lowest dice result |
 | `adv(d20)`, `dis(d20)` | Roll two dice and keep the higher/lower one |
 | `dice(count, sides)` | Roll and sum a pool with expression-valued count and sides |
+| `dice(count, "die_id")` | Roll and sum a custom die defined in the system package |
+| `countSymbol(pool, "symbol")` | Sum the named symbol’s multiplicities across faces in the pool |
 | `group("pool", "Pool", dice)` | Give a dice term a stable identity and display label |
 | `keepHighest(pool, count)`, `keepLowest(pool, count)` | Sum the highest or lowest dice after applying modifiers |
 | `countAtLeast(pool, threshold)`, `countAtMost(pool, threshold)`, `countEqual(pool, threshold)` | Count dice at or above, at or below, or equal to the threshold. `countSuccesses` is an alias for `countAtLeast`. |
@@ -60,7 +62,8 @@ Arithmetic and ordering require numbers. Equality operands have the same scalar 
 | Expression source | 1,024 UTF-8 bytes |
 | AST | 256 nodes, depth 32 |
 | All computed fields and validations of one sheet | 8,192 nodes, checked when the system is published |
-| Dice | 100 dice, 1,000 sides |
+| Dice | 100 draws per roll, 1,000 sides per standard die |
+| Custom dice | 16 definitions, 1–20 faces per die, 16 symbol IDs per face with counts 1–100 |
 | Entities | 32 |
 | Total fields | 512 |
 | Reference datasets | 64 |
@@ -100,7 +103,7 @@ for a granted roll or template formula. Both scopes support resource parts.
 A pool has a source, up to one reroll and one explosion modifier, and one
 reducer. Apply rerolls before explosions, for example
 `keepHighest(explode(rerollOnce(dice(fields.pool_size, 10), 1)), fields.keep_count)`.
-Count, sides, modifier faces, keep count, and thresholds are integer expressions.
+Count, numeric sides, standard-die modifier faces, keep count, and thresholds are integer expressions.
 Named pool parameters can read earlier groups through `rolled` and cannot draw
 new dice. An unnamed pool can use another roll as a parameter, as in
 `dice(d6, 6)`. A zero-die pool and a keep count of zero are valid.
@@ -123,6 +126,36 @@ Configurable pushes keep their additive sum/count and literal-scaling rules.
 A listed group with modifiers is eligible only when its policy lists those
 modifiers. An eligible starting die redraws its entire chain. Unlisted groups
 and locked chains reuse the original draws.
+
+## Custom dice
+
+The system document and compiled package may include a top-level `dice`
+array. Each definition has an `id`, `label` and a `faces` array. Every face
+has a finite numeric `value`, an optional text `label` and an optional
+`symbols` object of symbol IDs and positive counts. Face entries are
+equiprobable. Repeating a face gives it proportionally more chances to appear.
+
+```json
+{
+  "id": "signal_die",
+  "label": "Signal die",
+  "faces": [
+    { "value": 0, "label": "Spark", "symbols": { "hit": 2 } },
+    { "value": 0, "label": "Haze", "symbols": { "snag": 1 } },
+    { "value": 0, "label": "Still" }
+  ]
+}
+```
+
+`dice(4, "fudge")` sums four values from the defined die. A named custom
+pool supports reuse and any pool reducer. Use
+`countSymbol(group("signal", "Signal", dice(4, "signal_die")), "hit") - countSymbol(rolled("signal"), "snag")`
+to count two symbols from the same draws. An absent symbol contributes zero.
+Counting uses the final faces in each chain, excluding replaced starting faces.
+A custom die modifier matches the face’s numeric value. A custom explosion
+with no explicit face triggers on the highest numeric value. Saved rolls
+include each drawn face’s `faceLabel` and `symbols` when defined, plus the
+custom die ID in its group. Configurable push policies apply to standard dice.
 
 ## Roll outcomes and output text
 
@@ -154,6 +187,6 @@ outcomes yet.
 
 ## Exclusions
 
-Custom faces, arbitrary property traversal, effects, loops, assignment, and
+Arbitrary property traversal, effects, loops, assignment, and
 user-defined functions are outside this grammar. See the
 [rules coverage plan](../superpowers/plans/2026-11-10-rules-coverage.md).

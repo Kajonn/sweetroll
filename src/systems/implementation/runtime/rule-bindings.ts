@@ -14,6 +14,7 @@ export function characterRuleBindings(
   return {
     fields: buildFieldBindings(entity, state),
     inputs: {},
+    dice: pkg.dice,
     datasets: pkg.referenceData,
     slotEntries: (id) => {
       if (slots === undefined) {

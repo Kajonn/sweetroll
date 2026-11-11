@@ -15966,8 +15966,24 @@
                           "type": "integer"
                         },
                         "value": {
-                          "minimum": 1,
-                          "type": "integer"
+                          "type": "number"
+                        },
+                        "faceLabel": {
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "symbols": {
+                          "maxProperties": 16,
+                          "additionalProperties": false,
+                          "type": "object",
+                          "patternProperties": {
+                            "^[a-z][a-z0-9_]{0,63}$": {
+                              "minimum": 1,
+                              "maximum": 100,
+                              "type": "integer"
+                            }
+                          }
                         },
                         "kept": {
                           "type": "boolean"
@@ -16184,6 +16200,14 @@
                               "maximum": 1000,
                               "type": "integer"
                             },
+                            "dieId": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
+                            "symbol": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
                             "operation": {
                               "anyOf": [
                                 {
@@ -16200,6 +16224,10 @@
                                 },
                                 {
                                   "const": "countEqual",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "countSymbol",
                                   "type": "string"
                                 },
                                 {
@@ -16315,6 +16343,10 @@
                             "groupId": {
                               "minLength": 1,
                               "maxLength": 256,
+                              "type": "string"
+                            },
+                            "symbol": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
                               "type": "string"
                             },
                             "reused": {
@@ -16509,8 +16541,24 @@
                   "type": "integer"
                 },
                 "value": {
-                  "minimum": 1,
-                  "type": "integer"
+                  "type": "number"
+                },
+                "faceLabel": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "symbols": {
+                  "maxProperties": 16,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_]{0,63}$": {
+                      "minimum": 1,
+                      "maximum": 100,
+                      "type": "integer"
+                    }
+                  }
                 },
                 "kept": {
                   "type": "boolean"
@@ -16727,6 +16775,14 @@
                       "maximum": 1000,
                       "type": "integer"
                     },
+                    "dieId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "symbol": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
                     "operation": {
                       "anyOf": [
                         {
@@ -16743,6 +16799,10 @@
                         },
                         {
                           "const": "countEqual",
+                          "type": "string"
+                        },
+                        {
+                          "const": "countSymbol",
                           "type": "string"
                         },
                         {
@@ -16858,6 +16918,10 @@
                     "groupId": {
                       "minLength": 1,
                       "maxLength": 256,
+                      "type": "string"
+                    },
+                    "symbol": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
                       "type": "string"
                     },
                     "reused": {
@@ -17763,8 +17827,24 @@
                             "type": "integer"
                           },
                           "value": {
-                            "minimum": 1,
-                            "type": "integer"
+                            "type": "number"
+                          },
+                          "faceLabel": {
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "symbols": {
+                            "maxProperties": 16,
+                            "additionalProperties": false,
+                            "type": "object",
+                            "patternProperties": {
+                              "^[a-z][a-z0-9_]{0,63}$": {
+                                "minimum": 1,
+                                "maximum": 100,
+                                "type": "integer"
+                              }
+                            }
                           },
                           "kept": {
                             "type": "boolean"
@@ -17981,6 +18061,14 @@
                                 "maximum": 1000,
                                 "type": "integer"
                               },
+                              "dieId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "symbol": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
                               "operation": {
                                 "anyOf": [
                                   {
@@ -17997,6 +18085,10 @@
                                   },
                                   {
                                     "const": "countEqual",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countSymbol",
                                     "type": "string"
                                   },
                                   {
@@ -18112,6 +18204,10 @@
                               "groupId": {
                                 "minLength": 1,
                                 "maxLength": 256,
+                                "type": "string"
+                              },
+                              "symbol": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
                               },
                               "reused": {
@@ -19294,6 +19390,14 @@
                             "maximum": 1000,
                             "type": "integer"
                           },
+                          "dieId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "symbol": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
                           "operation": {
                             "anyOf": [
                               {
@@ -19310,6 +19414,10 @@
                               },
                               {
                                 "const": "countEqual",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countSymbol",
                                 "type": "string"
                               },
                               {
@@ -19427,6 +19535,10 @@
                             "maxLength": 256,
                             "type": "string"
                           },
+                          "symbol": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
                           "reused": {
                             "const": true,
                             "type": "boolean"
@@ -19456,8 +19568,24 @@
                         "type": "integer"
                       },
                       "value": {
-                        "minimum": 1,
-                        "type": "integer"
+                        "type": "number"
+                      },
+                      "faceLabel": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
                       },
                       "kept": {
                         "type": "boolean"
@@ -23692,6 +23820,64 @@
               }
             }
           },
+          "dice": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "faces"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "faces": {
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "referenceData": {
             "maxItems": 64,
             "type": "array",
@@ -25893,6 +26079,64 @@
               }
             }
           },
+          "dice": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "faces"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "faces": {
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "referenceData": {
             "maxItems": 64,
             "type": "array",
@@ -27981,6 +28225,28 @@
                     "type": "object",
                     "required": [
                       "kind",
+                      "count",
+                      "dieId"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "custom",
+                        "type": "string"
+                      },
+                      "count": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      },
+                      "dieId": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
                       "groupId"
                     ],
                     "properties": {
@@ -28057,41 +28323,63 @@
                 }
               },
               "reducer": {
-                "additionalProperties": false,
-                "type": "object",
-                "required": [
-                  "kind",
-                  "amount"
-                ],
-                "properties": {
-                  "kind": {
-                    "anyOf": [
-                      {
-                        "const": "keepHighest",
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "amount"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "const": "keepHighest",
+                            "type": "string"
+                          },
+                          {
+                            "const": "keepLowest",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countAtLeast",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countAtMost",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countEqual",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "amount": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      }
+                    }
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "symbol"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "countSymbol",
                         "type": "string"
                       },
-                      {
-                        "const": "keepLowest",
-                        "type": "string"
-                      },
-                      {
-                        "const": "countAtLeast",
-                        "type": "string"
-                      },
-                      {
-                        "const": "countAtMost",
-                        "type": "string"
-                      },
-                      {
-                        "const": "countEqual",
+                      "symbol": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
                         "type": "string"
                       }
-                    ]
-                  },
-                  "amount": {
-                    "$ref": "#/components/schemas/ExpressionAst"
+                    }
                   }
-                }
+                ]
               }
             }
           }

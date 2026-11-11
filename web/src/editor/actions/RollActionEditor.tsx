@@ -1,4 +1,4 @@
-import { children, parse, type ExpressionAstV1, type RulesDataset, type SlotEnvironment } from "@sweetroll/rules";
+import { children, parse, type ExpressionAstV1, type CustomDie, type RulesDataset, type SlotEnvironment } from "@sweetroll/rules";
 import { DebugOnly } from "../../ui/debugMode.js";
 import { Disclosure } from "../../ui/Disclosure.js";
 import {PushPolicyEditor} from "./PushPolicyEditor.js";
@@ -47,6 +47,7 @@ export type RollActionEditorProps = {
   onExpressionSourceChange: (next: string) => void;
   fieldTypes: Record<string, FieldBindingType>;
   itemTypes?: Record<string, FieldBindingType>;
+  dice?: readonly CustomDie[] | undefined;
   datasets?: readonly RulesDataset[];
   slots?: SlotEnvironment;
   fieldLabels?: Record<string, string> | undefined;
@@ -165,6 +166,7 @@ export function RollActionEditor({
   onExpressionSourceChange,
   fieldTypes,
   itemTypes,
+  dice,
   datasets,
   slots,
   fieldLabels,
@@ -225,7 +227,7 @@ export function RollActionEditor({
     setTryItResult(
       evaluateRoll({
         source: expressionSource,
-        env: { fields: fieldTypes, inputs: inputTypes, ...(itemTypes && { item: itemTypes }), ...(datasets && { datasets }), ...(slots && { slots }) },
+        env: { fields: fieldTypes, inputs: inputTypes, dice, ...(itemTypes && { item: itemTypes }), ...(datasets && { datasets }), ...(slots && { slots }) },
         fieldBindings: characterSamples,
         ...(itemTypes && { itemBindings: itemSamples }),
         resultType: "number",
@@ -326,7 +328,7 @@ export function RollActionEditor({
         )}
       </div>
       <PushPolicyEditor source={expressionSource} policy={action.pushPolicy} disabled={disabled || ("nominal" in action && action.nominal===true)} onChange={policy=>{const {pushPolicy:_old,...rest}=action;onChange(policy?{...rest,pushPolicy:policy}:rest);}}/>
-      <GroupedPoolEditor source={expressionSource} onChange={onExpressionSourceChange} disabled={disabled} choices={[
+      <GroupedPoolEditor dice={dice} source={expressionSource} onChange={onExpressionSourceChange} disabled={disabled} choices={[
         ...numericFields.map(([id])=>({value:`fields.${id}`,label:fieldLabels?.[id]??id})),
         ...Object.entries(itemTypes ?? {}).filter(([, type]) => type === "number").map(([id]) => ({ value: `item.${id}`, label: `item.${id}` })),
         ...action.inputs.filter(input=>input.valueType==="integer"||input.valueType==="decimal").map(input=>({value:`inputs.${input.id}`,label:input.label})),

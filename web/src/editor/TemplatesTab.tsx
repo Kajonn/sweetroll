@@ -428,6 +428,7 @@ function TemplateDetail({
                 }}
                 fieldTypes={templateFieldTypeMap(template, document)}
                 itemTypes={entityFieldTypes(template.fields)}
+                dice={document.dice}
                 datasets={document.referenceData}
                 fieldLabels={templateFieldLabels(template, document)}
                 guided

@@ -9455,7 +9455,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -9468,6 +9470,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -9477,6 +9480,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -10103,7 +10110,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -10116,6 +10125,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -10125,6 +10135,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -10751,7 +10765,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -10764,6 +10780,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -10773,6 +10790,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -11399,7 +11420,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -11412,6 +11435,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -11421,6 +11445,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -12048,7 +12076,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -12061,6 +12091,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -12070,6 +12101,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -12358,7 +12393,9 @@ export interface operations {
                                     label: string;
                                     count: number;
                                     sides: number;
-                                    operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                    dieId?: string;
+                                    symbol?: string;
+                                    operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                     threshold?: number;
                                     keepCount?: number;
                                     modifiers?: ("explode" | "rerollOnce")[];
@@ -12371,6 +12408,7 @@ export interface operations {
                                     operandIds: string[];
                                     value: (string | number | boolean | null) | string[];
                                     groupId?: string;
+                                    symbol?: string;
                                     /** @constant */
                                     reused?: true;
                                 }[];
@@ -12380,6 +12418,10 @@ export interface operations {
                             dice: {
                                 sides: number;
                                 value: number;
+                                faceLabel?: string;
+                                symbols?: {
+                                    [key: string]: number;
+                                };
                                 kept: boolean;
                                 id?: string;
                                 groupId?: string;
@@ -13238,7 +13280,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -13251,6 +13295,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -13260,6 +13305,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -13898,7 +13947,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -13911,6 +13962,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -13920,6 +13972,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -14572,7 +14628,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -14585,6 +14643,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -14594,6 +14653,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -15219,7 +15282,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -15232,6 +15297,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -15241,6 +15307,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -15870,7 +15940,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -15883,6 +15955,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -15892,6 +15965,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -16808,7 +16885,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -16821,6 +16900,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -16830,6 +16910,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -17989,7 +18073,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -18002,6 +18088,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -18011,6 +18098,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -18867,7 +18958,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -18880,6 +18973,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -18889,6 +18983,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;
@@ -30089,7 +30187,9 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
                                         threshold?: number;
                                         keepCount?: number;
                                         modifiers?: ("explode" | "rerollOnce")[];
@@ -30102,6 +30202,7 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        symbol?: string;
                                         /** @constant */
                                         reused?: true;
                                     }[];
@@ -30126,6 +30227,10 @@ export interface operations {
                                 dice: {
                                     sides: number;
                                     value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
                                     kept: boolean;
                                     id?: string;
                                     groupId?: string;

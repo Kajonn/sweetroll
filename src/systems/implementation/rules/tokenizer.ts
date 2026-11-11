@@ -1,6 +1,6 @@
 import type { RulesDiagnostic } from "./diagnostic.js";
 
-const FUNCTION_NAMES = ["min", "max", "round", "dice", "countSuccesses", "group", "rolled", "keepHighest", "keepLowest", "countAtLeast", "countAtMost", "countEqual", "explode", "rerollOnce", "floor", "ceil", "abs", "if", "has", "lookup", "lookupBand", "sum", "count", "sumWhere", "countWhere", "maxOf"] as const;
+const FUNCTION_NAMES = ["min", "max", "round", "dice", "countSuccesses", "group", "rolled", "keepHighest", "keepLowest", "countAtLeast", "countAtMost", "countEqual", "countSymbol", "explode", "rerollOnce", "floor", "ceil", "abs", "if", "has", "lookup", "lookupBand", "sum", "count", "sumWhere", "countWhere", "maxOf"] as const;
 export type FunctionName = typeof FUNCTION_NAMES[number];
 
 export type Token =

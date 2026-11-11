@@ -139,6 +139,7 @@ export type SystemPackageV1 = {
   presentation?: import("../theme/SystemPresentation.js").SystemPresentation;
   entities: EntityDefinitionV1[];
   expressions: CompiledExpressionSummary[];
+  dice?: readonly import("@sweetroll/rules").CustomDie[];
   datasets?: readonly RulesDataset[];
   slotsByEntity?: Record<string, SlotEnvironment>;
 };

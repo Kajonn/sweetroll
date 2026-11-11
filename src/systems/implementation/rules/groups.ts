@@ -7,9 +7,10 @@ export function children(node: ExpressionAstV1): ExpressionAstV1[] {
     case "unary": return [node.operand];
     case "call": return node.arguments;
     case "pool": {
-      const source = node.source.kind === "dice" ? [node.source.count, node.source.sides] : [];
+      const source = node.source.kind === "rolled" ? [] : [node.source.count];
+      if (node.source.kind === "dice") source.push(node.source.sides);
       const faces = node.modifiers.flatMap((modifier) => modifier.face ? [modifier.face] : []);
-      return [...source, ...faces, ...(node.reducer ? [node.reducer.amount] : [])];
+      return [...source, ...faces, ...(node.reducer && node.reducer.kind !== "countSymbol" ? [node.reducer.amount] : [])];
     }
     default: return [];
   }
@@ -20,7 +21,7 @@ export function containsDice(ast: ExpressionAstV1): boolean {
 }
 
 export function drawsDice(ast: ExpressionAstV1): boolean {
-  return (ast.kind === "pool" && ast.source.kind === "dice") || children(ast).some(drawsDice);
+  return (ast.kind === "pool" && ast.source.kind !== "rolled") || children(ast).some(drawsDice);
 }
 
 export function hasDiceGroups(ast: ExpressionAstV1): boolean {
@@ -29,7 +30,7 @@ export function hasDiceGroups(ast: ExpressionAstV1): boolean {
 
 /** Named groups of an expression, in the order they are rolled. */
 export function namedGroups(ast: ExpressionAstV1): string[] {
-  const own = ast.kind === "pool" && ast.group !== undefined && ast.source.kind === "dice" ? [ast.group.id] : [];
+  const own = ast.kind === "pool" && ast.group !== undefined && ast.source.kind !== "rolled" ? [ast.group.id] : [];
   return [...children(ast).flatMap(namedGroups), ...own];
 }
 
@@ -37,7 +38,11 @@ export function namedGroups(ast: ExpressionAstV1): string[] {
  * `rolled` lists groups that were rolled before this expression runs: an
  * outcome expression reads the groups of the roll it describes.
  */
-export function validateDiceGroups(ast: ExpressionAstV1, rolled: readonly string[] = []): RulesDiagnostic[] {
+export function validateDiceGroups(
+  ast: ExpressionAstV1,
+  rolled: readonly string[] = [],
+  customDice?: ReadonlySet<string>,
+): RulesDiagnostic[] {
   const diagnostics: RulesDiagnostic[] = [];
   const ids = new Set<string>(rolled);
   const available = new Set<string>(rolled);
@@ -69,6 +74,8 @@ export function validateDiceGroups(ast: ExpressionAstV1, rolled: readonly string
     }
     children(node).forEach(walk);
     if (node.kind !== "pool") return;
+    if (node.source.kind === "custom" && customDice && !customDice.has(node.source.dieId))
+      fail(`Unknown custom die '${node.source.dieId}'.`);
     if (node.modifiers[0]?.kind === "explode" && node.modifiers.length > 1)
       fail("Reroll once before applying explosions.");
     if (new Set(node.modifiers.map((modifier) => modifier.kind)).size !== node.modifiers.length)

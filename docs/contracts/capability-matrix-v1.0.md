@@ -23,11 +23,14 @@ The Roadwardens fixture exercises class progression tables, equipment
 aggregation, calculated health maxima, and dataset-backed choices through the
 API and browser acceptance flows.
 
+The Winter Compass and Signal Forge fixtures exercise labeled four-die Fudge
+rolls and net symbols from one saved pool. The dynamic pool fixtures exercise
+explosions, and Hearthbound exercises named move outcomes.
+
 ## Deferred
 
 | Capability | Status |
 |------------|--------|
-| Branching move outcomes | Deferred |
 | Opposed tests | Deferred |
-| Exploding and custom-face dice | Deferred |
+| Card decks | Deferred |
 | Automated roll consequences | Deferred |

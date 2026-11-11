@@ -218,12 +218,13 @@ function expressionOwners(
 
 function environmentFor(owner: ExpressionOwner | undefined, base: SystemPackageV1): ExpressionCompileEnv {
   const datasets = base.referenceData;
+  const dice = base.dice;
   if (owner === undefined) return { fields: {}, inputs: {}, datasets };
   const item = entityFieldTypes(owner.template.fields);
   if (owner.kind === "computed") return { fields: {}, inputs: {}, item, datasets };
   return {
     fields: grantedEntityFieldsForKind(base, owner.template.kind),
-    inputs: actionInputTypes(owner.action.inputs), item, datasets,
+    inputs: actionInputTypes(owner.action.inputs), item, datasets, dice,
   };
 }
 

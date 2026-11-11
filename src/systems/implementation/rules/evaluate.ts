@@ -1,3 +1,4 @@
+import type { CustomDie } from "../package/schema/dice.js";
 import type {DieResult, RollBreakdown} from "./result.js";
 export type {DieResult, RollBreakdown} from "./result.js";
 import { aggregateCall, aggregateKey, aggregateValue, isAggregate, literalId, lookupValue, type AggregateEntry, type RulesDataset } from "./data.js";
@@ -20,6 +21,7 @@ export type EvaluationBindings = {
   roll?: Record<string, BindingValue>;
   /** Outcome expressions: the finished roll's named groups, for rolled("group"). */
   rolled?: RolledPools;
+  dice?: readonly CustomDie[] | undefined;
   datasets?: readonly RulesDataset[];
   slotEntries?: (slot: string) => readonly AggregateEntry[];
   aggregates?: Record<string, BindingValue>;
@@ -116,6 +118,7 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefined {
       value,
       ...(node.kind === "pool" && {
         groupId: groupId(node, ctx),
+        ...(node.reducer?.kind === "countSymbol" && { symbol: node.reducer.symbol }),
         ...(node.source.kind === "rolled" && { reused: true as const }),
       }),
     });
@@ -123,9 +126,11 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefined {
   return value;
 }
 
+type DieSource = { sides: number; custom: CustomDie | undefined };
+
 function drawDie(
   ctx: Ctx,
-  sides: number,
+  { sides, custom }: DieSource,
   groupId: string,
   id: string,
   chainId: string,
@@ -133,27 +138,33 @@ function drawDie(
 ): DieResult | undefined {
   if (ctx.dice.length >= ctx.limits.dicePerRoll)
     return budgetExceeded(ctx, `dice count ${ctx.dice.length + 1} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
-  const die = { sides, value: Math.max(1, Math.ceil(ctx.draw(id, chainId) * sides)), kept: true, id, groupId, ...link };
+  const index = Math.max(1, Math.ceil(ctx.draw(id, chainId) * sides));
+  const face = custom?.faces[index - 1];
+  const die: DieResult = {
+    sides, value: face?.value ?? index, kept: true, id, groupId, ...link,
+    ...(face?.label === undefined ? {} : { faceLabel: face.label }),
+    ...(face?.symbols === undefined ? {} : { symbols: face.symbols }),
+  };
   ctx.dice.push(die);
   return die;
 }
 
 const EXPLOSIONS_PER_DIE = 10;
 
-function drawChains(ctx: Ctx, id: string, count: number, sides: number, reroll: number | undefined, explode: number | undefined): DieResult[][] | undefined {
+function drawChains(ctx: Ctx, id: string, count: number, source: DieSource, reroll: number | undefined, explode: number | undefined): DieResult[][] | undefined {
   const chains: DieResult[][] = [];
   for (let index = 0; index < count; index++) {
     const chainId = `${id}:${index}`;
-    let die = drawDie(ctx, sides, id, chainId, chainId);
+    let die = drawDie(ctx, source, id, chainId, chainId);
     if (!die) return undefined;
     if (die.value === reroll) {
       die.kept = false;
-      die = drawDie(ctx, sides, id, `${chainId}:r`, chainId, { rerolledFrom: chainId });
+      die = drawDie(ctx, source, id, `${chainId}:r`, chainId, { rerolledFrom: chainId });
       if (!die) return undefined;
     }
     const chain = [die];
     for (let extra = 1; extra <= EXPLOSIONS_PER_DIE && die.value === explode; extra++) {
-      die = drawDie(ctx, sides, id, `${chainId}:e${extra}`, chainId, { explodedFrom: die.id! });
+      die = drawDie(ctx, source, id, `${chainId}:e${extra}`, chainId, { explodedFrom: die.id! });
       if (!die) return undefined;
       chain.push(die);
     }
@@ -162,7 +173,13 @@ function drawChains(ctx: Ctx, id: string, count: number, sides: number, reroll: 
   return chains;
 }
 
-function reducePool(chains: DieResult[][], operation: RollBreakdown["groups"][number]["operation"], amount: number, record: boolean): number {
+function reducePool(chains: DieResult[][], operation: RollBreakdown["groups"][number]["operation"], amount: number | string, record: boolean): number {
+  if (typeof amount === "string") {
+    return chains.flat().reduce((sum, die) => {
+      const symbols = die.symbols;
+      return sum + (symbols && Object.hasOwn(symbols, amount) ? symbols[amount]! : 0);
+    }, 0);
+  }
   const values = chains.map((chain) => ({ chain, total: chain.reduce((sum, die) => sum + die.value, 0) }));
   if (operation === "sum") return values.reduce((sum, value) => sum + value.total, 0);
   if (operation === "keepHighest" || operation === "keepLowest") {
@@ -184,7 +201,7 @@ function evalPool(node: PoolAst, ctx: Ctx): number | undefined {
   const id = groupId(node, ctx);
   const operation = reducer?.kind ?? "sum";
   const keep = operation === "keepHighest" || operation === "keepLowest";
-  const readAmount = () => reducer
+  const readAmount = () => reducer?.kind === "countSymbol" ? reducer.symbol : reducer
     ? integer(reducer.amount, ctx, keep ? "keep count" : "success threshold", keep ? 0 : -Number.MAX_SAFE_INTEGER, keep ? ctx.limits.dicePerRoll : undefined)
     : 0;
   if (source.kind === "rolled") {
@@ -197,7 +214,11 @@ function evalPool(node: PoolAst, ctx: Ctx): number | undefined {
 
   const count = integer(source.count, ctx, "dice count", 0);
   if (count === undefined) return undefined;
-  const sides = integer(source.sides, ctx, "die sides", 1);
+  const custom = source.kind === "custom"
+    ? ctx.bindings.dice?.find((die) => die.id === source.dieId)
+    : undefined;
+  if (source.kind === "custom" && !custom) return fail(ctx, `unknown custom die '${source.dieId}'`);
+  const sides = source.kind === "dice" ? integer(source.sides, ctx, "die sides", 1) : custom?.faces.length;
   if (sides === undefined) return undefined;
   if (count + ctx.dice.length > ctx.limits.dicePerRoll)
     return budgetExceeded(ctx, `dice count ${count + ctx.dice.length} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
@@ -207,22 +228,28 @@ function evalPool(node: PoolAst, ctx: Ctx): number | undefined {
   let reroll: number | undefined;
   let explode: number | undefined;
   for (const modifier of node.modifiers) {
-    const face = modifier.face ? integer(modifier.face, ctx, `${modifier.kind} face`, 1, sides) : sides;
-    if (face === undefined) return undefined;
+    const face = custom
+      ? modifier.face ? evalNode(modifier.face, ctx) : Math.max(...custom.faces.map((face) => face.value))
+      : modifier.face ? integer(modifier.face, ctx, `${modifier.kind} face`, 1, sides) : sides;
+    if (custom && face !== undefined && (typeof face !== "number" || !custom.faces.some((candidate) => candidate.value === face))) {
+      return fail(ctx, `${modifier.kind} face must match a value on '${custom.id}'`);
+    }
+    if (typeof face !== "number") return undefined;
     if (modifier.kind === "rerollOnce") reroll = face;
     else explode = face;
   }
   const amount = readAmount();
   if (amount === undefined) return undefined;
   const first = ctx.dice.length;
-  const chains = drawChains(ctx, id, count, sides, reroll, explode);
+  const chains = drawChains(ctx, id, count, { sides, custom }, reroll, explode);
   if (!chains) return undefined;
   const total = reducePool(chains, operation, amount, true);
   if (node.group) ctx.pools.set(id, { total, chains });
   ctx.breakdown?.groups.push({
-    id, label: node.group?.label ?? "Dice", count, sides, operation, total,
+    id, label: node.group?.label ?? custom?.label ?? "Dice", count, sides, operation, total,
+    ...(custom && { dieId: custom.id }),
     diceIds: ctx.dice.slice(first).map((die) => die.id!),
-    ...(reducer && (keep ? { keepCount: amount } : { threshold: amount })),
+    ...(typeof amount === "string" ? { symbol: amount } : reducer && (keep ? { keepCount: amount } : { threshold: amount })),
     ...(node.modifiers.length > 0 && { modifiers: node.modifiers.map((modifier) => modifier.kind) }),
   });
   return total;

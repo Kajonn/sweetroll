@@ -24500,6 +24500,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -24516,6 +24524,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -24633,6 +24645,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -24665,8 +24681,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -27802,6 +27834,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -27818,6 +27858,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -27935,6 +27979,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -27967,8 +28015,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -31115,6 +31179,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -31131,6 +31203,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -31248,6 +31324,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -31280,8 +31360,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -34419,6 +34515,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -34435,6 +34539,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -34552,6 +34660,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -34584,8 +34696,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -37725,6 +37853,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -37741,6 +37877,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -37858,6 +37998,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -37890,8 +38034,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -39181,6 +39341,14 @@
                                     "maximum": 1000,
                                     "type": "integer"
                                   },
+                                  "dieId": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  },
+                                  "symbol": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  },
                                   "operation": {
                                     "anyOf": [
                                       {
@@ -39197,6 +39365,10 @@
                                       },
                                       {
                                         "const": "countEqual",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "countSymbol",
                                         "type": "string"
                                       },
                                       {
@@ -39314,6 +39486,10 @@
                                     "maxLength": 256,
                                     "type": "string"
                                   },
+                                  "symbol": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  },
                                   "reused": {
                                     "const": true,
                                     "type": "boolean"
@@ -39346,8 +39522,24 @@
                                 "type": "integer"
                               },
                               "value": {
-                                "minimum": 1,
-                                "type": "integer"
+                                "type": "number"
+                              },
+                              "faceLabel": {
+                                "minLength": 1,
+                                "maxLength": 120,
+                                "type": "string"
+                              },
+                              "symbols": {
+                                "maxProperties": 16,
+                                "additionalProperties": false,
+                                "type": "object",
+                                "patternProperties": {
+                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                    "minimum": 1,
+                                    "maximum": 100,
+                                    "type": "integer"
+                                  }
+                                }
                               },
                               "kept": {
                                 "type": "boolean"
@@ -43437,6 +43629,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -43453,6 +43653,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -43570,6 +43774,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -43602,8 +43810,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -46786,6 +47010,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -46802,6 +47034,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -46919,6 +47155,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -46951,8 +47191,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -50194,6 +50450,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -50210,6 +50474,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -50327,6 +50595,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -50359,8 +50631,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -53494,6 +53782,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -53510,6 +53806,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -53627,6 +53927,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -53659,8 +53963,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -56802,6 +57122,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -56818,6 +57146,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -56935,6 +57267,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -56967,8 +57303,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -61383,6 +61735,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -61399,6 +61759,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -61516,6 +61880,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -61548,8 +61916,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -66867,6 +67251,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -66883,6 +67275,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -67000,6 +67396,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -67032,8 +67432,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -71105,6 +71521,14 @@
                                           "maximum": 1000,
                                           "type": "integer"
                                         },
+                                        "dieId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "symbol": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
                                         "operation": {
                                           "anyOf": [
                                             {
@@ -71121,6 +71545,10 @@
                                             },
                                             {
                                               "const": "countEqual",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "countSymbol",
                                               "type": "string"
                                             },
                                             {
@@ -71238,6 +71666,10 @@
                                           "maxLength": 256,
                                           "type": "string"
                                         },
+                                        "symbol": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
                                         "reused": {
                                           "const": true,
                                           "type": "boolean"
@@ -71270,8 +71702,24 @@
                                       "type": "integer"
                                     },
                                     "value": {
-                                      "minimum": 1,
-                                      "type": "integer"
+                                      "type": "number"
+                                    },
+                                    "faceLabel": {
+                                      "minLength": 1,
+                                      "maxLength": 120,
+                                      "type": "string"
+                                    },
+                                    "symbols": {
+                                      "maxProperties": 16,
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^[a-z][a-z0-9_]{0,63}$": {
+                                          "minimum": 1,
+                                          "maximum": 100,
+                                          "type": "integer"
+                                        }
+                                      }
                                     },
                                     "kept": {
                                       "type": "boolean"
@@ -108881,6 +109329,14 @@
                                           "maximum": 1000,
                                           "type": "integer"
                                         },
+                                        "dieId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "symbol": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
                                         "operation": {
                                           "anyOf": [
                                             {
@@ -108897,6 +109353,10 @@
                                             },
                                             {
                                               "const": "countEqual",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "countSymbol",
                                               "type": "string"
                                             },
                                             {
@@ -109012,6 +109472,10 @@
                                         "groupId": {
                                           "minLength": 1,
                                           "maxLength": 256,
+                                          "type": "string"
+                                        },
+                                        "symbol": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                           "type": "string"
                                         },
                                         "reused": {
@@ -109138,8 +109602,24 @@
                                       "type": "integer"
                                     },
                                     "value": {
-                                      "minimum": 1,
-                                      "type": "integer"
+                                      "type": "number"
+                                    },
+                                    "faceLabel": {
+                                      "minLength": 1,
+                                      "maxLength": 120,
+                                      "type": "string"
+                                    },
+                                    "symbols": {
+                                      "maxProperties": 16,
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^[a-z][a-z0-9_]{0,63}$": {
+                                          "minimum": 1,
+                                          "maximum": 100,
+                                          "type": "integer"
+                                        }
+                                      }
                                     },
                                     "kept": {
                                       "type": "boolean"

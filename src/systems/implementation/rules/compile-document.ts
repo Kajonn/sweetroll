@@ -220,6 +220,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     const env: ExpressionCompileEnv = {
       fields: templateRolls.length > 0 ? grantedEntityFields.get(owner ?? "") ?? {} : entityEnv?.fields ?? {},
       inputs: {},
+      dice: document.dice,
       datasets: document.referenceData,
       ...(templateEnv?.item === undefined ? {} : { item: templateEnv.item }),
       ...(entityEnv?.slots === undefined ? {} : { slots: entityEnv.slots }),
@@ -330,6 +331,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     defaultDice: document.metadata.defaultDice,
     ...(document.metadata.presentation === undefined ? {} : { presentation: document.metadata.presentation }),
     entities: document.entities.map(entity => ({ ...entity, fields: entity.fields.map(field => fieldWithDatasetOptions(field, document.referenceData)) })),
+    ...(document.dice === undefined ? {} : { dice: document.dice }),
     referenceData: document.referenceData,
     sheets: document.sheets,
     expressions: compiled.map((b, i) => ({ id: document.expressions[i]!.id, ...b })),

@@ -23,7 +23,8 @@ export function characterRuleBindings(
           const slot = slots.get(entry.slotId) ?? [];
           slot.push({
             values: template === undefined ? {} : entry.values,
-            quantity: template?.aggregateQuantity === true ? entry.quantity ?? 1 : 1,
+            quantity: entry.quantity ?? 1,
+            quantityFields: new Set(template?.quantityFields ?? []),
           });
           slots.set(entry.slotId, slot);
         }

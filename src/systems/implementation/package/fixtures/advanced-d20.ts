@@ -30,7 +30,7 @@ export function advancedD20Document(): SystemDocumentV1 {
   });
   doc.slots.push({ id: "equipment", label: "Equipment", accepts: ["item"], maxEntries: 20 });
   doc.templates.push({
-    id: "leather", kind: "item", label: "Leather armor", aggregateQuantity: true,
+    id: "leather", kind: "item", label: "Leather armor", quantityFields: ["weight"],
     fields: [
       integer("armor", "Armor bonus", 2, 0, 10),
       integer("weight", "Weight", 3, 0, 100),

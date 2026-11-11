@@ -43,13 +43,15 @@ describe("rules data", () => {
     ['lookup("levels", 4, "bonus")', 3],
     ['lookupBand("levels", 3, "bonus")', 2],
     ['lookupBand("levels", 0, "bonus")', -1],
-    ['sumWhere("equipment", "armor", "equipped") + maxOf("equipment", "armor")', 7],
+    ['sumWhere("equipment", "armor", "equipped") + maxOf("equipment", "armor")', 5],
+    ['sum("equipment", "weight")', 11],
+    ['count("equipment") + countWhere("equipment", "equipped")', 3],
     ['item.armor + fields.armor', 9],
   ])("evaluates %s", (source, value) => {
     const env = {
       fields: { armor: "number" }, inputs: {}, item: { armor: "number" },
       datasets: [dataset],
-      slots: { equipment: { capacity: 10, fields: { armor: "number", equipped: "boolean" } } },
+      slots: { equipment: { capacity: 10, fields: { armor: "number", weight: "number", equipped: "boolean" } } },
     } as const;
     const compiled = compileExpression(source, { env, resultType: "number", fallback: -1, context: "computed" });
     if (!compiled.ok) throw Error(JSON.stringify(compiled.diagnostics));
@@ -57,8 +59,9 @@ describe("rules data", () => {
       fields: { armor: 5 }, inputs: {}, item: { armor: 4 },
       datasets: [dataset],
       slotEntries: () => [
-        { values: { armor: 2, equipped: true }, quantity: 2 },
-        { values: { armor: 3, equipped: false }, quantity: 1 },
+        // Two units: weight is per unit, the armor bonus counts once.
+        { values: { armor: 2, weight: 4, equipped: true }, quantity: 2, quantityFields: new Set(["weight"]) },
+        { values: { armor: 3, weight: 3, equipped: false }, quantity: 1, quantityFields: new Set(["weight"]) },
       ],
     });
     expect(result).toMatchObject({ ok: true, result: value });

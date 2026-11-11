@@ -3,7 +3,9 @@
   "mediaType": "application/vnd.sweetroll.system+json;version=1",
   "exportedAt": "2026-09-04T12:00:00Z",
   "package": {
-    "schemaVersion": "1.0",
+    "schemaVersion": "2.0",
+    "templates": [],
+    "slots": [],
     "systemId": "b0000000-0000-5000-8000-000000000001",
     "versionId": "b0000000-0000-5000-8000-000000000002",
     "semanticVersion": "1.0.0",
@@ -142,6 +144,7 @@
       {
         "id": "penalty_expr",
         "context": "computed",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
@@ -168,6 +171,7 @@
       {
         "id": "move_expr",
         "context": "roll",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
@@ -206,6 +210,7 @@
       {
         "id": "stat_valid_expr",
         "context": "validation",
+        "languageVersion": "1.0",
         "resultType": "boolean",
         "inferredType": "boolean",
         "fallback": false,
@@ -279,6 +284,7 @@
         "expressionId": "stat_valid_expr",
         "severity": "error",
         "message": "Move stat must be between -1 and 3",
+        "targetEntityId": "character",
         "targetId": "move_stat"
       }
     ],
@@ -291,7 +297,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:af94c546e6ed7e84626f3e2835f2bb6a7fd536696d965cf5acd34d0f9a51e61e"
+      "checksum": "sha256:e01c171a009193b56407cdc7d219129317481f01f740fb7b120918c71cc8c609"
     }
   }
 }

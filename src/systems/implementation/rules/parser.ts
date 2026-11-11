@@ -191,24 +191,34 @@ class Parser {
     this.take();
     const [first, second, third] = args;
     if (name === "dice" && args.length === 2) {
-      return { kind: "pool", source: { kind: "dice", count: first!, sides: second! }, modifiers: [] };
+      const source = second?.kind === "stringLiteral"
+        ? { kind: "custom", count: first!, dieId: second.value } as const
+        : { kind: "dice", count: first!, sides: second! } as const;
+      return { kind: "pool", source, modifiers: [] };
     }
     if (name === "rolled" && args.length === 1 && first?.kind === "stringLiteral") {
       return { kind: "pool", source: { kind: "rolled", groupId: first.value }, modifiers: [] };
     }
     if (name === "group" && args.length === 3 && first?.kind === "stringLiteral" &&
-        second?.kind === "stringLiteral" && third?.kind === "pool" && third.source.kind === "dice" && !third.group) {
+        second?.kind === "stringLiteral" && third?.kind === "pool" && third.source.kind !== "rolled" && !third.group) {
       return { ...third, group: { id: first.value, label: second.value } };
     }
     if (name === "explode" || name === "rerollOnce") {
       const validArity = args.length === 2 || (name === "explode" && args.length === 1);
-      if (validArity && first?.kind === "pool" && first.source.kind === "dice" &&
+      if (validArity && first?.kind === "pool" && first.source.kind !== "rolled" &&
           !first.reducer && !first.modifiers.some((modifier) => modifier.kind === name)) {
         const modifier = name === "rerollOnce" ? { kind: name, face: second! } as const
           : { kind: name, ...(second && { face: second }) } as const;
         return { ...first, modifiers: [...first.modifiers, modifier] };
       }
       this.fail(`${name} expects an unreduced dice pool and ${name === "explode" ? "an optional" : "a"} face`);
+      return undefined;
+    }
+    if (name === "countSymbol") {
+      if (args.length === 2 && first?.kind === "pool" && !first.reducer && second?.kind === "stringLiteral") {
+        return { ...first, reducer: { kind: "countSymbol", symbol: second.value } };
+      }
+      this.fail("countSymbol expects a direct dice expression or rolled group and a quoted symbol ID", "invalid_expression");
       return undefined;
     }
     if (name === "countSuccesses" || isReducer(name)) {
@@ -219,7 +229,7 @@ class Parser {
       return undefined;
     }
     if (name === "dice" || name === "group" || name === "rolled") {
-      const expected = { dice: "count and sides", group: "an ID, label and dice pool", rolled: "a quoted group ID" };
+      const expected = { dice: "a count and numeric sides or a quoted custom die ID", group: "an ID, label and dice pool", rolled: "a quoted group ID" };
       this.fail(`${name} expects ${expected[name]}`);
       return undefined;
     }

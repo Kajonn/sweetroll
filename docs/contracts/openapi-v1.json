@@ -16563,6 +16563,21 @@
                                                       }
                                                     ]
                                                   },
+                                                  "target": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "entityId"
+                                                    ],
+                                                    "properties": {
+                                                      "entityId": {
+                                                        "type": "string"
+                                                      }
+                                                    }
+                                                  },
+                                                  "respondsTo": {
+                                                    "const": true,
+                                                    "type": "boolean"
+                                                  },
                                                   "inputs": {
                                                     "type": "array",
                                                     "items": {
@@ -16876,6 +16891,21 @@
                                                                         "type": "string"
                                                                       }
                                                                     ]
+                                                                  },
+                                                                  "target": {
+                                                                    "type": "object",
+                                                                    "required": [
+                                                                      "entityId"
+                                                                    ],
+                                                                    "properties": {
+                                                                      "entityId": {
+                                                                        "type": "string"
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "respondsTo": {
+                                                                    "const": true,
+                                                                    "type": "boolean"
                                                                   },
                                                                   "inputs": {
                                                                     "type": "array",
@@ -21285,6 +21315,21 @@
                                                       }
                                                     ]
                                                   },
+                                                  "target": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "entityId"
+                                                    ],
+                                                    "properties": {
+                                                      "entityId": {
+                                                        "type": "string"
+                                                      }
+                                                    }
+                                                  },
+                                                  "respondsTo": {
+                                                    "const": true,
+                                                    "type": "boolean"
+                                                  },
                                                   "inputs": {
                                                     "type": "array",
                                                     "items": {
@@ -21598,6 +21643,21 @@
                                                                         "type": "string"
                                                                       }
                                                                     ]
+                                                                  },
+                                                                  "target": {
+                                                                    "type": "object",
+                                                                    "required": [
+                                                                      "entityId"
+                                                                    ],
+                                                                    "properties": {
+                                                                      "entityId": {
+                                                                        "type": "string"
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "respondsTo": {
+                                                                    "const": true,
+                                                                    "type": "boolean"
                                                                   },
                                                                   "inputs": {
                                                                     "type": "array",
@@ -23680,6 +23740,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -23993,6 +24068,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -24350,6 +24440,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -24500,6 +24598,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -24516,6 +24622,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -24633,6 +24743,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -24665,8 +24779,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -24723,6 +24853,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -26982,6 +27120,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -27295,6 +27448,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -27652,6 +27820,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -27802,6 +27978,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -27818,6 +28002,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -27935,6 +28123,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -27967,8 +28159,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -28025,6 +28233,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -30295,6 +30511,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -30608,6 +30839,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -30965,6 +31211,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -31115,6 +31369,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -31131,6 +31393,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -31248,6 +31514,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -31280,8 +31550,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -31338,6 +31624,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -33599,6 +33893,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -33912,6 +34221,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -34269,6 +34593,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -34419,6 +34751,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -34435,6 +34775,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -34552,6 +34896,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -34584,8 +34932,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -34642,6 +35006,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -36905,6 +37277,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -37218,6 +37605,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -37575,6 +37977,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -37725,6 +38135,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -37741,6 +38159,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -37858,6 +38280,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -37890,8 +38316,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -37948,6 +38390,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -38984,6 +39434,988 @@
         }
       }
     },
+    "/characters/{characterId}/actions/{actionId}/roll-options": {
+      "get": {
+        "operationId": "get_character_roll_options",
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "actionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "targets",
+                    "rolls"
+                  ],
+                  "properties": {
+                    "targets": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "characterId",
+                          "name"
+                        ],
+                        "properties": {
+                          "characterId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "rolls": {
+                      "maxItems": 50,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "rollId",
+                          "output"
+                        ],
+                        "properties": {
+                          "rollId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "output": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "const": "unauthorized",
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/characters/{characterId}/rolls/{rollId}": {
       "get": {
         "operationId": "get_characters_characterId_rolls_rollId",
@@ -39031,6 +40463,14 @@
                         "audience"
                       ],
                       "properties": {
+                        "targetCharacterId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "respondsTo": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
                         "push": {
                           "additionalProperties": false,
                           "type": "object",
@@ -39181,6 +40621,14 @@
                                     "maximum": 1000,
                                     "type": "integer"
                                   },
+                                  "dieId": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  },
+                                  "symbol": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  },
                                   "operation": {
                                     "anyOf": [
                                       {
@@ -39197,6 +40645,10 @@
                                       },
                                       {
                                         "const": "countEqual",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "countSymbol",
                                         "type": "string"
                                       },
                                       {
@@ -39314,6 +40766,10 @@
                                     "maxLength": 256,
                                     "type": "string"
                                   },
+                                  "symbol": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  },
                                   "reused": {
                                     "const": true,
                                     "type": "boolean"
@@ -39346,8 +40802,24 @@
                                 "type": "integer"
                               },
                               "value": {
-                                "minimum": 1,
-                                "type": "integer"
+                                "type": "number"
+                              },
+                              "faceLabel": {
+                                "minLength": 1,
+                                "maxLength": 120,
+                                "type": "string"
+                              },
+                              "symbols": {
+                                "maxProperties": 16,
+                                "additionalProperties": false,
+                                "type": "object",
+                                "patternProperties": {
+                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                    "minimum": 1,
+                                    "maximum": 100,
+                                    "type": "integer"
+                                  }
+                                }
                               },
                               "kept": {
                                 "type": "boolean"
@@ -39404,6 +40876,14 @@
                                   },
                                   {
                                     "const": "aggregates",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "target",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "opposed",
                                     "type": "string"
                                   }
                                 ]
@@ -42617,6 +44097,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -42930,6 +44425,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -43287,6 +44797,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -43437,6 +44955,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -43453,6 +44979,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -43570,6 +45100,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -43602,8 +45136,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -43660,6 +45210,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -44709,6 +46267,14 @@
                   "idempotencyKey"
                 ],
                 "properties": {
+                  "targetCharacterId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "respondsTo": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
                   "push": {
                     "not": {}
                   },
@@ -45966,6 +47532,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -46279,6 +47860,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -46636,6 +48232,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -46786,6 +48390,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -46802,6 +48414,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -46919,6 +48535,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -46951,8 +48571,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -47009,6 +48645,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -49374,6 +51018,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -49687,6 +51346,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -50044,6 +51718,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -50194,6 +51876,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -50210,6 +51900,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -50327,6 +52021,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -50359,8 +52057,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -50417,6 +52131,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -52674,6 +54396,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -52987,6 +54724,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -53344,6 +55096,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -53494,6 +55254,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -53510,6 +55278,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -53627,6 +55399,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -53659,8 +55435,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -53717,6 +55509,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -55982,6 +57782,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -56295,6 +58110,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -56652,6 +58482,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -56802,6 +58640,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -56818,6 +58664,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -56935,6 +58785,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -56967,8 +58821,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -57025,6 +58895,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -58662,6 +60540,21 @@
                                       "type": "string"
                                     }
                                   ]
+                                },
+                                "target": {
+                                  "type": "object",
+                                  "required": [
+                                    "entityId"
+                                  ],
+                                  "properties": {
+                                    "entityId": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "respondsTo": {
+                                  "const": true,
+                                  "type": "boolean"
                                 },
                                 "inputs": {
                                   "type": "array",
@@ -60563,6 +62456,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -60876,6 +62784,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -61233,6 +63156,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -61383,6 +63314,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -61399,6 +63338,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -61516,6 +63459,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -61548,8 +63495,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -61606,6 +63569,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -66047,6 +68018,21 @@
                                                           }
                                                         ]
                                                       },
+                                                      "target": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "entityId"
+                                                        ],
+                                                        "properties": {
+                                                          "entityId": {
+                                                            "type": "string"
+                                                          }
+                                                        }
+                                                      },
+                                                      "respondsTo": {
+                                                        "const": true,
+                                                        "type": "boolean"
+                                                      },
                                                       "inputs": {
                                                         "type": "array",
                                                         "items": {
@@ -66360,6 +68346,21 @@
                                                                             "type": "string"
                                                                           }
                                                                         ]
+                                                                      },
+                                                                      "target": {
+                                                                        "type": "object",
+                                                                        "required": [
+                                                                          "entityId"
+                                                                        ],
+                                                                        "properties": {
+                                                                          "entityId": {
+                                                                            "type": "string"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "respondsTo": {
+                                                                        "const": true,
+                                                                        "type": "boolean"
                                                                       },
                                                                       "inputs": {
                                                                         "type": "array",
@@ -66717,6 +68718,14 @@
                                 "audience"
                               ],
                               "properties": {
+                                "targetCharacterId": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
+                                "respondsTo": {
+                                  "format": "uuid",
+                                  "type": "string"
+                                },
                                 "push": {
                                   "additionalProperties": false,
                                   "type": "object",
@@ -66867,6 +68876,14 @@
                                             "maximum": 1000,
                                             "type": "integer"
                                           },
+                                          "dieId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "operation": {
                                             "anyOf": [
                                               {
@@ -66883,6 +68900,10 @@
                                               },
                                               {
                                                 "const": "countEqual",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countSymbol",
                                                 "type": "string"
                                               },
                                               {
@@ -67000,6 +69021,10 @@
                                             "maxLength": 256,
                                             "type": "string"
                                           },
+                                          "symbol": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
                                           "reused": {
                                             "const": true,
                                             "type": "boolean"
@@ -67032,8 +69057,24 @@
                                         "type": "integer"
                                       },
                                       "value": {
-                                        "minimum": 1,
-                                        "type": "integer"
+                                        "type": "number"
+                                      },
+                                      "faceLabel": {
+                                        "minLength": 1,
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "symbols": {
+                                        "maxProperties": 16,
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "minimum": 1,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          }
+                                        }
                                       },
                                       "kept": {
                                         "type": "boolean"
@@ -67090,6 +69131,14 @@
                                           },
                                           {
                                             "const": "aggregates",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "target",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "opposed",
                                             "type": "string"
                                           }
                                         ]
@@ -69326,6 +71375,21 @@
                                                       }
                                                     ]
                                                   },
+                                                  "target": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "entityId"
+                                                    ],
+                                                    "properties": {
+                                                      "entityId": {
+                                                        "type": "string"
+                                                      }
+                                                    }
+                                                  },
+                                                  "respondsTo": {
+                                                    "const": true,
+                                                    "type": "boolean"
+                                                  },
                                                   "inputs": {
                                                     "type": "array",
                                                     "items": {
@@ -69639,6 +71703,21 @@
                                                                         "type": "string"
                                                                       }
                                                                     ]
+                                                                  },
+                                                                  "target": {
+                                                                    "type": "object",
+                                                                    "required": [
+                                                                      "entityId"
+                                                                    ],
+                                                                    "properties": {
+                                                                      "entityId": {
+                                                                        "type": "string"
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "respondsTo": {
+                                                                    "const": true,
+                                                                    "type": "boolean"
                                                                   },
                                                                   "inputs": {
                                                                     "type": "array",
@@ -70955,6 +73034,14 @@
                               "audience"
                             ],
                             "properties": {
+                              "targetCharacterId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "respondsTo": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
                               "push": {
                                 "additionalProperties": false,
                                 "type": "object",
@@ -71105,6 +73192,14 @@
                                           "maximum": 1000,
                                           "type": "integer"
                                         },
+                                        "dieId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "symbol": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
                                         "operation": {
                                           "anyOf": [
                                             {
@@ -71121,6 +73216,10 @@
                                             },
                                             {
                                               "const": "countEqual",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "countSymbol",
                                               "type": "string"
                                             },
                                             {
@@ -71238,6 +73337,10 @@
                                           "maxLength": 256,
                                           "type": "string"
                                         },
+                                        "symbol": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
                                         "reused": {
                                           "const": true,
                                           "type": "boolean"
@@ -71270,8 +73373,24 @@
                                       "type": "integer"
                                     },
                                     "value": {
-                                      "minimum": 1,
-                                      "type": "integer"
+                                      "type": "number"
+                                    },
+                                    "faceLabel": {
+                                      "minLength": 1,
+                                      "maxLength": 120,
+                                      "type": "string"
+                                    },
+                                    "symbols": {
+                                      "maxProperties": 16,
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^[a-z][a-z0-9_]{0,63}$": {
+                                          "minimum": 1,
+                                          "maximum": 100,
+                                          "type": "integer"
+                                        }
+                                      }
                                     },
                                     "kept": {
                                       "type": "boolean"
@@ -71328,6 +73447,14 @@
                                         },
                                         {
                                           "const": "aggregates",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "target",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "opposed",
                                           "type": "string"
                                         }
                                       ]
@@ -77529,6 +79656,23 @@
                                     "outputTemplate"
                                   ],
                                   "properties": {
+                                    "target": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "entityId"
+                                      ],
+                                      "properties": {
+                                        "entityId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "respondsTo": {
+                                      "const": true,
+                                      "type": "boolean"
+                                    },
                                     "outcomes": {
                                       "maxItems": 16,
                                       "type": "array",
@@ -96271,6 +98415,21 @@
                                                       }
                                                     ]
                                                   },
+                                                  "target": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "entityId"
+                                                    ],
+                                                    "properties": {
+                                                      "entityId": {
+                                                        "type": "string"
+                                                      }
+                                                    }
+                                                  },
+                                                  "respondsTo": {
+                                                    "const": true,
+                                                    "type": "boolean"
+                                                  },
                                                   "inputs": {
                                                     "type": "array",
                                                     "items": {
@@ -96584,6 +98743,21 @@
                                                                         "type": "string"
                                                                       }
                                                                     ]
+                                                                  },
+                                                                  "target": {
+                                                                    "type": "object",
+                                                                    "required": [
+                                                                      "entityId"
+                                                                    ],
+                                                                    "properties": {
+                                                                      "entityId": {
+                                                                        "type": "string"
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "respondsTo": {
+                                                                    "const": true,
+                                                                    "type": "boolean"
                                                                   },
                                                                   "inputs": {
                                                                     "type": "array",
@@ -98727,6 +100901,21 @@
                                                       }
                                                     ]
                                                   },
+                                                  "target": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "entityId"
+                                                    ],
+                                                    "properties": {
+                                                      "entityId": {
+                                                        "type": "string"
+                                                      }
+                                                    }
+                                                  },
+                                                  "respondsTo": {
+                                                    "const": true,
+                                                    "type": "boolean"
+                                                  },
                                                   "inputs": {
                                                     "type": "array",
                                                     "items": {
@@ -99040,6 +101229,21 @@
                                                                         "type": "string"
                                                                       }
                                                                     ]
+                                                                  },
+                                                                  "target": {
+                                                                    "type": "object",
+                                                                    "required": [
+                                                                      "entityId"
+                                                                    ],
+                                                                    "properties": {
+                                                                      "entityId": {
+                                                                        "type": "string"
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "respondsTo": {
+                                                                    "const": true,
+                                                                    "type": "boolean"
                                                                   },
                                                                   "inputs": {
                                                                     "type": "array",
@@ -100904,6 +103108,21 @@
                                                       }
                                                     ]
                                                   },
+                                                  "target": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "entityId"
+                                                    ],
+                                                    "properties": {
+                                                      "entityId": {
+                                                        "type": "string"
+                                                      }
+                                                    }
+                                                  },
+                                                  "respondsTo": {
+                                                    "const": true,
+                                                    "type": "boolean"
+                                                  },
                                                   "inputs": {
                                                     "type": "array",
                                                     "items": {
@@ -101217,6 +103436,21 @@
                                                                         "type": "string"
                                                                       }
                                                                     ]
+                                                                  },
+                                                                  "target": {
+                                                                    "type": "object",
+                                                                    "required": [
+                                                                      "entityId"
+                                                                    ],
+                                                                    "properties": {
+                                                                      "entityId": {
+                                                                        "type": "string"
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "respondsTo": {
+                                                                    "const": true,
+                                                                    "type": "boolean"
                                                                   },
                                                                   "inputs": {
                                                                     "type": "array",
@@ -103086,6 +105320,21 @@
                                                       }
                                                     ]
                                                   },
+                                                  "target": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "entityId"
+                                                    ],
+                                                    "properties": {
+                                                      "entityId": {
+                                                        "type": "string"
+                                                      }
+                                                    }
+                                                  },
+                                                  "respondsTo": {
+                                                    "const": true,
+                                                    "type": "boolean"
+                                                  },
                                                   "inputs": {
                                                     "type": "array",
                                                     "items": {
@@ -103399,6 +105648,21 @@
                                                                         "type": "string"
                                                                       }
                                                                     ]
+                                                                  },
+                                                                  "target": {
+                                                                    "type": "object",
+                                                                    "required": [
+                                                                      "entityId"
+                                                                    ],
+                                                                    "properties": {
+                                                                      "entityId": {
+                                                                        "type": "string"
+                                                                      }
+                                                                    }
+                                                                  },
+                                                                  "respondsTo": {
+                                                                    "const": true,
+                                                                    "type": "boolean"
                                                                   },
                                                                   "inputs": {
                                                                     "type": "array",
@@ -108881,6 +111145,14 @@
                                           "maximum": 1000,
                                           "type": "integer"
                                         },
+                                        "dieId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "symbol": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
                                         "operation": {
                                           "anyOf": [
                                             {
@@ -108897,6 +111169,10 @@
                                             },
                                             {
                                               "const": "countEqual",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "countSymbol",
                                               "type": "string"
                                             },
                                             {
@@ -109014,6 +111290,10 @@
                                           "maxLength": 256,
                                           "type": "string"
                                         },
+                                        "symbol": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
                                         "reused": {
                                           "const": true,
                                           "type": "boolean"
@@ -109024,6 +111304,14 @@
                                 }
                               },
                               "breakdownText": {
+                                "type": "string"
+                              },
+                              "targetCharacterId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "respondsTo": {
+                                "format": "uuid",
                                 "type": "string"
                               },
                               "push": {
@@ -109138,8 +111426,24 @@
                                       "type": "integer"
                                     },
                                     "value": {
-                                      "minimum": 1,
-                                      "type": "integer"
+                                      "type": "number"
+                                    },
+                                    "faceLabel": {
+                                      "minLength": 1,
+                                      "maxLength": 120,
+                                      "type": "string"
+                                    },
+                                    "symbols": {
+                                      "maxProperties": 16,
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "patternProperties": {
+                                        "^[a-z][a-z0-9_]{0,63}$": {
+                                          "minimum": 1,
+                                          "maximum": 100,
+                                          "type": "integer"
+                                        }
+                                      }
                                     },
                                     "kept": {
                                       "type": "boolean"

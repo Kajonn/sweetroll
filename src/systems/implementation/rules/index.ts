@@ -15,6 +15,8 @@ export type {
 } from "../package/schema/expression.js";
 export type { ScalarValue, ValueType } from "../package/schema/common.js";
 
+export { PACKAGE_LIMITS } from "../package/limits.js";
+export type { CustomDie } from "../package/schema/dice.js";
 export type { RollBreakdown } from "./result.js";
 
 export {parse} from "./parser.js";
@@ -25,7 +27,7 @@ export {validatePushPolicies} from "./push-policy.js";
 export type {PushPolicy} from "../package/schema/push-policy.js";
 
 export type {PushResult} from "./result.js";
-export {SavedPushRollSchema} from "./result.js";
+export {SavedPushRollSchema, formatDieFace} from "./result.js";
 
 export { entityFieldTypes, type FieldBindingType } from "./typecheck.js";
 

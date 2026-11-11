@@ -3,6 +3,7 @@ import { Type, type Static } from "@sinclair/typebox";
 
 import {PushPolicySchema} from "./push-policy.js";
 
+import { CustomDieSchema } from "./dice.js";
 import { PACKAGE_LIMITS } from "../limits.js";
 import { DefinitionIdSchema, ValueTypeSchema } from "./common.js";
 
@@ -346,6 +347,8 @@ export type RollOutcomeV1 = Static<typeof RollOutcomeV1Schema>;
 
 export const RollActionV1Schema = Type.Object(
   {
+    target: Type.Optional(Type.Object({ entityId: DefinitionIdSchema }, { additionalProperties: false })),
+    respondsTo: Type.Optional(Type.Literal(true)),
     outcomes: Type.Optional(Type.Array(RollOutcomeV1Schema, { maxItems: 16 })),
     details: Type.Optional(Type.Array(RollOutcomeV1Schema, { maxItems: 8 })),
     pushPolicy: Type.Optional(PushPolicySchema),
@@ -501,6 +504,7 @@ export const SystemDocumentV1Schema = Type.Object(
     schemaVersion: Type.Literal("2.0"),
     metadata: SystemMetadataV1Schema,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
+    dice: Type.Optional(Type.Array(CustomDieSchema, { maxItems: PACKAGE_LIMITS.customDice })),
     referenceData: Type.Array(ReferenceDataV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceDataSets,
     }),

@@ -52,6 +52,8 @@ export function compileExtensionDocument(
   if (structural.length > 0) return { ok: false, diagnostics: structural };
 
   for (const template of document.templates) {
+    const contextProblem = validateRollContexts(template, base);
+    if (contextProblem !== null) return contextProblem;
     for (const field of template.fields) {
       if ((field.kind === "singleChoice" || field.kind === "multiChoice") && field.optionsFrom !== undefined
         && !base.referenceData.some(dataset => dataset.id === field.optionsFrom)) {
@@ -134,6 +136,8 @@ export function validateExtensionAgainst(
     return fail("extension_base_mismatch", "/baseSystemId", "Extension belongs to a different system.");
   }
   for (const template of extension.templates) {
+    const contextProblem = validateRollContexts(template, base);
+    if (contextProblem !== null) return contextProblem;
     for (const field of template.fields) {
       if ((field.kind !== "singleChoice" && field.kind !== "multiChoice") || field.optionsFrom === undefined) continue;
       const resolved = fieldWithDatasetOptions(field, base.referenceData);
@@ -216,14 +220,31 @@ function expressionOwners(
   return { ok: true, value: owners };
 }
 
+function validateRollContexts(template: ObjectTemplateV1, base: SystemPackageV1): CompileResult<never> | null {
+  for (const action of template.grantedActions) {
+    if (action.kind !== "roll") continue;
+    if (action.target && !base.entities.some(entity => entity.id === action.target?.entityId)) {
+      return fail("missing_reference", `/templates/${template.id}/grantedActions/${action.id}/target`, "Target entity does not exist in the base system.");
+    }
+    if ((action.target || action.respondsTo) && action.nominal) {
+      return fail("invalid_expression", `/templates/${template.id}/grantedActions/${action.id}`, "A nominal action cannot use a campaign roll context.");
+    }
+  }
+  return null;
+}
+
 function environmentFor(owner: ExpressionOwner | undefined, base: SystemPackageV1): ExpressionCompileEnv {
   const datasets = base.referenceData;
+  const dice = base.dice;
   if (owner === undefined) return { fields: {}, inputs: {}, datasets };
   const item = entityFieldTypes(owner.template.fields);
   if (owner.kind === "computed") return { fields: {}, inputs: {}, item, datasets };
+  const target = base.entities.find(entity => entity.id === owner.action.target?.entityId);
   return {
+    ...(target ? { target: entityFieldTypes(target.fields) } : {}),
+    ...(owner.action.respondsTo ? { opposed: { total: "number" as const } } : {}),
     fields: grantedEntityFieldsForKind(base, owner.template.kind),
-    inputs: actionInputTypes(owner.action.inputs), item, datasets,
+    inputs: actionInputTypes(owner.action.inputs), item, datasets, dice,
   };
 }
 

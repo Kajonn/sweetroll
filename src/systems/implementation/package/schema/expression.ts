@@ -30,7 +30,7 @@ export const ExpressionAstV1Schema = Type.Recursive(
       Type.Object(
         {
           kind: Type.Literal("reference"),
-          scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("roll")]),
+          scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("roll"), Type.Literal("target"), Type.Literal("opposed")]),
           id: DefinitionIdSchema,
           part: Type.Optional(Type.Union([Type.Literal("current"), Type.Literal("max")])),
         },
@@ -99,6 +99,7 @@ export const ExpressionAstV1Schema = Type.Recursive(
           kind: Type.Literal("pool"),
           source: Type.Union([
             Type.Object({ kind: Type.Literal("dice"), count: ExpressionAstV1, sides: ExpressionAstV1 }, { additionalProperties: false }),
+            Type.Object({ kind: Type.Literal("custom"), count: ExpressionAstV1, dieId: DefinitionIdSchema }, { additionalProperties: false }),
             Type.Object({ kind: Type.Literal("rolled"), groupId: DefinitionIdSchema }, { additionalProperties: false }),
           ]),
           group: Type.Optional(Type.Object({
@@ -109,13 +110,16 @@ export const ExpressionAstV1Schema = Type.Recursive(
             Type.Object({ kind: Type.Literal("explode"), face: Type.Optional(ExpressionAstV1) }, { additionalProperties: false }),
             Type.Object({ kind: Type.Literal("rerollOnce"), face: ExpressionAstV1 }, { additionalProperties: false }),
           ]), { maxItems: 2 }),
-          reducer: Type.Optional(Type.Object({
+          reducer: Type.Optional(Type.Union([Type.Object({
             kind: Type.Union([
               Type.Literal("keepHighest"), Type.Literal("keepLowest"),
               Type.Literal("countAtLeast"), Type.Literal("countAtMost"), Type.Literal("countEqual"),
             ]),
             amount: ExpressionAstV1,
-          }, { additionalProperties: false })),
+          }, { additionalProperties: false }), Type.Object({
+            kind: Type.Literal("countSymbol"),
+            symbol: DefinitionIdSchema,
+          }, { additionalProperties: false })])),
         },
         { additionalProperties: false },
       ),

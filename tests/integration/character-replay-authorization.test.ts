@@ -111,6 +111,8 @@ const DDL = `
     UNIQUE (actor_id, command_kind, idempotency_key)
   );
   CREATE TABLE character_rolls (
+    target_character_id uuid,
+    responds_to_roll_id uuid,
     breakdown_json jsonb,
     parent_roll_id uuid, root_roll_id uuid, push_attempt integer, push_context_json jsonb, push_result_json jsonb, audience_actor_id uuid,
     id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -570,6 +572,7 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
         "open",
         "pushOptions",
         "readRoll",
+        "rollOptions",
         "openPortrait",
         "setPortrait",
         "removePortrait",

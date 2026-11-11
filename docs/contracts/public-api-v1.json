@@ -4470,6 +4470,94 @@
         }
       }
     },
+    "/characters/{characterId}/actions/{actionId}/roll-options": {
+      "get": {
+        "operationId": "listCharacterRollOptions",
+        "description": "List eligible targets and recent visible rolls for a campaign action on a character the caller controls.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "actionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
     "/characters/{characterId}/actions/{actionId}": {
       "post": {
         "operationId": "executeCharacterAction",
@@ -4515,6 +4603,14 @@
                   "idempotencyKey"
                 ],
                 "properties": {
+                  "targetCharacterId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "respondsTo": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
                   "inputs": {
                     "maxProperties": 64,
                     "type": "object",
@@ -15930,6 +16026,14 @@
                   "breakdown"
                 ],
                 "properties": {
+                  "targetCharacterId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "respondsTo": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
                   "rollId": {
                     "description": "Saved roll ID of a push-tracked roll, for reads and pushes. Null for rolls without a push policy, and when the reader may not correlate the roll; those appear in the activity feed.",
                     "anyOf": [
@@ -15966,8 +16070,24 @@
                           "type": "integer"
                         },
                         "value": {
-                          "minimum": 1,
-                          "type": "integer"
+                          "type": "number"
+                        },
+                        "faceLabel": {
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "symbols": {
+                          "maxProperties": 16,
+                          "additionalProperties": false,
+                          "type": "object",
+                          "patternProperties": {
+                            "^[a-z][a-z0-9_]{0,63}$": {
+                              "minimum": 1,
+                              "maximum": 100,
+                              "type": "integer"
+                            }
+                          }
                         },
                         "kept": {
                           "type": "boolean"
@@ -16025,6 +16145,14 @@
                             },
                             {
                               "const": "aggregates",
+                              "type": "string"
+                            },
+                            {
+                              "const": "target",
+                              "type": "string"
+                            },
+                            {
+                              "const": "opposed",
                               "type": "string"
                             }
                           ]
@@ -16184,6 +16312,14 @@
                               "maximum": 1000,
                               "type": "integer"
                             },
+                            "dieId": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
+                            "symbol": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
                             "operation": {
                               "anyOf": [
                                 {
@@ -16200,6 +16336,10 @@
                                 },
                                 {
                                   "const": "countEqual",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "countSymbol",
                                   "type": "string"
                                 },
                                 {
@@ -16315,6 +16455,10 @@
                             "groupId": {
                               "minLength": 1,
                               "maxLength": 256,
+                              "type": "string"
+                            },
+                            "symbol": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
                               "type": "string"
                             },
                             "reused": {
@@ -16473,6 +16617,14 @@
           "breakdown"
         ],
         "properties": {
+          "targetCharacterId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "respondsTo": {
+            "format": "uuid",
+            "type": "string"
+          },
           "rollId": {
             "description": "Saved roll ID of a push-tracked roll, for reads and pushes. Null for rolls without a push policy, and when the reader may not correlate the roll; those appear in the activity feed.",
             "anyOf": [
@@ -16509,8 +16661,24 @@
                   "type": "integer"
                 },
                 "value": {
-                  "minimum": 1,
-                  "type": "integer"
+                  "type": "number"
+                },
+                "faceLabel": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "symbols": {
+                  "maxProperties": 16,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_]{0,63}$": {
+                      "minimum": 1,
+                      "maximum": 100,
+                      "type": "integer"
+                    }
+                  }
                 },
                 "kept": {
                   "type": "boolean"
@@ -16568,6 +16736,14 @@
                     },
                     {
                       "const": "aggregates",
+                      "type": "string"
+                    },
+                    {
+                      "const": "target",
+                      "type": "string"
+                    },
+                    {
+                      "const": "opposed",
                       "type": "string"
                     }
                   ]
@@ -16727,6 +16903,14 @@
                       "maximum": 1000,
                       "type": "integer"
                     },
+                    "dieId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "symbol": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
                     "operation": {
                       "anyOf": [
                         {
@@ -16743,6 +16927,10 @@
                         },
                         {
                           "const": "countEqual",
+                          "type": "string"
+                        },
+                        {
+                          "const": "countSymbol",
                           "type": "string"
                         },
                         {
@@ -16860,6 +17048,10 @@
                       "maxLength": 256,
                       "type": "string"
                     },
+                    "symbol": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
                     "reused": {
                       "const": true,
                       "type": "boolean"
@@ -16960,6 +17152,55 @@
                       "type": "integer"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      },
+      "RollOptions": {
+        "type": "object",
+        "required": [
+          "targets",
+          "rolls"
+        ],
+        "properties": {
+          "targets": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "characterId",
+                "name"
+              ],
+              "properties": {
+                "characterId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "rolls": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "rollId",
+                "output"
+              ],
+              "properties": {
+                "rollId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "output": {
+                  "type": "string"
                 }
               }
             }
@@ -17597,6 +17838,23 @@
                           }
                         ]
                       },
+                      "target": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "entityId"
+                        ],
+                        "properties": {
+                          "entityId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "respondsTo": {
+                        "const": true,
+                        "type": "boolean"
+                      },
                       "inputs": {
                         "type": "array",
                         "items": {
@@ -17727,6 +17985,14 @@
                     "breakdown"
                   ],
                   "properties": {
+                    "targetCharacterId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "respondsTo": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
                     "rollId": {
                       "description": "Saved roll ID of a push-tracked roll, for reads and pushes. Null for rolls without a push policy, and when the reader may not correlate the roll; those appear in the activity feed.",
                       "anyOf": [
@@ -17763,8 +18029,24 @@
                             "type": "integer"
                           },
                           "value": {
-                            "minimum": 1,
-                            "type": "integer"
+                            "type": "number"
+                          },
+                          "faceLabel": {
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "symbols": {
+                            "maxProperties": 16,
+                            "additionalProperties": false,
+                            "type": "object",
+                            "patternProperties": {
+                              "^[a-z][a-z0-9_]{0,63}$": {
+                                "minimum": 1,
+                                "maximum": 100,
+                                "type": "integer"
+                              }
+                            }
                           },
                           "kept": {
                             "type": "boolean"
@@ -17822,6 +18104,14 @@
                               },
                               {
                                 "const": "aggregates",
+                                "type": "string"
+                              },
+                              {
+                                "const": "target",
+                                "type": "string"
+                              },
+                              {
+                                "const": "opposed",
                                 "type": "string"
                               }
                             ]
@@ -17981,6 +18271,14 @@
                                 "maximum": 1000,
                                 "type": "integer"
                               },
+                              "dieId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "symbol": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
                               "operation": {
                                 "anyOf": [
                                   {
@@ -17997,6 +18295,10 @@
                                   },
                                   {
                                     "const": "countEqual",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countSymbol",
                                     "type": "string"
                                   },
                                   {
@@ -18112,6 +18414,10 @@
                               "groupId": {
                                 "minLength": 1,
                                 "maxLength": 256,
+                                "type": "string"
+                              },
+                              "symbol": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
                               },
                               "reused": {
@@ -19204,6 +19510,14 @@
                 "occurredAt"
               ],
               "properties": {
+                "targetCharacterId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "respondsTo": {
+                  "format": "uuid",
+                  "type": "string"
+                },
                 "rollId": {
                   "format": "uuid",
                   "type": "string"
@@ -19294,6 +19608,14 @@
                             "maximum": 1000,
                             "type": "integer"
                           },
+                          "dieId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "symbol": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
                           "operation": {
                             "anyOf": [
                               {
@@ -19310,6 +19632,10 @@
                               },
                               {
                                 "const": "countEqual",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countSymbol",
                                 "type": "string"
                               },
                               {
@@ -19427,6 +19753,10 @@
                             "maxLength": 256,
                             "type": "string"
                           },
+                          "symbol": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
                           "reused": {
                             "const": true,
                             "type": "boolean"
@@ -19456,8 +19786,24 @@
                         "type": "integer"
                       },
                       "value": {
-                        "minimum": 1,
-                        "type": "integer"
+                        "type": "number"
+                      },
+                      "faceLabel": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
                       },
                       "kept": {
                         "type": "boolean"
@@ -21286,6 +21632,23 @@
                           "outputTemplate"
                         ],
                         "properties": {
+                          "target": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "entityId"
+                            ],
+                            "properties": {
+                              "entityId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "respondsTo": {
+                            "const": true,
+                            "type": "boolean"
+                          },
                           "outcomes": {
                             "maxItems": 16,
                             "type": "array",
@@ -23692,6 +24055,64 @@
               }
             }
           },
+          "dice": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "faces"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "faces": {
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "referenceData": {
             "maxItems": 64,
             "type": "array",
@@ -24071,6 +24492,23 @@
                     "outputTemplate"
                   ],
                   "properties": {
+                    "target": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "entityId"
+                      ],
+                      "properties": {
+                        "entityId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "respondsTo": {
+                      "const": true,
+                      "type": "boolean"
+                    },
                     "outcomes": {
                       "maxItems": 16,
                       "type": "array",
@@ -24976,6 +25414,23 @@
                           "outputTemplate"
                         ],
                         "properties": {
+                          "target": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "entityId"
+                            ],
+                            "properties": {
+                              "entityId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "respondsTo": {
+                            "const": true,
+                            "type": "boolean"
+                          },
                           "outcomes": {
                             "maxItems": 16,
                             "type": "array",
@@ -25893,6 +26348,64 @@
               }
             }
           },
+          "dice": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "faces"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "faces": {
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "referenceData": {
             "maxItems": 64,
             "type": "array",
@@ -26307,6 +26820,23 @@
                     "outputTemplate"
                   ],
                   "properties": {
+                    "target": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "entityId"
+                      ],
+                      "properties": {
+                        "entityId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "respondsTo": {
+                      "const": true,
+                      "type": "boolean"
+                    },
                     "outcomes": {
                       "maxItems": 16,
                       "type": "array",
@@ -27212,6 +27742,23 @@
                           "outputTemplate"
                         ],
                         "properties": {
+                          "target": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "entityId"
+                            ],
+                            "properties": {
+                              "entityId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "respondsTo": {
+                            "const": true,
+                            "type": "boolean"
+                          },
                           "outcomes": {
                             "maxItems": 16,
                             "type": "array",
@@ -27709,6 +28256,14 @@
                   {
                     "const": "roll",
                     "type": "string"
+                  },
+                  {
+                    "const": "target",
+                    "type": "string"
+                  },
+                  {
+                    "const": "opposed",
+                    "type": "string"
                   }
                 ]
               },
@@ -27981,6 +28536,28 @@
                     "type": "object",
                     "required": [
                       "kind",
+                      "count",
+                      "dieId"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "custom",
+                        "type": "string"
+                      },
+                      "count": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      },
+                      "dieId": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
                       "groupId"
                     ],
                     "properties": {
@@ -28057,41 +28634,63 @@
                 }
               },
               "reducer": {
-                "additionalProperties": false,
-                "type": "object",
-                "required": [
-                  "kind",
-                  "amount"
-                ],
-                "properties": {
-                  "kind": {
-                    "anyOf": [
-                      {
-                        "const": "keepHighest",
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "amount"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "const": "keepHighest",
+                            "type": "string"
+                          },
+                          {
+                            "const": "keepLowest",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countAtLeast",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countAtMost",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countEqual",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "amount": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      }
+                    }
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "symbol"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "countSymbol",
                         "type": "string"
                       },
-                      {
-                        "const": "keepLowest",
-                        "type": "string"
-                      },
-                      {
-                        "const": "countAtLeast",
-                        "type": "string"
-                      },
-                      {
-                        "const": "countAtMost",
-                        "type": "string"
-                      },
-                      {
-                        "const": "countEqual",
+                      "symbol": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
                         "type": "string"
                       }
-                    ]
-                  },
-                  "amount": {
-                    "$ref": "#/components/schemas/ExpressionAst"
+                    }
                   }
-                }
+                ]
               }
             }
           }

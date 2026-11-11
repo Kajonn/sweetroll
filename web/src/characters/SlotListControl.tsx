@@ -1,3 +1,6 @@
+import { hasRollSelection, RollContextFields, type RollRequirements } from "../rolls/RollContextFields.js";
+import type { CharactersApi } from "./api.js";
+import type { CampaignRollSelection } from "./types.js";
 import {TypedEntryFields} from "./TypedEntryFields.js";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -17,7 +20,7 @@ export type SlotGrantedActionInput = {
   default: unknown;
 };
 
-export type SlotGrantedAction = {
+export type SlotGrantedAction = RollRequirements & {
   id: string;
   label: string;
   actionKind: "roll" | "resourceBump";
@@ -49,7 +52,7 @@ export type SlotTemplateField = {
 };
 
 export type SlotListEntry = {
-  definition?: {id:string;label:string;kind:string;fields:SlotTemplateField[];grantedActions:Array<{id:string;label:string;kind:"roll"|"resourceBump";inputs?:SlotGrantedActionInput[]}>};
+  definition?: {id:string;label:string;kind:string;fields:SlotTemplateField[];grantedActions:Array<RollRequirements & {id:string;label:string;kind:"roll"|"resourceBump";inputs?:SlotGrantedActionInput[]}>};
   metadata?: {name:string;description?:string;notes?:string};
   source?: import("./types.js").EntrySource;
   entryId: string;
@@ -76,7 +79,9 @@ export type SlotListControlProps = {
   onAddEntry(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
   onRemoveEntry(entryId: string): void | Promise<void>;
   onUpdateEntry(entryId: string, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
-  onExecuteGranted(entryId: string, actionId: string, inputs: Record<string, unknown>): void | Promise<void>;
+  characterId?: string | undefined;
+  loadRollOptions?: CharactersApi["rollOptions"];
+  onExecuteGranted(entryId: string, actionId: string, inputs: Record<string, unknown>, selection?: CampaignRollSelection): void | Promise<void>;
 };
 
 function describeCommandError(error: unknown): string {
@@ -110,23 +115,29 @@ function invokeCommand(invoke: () => void | Promise<void>, onError: (message: st
   }
 }
 
-function GrantedActionForm({ entryId, action, disabled, onExecute }: {
+function GrantedActionForm({ entryId, action, disabled, onExecute, characterId, loadRollOptions }: {
   entryId: string;
   action: SlotGrantedAction;
   disabled: boolean;
-  onExecute(entryId: string, actionId: string, inputs: Record<string, unknown>): void | Promise<void>;
+  characterId?: string | undefined;
+  loadRollOptions?: CharactersApi["rollOptions"];
+  onExecute(entryId: string, actionId: string, inputs: Record<string, unknown>, selection?: CampaignRollSelection): void | Promise<void>;
 }) {
   const [inputs, setInputs] = useState<Record<string, unknown>>(() =>
     Object.fromEntries(action.inputs.map((input) => [input.id, input.default])));
   const [commandError, setCommandError] = useState("");
+  const [selection, setSelection] = useState<CampaignRollSelection>({});
+  const contextual = Boolean(action.target || action.respondsTo);
+  const blocked = disabled || (contextual && (!characterId || !hasRollSelection(action, selection)));
   return (
     <form
       className={styles.action}
       data-testid={`slot-granted-${entryId}-${action.id}`}
       onSubmit={(event) => {
         event.preventDefault();
-        if (disabled) return;
-        invokeCommand(() => onExecute(entryId, action.id, inputs), (message) => setCommandError(message));
+        if (blocked) return;
+        invokeCommand(() => contextual
+          ? onExecute(entryId, action.id, inputs, selection) : onExecute(entryId, action.id, inputs), (message) => setCommandError(message));
       }}
     >
       {action.inputs.map((input) => (
@@ -149,7 +160,9 @@ function GrantedActionForm({ entryId, action, disabled, onExecute }: {
           />
         </label>
       ))}
-      <Button type="submit" variant="secondary" disabled={disabled}>{action.label}</Button>
+      <RollContextFields requirements={action} selection={selection} onChange={setSelection} disabled={disabled}
+        characterId={characterId} actionId={action.id} entryId={entryId} loadOptions={loadRollOptions} />
+      <Button type="submit" variant="secondary" disabled={blocked}>{action.label}</Button>
       {commandError !== "" ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}
     </form>
   );
@@ -438,7 +451,7 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
  * projection elements are owned here (CharacterSheet skips them), resolved
  * against the template catalog passed down from the route.
  */
-export function SlotListControl({ slotId, label, accepts, entries, templates, disabled, actionsDisabled, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, renderEntryImage }: SlotListControlProps) {
+export function SlotListControl({ slotId, label, accepts, entries, templates, disabled, actionsDisabled, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, renderEntryImage, characterId, loadRollOptions }: SlotListControlProps) {
   const byId = new Map(templates.map((template) => [template.id, template]));
   const grantedDisabled = actionsDisabled ?? disabled;
   return (
@@ -463,7 +476,7 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
         ) : (
           <ul className={styles.slotList}>
             {entries.map((entry) => {
-              const template:SlotTemplate|undefined = entry.definition ? {...entry.definition,grantedActions:entry.definition.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,inputs:a.inputs ?? []}))} : entry.templateId === null ? undefined : byId.get(entry.templateId);
+              const template:SlotTemplate|undefined = entry.definition ? {...entry.definition,grantedActions:entry.definition.grantedActions.map(a=>({ ...a, actionKind: a.kind, inputs: a.inputs ?? [] }))} : entry.templateId === null ? undefined : byId.get(entry.templateId);
               const summary = entry.templateId === null && !entry.definition ? null : scalarSummary(entry.values, entry.label);
               return (
                 <li key={entry.entryId} data-system-item data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>
@@ -484,6 +497,8 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
                       action={action}
                       disabled={grantedDisabled}
                       onExecute={onExecuteGranted}
+                      characterId={characterId}
+                      loadRollOptions={loadRollOptions}
                     />
                   ))}
                   {entry.templateId === null && !entry.definition ? (

@@ -30,6 +30,7 @@ import { SheetEditor, type UnplacedDefinition } from "./sheet/SheetEditor.js";
 import type { SheetEditorV1 } from "./sheet/sheetTypes.js";
 import { collectUsedIds, nextScopedId, readSlots } from "./sheet/slotTypes.js";
 import type { OutcomeExpressions } from "./actions/RollOutcomesEditor.js";
+import { CustomDiceEditor } from "./actions/CustomDiceEditor.js";
 import { TemplatesTab } from "./TemplatesTab.js";
 import { useDraftSync } from "../state/draftSync.js";
 import {
@@ -1027,6 +1028,11 @@ function DiceTab({
 
   return (
     <section data-testid="dice-tab" data-path="/dice">
+    <CustomDiceEditor
+      dice={document.dice ?? []}
+      usedIds={collectUsedIds(document)}
+      onChange={(dice) => dispatch({ type: "setDice", dice })}
+    />
     <section data-testid="actions-tab" data-path="/actions">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.actions.addTitle")}</h2>
@@ -1057,6 +1063,8 @@ function DiceTab({
                   }}
                   outcomeExpressions={outcomeExpressionStore(document, dispatch)}
                   fieldTypes={buildFieldTypeMap(document, action.id)}
+                  targetEntities={document.entities.map(entity => ({ id: entity.id, label: entity.label, fields: entityFieldTypes(entity.fields) }))}
+                  dice={document.dice}
                   datasets={document.referenceData}
                   slots={previewSlots(document, actionOwner(document, action.id)?.id)}
                   fieldLabels={Object.fromEntries(document.entities.flatMap(entity => entity.fields.map(field => [field.id, typeof field.label === "string" ? field.label : field.id])))}
@@ -1499,6 +1507,7 @@ export function buildPreviewPackage(document: SystemDocumentV1): import("../prev
     presentation: document.metadata.presentation,
     entities,
     expressions: compilePreviewExpressions(document),
+    dice: document.dice,
     datasets: document.referenceData,
     slotsByEntity: Object.fromEntries(document.entities.map(entity => [entity.id, previewSlots(document, entity.id)])),
     sheets: sheets as unknown as never,
@@ -1549,6 +1558,7 @@ function compilePreviewExpressions(
         env: {
           fields: owner === undefined ? fields : entityFieldTypes(owner.fields),
           inputs: inputsByExpression.get(entry.id) ?? {},
+          dice: document.dice,
           datasets: document.referenceData, slots: previewSlots(document, owner?.id),
         },
 

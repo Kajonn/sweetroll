@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   parse,
   renderExpression,
+  type CustomDie,
   type ExpressionAstV1,
   type PoolAst,
 } from "@sweetroll/rules";
@@ -27,6 +28,7 @@ const REDUCERS = [
   { value: "success", label: "Count successes" },
   { value: "countAtMost", label: "Count at most" },
   { value: "countEqual", label: "Count equal" },
+  { value: "countSymbol", label: "Count symbols" },
   { value: "keepHighest", label: "Keep highest" },
   { value: "keepLowest", label: "Keep lowest" },
 ];
@@ -37,15 +39,15 @@ export function readGuidedGroups(source: string): Group[] | null {
   const out: Group[] = [];
   const walk = (node: ExpressionAstV1): boolean => {
     if (node.kind === "binary" && node.operator === "+") return walk(node.left) && walk(node.right);
-    if (node.kind !== "pool" || node.source.kind !== "dice" || node.group === undefined) return false;
+    if (node.kind !== "pool" || node.source.kind === "rolled" || node.group === undefined) return false;
     const explode = node.modifiers.find((modifier) => modifier.kind === "explode");
     const reroll = node.modifiers.find((modifier) => modifier.kind === "rerollOnce");
     out.push({
       ...node.group,
       count: renderExpression(node.source.count),
-      sides: renderExpression(node.source.sides),
+      sides: node.source.kind === "custom" ? JSON.stringify(node.source.dieId) : renderExpression(node.source.sides),
       reducer: node.reducer?.kind ?? "sum",
-      amount: node.reducer ? renderExpression(node.reducer.amount) : "6",
+      amount: node.reducer?.kind === "countSymbol" ? node.reducer.symbol : node.reducer ? renderExpression(node.reducer.amount) : "6",
       explode: explode !== undefined,
       explodeFace: explode?.face ? renderExpression(explode.face) : "",
       reroll: reroll !== undefined,
@@ -63,7 +65,8 @@ export function writeGuidedGroups(groups: Group[]): string {
     if (group.explode) pool = `explode(${pool}${group.explodeFace ? `, ${group.explodeFace}` : ""})`;
     pool = `group(${JSON.stringify(group.id)}, ${JSON.stringify(group.label)}, ${pool})`;
     const reducer = group.reducer === "countAtLeast" ? "countSuccesses" : group.reducer;
-    return reducer === "sum" ? pool : `${reducer}(${pool}, ${group.amount})`;
+    const amount = reducer === "countSymbol" ? JSON.stringify(group.amount) : group.amount;
+    return reducer === "sum" ? pool : `${reducer}(${pool}, ${amount})`;
   }).join(" + ") || "0";
 }
 
@@ -71,11 +74,13 @@ export function GroupedPoolEditor({
   source,
   onChange,
   choices,
+  dice = [],
   disabled,
 }: {
   source: string;
   onChange: (source: string) => void;
   choices: Array<{ value: string; label: string }>;
+  dice?: readonly CustomDie[] | undefined;
   disabled?: boolean | undefined;
 }) {
   const [open, setOpen] = useState(false);
@@ -155,6 +160,7 @@ export function GroupedPoolEditor({
                 const sides = [
                   ...[4, 6, 8, 10, 12, 20, 100].map((n) => ({ value: String(n), label: `d${n}` })),
                   ...choices,
+                  ...dice.map(die => ({ value: JSON.stringify(die.id), label: die.label })),
                 ];
                 if (!sides.some((choice) => choice.value === g.sides)) sides.push({ value: g.sides, label: g.sides });
                 const amountIsExpression = !/^-?\d+$/.test(g.amount);
@@ -162,6 +168,9 @@ export function GroupedPoolEditor({
                 const amountOptions = [{ value: "", label: "Fixed number" }, ...choices];
                 if (!amountOptions.some((choice) => choice.value === amountChoice))
                   amountOptions.push({ value: amountChoice, label: amountChoice });
+                const custom = dice.find(die => JSON.stringify(die.id) === g.sides);
+                const symbols = [...new Set(custom?.faces.flatMap(face => Object.keys(face.symbols ?? {})))];
+                const symbolOptions = [...new Set([...symbols, g.amount])].map(symbol => ({ value: symbol, label: symbol }));
                 const keep = g.reducer === "keepHighest" || g.reducer === "keepLowest";
                 return (
                   <fieldset
@@ -201,13 +210,16 @@ export function GroupedPoolEditor({
                     <Select
                       label={t("roll.groups.operation")}
                       value={g.reducer === "countAtLeast" ? "success" : g.reducer}
-                      options={REDUCERS}
+                      options={REDUCERS.filter(option => option.value !== "countSymbol" || symbols.length > 0 || g.reducer === "countSymbol")}
                       onChange={(e) => {
                         const reducer = e.target.value === "success" ? "countAtLeast" : e.target.value as Group["reducer"];
-                        patch({ reducer, amount: reducer.startsWith("keep") ? "1" : "6" });
+                        patch({ reducer, amount: reducer === "countSymbol" ? symbols[0] ?? "symbol" : reducer.startsWith("keep") ? "1" : "6" });
                       }}
                     />
-                    {g.reducer !== "sum" ? (
+                    {g.reducer === "countSymbol" ? (
+                      <Select label="Symbol to count" value={g.amount} options={symbolOptions}
+                        onChange={(event) => patch({ amount: event.target.value })} />
+                    ) : g.reducer !== "sum" ? (
                       <>
                         <Select
                           label={keep ? "Keep count source" : "Threshold source"}

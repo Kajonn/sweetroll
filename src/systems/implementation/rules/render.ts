@@ -66,6 +66,7 @@ function renderNode(ast: ExpressionAstV1): string {
         keep && reducer.amount.kind === "numberLiteral" && Number.isInteger(reducer.amount.value) && reducer.amount.value > 0 &&
         modifiers.length === 0;
       if (source.kind === "rolled") expression = `rolled(${JSON.stringify(source.groupId)})`;
+      else if (source.kind === "custom") expression = `dice(${renderNode(source.count)}, ${JSON.stringify(source.dieId)})`;
       else if (shorthand) {
         expression = `${renderNode(source.count)}d${renderNode(source.sides)}${reducer.kind === "keepHighest" ? "kh" : "kl"}${renderNode(reducer.amount)}`;
       } else if (source.count.kind === "numberLiteral" && source.count.value === 1 &&
@@ -77,7 +78,9 @@ function renderNode(ast: ExpressionAstV1): string {
         expression = `${modifier.kind}(${expression}${face})`;
       }
       if (group) expression = `group(${JSON.stringify(group.id)}, ${JSON.stringify(group.label)}, ${expression})`;
-      if (reducer && !shorthand) {
+      if (reducer?.kind === "countSymbol") {
+        expression = `countSymbol(${expression}, ${JSON.stringify(reducer.symbol)})`;
+      } else if (reducer && !shorthand) {
         const name = reducer.kind === "countAtLeast" ? "countSuccesses" : reducer.kind;
         expression = `${name}(${expression}, ${renderNode(reducer.amount)})`;
       }

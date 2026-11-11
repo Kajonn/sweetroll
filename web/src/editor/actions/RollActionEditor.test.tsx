@@ -54,6 +54,7 @@ type RenderOptions = {
   guided?: boolean;
   diceKind?: string;
   onDiceKindChange?: (next: string) => void;
+  targetEntities?: { id: string; label: string; fields: Record<string, "number"> }[];
   fieldTypes?: Record<string, "number" | "text" | "boolean">;
 };
 
@@ -67,6 +68,7 @@ function renderEditor(options: RenderOptions = {}) {
     diceKind,
     onDiceKindChange,
     fieldTypes = {},
+    targetEntities,
   } = options;
   const client: ApiClient = createApiClient({ baseUrl: "http://x", fetch: fetch_ as typeof fetch });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -85,6 +87,7 @@ function renderEditor(options: RenderOptions = {}) {
       expressionSource={expressionSource}
       onExpressionSourceChange={onExpressionSourceChange ?? vi.fn()}
       fieldTypes={fieldTypes}
+      targetEntities={targetEntities}
       guided={guided}
       diceKind={diceKind}
       onDiceKindChange={onDiceKindChange}
@@ -101,6 +104,7 @@ function renderEditor(options: RenderOptions = {}) {
         expressionSource={expressionSource}
         onExpressionSourceChange={onExpressionSourceChange ?? vi.fn()}
         fieldTypes={fieldTypes}
+      targetEntities={targetEntities}
         guided={guided}
         diceKind={diceKind}
         onDiceKindChange={onDiceKindChange}
@@ -448,4 +452,19 @@ describe("push policy authoring",()=>{
   fireEvent.change(screen.getByLabelText("Maximum pushes"),{target:{value:"2"}});v.applyChange();expect(v.current().pushPolicy?.maxAttempts).toBe(2);
  });
  it("explains unsupported formulas and leaves the source intact",()=>{const v=renderEditor({expressionSource:'group("base","Base",2d6) / d6'});fireEvent.click(screen.getByText("Push rules"));expect(screen.getByLabelText("Enable pushing")).toBeDisabled();expect(screen.getByText(/named dice group.*additive/i)).toBeVisible();expect(v.onChange).not.toHaveBeenCalled();});
+});
+
+it("authors targeted and opposed rolls and previews them with sample values", () => {
+  const { onChange, applyChange } = renderEditor({
+    expressionSource: "d20 - target.defense - opposed.total",
+    targetEntities: [{ id: "defender", label: "Defender", fields: { defense: "number" } }],
+  });
+  fireEvent.change(screen.getByLabelText("Target entity"), { target: { value: "defender" } });
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ target: { entityId: "defender" } }));
+  applyChange();
+  fireEvent.click(screen.getByLabelText("Respond to a recorded roll"));
+  expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ respondsTo: true }));
+  applyChange();
+  fireEvent.click(screen.getByTestId("roll-action-try-atk"));
+  expect(screen.getByTestId("roll-breakdown")).toBeInTheDocument();
 });

@@ -28,6 +28,7 @@ export type SystemDocumentV1 = {
   schemaVersion: "2.0";
   metadata: SystemMetadataV1;
   entities: EntityDefinitionV1[];
+  dice?: import("@sweetroll/rules").CustomDie[];
   referenceData: ReferenceDataV1[];
   sheets: SheetV1[];
   expressions: SourceExpressionV1[];
@@ -45,6 +46,7 @@ export type DocumentAction =
   | { type: "updateField"; entityId: string; fieldId: string; field: EntityFieldV1 }
   | { type: "setEntities"; entities: EntityDefinitionV1[] }
   | { type: "setSheets"; sheets: SheetV1[] }
+  | { type: "setDice"; dice: NonNullable<SystemDocumentV1["dice"]> }
   | { type: "setReferenceData"; referenceData: ReferenceDataV1[] }
   | { type: "setActions"; actions: ActionV1[] }
   | { type: "setValidations"; validations: ValidationV1[] }
@@ -118,6 +120,8 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
       return { ...state, entities: action.entities };
     case "setSheets":
       return { ...state, sheets: action.sheets };
+    case "setDice":
+      return { ...state, dice: action.dice };
     case "setReferenceData":
       return { ...state, referenceData: action.referenceData };
     case "setActions":

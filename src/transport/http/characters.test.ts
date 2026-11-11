@@ -147,6 +147,7 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
     setPortrait: async () => ({ ok: true, value: { revision: 1, portrait: null } }),
     removePortrait: async () => ({ ok: true, value: { revision: 1, portrait: null } }),
     openPortraitImage: async () => ({ ok: false, error: { code: "not_found", message: "Unavailable" } }),
+    rollOptions: async () => ({ ok: true, value: { targets: [], rolls: [] } }),
     readRoll:async()=>({ok:false,error:{code:"not_found",message:"Unavailable"}}),
     pushOptions:async()=>({ok:true,value:{canPush:false,reason:"no_eligible_dice",eligibleDiceIds:[],revision:1,nextAttempt:1,maxAttempts:1}}),
     create: async () => ({ ok: true, value: characterView() }),

@@ -1,3 +1,4 @@
+import type { CustomDie } from "../package/schema/dice.js";
 import { children, containsDice, drawsDice } from "./groups.js";
 import type { ExpressionAstV1, ValueType, DefinitionId } from "../package/schema/index.js";
 import { aggregateCall, isAggregate, literalId, type RulesDataset, type SlotEnvironment } from "./data.js";
@@ -9,8 +10,11 @@ export type ExpressionCompileEnv = {
   fields: Record<string, FieldBindingType>;
   inputs: Record<string, ValueType>;
   item?: Record<string, FieldBindingType>;
+  target?: Record<string, FieldBindingType>;
+  opposed?: Record<string, ValueType>;
   /** Outcome expressions only: values of the roll being described (`roll.total`). */
   roll?: Record<string, ValueType>;
+  dice?: readonly CustomDie[] | undefined;
   datasets?: readonly RulesDataset[];
   slots?: SlotEnvironment;
 };
@@ -139,6 +143,15 @@ export function inferType(ast: ExpressionAstV1, env: ExpressionCompileEnv): Infe
       return { ok: true, type: "number" };
     }
     case "pool": {
+      if (ast.source.kind === "custom") {
+        const { dieId } = ast.source;
+        if (!env.dice?.some((die) => die.id === dieId)) {
+          return diag("missing_reference", `Unknown custom die '${dieId}'.`);
+        }
+      }
+      if (ast.reducer?.kind === "countSymbol" && !/^[a-z][a-z0-9_]{0,63}$/.test(ast.reducer.symbol)) {
+        return diag("invalid_expression", "Invalid dice symbol ID.");
+      }
       for (const parameter of children(ast)) {
         const result = inferType(parameter, env);
         if (!result.ok) return result;

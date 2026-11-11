@@ -206,6 +206,8 @@ export type CampaignExportSnapshot = {
    * rolls carry their full details.
    */
   rolls: {
+    targetCharacterId?: string;
+    respondsTo?: string;
     rollId: string;
     characterId: string;
     actorId: string;
@@ -1826,6 +1828,8 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             occurredAt: event.occurredAt.toISOString(),
           })),
           rolls: snapshot.rolls.map((roll) => ({
+            ...(roll.targetCharacterId === undefined ? {} : { targetCharacterId: roll.targetCharacterId }),
+            ...(roll.respondsTo === undefined ? {} : { respondsTo: roll.respondsTo }),
             rollId: roll.rollId,
             characterId: roll.characterId,
             actorId: roll.actorId,

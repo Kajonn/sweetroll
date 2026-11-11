@@ -558,6 +558,64 @@
         }
       }
     },
+    "dice": {
+      "maxItems": 16,
+      "type": "array",
+      "items": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "faces"
+        ],
+        "properties": {
+          "id": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "type": "string"
+          },
+          "label": {
+            "minLength": 1,
+            "maxLength": 120,
+            "type": "string"
+          },
+          "faces": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "value"
+              ],
+              "properties": {
+                "value": {
+                  "type": "number"
+                },
+                "label": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "symbols": {
+                  "maxProperties": 16,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_]{0,63}$": {
+                      "minimum": 1,
+                      "maximum": 100,
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "referenceData": {
       "maxItems": 64,
       "type": "array",
@@ -1033,6 +1091,14 @@
                       {
                         "const": "roll",
                         "type": "string"
+                      },
+                      {
+                        "const": "target",
+                        "type": "string"
+                      },
+                      {
+                        "const": "opposed",
+                        "type": "string"
                       }
                     ]
                   },
@@ -1305,6 +1371,28 @@
                         "type": "object",
                         "required": [
                           "kind",
+                          "count",
+                          "dieId"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "custom",
+                            "type": "string"
+                          },
+                          "count": {
+                            "$ref": "ExpressionAstV1"
+                          },
+                          "dieId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "kind",
                           "groupId"
                         ],
                         "properties": {
@@ -1381,41 +1469,63 @@
                     }
                   },
                   "reducer": {
-                    "additionalProperties": false,
-                    "type": "object",
-                    "required": [
-                      "kind",
-                      "amount"
-                    ],
-                    "properties": {
-                      "kind": {
-                        "anyOf": [
-                          {
-                            "const": "keepHighest",
+                    "anyOf": [
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "amount"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "keepHighest",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keepLowest",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countAtLeast",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countAtMost",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countEqual",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "amount": {
+                            "$ref": "ExpressionAstV1"
+                          }
+                        }
+                      },
+                      {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "symbol"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "const": "countSymbol",
                             "type": "string"
                           },
-                          {
-                            "const": "keepLowest",
-                            "type": "string"
-                          },
-                          {
-                            "const": "countAtLeast",
-                            "type": "string"
-                          },
-                          {
-                            "const": "countAtMost",
-                            "type": "string"
-                          },
-                          {
-                            "const": "countEqual",
+                          "symbol": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
                           }
-                        ]
-                      },
-                      "amount": {
-                        "$ref": "ExpressionAstV1"
+                        }
                       }
-                    }
+                    ]
                   }
                 }
               }
@@ -1441,6 +1551,23 @@
               "outputTemplate"
             ],
             "properties": {
+              "target": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "entityId"
+                ],
+                "properties": {
+                  "entityId": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  }
+                }
+              },
+              "respondsTo": {
+                "const": true,
+                "type": "boolean"
+              },
               "outcomes": {
                 "maxItems": 16,
                 "type": "array",
@@ -2346,6 +2473,23 @@
                     "outputTemplate"
                   ],
                   "properties": {
+                    "target": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "entityId"
+                      ],
+                      "properties": {
+                        "entityId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "respondsTo": {
+                      "const": true,
+                      "type": "boolean"
+                    },
                     "outcomes": {
                       "maxItems": 16,
                       "type": "array",

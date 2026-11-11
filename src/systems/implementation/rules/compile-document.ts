@@ -178,6 +178,12 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
       action.kind === "roll" ? [{ action, path: `/templates/${templateIndex}/grantedActions/${index}` }] : [])),
   ];
   for (const { action, path } of describedActions) {
+    if (action.target && !entityEnvironments.has(action.target.entityId)) {
+      return scopeDiagnostic("missing_reference", `${path}/target/entityId`, "Select an existing target entity.");
+    }
+    if ((action.target || action.respondsTo) && "nominal" in action && action.nominal === true) {
+      return scopeDiagnostic("invalid_expression", path, "A nominal action cannot use a campaign roll context.");
+    }
     for (const list of ["outcomes", "details"] as const) {
       for (const [index, entry] of (action[list] ?? []).entries()) {
         const uses = outcomeUses.get(entry.expressionId) ?? [];
@@ -220,12 +226,15 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     const env: ExpressionCompileEnv = {
       fields: templateRolls.length > 0 ? grantedEntityFields.get(owner ?? "") ?? {} : entityEnv?.fields ?? {},
       inputs: {},
+      dice: document.dice,
       datasets: document.referenceData,
       ...(templateEnv?.item === undefined ? {} : { item: templateEnv.item }),
       ...(entityEnv?.slots === undefined ? {} : { slots: entityEnv.slots }),
     };
     const action = actions[0];
     if (action !== undefined) {
+      if (action.target) env.target = entityEnvironments.get(action.target.entityId)!.fields;
+      if (action.respondsTo) env.opposed = { total: "number" };
       for (const actionInput of action.inputs) {
         env.inputs[actionInput.id] = actionInputToValueType(actionInput);
       }
@@ -330,6 +339,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     defaultDice: document.metadata.defaultDice,
     ...(document.metadata.presentation === undefined ? {} : { presentation: document.metadata.presentation }),
     entities: document.entities.map(entity => ({ ...entity, fields: entity.fields.map(field => fieldWithDatasetOptions(field, document.referenceData)) })),
+    ...(document.dice === undefined ? {} : { dice: document.dice }),
     referenceData: document.referenceData,
     sheets: document.sheets,
     expressions: compiled.map((b, i) => ({ id: document.expressions[i]!.id, ...b })),

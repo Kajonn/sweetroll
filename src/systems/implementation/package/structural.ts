@@ -63,7 +63,7 @@ export function preflightExportAstLimits(value: unknown): PackageDiagnostic[] {
 }
 
 function validateStructure(value: StructuralValue, prefix: string, extension: boolean): PackageDiagnostic[] {
-  const budgetDiagnostics = validateBudgets(value, prefix);
+  const budgetDiagnostics = validateBudgets(value, prefix, extension);
   if (budgetDiagnostics.length > 0) return budgetDiagnostics;
 
   const diagnostics: PackageDiagnostic[] = validatePushPolicies(value);
@@ -110,6 +110,8 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
       }
     });
   });
+
+  value.dice?.forEach((die, index) => collectId(die.id, `/dice/${index}/id`));
 
   value.referenceData.forEach((dataSet, dataSetIndex) => {
     const dataSetPath = `/referenceData/${dataSetIndex}`;
@@ -329,7 +331,7 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
   return diagnostics;
 }
 
-function validateBudgets(value: StructuralValue, prefix: string): PackageDiagnostic[] {
+function validateBudgets(value: StructuralValue, prefix: string, extension: boolean): PackageDiagnostic[] {
   const diagnostics: PackageDiagnostic[] = [];
   const templates = value.templates;
   const slots = value.slots;
@@ -412,7 +414,7 @@ function validateBudgets(value: StructuralValue, prefix: string): PackageDiagnos
   }
 
   if ("effectiveLimits" in value) {
-    validatePackageBudgets(value, prefix, diagnostics);
+    validatePackageBudgets(value, prefix, diagnostics, extension);
   } else {
     value.expressions.forEach((expression, expressionIndex) => {
       if (Buffer.byteLength(expression.source, "utf8") > PACKAGE_LIMITS.expressionBytes) {
@@ -431,6 +433,7 @@ function validatePackageBudgets(
   value: SystemPackageV1,
   prefix: string,
   diagnostics: PackageDiagnostic[],
+  extension: boolean,
 ): void {
   const ceilings = {
     expressionBytes: PACKAGE_LIMITS.expressionBytes,
@@ -461,10 +464,13 @@ function validatePackageBudgets(
     for (const entry of [...(action.outcomes ?? []), ...(action.details ?? [])]) rolledBy.set(entry.expressionId, groups);
   }
 
+  const customDice = extension ? undefined : new Set(value.dice?.map(die => die.id));
   value.expressions.forEach((expression, expressionIndex) => {
-    diagnostics.push(...validateDiceGroups(expression.ast, rolledBy.get(expression.id) ?? []).map(d => ({...d, path: `${prefix}/expressions/${expressionIndex}/ast`})));
-    const { depth, nodes } = measureAst(expression.ast);
     const path = `${prefix}/expressions/${expressionIndex}/ast`;
+    diagnostics.push(...validateDiceGroups(expression.ast, rolledBy.get(expression.id), customDice).map(diagnostic => ({
+      ...diagnostic, path,
+    })));
+    const { depth, nodes } = measureAst(expression.ast);
     if (nodes > PACKAGE_LIMITS.expressionAstNodes) {
       diagnostics.push({
         code: "limit_exceeded",
@@ -523,8 +529,8 @@ function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
       return hasOnlyKeys(node, ["kind", "value"]) && typeof node.value === "boolean";
     case "reference":
       return hasOnlyKeys(node, ["kind", "scope", "id"], ["part"])
-        && (node.scope === "fields" || node.scope === "inputs" || node.scope === "item" || node.scope === "roll")
-        && (node.part === undefined || (node.scope !== "inputs" && node.scope !== "roll" && (node.part === "current" || node.part === "max")))
+        && (node.scope === "fields" || node.scope === "inputs" || node.scope === "item" || node.scope === "roll" || node.scope === "target" || node.scope === "opposed")
+        && (node.part === undefined || ((node.scope === "fields" || node.scope === "item" || node.scope === "target") && (node.part === "current" || node.part === "max")))
         && typeof node.id === "string"
         && /^[a-z][a-z0-9_]{0,63}$/.test(node.id);
     case "unary":
@@ -555,13 +561,20 @@ function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
       const source = node.source;
       if (source.kind === "dice") {
         if (!hasOnlyKeys(source, ["kind", "count", "sides"]) || !isObject(source.count) || !isObject(source.sides)) return false;
+      } else if (source.kind === "custom") {
+        if (!hasOnlyKeys(source, ["kind", "count", "dieId"]) || !isObject(source.count) || typeof source.dieId !== "string") return false;
       } else if (source.kind !== "rolled" || !hasOnlyKeys(source, ["kind", "groupId"]) || typeof source.groupId !== "string") return false;
       if (!node.modifiers.every((modifier) => isObject(modifier) && (
         modifier.kind === "explode" && hasOnlyKeys(modifier, ["kind"], ["face"]) && (modifier.face === undefined || isObject(modifier.face)) ||
         modifier.kind === "rerollOnce" && hasOnlyKeys(modifier, ["kind", "face"]) && isObject(modifier.face)
       ))) return false;
-      return node.reducer === undefined || isObject(node.reducer) && hasOnlyKeys(node.reducer, ["kind", "amount"]) &&
-        typeof node.reducer.kind === "string" && ["keepHighest", "keepLowest", "countAtLeast", "countAtMost", "countEqual"].includes(node.reducer.kind) &&
+      if (node.reducer === undefined) return true;
+      if (!isObject(node.reducer)) return false;
+      if (node.reducer.kind === "countSymbol") {
+        return hasOnlyKeys(node.reducer, ["kind", "symbol"]) && typeof node.reducer.symbol === "string";
+      }
+      return hasOnlyKeys(node.reducer, ["kind", "amount"]) && typeof node.reducer.kind === "string" &&
+        ["keepHighest", "keepLowest", "countAtLeast", "countAtMost", "countEqual"].includes(node.reducer.kind) &&
         isObject(node.reducer.amount);
     }
     default:

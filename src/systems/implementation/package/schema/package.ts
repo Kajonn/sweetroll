@@ -1,5 +1,6 @@
 import { Type, type Static } from "@sinclair/typebox";
 
+import { CustomDieSchema } from "./dice.js";
 import { PACKAGE_LIMITS } from "../limits.js";
 import {
   ActionV1Schema,
@@ -47,6 +48,7 @@ export const SystemPackageV1Schema = Type.Object(
     semanticVersion: Type.String({ pattern: SEMANTIC_VERSION_PATTERN }),
     ...SystemMetadataV1Schema.properties,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
+    dice: Type.Optional(Type.Array(CustomDieSchema, { maxItems: PACKAGE_LIMITS.customDice })),
     referenceData: Type.Array(ReferenceDataV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceDataSets,
     }),

@@ -1,4 +1,5 @@
 import { ApiError } from "../api/client.js";
+import type { CampaignRollSelection } from "./types.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt, WriteGuard } from "./store.js";
 import { validPushResponse } from "./push-response.js";
@@ -113,7 +114,7 @@ export type CharacterSession = {
   adjustResource(resourceId: string, delta: number): Promise<void>;
   /** Direct input of the current value and/or the character's maximum. */
   setResource(resourceId: string, values: { current?: number; max?: number }): Promise<void>;
-  executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  executeAction(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void>;
   pushRoll(parentRollId:string):Promise<void>;
   refresh():Promise<void>;
   forgetRoll(rootRollId:string):Promise<void>;
@@ -121,7 +122,7 @@ export type CharacterSession = {
    * Task 7: template-granted roll routed through the executeAction intent
    * with its owning entry. Online-only, like entity actions.
    */
-  executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void>;
   /**
    * Task 7: durable entry intents. Offline-capable like field sets and
    * resource bumps: they queue durably and replay verbatim, so offline
@@ -540,6 +541,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       path: `/characters/${characterId}/actions/${entry.intent.actionId}`,
       body: {
         inputs: entry.intent.inputs ?? {},
+        ...entry.intent.campaignRoll,
         ...(entry.intent.entryId === undefined ? {} : { entryId: entry.intent.entryId }),
         expectedRevision,
         idempotencyKey: key,
@@ -1990,7 +1992,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         ...(values.max === undefined ? {} : { max: values.max }),
       }));
     },
-    async executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void> {
+    async executeAction(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void> {
       assertMutationAllowed();
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
@@ -2004,10 +2006,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           kind: "executeAction",
           actionId,
           ...(inputs !== undefined ? { inputs } : {}),
+          ...(campaignRoll === undefined ? {} : { campaignRoll }),
         }),
       );
     },
-    async executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>): Promise<void> {
+    async executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void> {
       assertMutationAllowed();
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
@@ -2022,6 +2025,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           actionId,
           entryId,
           ...(inputs !== undefined ? { inputs } : {}),
+          ...(campaignRoll === undefined ? {} : { campaignRoll }),
         }),
       );
     },

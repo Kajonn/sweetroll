@@ -7,6 +7,8 @@ const rollForms = [
   "countAtLeast(dice(count, sides), threshold)",
   "countAtMost(dice(count, sides), threshold)",
   "countEqual(dice(count, sides), threshold)",
+  'dice(count, "die_id")',
+  'countSymbol(dice(count, "die_id"), "symbol")',
   "explode(dice(count, sides))",
   "rerollOnce(dice(count, sides), 1)",
   'group("pool", "Pool", dice(count, sides))',

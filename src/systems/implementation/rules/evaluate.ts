@@ -2,7 +2,8 @@ import type {DieResult, RollBreakdown} from "./result.js";
 export type {DieResult, RollBreakdown} from "./result.js";
 import { aggregateCall, aggregateKey, aggregateValue, isAggregate, literalId, lookupValue, type AggregateEntry, type RulesDataset } from "./data.js";
 import {referenceKey} from "./typecheck.js";
-import {children, hasDiceGroups} from "./groups.js";
+import { children } from "./groups.js";
+import type { PoolAst } from "../package/schema/expression.js";
 import type { CompiledExpressionV1, ExpressionAstV1, ScalarValue } from "../package/schema/index.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import { renderExpression } from "./render.js";
@@ -38,7 +39,7 @@ export type RuntimeDiagnostic = {
 };
 
 
-export type RollResult = { total: number; dice: DieResult[]; expression: string; breakdown?: RollBreakdown };
+export type RollResult = { total: number; dice: DieResult[]; expression: string; breakdown: RollBreakdown };
 
 export type EvalResult =
   | { ok: true; roll: RollResult | null; result: ScalarValue; diagnostics: RuntimeDiagnostic[]; bindings: EvaluationBinding[] }
@@ -48,13 +49,14 @@ type Ctx = {
   bindings: EvaluationBindings;
   bindingTrace: EvaluationBinding[];
   limits: EvaluationLimits;
-  rng: Rng;
+  draw: PoolDraw;
   dice: DieResult[];
   diagnostics: RuntimeDiagnostic[];
   expression: string;
   nodeIds: Map<ExpressionAstV1, string>;
   evaluatedNodes: Set<ExpressionAstV1>;
-  breakdown?: RollBreakdown;
+  breakdown: RollBreakdown | undefined;
+  pools: Map<string, { total: number; chains: DieResult[][] }>;
 };
 
 function fail(ctx: Ctx, message: string): undefined {
@@ -75,75 +77,145 @@ function bool(v: BindingValue): boolean | undefined {
   return typeof v === "boolean" ? v : undefined;
 }
 
-function isNonNegativeInteger(v: number): boolean {
-  return Number.isInteger(v) && v >= 0;
+export type PoolDraw = (id: string, chainId: string) => number;
+
+function integer(node: ExpressionAstV1, ctx: Ctx, name: string, min: number, max = Number.MAX_SAFE_INTEGER): number | undefined {
+  const value = evalNode(node, ctx);
+  if (value === undefined) return undefined;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < min || value > max)
+    return fail(ctx, `${name} must be an integer between ${min} and ${max}`);
+  return value;
 }
 
-function rollDice(count: number, sides: number, ctx: Ctx): DieResult[] | undefined {
-  const totalDice = ctx.dice.length + count;
-  if (totalDice > ctx.limits.dicePerRoll) {
-    return budgetExceeded(ctx, `dice count ${totalDice} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
-  }
-  if (sides > ctx.limits.sidesPerDie) {
-    return budgetExceeded(ctx, `die sides ${sides} exceed the ${ctx.limits.sidesPerDie}-side-per-die limit`);
-  }
-  const dice: DieResult[] = [];
-  for (let i = 0; i < count; i++) {
-    let value = Math.ceil(ctx.rng() * sides);
-    if (value < 1) value = 1;
-    dice.push({ sides, value, kept: true });
-  }
-  return dice;
-}
-
-function containsRoll(ast: ExpressionAstV1): boolean {
-  switch (ast.kind) {
-    case "dice":
-    case "keep":
-    case "successCount":
-      return true;
-    case "unary":
-      return containsRoll(ast.operand);
-    case "binary":
-      return containsRoll(ast.left) || containsRoll(ast.right);
-    case "call":
-      return ast.arguments.some(containsRoll);
-    default:
-      return false;
-  }
+function groupId(node: PoolAst, ctx: Ctx): string {
+  return node.source.kind === "rolled" ? node.source.groupId : node.group?.id ?? `@${ctx.nodeIds.get(node)!}`;
 }
 
 function evalNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefined {
   const value = evalValueNode(node, ctx);
+  if (typeof value === "number" && !Number.isFinite(value)) return fail(ctx, "expression produced a non-finite number");
   if (value !== undefined && ctx.breakdown !== undefined) {
     ctx.evaluatedNodes.add(node);
-    const reduction = node.kind === "keep" || node.kind === "successCount";
-    const dice = node.kind === "dice" ? node : reduction && node.dice.kind === "dice" ? node.dice : undefined;
-    const operands = reduction && dice !== undefined ? [dice.count] : children(node);
-    const groupId = dice === undefined ? undefined : dice.group?.id ?? `@${ctx.nodeIds.get(dice)!}`;
     ctx.breakdown.terms.push({
       id: ctx.nodeIds.get(node)!,
       operation: node.kind === "binary" || node.kind === "unary" ? node.operator
         : node.kind === "call" ? node.function === "round" ? `round_${node.roundMode ?? "nearest"}` : node.function
-        : node.kind === "dice" ? "sum" : node.kind === "keep" ? node.mode === "highest" ? "keepHighest" : "keepLowest"
+        : node.kind === "pool" ? node.reducer?.kind ?? (node.source.kind === "rolled" ? "rolled" : "sum")
         : node.kind === "reference" ? "binding" : node.kind.endsWith("Literal") ? "literal" : node.kind,
-      operandIds: operands.filter(n => ctx.evaluatedNodes.has(n)).map(n => ctx.nodeIds.get(n)!), value,
-      ...(groupId === undefined ? {} : {groupId}),
+      operandIds: children(node).filter((child) => ctx.evaluatedNodes.has(child)).map((child) => ctx.nodeIds.get(child)!),
+      value,
+      ...(node.kind === "pool" && {
+        groupId: groupId(node, ctx),
+        ...(node.source.kind === "rolled" && { reused: true as const }),
+      }),
     });
   }
   return value;
 }
 
-function recordGroup(node: Extract<ExpressionAstV1, {kind:"dice"}>, ctx: Ctx, dice: DieResult[], operation: RollBreakdown["groups"][number]["operation"], total: number, threshold?: number): void {
-  if (ctx.breakdown === undefined) return;
-  const id = node.group?.id ?? `@${ctx.nodeIds.get(node)!}`;
-  dice.forEach((die, index) => {
-    die.id = `${id}:${index}`;
-    die.groupId = id;
-    if (threshold !== undefined) die.success = die.kept && die.value >= threshold;
+function drawDie(
+  ctx: Ctx,
+  sides: number,
+  groupId: string,
+  id: string,
+  chainId: string,
+  link?: Pick<DieResult, "rerolledFrom" | "explodedFrom">,
+): DieResult | undefined {
+  if (ctx.dice.length >= ctx.limits.dicePerRoll)
+    return budgetExceeded(ctx, `dice count ${ctx.dice.length + 1} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
+  const die = { sides, value: Math.max(1, Math.ceil(ctx.draw(id, chainId) * sides)), kept: true, id, groupId, ...link };
+  ctx.dice.push(die);
+  return die;
+}
+
+const EXPLOSIONS_PER_DIE = 10;
+
+function drawChains(ctx: Ctx, id: string, count: number, sides: number, reroll: number | undefined, explode: number | undefined): DieResult[][] | undefined {
+  const chains: DieResult[][] = [];
+  for (let index = 0; index < count; index++) {
+    const chainId = `${id}:${index}`;
+    let die = drawDie(ctx, sides, id, chainId, chainId);
+    if (!die) return undefined;
+    if (die.value === reroll) {
+      die.kept = false;
+      die = drawDie(ctx, sides, id, `${chainId}:r`, chainId, { rerolledFrom: chainId });
+      if (!die) return undefined;
+    }
+    const chain = [die];
+    for (let extra = 1; extra <= EXPLOSIONS_PER_DIE && die.value === explode; extra++) {
+      die = drawDie(ctx, sides, id, `${chainId}:e${extra}`, chainId, { explodedFrom: die.id! });
+      if (!die) return undefined;
+      chain.push(die);
+    }
+    chains.push(chain);
+  }
+  return chains;
+}
+
+function reducePool(chains: DieResult[][], operation: RollBreakdown["groups"][number]["operation"], amount: number, record: boolean): number {
+  const values = chains.map((chain) => ({ chain, total: chain.reduce((sum, die) => sum + die.value, 0) }));
+  if (operation === "sum") return values.reduce((sum, value) => sum + value.total, 0);
+  if (operation === "keepHighest" || operation === "keepLowest") {
+    values.sort((a, b) => operation === "keepHighest" ? b.total - a.total : a.total - b.total);
+    if (record) for (const { chain } of values.slice(amount)) for (const die of chain) die.kept = false;
+    return values.slice(0, amount).reduce((sum, value) => sum + value.total, 0);
+  }
+  let successes = 0;
+  for (const { chain, total } of values) {
+    const success = operation === "countAtLeast" ? total >= amount : operation === "countAtMost" ? total <= amount : total === amount;
+    if (success) successes++;
+    if (record) for (const die of chain) die.success = success;
+  }
+  return successes;
+}
+
+function evalPool(node: PoolAst, ctx: Ctx): number | undefined {
+  const { source, reducer } = node;
+  const id = groupId(node, ctx);
+  const operation = reducer?.kind ?? "sum";
+  const keep = operation === "keepHighest" || operation === "keepLowest";
+  const readAmount = () => reducer
+    ? integer(reducer.amount, ctx, keep ? "keep count" : "success threshold", keep ? 0 : -Number.MAX_SAFE_INTEGER, keep ? ctx.limits.dicePerRoll : undefined)
+    : 0;
+  if (source.kind === "rolled") {
+    const prior = ctx.pools.get(id);
+    if (!prior) return fail(ctx, `group '${id}' has not been rolled`);
+    if (!reducer) return prior.total;
+    const amount = readAmount();
+    return amount === undefined ? undefined : reducePool(prior.chains, operation, amount, false);
+  }
+
+  const count = integer(source.count, ctx, "dice count", 0);
+  if (count === undefined) return undefined;
+  const sides = integer(source.sides, ctx, "die sides", 1);
+  if (sides === undefined) return undefined;
+  if (count + ctx.dice.length > ctx.limits.dicePerRoll)
+    return budgetExceeded(ctx, `dice count ${count + ctx.dice.length} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
+  if (sides > ctx.limits.sidesPerDie)
+    return budgetExceeded(ctx, `die sides ${sides} exceed the ${ctx.limits.sidesPerDie}-side-per-die limit`);
+
+  let reroll: number | undefined;
+  let explode: number | undefined;
+  for (const modifier of node.modifiers) {
+    const face = modifier.face ? integer(modifier.face, ctx, `${modifier.kind} face`, 1, sides) : sides;
+    if (face === undefined) return undefined;
+    if (modifier.kind === "rerollOnce") reroll = face;
+    else explode = face;
+  }
+  const amount = readAmount();
+  if (amount === undefined) return undefined;
+  const first = ctx.dice.length;
+  const chains = drawChains(ctx, id, count, sides, reroll, explode);
+  if (!chains) return undefined;
+  const total = reducePool(chains, operation, amount, true);
+  if (node.group) ctx.pools.set(id, { total, chains });
+  ctx.breakdown?.groups.push({
+    id, label: node.group?.label ?? "Dice", count, sides, operation, total,
+    diceIds: ctx.dice.slice(first).map((die) => die.id!),
+    ...(reducer && (keep ? { keepCount: amount } : { threshold: amount })),
+    ...(node.modifiers.length > 0 && { modifiers: node.modifiers.map((modifier) => modifier.kind) }),
   });
-  ctx.breakdown.groups.push({id,label:node.group?.label ?? "Dice",count:dice.length,sides:node.sides,operation,
-    total,diceIds:dice.map(d => d.id!),...(threshold === undefined ? {} : {threshold})});
+  return total;
 }
 
 function evalValueNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefined {
@@ -316,55 +388,8 @@ function evalValueNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefine
         case "abs": return Math.abs(numbers[0]!);
       }
     }
-    case "dice": {
-      const count = evalNode(node.count, ctx);
-      if (count === undefined) return undefined;
-      const cn = num(count);
-      if (cn === undefined || !isNonNegativeInteger(cn)) return fail(ctx, "dice count must be a non-negative integer");
-      const dice = rollDice(cn, node.sides, ctx);
-      if (dice === undefined) return undefined;
-      ctx.dice.push(...dice);
-      const total = dice.reduce((s, d) => s + d.value, 0);
-      recordGroup(node, ctx, dice, "sum", total);
-      return total;
-    }
-    case "keep": {
-      if (node.dice.kind !== "dice") return fail(ctx, "keep expects a dice expression");
-      const count = evalNode(node.dice.count, ctx);
-      if (count === undefined) return undefined;
-      const cn = num(count);
-      if (cn === undefined || !isNonNegativeInteger(cn)) return fail(ctx, "dice count must be a non-negative integer");
-      const dice = rollDice(cn, node.dice.sides, ctx);
-      if (dice === undefined) return undefined;
-      const chosen = Math.min(node.count, dice.length);
-      const sorted = [...dice].sort((a, b) => node.mode === "highest" ? b.value - a.value : a.value - b.value);
-      const keptSet = new Set(sorted.slice(0, chosen));
-      let total = 0;
-      for (const d of dice) {
-        if (keptSet.has(d)) {
-          d.kept = true;
-          total += d.value;
-        } else {
-          d.kept = false;
-        }
-      }
-      ctx.dice.push(...dice);
-      recordGroup(node.dice, ctx, dice, node.mode === "highest" ? "keepHighest" : "keepLowest", total);
-      return total;
-    }
-    case "successCount": {
-      if (node.dice.kind !== "dice") return fail(ctx, "countSuccesses expects a dice expression");
-      const count = evalNode(node.dice.count, ctx);
-      if (count === undefined) return undefined;
-      const cn = num(count);
-      if (cn === undefined || !isNonNegativeInteger(cn)) return fail(ctx, "dice count must be a non-negative integer");
-      const dice = rollDice(cn, node.dice.sides, ctx);
-      if (dice === undefined) return undefined;
-      ctx.dice.push(...dice);
-      const total = dice.reduce((s, d) => (d.value >= node.threshold ? s + 1 : s), 0);
-      recordGroup(node.dice, ctx, dice, "successCount", total, node.threshold);
-      return total;
-    }
+    case "pool":
+      return evalPool(node, ctx);
   }
 }
 
@@ -373,6 +398,7 @@ export function evaluate(
   bindings: EvaluationBindings,
   rng?: Rng,
   limits: EvaluationLimits = PACKAGE_LIMITS,
+  draw?: PoolDraw,
 ): EvalResult {
   const expression = renderExpression(compiled.ast);
   const nodeIds = new Map<ExpressionAstV1, string>();
@@ -380,35 +406,40 @@ export function evaluate(
     nodeIds.set(node, path);
     children(node).forEach((child, index) => identify(child, `${path}.${index}`));
   };
-  identify(compiled.ast, "root");
+  const breakdown: RollBreakdown | undefined = compiled.context === "roll"
+    ? { version: "1.0", rootId: "root", groups: [], terms: [] }
+    : undefined;
+  if (breakdown) identify(compiled.ast, breakdown.rootId);
   const ctx: Ctx = {
     nodeIds,
     evaluatedNodes: new Set(),
-    ...(hasDiceGroups(compiled.ast) ? {breakdown:{version:"1.0" as const,rootId:"root",groups:[],terms:[]}} : {}),
+    breakdown,
+    pools: new Map(),
     bindings,
     bindingTrace: [],
     limits,
-    rng: rng ?? Math.random,
+    draw: draw ?? rng ?? Math.random,
     dice: [],
     diagnostics: [],
     expression,
   };
   const value = evalNode(compiled.ast, ctx);
-  if (value === null || Array.isArray(value)) fail(ctx, "expression did not produce a scalar result");
-  if (value === undefined || value === null || Array.isArray(value)) {
+  const invalidValue = value === null || Array.isArray(value) || (typeof value === "number" && !Number.isFinite(value));
+  if (invalidValue) fail(ctx, "expression did not produce a finite scalar result");
+  if (value === undefined || invalidValue) {
     if (ctx.diagnostics.some((diagnostic) => diagnostic.code === "budget_exceeded")) {
       return { ok: false, diagnostics: ctx.diagnostics };
     }
     const diagnostics = ctx.diagnostics.length > 0
       ? ctx.diagnostics
       : [{ code: "arithmetic_failure" as const, path: expression, message: "evaluation failed" }];
-    const roll = containsRoll(compiled.ast)
-      ? { total: num(compiled.fallback) ?? 0, dice: ctx.dice, expression }
-      : null;
+    if (breakdown) {
+      if (breakdown.terms.at(-1)?.id === breakdown.rootId) breakdown.terms.pop();
+      breakdown.terms.push({ id: breakdown.rootId, operation: "fallback", operandIds: [], value: compiled.fallback });
+    }
+    const roll = breakdown ? { total: num(compiled.fallback) ?? 0, dice: ctx.dice, expression, breakdown } : null;
     return { ok: true, result: compiled.fallback, roll, diagnostics, bindings: ctx.bindingTrace };
   }
-  const roll = containsRoll(compiled.ast)
-    ? { total: num(value) ?? 0, dice: ctx.dice, expression, ...(ctx.breakdown === undefined ? {} : {breakdown:ctx.breakdown}) }
-    : null;
+  const roll = breakdown ? { total: num(value) ?? 0, dice: ctx.dice, expression, breakdown } : null;
   return { ok: true, result: value, roll, diagnostics: ctx.diagnostics, bindings: ctx.bindingTrace };
 }

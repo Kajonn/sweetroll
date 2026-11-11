@@ -20,6 +20,7 @@ export type ExpressionEditorProps = {
   source: string;
   onSourceChange: (next: string) => void;
   expressionId?: string;
+  roll?: boolean;
   references?: readonly string[];
   disabled?: boolean;
 };
@@ -41,6 +42,7 @@ export function ExpressionEditor({
   source,
   onSourceChange,
   expressionId,
+  roll,
   references = [],
   disabled,
 }: ExpressionEditorProps) {
@@ -102,6 +104,7 @@ export function ExpressionEditor({
         </div>
         <ExpressionSuggestions
           references={references}
+          roll={roll ?? false}
           disabled={disabled}
           onInsert={(token) => {
             const input = sourceRef.current;

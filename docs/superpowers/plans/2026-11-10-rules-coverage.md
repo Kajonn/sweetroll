@@ -349,4 +349,19 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
 - Roadwardens is the M2 fixture with an API scenario and a browser journey for
   the creator, player sheet, and GM session.
 
-R4–R8: not started.
+**R4 — implemented.**
+
+- All dice syntax compiles to a pool with deterministic, integer-valued parameters.
+  Rerolls run before explosions. Keep and count reducers operate on whole chains.
+- A named pool can supply its original total or its saved dice to a later reducer.
+  All rolls carry a breakdown graph. Activity preserves the graph and campaign
+  export includes the graph and plain-text details.
+- Modified push groups require explicit policy opt-in. Pushes redraw eligible
+  chains and replay retained draws from the saved roll.
+- The creator builder supports dynamic sides, keep counts and thresholds, rerolls
+  and explosions. The free-form editor supports reuse and compound formulas.
+- Glass Observatory, Midnight Dispatch, Far Beacon and Lantern Court cover M5–M8
+  in PostgreSQL API scenarios and creator/player/GM browser journeys. The M5
+  fixture uses a numeric doubles result. Outcome bands are scheduled in R5.
+
+R5–R8 remain in plan order.

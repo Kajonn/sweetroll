@@ -20,13 +20,16 @@ export function RollBreakdown({
   if (b === undefined || b.version !== "1.0") return null;
   const terms = new Map(b.terms.map((term) => [term.id, term]));
   const groups = new Map(b.groups.map((group) => [group.id, group]));
+  const dice = new Map(roll.dice.map((die) => [die.id, die]));
   const explain = (id: string, depth = 0): string => {
     const term = terms.get(id);
     if (!term || depth > 64) return "?";
     const group =
       term.groupId === undefined ? undefined : groups.get(term.groupId);
-    if (group) return `${group.label} (${String(term.value)})`;
-    if (term.operation === "binding" || term.operation === "literal")
+    if (group) {
+      return `${group.label}${term.reused ? ` [reuse: ${term.operation}]` : ""} (${String(term.value)})`;
+    }
+    if (term.operation === "binding" || term.operation === "literal" || term.operation === "fallback")
       return String(term.value);
     const args = term.operandIds.map((child) => explain(child, depth + 1));
     if (
@@ -36,6 +39,7 @@ export function RollBreakdown({
         "-",
         "*",
         "/",
+        "%",
         "<",
         "<=",
         ">",
@@ -54,9 +58,7 @@ export function RollBreakdown({
       {roll.push ? <p>{roll.push.attempt === 0 ? `Original roll · up to ${roll.push.maxAttempts} pushes` : `Push ${roll.push.attempt} of ${roll.push.maxAttempts}`}</p> : null}
       <ul>
         {b.groups.map(group => <li key={group.id} data-testid={`roll-group-${group.id}`}>
-          <strong>{group.label}</strong>: {group.count}d{group.sides} · {group.operation === "successCount"
-            ? `${t("roll.groups.successes")} ≥ ${group.threshold}`
-            : t(group.operation === "sum" ? "roll.groups.sum" : group.operation === "keepHighest" ? "roll.groups.keepHighest" : "roll.groups.keepLowest")}: {group.total}
+          <strong>{group.label}</strong>: {group.count}d{group.sides} · {describeOperation(group)}: {group.total}
           {group.diceIds.length === 0 ? ` · ${t("roll.groups.empty")}` : null}
         </li>)}
       </ul>
@@ -68,6 +70,8 @@ export function RollBreakdown({
             <strong>{group.label}</strong>
             <ul>{roll.dice.filter(die => die.groupId === group.id).map(die => <li key={die.id}>
               d{die.sides}={die.value}
+              {die.rerolledFrom ? ` · Rerolled from ${dice.get(die.rerolledFrom)?.value ?? "?"}` : null}
+              {die.explodedFrom ? ` · Explosion after ${dice.get(die.explodedFrom)?.value ?? "?"}` : null}
               {roll.push && roll.push.attempt > 0 ? ` · ${roll.push.rerolledDiceIds.includes(die.id ?? "") ? "Rerolled" : "Retained"}` : null}
               {" · "}{t(die.kept ? "roll.groups.kept" : "roll.groups.discarded")}
               {die.success === undefined ? null : ` · ${t(die.success ? "roll.groups.success" : "roll.groups.failure")}`}
@@ -79,4 +83,15 @@ export function RollBreakdown({
       </Disclosure>
     </section>
   );
+}
+
+function describeOperation(group: Breakdown["groups"][number]): string {
+  switch (group.operation) {
+    case "countAtLeast": return `${t("roll.groups.successes")} ≥ ${group.threshold}`;
+    case "countAtMost": return `${t("roll.groups.successes")} ≤ ${group.threshold}`;
+    case "countEqual": return `${t("roll.groups.successes")} = ${group.threshold}`;
+    case "keepHighest": return `${t("roll.groups.keepHighest")} ${group.keepCount ?? ""}`.trim();
+    case "keepLowest": return `${t("roll.groups.keepLowest")} ${group.keepCount ?? ""}`.trim();
+    case "sum": return t("roll.groups.sum");
+  }
 }

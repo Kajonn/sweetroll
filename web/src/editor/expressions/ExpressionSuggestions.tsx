@@ -1,5 +1,18 @@
 import { t } from "../../i18n/index.js";
 
+const rollForms = [
+  "dice(count, sides)",
+  "keepHighest(dice(count, sides), keep)",
+  "keepLowest(dice(count, sides), keep)",
+  "countAtLeast(dice(count, sides), threshold)",
+  "countAtMost(dice(count, sides), threshold)",
+  "countEqual(dice(count, sides), threshold)",
+  "explode(dice(count, sides))",
+  "rerollOnce(dice(count, sides), 1)",
+  'group("pool", "Pool", dice(count, sides))',
+  'rolled("pool")',
+];
+
 const forms = [
   "if(condition, value, otherwise)",
   'has(fields.skills, "climb")',
@@ -20,10 +33,12 @@ const forms = [
 
 export function ExpressionSuggestions({
   references = [],
+  roll = false,
   disabled,
   onInsert,
 }: {
   references?: readonly string[];
+  roll?: boolean;
   disabled?: boolean | undefined;
   onInsert: (token: string) => void;
 }) {
@@ -41,7 +56,7 @@ export function ExpressionSuggestions({
           }}
         >
           <option value="">{t("editor.expression.choose")}</option>
-          {[...forms, ...references].map((option) => <option key={option}>{option}</option>)}
+          {[...forms, ...(roll ? rollForms : []), ...references].map((option) => <option key={option}>{option}</option>)}
         </select>
       </label>
     </details>

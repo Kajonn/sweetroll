@@ -13,6 +13,8 @@ export const DieResultSchema = Type.Object(
     id: Type.Optional(Identity),
     groupId: Type.Optional(Identity),
     success: Type.Optional(Type.Boolean()),
+    rerolledFrom: Type.Optional(Identity),
+    explodedFrom: Type.Optional(Identity),
   },
   { additionalProperties: false },
 );
@@ -36,11 +38,15 @@ export const RollBreakdownSchema = Type.Object(
           }),
           operation: Type.Union([
             Type.Literal("sum"),
-            Type.Literal("successCount"),
+            Type.Literal("countAtLeast"),
+            Type.Literal("countAtMost"),
+            Type.Literal("countEqual"),
             Type.Literal("keepHighest"),
             Type.Literal("keepLowest"),
           ]),
           threshold: Type.Optional(Type.Integer()),
+          keepCount: Type.Optional(Type.Integer({ minimum: 0, maximum: PACKAGE_LIMITS.dicePerRoll })),
+          modifiers: Type.Optional(Type.Array(Type.Union([Type.Literal("explode"), Type.Literal("rerollOnce")]), { maxItems: 2, uniqueItems: true })),
           diceIds: Type.Array(Identity, {
             maxItems: PACKAGE_LIMITS.dicePerRoll,
           }),
@@ -58,6 +64,7 @@ export const RollBreakdownSchema = Type.Object(
           operandIds: Type.Array(Identity, { maxItems: 8 }),
           value: BindingValueSchema,
           groupId: Type.Optional(Identity),
+          reused: Type.Optional(Type.Literal(true)),
         },
         { additionalProperties: false },
       ),
@@ -67,6 +74,30 @@ export const RollBreakdownSchema = Type.Object(
   { additionalProperties: false },
 );
 export type RollBreakdown = Static<typeof RollBreakdownSchema>;
+
+/** Plain-text dice details for campaign exports alongside the structured graph. */
+export function formatRollBreakdown(breakdown: RollBreakdown, dice: readonly DieResult[]): string {
+  const byId = new Map(dice.map((die) => [die.id, die]));
+  const lines = breakdown.groups.map((group) => {
+    const parameter = group.keepCount ?? group.threshold;
+    const operation = parameter === undefined ? group.operation : `${group.operation} ${parameter}`;
+    const faces = group.diceIds.map((id) => {
+      const die = byId.get(id)!;
+      const parentId = die.rerolledFrom ?? die.explodedFrom;
+      const source = parentId === undefined ? "" :
+        die.rerolledFrom ? ` (rerolled from ${byId.get(parentId)?.value})` : ` (explosion after ${byId.get(parentId)?.value})`;
+      return `d${die.sides}=${die.value}${source}${die.kept ? "" : " (discarded)"}`;
+    });
+    return `${group.label} (${group.count}d${group.sides}, ${operation}): ${group.total}${faces.length ? ` [${faces.join(", ")}]` : ""}`;
+  });
+  const groups = new Map(breakdown.groups.map((group) => [group.id, group.label]));
+  for (const term of breakdown.terms) {
+    if (term.reused && term.groupId) lines.push(`Reused ${groups.get(term.groupId)} (${term.operation}): ${String(term.value)}`);
+  }
+  const root = breakdown.terms.find((term) => term.id === breakdown.rootId);
+  if (root) lines.push(`Total: ${String(root.value)}`);
+  return lines.join("\n");
+}
 
 export const PushResultSchema=Type.Object({
  version:Type.Literal("1.0"),rollId:Type.String({pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}),rootRollId:Type.String({pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}),parentRollId:Type.Union([Type.String({pattern:"^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}),Type.Null()]),attempt:Type.Integer({minimum:0,maximum:10}),maxAttempts:Type.Integer({minimum:1,maximum:10}),rerolledDiceIds:Type.Array(Identity,{maxItems:100,uniqueItems:true}),

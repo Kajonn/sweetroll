@@ -2362,7 +2362,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const roll = resolved.value.roll;
         if(roll&&resolved.value.pushContext&&!roll.push){
           const policy=resolved.value.pushContext.policy;
-          roll.push={version:"1.0",rollId:executionId,rootRollId:executionId,parentRollId:null,attempt:0,maxAttempts:policy.maxAttempts,rerolledDiceIds:[],faceOutcomes:policy.groups.flatMap(g=>g.reportedFaces.map(face=>({groupId:g.groupId,face,combinedCount:roll.dice.filter(d=>d.groupId===g.groupId&&d.value===face).length,rerolledCount:0})))};
+          roll.push={version:"1.0",rollId:executionId,rootRollId:executionId,parentRollId:null,attempt:0,maxAttempts:policy.maxAttempts,rerolledDiceIds:[],faceOutcomes:policy.groups.flatMap(g=>g.reportedFaces.map(face=>({groupId:g.groupId,face,combinedCount:roll.dice.filter(d=>d.kept&&d.groupId===g.groupId&&d.value===face).length,rerolledCount:0})))};
         }
         const nominal = resolved.value.nominal;
 

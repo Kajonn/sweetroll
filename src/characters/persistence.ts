@@ -553,7 +553,7 @@ async function applyCommandCampaignTx(
         effectiveAudience,
         input.activity.requestId,
         campaignId,
-        input.roll.breakdown === undefined ? null : JSON.stringify(input.roll.breakdown),
+        JSON.stringify(input.roll.breakdown),
       ],
     );
     rollId = requireRow(insertedRoll.rows[0], "applyCommandCampaignTx.roll").id;
@@ -1138,7 +1138,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
               input.roll.output,
               input.roll.audience,
               input.activity.requestId,
-              input.roll.breakdown === undefined ? null : JSON.stringify(input.roll.breakdown),
+              JSON.stringify(input.roll.breakdown),
             ],
           );
           rollId = requireRow(insertedRoll.rows[0], "applyCommandTx.roll").id;

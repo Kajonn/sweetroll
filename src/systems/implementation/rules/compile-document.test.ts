@@ -15,7 +15,7 @@ describe("compileDocument", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.expressions).toHaveLength(3);
-    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 6, 7]);
+    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 7, 7]);
     expect(r.value.integrity.checksum).toMatch(/^sha256:[0-9a-f]{64}$/);
     for (let i = 0; i < r.value.expressions.length; i++) {
       expect(r.value.expressions[i]!.ast).toEqual(d20Package.expressions[i]!.ast);
@@ -26,7 +26,7 @@ describe("compileDocument", () => {
     const r = compileDocument(pbta2d6Document, opts);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 6, 7]);
+    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 7, 7]);
     for (let i = 0; i < r.value.expressions.length; i++) {
       expect(r.value.expressions[i]!.ast).toEqual(pbta2d6Package.expressions[i]!.ast);
     }
@@ -36,7 +36,7 @@ describe("compileDocument", () => {
     const r = compileDocument(d6SuccessPoolDocument, opts);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 7, 7]);
+    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 8, 7]);
     for (let i = 0; i < r.value.expressions.length; i++) {
       expect(r.value.expressions[i]!.ast).toEqual(d6SuccessPoolPackage.expressions[i]!.ast);
     }

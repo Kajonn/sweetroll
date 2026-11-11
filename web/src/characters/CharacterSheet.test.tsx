@@ -81,14 +81,14 @@ describe("CharacterSheet", () => {
   });
 
   it("renders the server-returned roll result without predicting action effects", () => {
-    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true, id: "@root.0:0", groupId: "@root.0" }], breakdown: { version: "1.0", rootId: "root", groups: [{ id: "@root.0", label: "Dice", count: 1, sides: 20, operation: "sum", diceIds: ["@root.0:0"], total: 14 }], terms: [] }, bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Roll result" })).toBeVisible();
     expect(screen.getByText("d20 + 2")).toBeVisible();
     expect(screen.getByText("16")).toBeVisible();
     expect(screen.getByText("Success")).toBeVisible();
     expect(screen.getByText("Owner only")).toBeVisible();
-    expect(screen.queryByText("d20=14")).not.toBeInTheDocument();
+    expect(screen.getByText(/^d20=14/)).not.toBeVisible();
   });
 
   it("confirms a nominal granted action without displaying its unused roll template", () => {
@@ -118,7 +118,7 @@ describe("CharacterSheet", () => {
     ["campaign", "Campaign"],
   ] as const)("renders a readable %s roll audience", (audience, label) => {
     render(<CharacterSheet snapshot={snapshot({ lastRoll: {
-      actionId: "roll-check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience,
+      actionId: "roll-check", expression: "d20", dice: [], breakdown: { version: "1.0", rootId: "root", groups: [], terms: [] }, bindings: [], total: 12, output: "12", audience,
     } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByText(label)).toBeVisible();
     expect(screen.queryByText(`character.rollResult.audience.${audience}`)).not.toBeInTheDocument();
@@ -126,9 +126,9 @@ describe("CharacterSheet", () => {
 
   it("shows roll dice and bindings only when details are requested", async () => {
     const user = userEvent.setup();
-    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Show roll details" }));
-    expect(screen.getByText("d20=14")).toBeVisible();
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true, id: "@root.0:0", groupId: "@root.0" }], breakdown: { version: "1.0", rootId: "root", groups: [{ id: "@root.0", label: "Dice", count: 1, sides: 20, operation: "sum", diceIds: ["@root.0:0"], total: 14 }], terms: [] }, bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    await user.click(screen.getByText("Show roll details", { exact: true }));
+    expect(screen.getByText(/^d20=14/)).toBeVisible();
     expect(screen.getByText("inputs.bonus: 2")).toBeVisible();
   });
 
@@ -141,13 +141,13 @@ describe("CharacterSheet", () => {
       elements: [...section.elements, { kind: "field" as const, id: "might-control", fieldId: "might", label: "Might", fieldKind: "integer" as const, value: 3, editable: true, constraints: {}, validations: [] }],
     })) }));
     render(<CharacterSheet snapshot={{ ...base, confirmed: { ...base.confirmed!, projection: { ...projection, sheets } }, lastRoll: {
-      actionId: "hit", expression: "d20 + fields.might + fields.unknown", dice: [{ sides: 20, value: 12, kept: true }],
+      actionId: "hit", expression: "d20 + fields.might + fields.unknown", dice: [{ sides: 20, value: 12, kept: true }], breakdown: { version: "1.0", rootId: "root", groups: [], terms: [] },
       bindings: [{ scope: "fields", definitionId: "might", value: 3 }, { scope: "fields", definitionId: "unknown", value: 1 }],
       total: 16, output: "Hit: 16", audience: "owner_only",
     } }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
 
     expect(screen.getByText("d20 + Might + fields.unknown")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Show roll details" }));
+    await user.click(screen.getByText("Show roll details", { exact: true }));
     expect(screen.getByText("Might: 3")).toBeVisible();
     expect(screen.getByText("fields.unknown: 1")).toBeVisible();
   });

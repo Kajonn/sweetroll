@@ -24340,6 +24340,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -24506,7 +24507,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -24521,6 +24530,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -24601,6 +24632,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -24648,6 +24683,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -27559,6 +27604,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -27725,7 +27771,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -27740,6 +27794,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -27820,6 +27896,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -27867,6 +27947,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -30789,6 +30879,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -30955,7 +31046,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -30970,6 +31069,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -31050,6 +31171,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -31097,6 +31222,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -34010,6 +34145,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -34176,7 +34312,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -34191,6 +34335,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -34271,6 +34437,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -34318,6 +34488,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -37233,6 +37413,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -37399,7 +37580,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -37414,6 +37603,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -37494,6 +37705,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -37541,6 +37756,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -38606,6 +38831,7 @@
                     "roll": {
                       "type": "object",
                       "required": [
+                        "breakdown",
                         "actionId",
                         "expression",
                         "dice",
@@ -38772,7 +38998,15 @@
                                         "type": "string"
                                       },
                                       {
-                                        "const": "successCount",
+                                        "const": "countAtLeast",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "countAtMost",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "countEqual",
                                         "type": "string"
                                       },
                                       {
@@ -38787,6 +39021,28 @@
                                   },
                                   "threshold": {
                                     "type": "integer"
+                                  },
+                                  "keepCount": {
+                                    "minimum": 0,
+                                    "maximum": 100,
+                                    "type": "integer"
+                                  },
+                                  "modifiers": {
+                                    "maxItems": 2,
+                                    "uniqueItems": true,
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "const": "explode",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "rerollOnce",
+                                          "type": "string"
+                                        }
+                                      ]
+                                    }
                                   },
                                   "diceIds": {
                                     "maxItems": 100,
@@ -38867,6 +39123,10 @@
                                     "minLength": 1,
                                     "maxLength": 256,
                                     "type": "string"
+                                  },
+                                  "reused": {
+                                    "const": true,
+                                    "type": "boolean"
                                   }
                                 }
                               }
@@ -38914,6 +39174,16 @@
                               },
                               "success": {
                                 "type": "boolean"
+                              },
+                              "rerolledFrom": {
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "type": "string"
+                              },
+                              "explodedFrom": {
+                                "minLength": 1,
+                                "maxLength": 256,
+                                "type": "string"
                               }
                             }
                           }
@@ -42779,6 +43049,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -42945,7 +43216,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -42960,6 +43239,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -43040,6 +43341,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -43087,6 +43392,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -46045,6 +46360,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -46211,7 +46527,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -46226,6 +46550,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -46306,6 +46652,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -46353,6 +46703,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -49370,6 +49730,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -49536,7 +49897,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -49551,6 +49920,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -49631,6 +50022,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -49678,6 +50073,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -52587,6 +52992,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -52753,7 +53159,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -52768,6 +53182,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -52848,6 +53284,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -52895,6 +53335,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -55812,6 +56262,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -55978,7 +56429,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -55993,6 +56452,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -56073,6 +56554,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -56120,6 +56605,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -60310,6 +60805,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -60476,7 +60972,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -60491,6 +60995,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -60571,6 +61097,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -60618,6 +61148,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -65711,6 +66251,7 @@
                             {
                               "type": "object",
                               "required": [
+                                "breakdown",
                                 "actionId",
                                 "expression",
                                 "dice",
@@ -65877,7 +66418,15 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "const": "successCount",
+                                                "const": "countAtLeast",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countAtMost",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "countEqual",
                                                 "type": "string"
                                               },
                                               {
@@ -65892,6 +66441,28 @@
                                           },
                                           "threshold": {
                                             "type": "integer"
+                                          },
+                                          "keepCount": {
+                                            "minimum": 0,
+                                            "maximum": 100,
+                                            "type": "integer"
+                                          },
+                                          "modifiers": {
+                                            "maxItems": 2,
+                                            "uniqueItems": true,
+                                            "type": "array",
+                                            "items": {
+                                              "anyOf": [
+                                                {
+                                                  "const": "explode",
+                                                  "type": "string"
+                                                },
+                                                {
+                                                  "const": "rerollOnce",
+                                                  "type": "string"
+                                                }
+                                              ]
+                                            }
                                           },
                                           "diceIds": {
                                             "maxItems": 100,
@@ -65972,6 +66543,10 @@
                                             "minLength": 1,
                                             "maxLength": 256,
                                             "type": "string"
+                                          },
+                                          "reused": {
+                                            "const": true,
+                                            "type": "boolean"
                                           }
                                         }
                                       }
@@ -66019,6 +66594,16 @@
                                       },
                                       "success": {
                                         "type": "boolean"
+                                      },
+                                      "rerolledFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
+                                      },
+                                      "explodedFrom": {
+                                        "minLength": 1,
+                                        "maxLength": 256,
+                                        "type": "string"
                                       }
                                     }
                                   }
@@ -69866,6 +70451,7 @@
                           "roll": {
                             "type": "object",
                             "required": [
+                              "breakdown",
                               "actionId",
                               "expression",
                               "dice",
@@ -70032,7 +70618,15 @@
                                               "type": "string"
                                             },
                                             {
-                                              "const": "successCount",
+                                              "const": "countAtLeast",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "countAtMost",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "countEqual",
                                               "type": "string"
                                             },
                                             {
@@ -70047,6 +70641,28 @@
                                         },
                                         "threshold": {
                                           "type": "integer"
+                                        },
+                                        "keepCount": {
+                                          "minimum": 0,
+                                          "maximum": 100,
+                                          "type": "integer"
+                                        },
+                                        "modifiers": {
+                                          "maxItems": 2,
+                                          "uniqueItems": true,
+                                          "type": "array",
+                                          "items": {
+                                            "anyOf": [
+                                              {
+                                                "const": "explode",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "rerollOnce",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          }
                                         },
                                         "diceIds": {
                                           "maxItems": 100,
@@ -70127,6 +70743,10 @@
                                           "minLength": 1,
                                           "maxLength": 256,
                                           "type": "string"
+                                        },
+                                        "reused": {
+                                          "const": true,
+                                          "type": "boolean"
                                         }
                                       }
                                     }
@@ -70174,6 +70794,16 @@
                                     },
                                     "success": {
                                       "type": "boolean"
+                                    },
+                                    "rerolledFrom": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "explodedFrom": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
                                     }
                                   }
                                 }
@@ -76424,6 +77054,23 @@
                                                   "minimum": 1,
                                                   "maximum": 1000,
                                                   "type": "integer"
+                                                }
+                                              },
+                                              "modifiers": {
+                                                "maxItems": 2,
+                                                "uniqueItems": true,
+                                                "type": "array",
+                                                "items": {
+                                                  "anyOf": [
+                                                    {
+                                                      "const": "rerollOnce",
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "const": "explode",
+                                                      "type": "string"
+                                                    }
+                                                  ]
                                                 }
                                               }
                                             }
@@ -107545,6 +108192,8 @@
                               "actionId",
                               "audience",
                               "expression",
+                              "breakdown",
+                              "breakdownText",
                               "dice",
                               "bindings",
                               "total",
@@ -107647,7 +108296,15 @@
                                               "type": "string"
                                             },
                                             {
-                                              "const": "successCount",
+                                              "const": "countAtLeast",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "countAtMost",
+                                              "type": "string"
+                                            },
+                                            {
+                                              "const": "countEqual",
                                               "type": "string"
                                             },
                                             {
@@ -107662,6 +108319,28 @@
                                         },
                                         "threshold": {
                                           "type": "integer"
+                                        },
+                                        "keepCount": {
+                                          "minimum": 0,
+                                          "maximum": 100,
+                                          "type": "integer"
+                                        },
+                                        "modifiers": {
+                                          "maxItems": 2,
+                                          "uniqueItems": true,
+                                          "type": "array",
+                                          "items": {
+                                            "anyOf": [
+                                              {
+                                                "const": "explode",
+                                                "type": "string"
+                                              },
+                                              {
+                                                "const": "rerollOnce",
+                                                "type": "string"
+                                              }
+                                            ]
+                                          }
                                         },
                                         "diceIds": {
                                           "maxItems": 100,
@@ -107742,11 +108421,18 @@
                                           "minLength": 1,
                                           "maxLength": 256,
                                           "type": "string"
+                                        },
+                                        "reused": {
+                                          "const": true,
+                                          "type": "boolean"
                                         }
                                       }
                                     }
                                   }
                                 }
+                              },
+                              "breakdownText": {
+                                "type": "string"
                               },
                               "push": {
                                 "additionalProperties": false,
@@ -107843,7 +108529,55 @@
                                   }
                                 }
                               },
-                              "dice": {},
+                              "dice": {
+                                "type": "array",
+                                "items": {
+                                  "additionalProperties": false,
+                                  "type": "object",
+                                  "required": [
+                                    "sides",
+                                    "value",
+                                    "kept"
+                                  ],
+                                  "properties": {
+                                    "sides": {
+                                      "minimum": 1,
+                                      "maximum": 1000,
+                                      "type": "integer"
+                                    },
+                                    "value": {
+                                      "minimum": 1,
+                                      "type": "integer"
+                                    },
+                                    "kept": {
+                                      "type": "boolean"
+                                    },
+                                    "id": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "groupId": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "success": {
+                                      "type": "boolean"
+                                    },
+                                    "rerolledFrom": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    },
+                                    "explodedFrom": {
+                                      "minLength": 1,
+                                      "maxLength": 256,
+                                      "type": "string"
+                                    }
+                                  }
+                                }
+                              },
                               "bindings": {},
                               "total": {
                                 "type": "number"

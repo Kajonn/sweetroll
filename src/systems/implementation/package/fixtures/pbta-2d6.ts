@@ -278,14 +278,14 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       inferredType: "number",
       fallback: 0,
       dependencies: ["move_stat", "forward"],
-      cost: 6,
+      cost: 7,
       ast: {
         kind: "binary",
         operator: "+",
         left: {
           kind: "binary",
           operator: "+",
-          left: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 6 },
+          left: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 6 } }, modifiers: [] },
           right: { kind: "reference", scope: "fields", id: "move_stat" },
         },
         right: { kind: "reference", scope: "inputs", id: "forward" },

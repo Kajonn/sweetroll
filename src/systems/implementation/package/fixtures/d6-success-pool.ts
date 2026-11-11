@@ -312,10 +312,10 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       inferredType: "number",
       fallback: 0,
       dependencies: ["attribute", "skill", "bonus_dice"],
-      cost: 7,
+      cost: 8,
       ast: {
-        kind: "successCount",
-        dice: {
+        kind: "pool",
+        source: {
           kind: "dice",
           count: {
             kind: "binary",
@@ -328,9 +328,10 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
             },
             right: { kind: "reference", scope: "inputs", id: "bonus_dice" },
           },
-          sides: 6,
+          sides: { kind: "numberLiteral", value: 6 },
         },
-        threshold: 6,
+        modifiers: [],
+        reducer: { kind: "countAtLeast", amount: { kind: "numberLiteral", value: 6 } },
       },
     },
     {

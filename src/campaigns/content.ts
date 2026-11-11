@@ -1,6 +1,6 @@
 import {createProposalRepository} from "./proposalPersistence.js";
 import {proposalView} from "./proposals.js";
-import type {RollBreakdown, PushResult} from "../systems/implementation/rules/result.js";
+import { formatRollBreakdown, type DieResult, type RollBreakdown, type PushResult } from "../systems/implementation/rules/result.js";
 import {createTemplateRepository} from "./templatePersistence.js";
 import { randomUUID } from "node:crypto";
 
@@ -212,9 +212,10 @@ export type CampaignExportSnapshot = {
     actionId: string;
     audience: "owner_only" | "gm_only" | "campaign";
     expression: string;
-    breakdown?: RollBreakdown;
+    breakdown: RollBreakdown;
+    breakdownText: string;
     push?: PushResult;
-    dice: unknown;
+    dice: DieResult[];
     bindings: unknown;
     total: number;
     output: string;
@@ -1832,7 +1833,8 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             audience: roll.audience,
             expression: roll.expression,
             dice: roll.dice,
-            ...(roll.breakdown === undefined ? {} : {breakdown:roll.breakdown}),
+            breakdown: roll.breakdown,
+            breakdownText: formatRollBreakdown(roll.breakdown, roll.dice),
             ...(roll.push === undefined ? {} : {push:roll.push}),
             bindings: roll.bindings,
             total: roll.total,

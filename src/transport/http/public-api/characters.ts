@@ -24,7 +24,7 @@ export const roll = s.object({
   total: Type.Number(),
   output: s.text,
   audience,
-  breakdown: Type.Optional(RollBreakdownSchema),
+  breakdown: RollBreakdownSchema,
   push: Type.Optional(PushResultSchema),
 });
 const commandResult = s.object({

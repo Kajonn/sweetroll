@@ -299,6 +299,7 @@ export function RollActionEditor({
       ]}/>
       {guided !== true || diceKind === "custom" || customEditing ? (
         <ExpressionEditor
+                  roll
           references={[...Object.keys(fieldTypes).map(id => `fields.${id}`), ...Object.keys(inputTypes).map(id => `inputs.${id}`), ...Object.keys(itemTypes ?? {}).map(id => `item.${id}`)]}
           client={client}
           systemId={systemId}

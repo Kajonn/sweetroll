@@ -9446,7 +9446,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -9455,8 +9455,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -9466,6 +9468,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -9477,6 +9481,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -10079,7 +10085,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -10088,8 +10094,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -10099,6 +10107,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -10110,6 +10120,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -10712,7 +10724,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -10721,8 +10733,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -10732,6 +10746,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -10743,6 +10759,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -11345,7 +11363,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -11354,8 +11372,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -11365,6 +11385,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -11376,6 +11398,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -11979,7 +12003,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -11988,8 +12012,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -11999,6 +12025,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -12010,6 +12038,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -12274,7 +12304,7 @@ export interface operations {
                                     rerolledCount: number;
                                 }[];
                             };
-                            breakdown?: {
+                            breakdown: {
                                 /** @constant */
                                 version: "1.0";
                                 rootId: string;
@@ -12283,8 +12313,10 @@ export interface operations {
                                     label: string;
                                     count: number;
                                     sides: number;
-                                    operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                    operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                     threshold?: number;
+                                    keepCount?: number;
+                                    modifiers?: ("explode" | "rerollOnce")[];
                                     diceIds: string[];
                                     total: number;
                                 }[];
@@ -12294,6 +12326,8 @@ export interface operations {
                                     operandIds: string[];
                                     value: (string | number | boolean | null) | string[];
                                     groupId?: string;
+                                    /** @constant */
+                                    reused?: true;
                                 }[];
                             };
                             actionId: string;
@@ -12305,6 +12339,8 @@ export interface operations {
                                 id?: string;
                                 groupId?: string;
                                 success?: boolean;
+                                rerolledFrom?: string;
+                                explodedFrom?: string;
                             }[];
                             bindings: {
                                 scope: "fields" | "inputs" | "item" | "aggregates";
@@ -13139,7 +13175,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -13148,8 +13184,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -13159,6 +13197,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -13170,6 +13210,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -13784,7 +13826,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -13793,8 +13835,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -13804,6 +13848,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -13815,6 +13861,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -14443,7 +14491,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -14452,8 +14500,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -14463,6 +14513,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -14474,6 +14526,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -15075,7 +15129,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -15084,8 +15138,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -15095,6 +15151,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -15106,6 +15164,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -15711,7 +15771,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -15720,8 +15780,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -15731,6 +15793,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -15742,6 +15806,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -16634,7 +16700,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -16643,8 +16709,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -16654,6 +16722,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -16665,6 +16735,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -17800,7 +17872,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -17809,8 +17881,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -17820,6 +17894,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -17831,6 +17907,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -18663,7 +18741,7 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -18672,8 +18750,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -18683,6 +18763,8 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
                                 actionId: string;
@@ -18694,6 +18776,8 @@ export interface operations {
                                     id?: string;
                                     groupId?: string;
                                     success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
                                 }[];
                                 bindings: {
                                     scope: "fields" | "inputs" | "item" | "aggregates";
@@ -20760,6 +20844,7 @@ export interface operations {
                                         groupId: string;
                                         lockedFaces: number[];
                                         reportedFaces: number[];
+                                        modifiers?: ("rerollOnce" | "explode")[];
                                     }[];
                                 };
                                 /** @constant */
@@ -29859,7 +29944,7 @@ export interface operations {
                                 actionId: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                                 expression: string;
-                                breakdown?: {
+                                breakdown: {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
@@ -29868,8 +29953,10 @@ export interface operations {
                                         label: string;
                                         count: number;
                                         sides: number;
-                                        operation: "sum" | "successCount" | "keepHighest" | "keepLowest";
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "keepHighest" | "keepLowest";
                                         threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
                                         diceIds: string[];
                                         total: number;
                                     }[];
@@ -29879,8 +29966,11 @@ export interface operations {
                                         operandIds: string[];
                                         value: (string | number | boolean | null) | string[];
                                         groupId?: string;
+                                        /** @constant */
+                                        reused?: true;
                                     }[];
                                 };
+                                breakdownText: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -29897,7 +29987,16 @@ export interface operations {
                                         rerolledCount: number;
                                     }[];
                                 };
-                                dice: unknown;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
+                                }[];
                                 bindings: unknown;
                                 total: number;
                                 output: string;

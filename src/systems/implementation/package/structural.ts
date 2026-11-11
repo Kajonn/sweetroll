@@ -1,7 +1,7 @@
 import { sheetActionOwners, validationOwner } from "../rules/owners.js";
 import { fieldWithDatasetOptions, validateDataset } from "./reference-data.js";
 import {validatePushPolicies} from "../rules/push-policy.js";
-import { validateDiceGroups } from "../rules/groups.js";
+import { children, validateDiceGroups } from "../rules/groups.js";
 import { Buffer } from "node:buffer";
 
 import { PACKAGE_LIMITS } from "./limits.js";
@@ -449,34 +449,7 @@ function measureAst(root: ExpressionAstV1): { depth: number; nodes: number } {
     nodes += 1;
     depth = Math.max(depth, current.depth);
     const childDepth = current.depth + 1;
-    switch (current.node.kind) {
-      case "unary":
-        pending.push({ node: current.node.operand, depth: childDepth });
-        break;
-      case "binary":
-        pending.push(
-          { node: current.node.right, depth: childDepth },
-          { node: current.node.left, depth: childDepth },
-        );
-        break;
-      case "call":
-        for (const argument of current.node.arguments) {
-          pending.push({ node: argument, depth: childDepth });
-        }
-        break;
-      case "dice":
-        pending.push({ node: current.node.count, depth: childDepth });
-        break;
-      case "keep":
-      case "successCount":
-        pending.push({ node: current.node.dice, depth: childDepth });
-        break;
-      case "numberLiteral":
-      case "stringLiteral":
-      case "booleanLiteral":
-      case "reference":
-        break;
-    }
+    for (const node of children(current.node)) pending.push({ node, depth: childDepth });
   }
   return { depth, nodes };
 }
@@ -493,31 +466,7 @@ function preflightAst(root: Record<string, unknown>): "depth" | "invalid" | "nod
     if (!isObject(current.node) || !isLocallyValidAstNode(current.node)) return "invalid";
 
     const childDepth = current.depth + 1;
-    switch (current.node.kind) {
-      case "unary":
-        pending.push({ node: current.node.operand, depth: childDepth });
-        break;
-      case "binary":
-        pending.push(
-          { node: current.node.left, depth: childDepth },
-          { node: current.node.right, depth: childDepth },
-        );
-        break;
-      case "call":
-        if (Array.isArray(current.node.arguments)) {
-          for (const argument of current.node.arguments) {
-            pending.push({ node: argument, depth: childDepth });
-          }
-        }
-        break;
-      case "dice":
-        pending.push({ node: current.node.count, depth: childDepth });
-        break;
-      case "keep":
-      case "successCount":
-        pending.push({ node: current.node.dice, depth: childDepth });
-        break;
-    }
+    for (const node of children(current.node as ExpressionAstV1)) pending.push({ node, depth: childDepth });
   }
   return null;
 }
@@ -558,19 +507,21 @@ function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
           || node.roundMode === "nearest"
           || node.roundMode === "down"
           || node.roundMode === "up");
-    case "dice":
-      return hasOnlyKeys(node, ["kind", "count", "sides"], ["group"])
-        && isObject(node.count)
-        && isIntegerBetween(node.sides, 1, PACKAGE_LIMITS.sidesPerDie);
-    case "keep":
-      return hasOnlyKeys(node, ["kind", "mode", "count", "dice"])
-        && (node.mode === "highest" || node.mode === "lowest")
-        && isIntegerBetween(node.count, 1, PACKAGE_LIMITS.dicePerRoll)
-        && isObject(node.dice);
-    case "successCount":
-      return hasOnlyKeys(node, ["kind", "dice", "threshold"])
-        && isObject(node.dice)
-        && Number.isInteger(node.threshold);
+    case "pool": {
+      if (!hasOnlyKeys(node, ["kind", "source", "modifiers"], ["group", "reducer"]) ||
+          !isObject(node.source) || !Array.isArray(node.modifiers) || node.modifiers.length > 2) return false;
+      const source = node.source;
+      if (source.kind === "dice") {
+        if (!hasOnlyKeys(source, ["kind", "count", "sides"]) || !isObject(source.count) || !isObject(source.sides)) return false;
+      } else if (source.kind !== "rolled" || !hasOnlyKeys(source, ["kind", "groupId"]) || typeof source.groupId !== "string") return false;
+      if (!node.modifiers.every((modifier) => isObject(modifier) && (
+        modifier.kind === "explode" && hasOnlyKeys(modifier, ["kind"], ["face"]) && (modifier.face === undefined || isObject(modifier.face)) ||
+        modifier.kind === "rerollOnce" && hasOnlyKeys(modifier, ["kind", "face"]) && isObject(modifier.face)
+      ))) return false;
+      return node.reducer === undefined || isObject(node.reducer) && hasOnlyKeys(node.reducer, ["kind", "amount"]) &&
+        typeof node.reducer.kind === "string" && ["keepHighest", "keepLowest", "countAtLeast", "countAtMost", "countEqual"].includes(node.reducer.kind) &&
+        isObject(node.reducer.amount);
+    }
     default:
       return false;
   }
@@ -590,9 +541,7 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function isIntegerBetween(value: unknown, minimum: number, maximum: number): value is number {
-  return Number.isInteger(value) && (value as number) >= minimum && (value as number) <= maximum;
-}
+
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

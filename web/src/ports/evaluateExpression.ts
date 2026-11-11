@@ -1,5 +1,6 @@
 import {
   compileExpression,
+  containsDice,
   evaluate,
   renderExpression,
   type CompiledExpressionV1,
@@ -26,6 +27,7 @@ export type EvaluateExpressionInput = {
   resultType: ValueType;
   fallback: ScalarValue;
   bindings: Record<string, BindingValue>;
+  fieldBindings?: Record<string, BindingValue>;
   itemBindings?: Record<string, BindingValue>;
   rng?: Rng;
   /** Where the expression is used. Computed fields and validations may be text or boolean; rolls must be numbers. */
@@ -74,7 +76,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
   }
   const body = compiled.value;
   const scopedBindings: EvaluateExpressionBindings = {
-    fields: pickBindings(input.bindings, input.env.fields),
+    fields: pickBindings(input.fieldBindings ?? input.bindings, input.env.fields),
     inputs: pickBindings(input.bindings, input.env.inputs),
     ...(input.env.item === undefined ? {} : { item: pickBindings(input.itemBindings ?? {}, input.env.item) }),
     ...(input.env.datasets === undefined ? {} : { datasets: input.env.datasets }),
@@ -104,23 +106,14 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
 /** A flat dice sum only explains additive rolls; count/scale/negation need their own breakdown. */
 export function additiveRollModifier(result: EvaluateExpressionResult): number | null {
   if (!result.ok || result.roll === null || result.diagnostics.length > 0) return null;
-  function diceFree(ast: ExpressionAstV1): boolean {
-    switch (ast.kind) {
-      case "dice": case "keep": case "successCount": return false;
-      case "binary": return diceFree(ast.left) && diceFree(ast.right);
-      case "unary": return diceFree(ast.operand);
-      case "call": return ast.arguments.every(diceFree);
-      default: return true;
-    }
-  }
   function additive(ast: ExpressionAstV1): boolean {
-    if (diceFree(ast)) return true;
+    if (!containsDice(ast)) return true;
     switch (ast.kind) {
-      case "dice": return diceFree(ast.count);
-      case "keep": return ast.dice.kind === "dice" && diceFree(ast.dice.count);
+      case "pool":
+        return ast.source.kind === "dice" && (!ast.reducer || ast.reducer.kind === "keepHighest" || ast.reducer.kind === "keepLowest");
       case "binary": return ast.operator === "+"
         ? additive(ast.left) && additive(ast.right)
-        : ast.operator === "-" && additive(ast.left) && diceFree(ast.right);
+        : ast.operator === "-" && additive(ast.left) && !containsDice(ast.right);
       default: return false;
     }
   }

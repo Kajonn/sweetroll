@@ -445,8 +445,8 @@ describeWithDatabase("current database schema", () => {
     await client.query(
       `INSERT INTO character_rolls
          (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json,
-          total, rendered_output, request_id)
-       VALUES ($1, $2, 'check', $3, '1d20', '[]'::jsonb, '{}'::jsonb, 10, '10', $4)`,
+          total, rendered_output, request_id, breakdown_json)
+       VALUES ($1, $2, 'check', $3, '1d20', '[]'::jsonb, '{}'::jsonb, 10, '10', $4, '{"version":"1.0","rootId":"root","groups":[],"terms":[{"id":"root","operation":"literal","operandIds":[],"value":10}]}'::jsonb)`,
       [characterId, userId, randomUUID(), randomUUID()],
     );
     await client.query(
@@ -816,8 +816,8 @@ describeWithDatabase("current database schema", () => {
     const ownerRollId = randomUUID();
     await client.query(
       `INSERT INTO character_rolls
-         (id, character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, request_id)
-       VALUES ($1, $2, $3, 'check', $4, 'd20', '[]', '[]', 12, 'Result: 12', $5)`,
+         (id, character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, request_id, breakdown_json)
+       VALUES ($1, $2, $3, 'check', $4, 'd20', '[]', '[]', 12, 'Result: 12', $5, '{"version":"1.0","rootId":"root","groups":[],"terms":[{"id":"root","operation":"literal","operandIds":[],"value":12}]}'::jsonb)`,
       [ownerRollId, characterId, userId, executionId, randomUUID()],
     );
 
@@ -827,16 +827,16 @@ describeWithDatabase("current database schema", () => {
     for (const audience of ["gm_only", "campaign"] as const) {
       await client.query(
         `INSERT INTO character_rolls
-           (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
-         VALUES ($1, $2, 'check', $3, 'd20', '[]', '[]', 12, 'Result: 12', $4, $5)`,
+           (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, breakdown_json)
+         VALUES ($1, $2, 'check', $3, 'd20', '[]', '[]', 12, 'Result: 12', $4, $5, '{"version":"1.0","rootId":"root","groups":[],"terms":[{"id":"root","operation":"literal","operandIds":[],"value":12}]}'::jsonb)`,
         [characterId, userId, randomUUID(), audience, randomUUID()],
       );
     }
     await expect(
       client.query(
         `INSERT INTO character_rolls
-           (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id)
-         VALUES ($1, $2, 'check', $3, 'd20', '[]', '[]', 12, 'Result: 12', 'everyone', $4)`,
+           (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, breakdown_json)
+         VALUES ($1, $2, 'check', $3, 'd20', '[]', '[]', 12, 'Result: 12', 'everyone', $4, '{"version":"1.0","rootId":"root","groups":[],"terms":[{"id":"root","operation":"literal","operandIds":[],"value":12}]}'::jsonb)`,
         [characterId, userId, randomUUID(), randomUUID()],
       ),
     ).rejects.toThrow();
@@ -929,15 +929,15 @@ describeWithDatabase("current database schema", () => {
     await client.query(
       `INSERT INTO character_rolls
          (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json,
-          total, rendered_output, audience, request_id, scope_campaign_id)
-       VALUES ($1, $2, 'check', $3, 'd20', '[]'::jsonb, '{}'::jsonb, 12, 'Result: 12', 'campaign', $4, $5)`,
+          total, rendered_output, audience, request_id, scope_campaign_id, breakdown_json)
+       VALUES ($1, $2, 'check', $3, 'd20', '[]'::jsonb, '{}'::jsonb, 12, 'Result: 12', 'campaign', $4, $5, '{"version":"1.0","rootId":"root","groups":[],"terms":[{"id":"root","operation":"literal","operandIds":[],"value":12}]}'::jsonb)`,
       [characterId, userId, randomUUID(), requestId, campaignId],
     );
     await client.query(
       `INSERT INTO character_rolls
          (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json,
-          total, rendered_output, audience, request_id, scope_campaign_id)
-       VALUES ($1, $2, 'check', $3, 'd20', '[]'::jsonb, '{}'::jsonb, 7, 'Result: 7', 'campaign', $4, $5)`,
+          total, rendered_output, audience, request_id, scope_campaign_id, breakdown_json)
+       VALUES ($1, $2, 'check', $3, 'd20', '[]'::jsonb, '{}'::jsonb, 7, 'Result: 7', 'campaign', $4, $5, '{"version":"1.0","rootId":"root","groups":[],"terms":[{"id":"root","operation":"literal","operandIds":[],"value":7}]}'::jsonb)`,
       [characterId, userId, randomUUID(), randomUUID(), otherCampaignId],
     );
     const repo = createCampaignPersistenceRepository(client as unknown as import("pg").Pool);

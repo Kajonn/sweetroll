@@ -96,27 +96,26 @@ export const ExpressionAstV1Schema = Type.Recursive(
       ),
       Type.Object(
         {
-          kind: Type.Literal("dice"),
-          group: Type.Optional(Type.Object({ id: DefinitionIdSchema, label: Type.String({minLength: 1, maxLength: 120}) }, {additionalProperties: false})),
-          count: ExpressionAstV1,
-          sides: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.sidesPerDie }),
-        },
-        { additionalProperties: false },
-      ),
-      Type.Object(
-        {
-          kind: Type.Literal("keep"),
-          mode: Type.Union([Type.Literal("highest"), Type.Literal("lowest")]),
-          count: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.dicePerRoll }),
-          dice: ExpressionAstV1,
-        },
-        { additionalProperties: false },
-      ),
-      Type.Object(
-        {
-          kind: Type.Literal("successCount"),
-          dice: ExpressionAstV1,
-          threshold: Type.Integer(),
+          kind: Type.Literal("pool"),
+          source: Type.Union([
+            Type.Object({ kind: Type.Literal("dice"), count: ExpressionAstV1, sides: ExpressionAstV1 }, { additionalProperties: false }),
+            Type.Object({ kind: Type.Literal("rolled"), groupId: DefinitionIdSchema }, { additionalProperties: false }),
+          ]),
+          group: Type.Optional(Type.Object({
+            id: DefinitionIdSchema,
+            label: Type.String({ minLength: 1, maxLength: 120 }),
+          }, { additionalProperties: false })),
+          modifiers: Type.Array(Type.Union([
+            Type.Object({ kind: Type.Literal("explode"), face: Type.Optional(ExpressionAstV1) }, { additionalProperties: false }),
+            Type.Object({ kind: Type.Literal("rerollOnce"), face: ExpressionAstV1 }, { additionalProperties: false }),
+          ]), { maxItems: 2 }),
+          reducer: Type.Optional(Type.Object({
+            kind: Type.Union([
+              Type.Literal("keepHighest"), Type.Literal("keepLowest"),
+              Type.Literal("countAtLeast"), Type.Literal("countAtMost"), Type.Literal("countEqual"),
+            ]),
+            amount: ExpressionAstV1,
+          }, { additionalProperties: false })),
         },
         { additionalProperties: false },
       ),
@@ -124,6 +123,7 @@ export const ExpressionAstV1Schema = Type.Recursive(
   { $id: "ExpressionAstV1" },
 );
 export type ExpressionAstV1 = Static<typeof ExpressionAstV1Schema>;
+export type PoolAst = Extract<ExpressionAstV1, { kind: "pool" }>;
 
 export const CompiledExpressionV1Schema = Type.Object(
   {

@@ -1,7 +1,6 @@
 import { Ajv } from "ajv";
 import { describe, expect, it } from "vitest";
 
-import { PACKAGE_LIMITS } from "../limits.js";
 import { SystemExportV1Schema } from "./export.js";
 import { SystemPackageV1Schema } from "./package.js";
 import { validSignedShapePackage } from "./test-values.js";
@@ -110,7 +109,7 @@ function packageWithEveryAstVariant() {
       fallback: 0,
       dependencies: [],
       cost: 2,
-      ast: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 6 },
+      ast: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 6 } }, modifiers: [] },
     },
     {
       id: "keep_high_expr",
@@ -120,12 +119,7 @@ function packageWithEveryAstVariant() {
       fallback: 0,
       dependencies: [],
       cost: 3,
-      ast: {
-        kind: "keep",
-        mode: "highest",
-        count: 1,
-        dice: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 20 },
-      },
+      ast: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 20 } }, modifiers: [], reducer: { kind: "keepHighest", amount: { kind: "numberLiteral", value: 1 } } },
     },
     {
       id: "keep_low_expr",
@@ -135,12 +129,7 @@ function packageWithEveryAstVariant() {
       fallback: 0,
       dependencies: [],
       cost: 3,
-      ast: {
-        kind: "keep",
-        mode: "lowest",
-        count: 1,
-        dice: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 20 },
-      },
+      ast: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 20 } }, modifiers: [], reducer: { kind: "keepLowest", amount: { kind: "numberLiteral", value: 1 } } },
     },
     {
       id: "input_expr",
@@ -172,13 +161,9 @@ describe("compiled package schemas", () => {
     expect(validatePackage(value)).toBe(false);
   });
 
-  it("rejects die sides above the platform ceiling", () => {
+  it("rejects sides that are not an expression", () => {
     const value = validSignedShapePackage();
-    value.expressions[0]!.ast = {
-      kind: "dice",
-      count: { kind: "numberLiteral", value: 1 },
-      sides: 1001,
-    };
+    value.expressions[0]!.ast = { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: 6 }, modifiers: [] } as never;
 
     expect(validatePackage(value)).toBe(false);
   });
@@ -214,13 +199,12 @@ describe("compiled package schemas", () => {
     };
     expect(validatePackage(tooManyArguments)).toBe(false);
 
-    const tooManyKeptDice = validSignedShapePackage();
-    tooManyKeptDice.expressions[0]!.ast = {
-      kind: "keep",
-      mode: "highest",
-      count: PACKAGE_LIMITS.dicePerRoll + 1,
-      dice: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 6 },
+    const tooManyModifiers = validSignedShapePackage();
+    tooManyModifiers.expressions[0]!.ast = {
+      kind: "pool",
+      source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 6 } },
+      modifiers: [{ kind: "explode" }, { kind: "explode" }, { kind: "explode" }],
     };
-    expect(validatePackage(tooManyKeptDice)).toBe(false);
+    expect(validatePackage(tooManyModifiers)).toBe(false);
   });
 });

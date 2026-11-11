@@ -203,7 +203,7 @@ Expressions are declarative math, conditionals, and dice, parsed into a lightwei
 - **No** effect engine (set/increment/append) — resource changes are simple built-in "bump" actions
 - **No** `against target.defense` action chains
 
-[Grammar 1.0](docs/contracts/grammar-v1.0.md) is the current contract for system and extension document/package 2.0. It includes named groups and bounded push policies, and excludes exploding dice, custom faces, arbitrary property traversal, and executable extension points. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 dice per roll, and 1,000 sides per die.
+[Grammar 1.0](docs/contracts/grammar-v1.0.md) is the current contract for system and extension document/package 2.0. It supports dynamic dice parameters, reroll-once and bounded explosion modifiers, one reducer per pool, and reuse of a previously evaluated named group. All rolls share a saved breakdown graph. It records the original and replacement faces, explosion chains, reductions, and group reuse. Character activity and campaign export preserve those details. Push policies explicitly opt into modified pools and reroll eligible chains from their starting die. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 draws per roll including rerolls and explosions, 1,000 sides per die, and ten explosions per starting die.
 
 **Rolls** are a button press → server evaluates → result shows normalized expression, individual dice, modifiers, total, and audience. Rolls are factual; the platform does **not** auto-apply outcomes to state.
 

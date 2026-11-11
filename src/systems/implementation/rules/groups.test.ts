@@ -44,14 +44,14 @@ describe("grammar 0.2 named groups", () => {
       {
         id: "attribute",
         count: 2,
-        operation: "successCount",
+        operation: "countAtLeast",
         threshold: 6,
         total: 1,
       },
       {
         id: "skill",
         count: 1,
-        operation: "successCount",
+        operation: "countAtLeast",
         threshold: 5,
         total: 1,
       },
@@ -124,7 +124,7 @@ describe("grammar 0.2 named groups", () => {
       "arithmetic_failure",
     );
   });
-  it("preserves plain dice result shape and deterministic draw order", () => {
+  it("records a graph for unnamed pools and preserves deterministic draw order", () => {
     const compiled = compileExpression("2d6kh1 + d4", {
       ...opts,
     });
@@ -138,9 +138,10 @@ describe("grammar 0.2 named groups", () => {
       () => rng[calls++]!,
     );
     expect(calls).toBe(3);
-    expect(result.ok && result.roll).toEqual({
+    expect(result.ok && result.roll).toMatchObject({
       total: 8,
       expression: "2d6kh1 + d4",
+      breakdown: { groups: [{ id: "@root.0" }, { id: "@root.1" }] },
       dice: [
         { sides: 6, value: 6, kept: true },
         { sides: 6, value: 1, kept: false },

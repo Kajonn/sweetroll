@@ -313,14 +313,14 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       inferredType: "number",
       fallback: 0,
       dependencies: ["modifier", "bonus"],
-      cost: 6,
+      cost: 7,
       ast: {
         kind: "binary",
         operator: "+",
         left: {
           kind: "binary",
           operator: "+",
-          left: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: 20 },
+          left: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: { kind: "numberLiteral", value: 20 } }, modifiers: [] },
           right: { kind: "reference", scope: "fields", id: "modifier" },
         },
         right: { kind: "reference", scope: "inputs", id: "bonus" },

@@ -79,8 +79,8 @@ scenario("Dice pool: salvage the relay and push a saved roll", async ({ actor, p
   const originalPath = `${sheetPath}/rolls/${original.rollId}` as const;
   expect(original.push).toMatchObject({ rootRollId: original.rollId, parentRollId: null, attempt: 0 });
   expect(original.breakdown.groups).toMatchObject([
-    { id: "attribute", count: 3, sides: 6, operation: "successCount", threshold: 6 },
-    { id: "skill", count: 2, sides: 8, operation: "successCount", threshold: 5 },
+    { id: "attribute", count: 3, sides: 6, operation: "countAtLeast", threshold: 6 },
+    { id: "skill", count: 2, sides: 8, operation: "countAtLeast", threshold: 5 },
     { id: "gear", count: 1, sides: 4, operation: "sum" },
   ]);
 

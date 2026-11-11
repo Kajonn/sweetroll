@@ -476,21 +476,21 @@ describe("SystemRuntime contract", () => {
     });
     expect(result).toMatchObject({ ok: false, error: {
       code: "action_evaluation_failed", definitionId: "test_pool",
-      actionDiagnostics: [{ code: "arithmetic_failure", actionId: "test_pool", expressionId: "pool_roll_expr", message: expect.stringContaining("non-negative integer") }],
+      actionDiagnostics: [{ code: "arithmetic_failure", actionId: "test_pool", expressionId: "pool_roll_expr", message: expect.stringContaining("dice count must be an integer") }],
     } });
     expect(state).toEqual(initialized.state);
   });
 
-  it.each(["partial division", "legacy scalar operand"])("rejects %s without returning fallback or partial dice", async (mode) => {
+  it.each(["partial division", "invalid die size"])("rejects %s without returning fallback or partial dice", async (mode) => {
     const pkg = structuredClone(d6SuccessPoolPackage);
     const expression = pkg.expressions.find((e) => e.id === "pool_roll_expr")!;
-    expression.ast = mode === "legacy scalar operand"
-      ? { kind: "successCount", dice: { kind: "numberLiteral", value: 5 }, threshold: 6 }
-      : { kind: "binary", operator: "+", left: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: 6 }, right: { kind: "binary", operator: "/", left: { kind: "numberLiteral", value: 1 }, right: { kind: "numberLiteral", value: 0 } } };
+    expression.ast = mode === "invalid die size"
+      ? { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: { kind: "numberLiteral", value: 0 } }, modifiers: [] }
+      : { kind: "binary", operator: "+", left: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: { kind: "numberLiteral", value: 6 } }, modifiers: [] }, right: { kind: "binary", operator: "/", left: { kind: "numberLiteral", value: 1 }, right: { kind: "numberLiteral", value: 0 } } };
     const runtime = createRuntime(signSystemPackage(pkg));
     const initialized = await initialize(runtime, pkg);
     const result = await runtime.resolve({ versionId: pkg.versionId, entityId: "character", state: initialized.state,
-      intent: { kind: "action", actionId: "test_pool", inputs: {}, executionId: "legacy-failure" },
+      intent: { kind: "action", actionId: "test_pool", inputs: {}, executionId: "pool-failure" },
     });
     expect(result).toMatchObject({ ok: false, error: { code: "action_evaluation_failed", actionDiagnostics: [{ actionId: "test_pool", expressionId: "pool_roll_expr", code: "arithmetic_failure" }] } });
     expect(result).not.toHaveProperty("value");
@@ -521,7 +521,7 @@ describe("SystemRuntime contract", () => {
 
     expect(a.ok && b.ok).toBe(true);
     if (!a.ok || !b.ok) return;
-    expect(a.value.roll).toEqual({
+    expect(a.value.roll).toMatchObject({
       actionId: "test_pool",
       expression: "countSuccesses(dice(fields.attribute + fields.skill + inputs.bonus_dice, 6), 6)",
       dice: [4, 4, 3, 5, 3, 4, 6, 3].map((value) => ({ sides: 6, value, kept: true })),

@@ -202,7 +202,7 @@
           "modifier",
           "bonus"
         ],
-        "cost": 6,
+        "cost": 7,
         "ast": {
           "kind": "binary",
           "operator": "+",
@@ -210,12 +210,19 @@
             "kind": "binary",
             "operator": "+",
             "left": {
-              "kind": "dice",
-              "count": {
-                "kind": "numberLiteral",
-                "value": 1
+              "kind": "pool",
+              "source": {
+                "kind": "dice",
+                "count": {
+                  "kind": "numberLiteral",
+                  "value": 1
+                },
+                "sides": {
+                  "kind": "numberLiteral",
+                  "value": 20
+                }
               },
-              "sides": 20
+              "modifiers": []
             },
             "right": {
               "kind": "reference",
@@ -330,7 +337,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:da1eff8a3ef0dd68e91b841744245c4d747d0151361ba6331ff6e70b690d3090"
+      "checksum": "sha256:5178fbd42729b28f711bc54866394108602c9aa148cf125992dd5d24fb2d83a4"
     }
   }
 }

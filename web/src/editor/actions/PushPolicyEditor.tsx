@@ -71,10 +71,13 @@ export function PushPolicyEditor({
   disabled?: boolean | undefined;
 }) {
   const parsed = parse(source);
-  const groups: { id: string; label: string; sides: number }[] = [];
+  const groups: { id: string; label: string; sides: number; dynamic: boolean; modifiers: NonNullable<PushPolicy["groups"][number]["modifiers"]> }[] = [];
   const walk = (n: ExpressionAstV1) => {
-    if (n.kind === "dice" && n.group)
-      groups.push({ ...n.group, sides: n.sides });
+    if (n.kind === "pool" && n.group && n.source.kind === "dice") {
+      const sides = n.source.sides;
+      groups.push({ ...n.group, sides: sides.kind === "numberLiteral" ? sides.value : 1000,
+        dynamic: sides.kind !== "numberLiteral", modifiers: n.modifiers.map((modifier) => modifier.kind) });
+    }
     children(n).forEach(walk);
   };
   if (parsed.ok) walk(parsed.ast);
@@ -83,7 +86,7 @@ export function PushPolicyEditor({
     maxAttempts: 1,
     successThreshold: 1,
     allowOnSuccess: false,
-    groups: groups.map((g) => ({
+    groups: (groups.some((g) => g.modifiers.length === 0) ? groups.filter((g) => g.modifiers.length === 0) : groups).map((g) => ({
       groupId: g.id,
       lockedFaces: [],
       reportedFaces: [],
@@ -101,7 +104,10 @@ export function PushPolicyEditor({
             expressionId: "expr",
             outputTemplate: "",
             inputs: [],
-            pushPolicy: candidate,
+            pushPolicy: policy ?? { ...candidate, groups: candidate.groups.map((group) => {
+              const modifiers = groups.find((g) => g.id === group.groupId)?.modifiers;
+              return modifiers?.length ? { ...group, modifiers } : group;
+            }) },
           },
         ],
         expressions: [{ id: "expr", ast: parsed.ast }],
@@ -165,7 +171,7 @@ export function PushPolicyEditor({
             return (
               <fieldset key={g.id}>
                 <legend>
-                  {g.label} (d{g.sides})
+                  {g.label} ({g.dynamic ? "variable die" : `d${g.sides}`})
                 </legend>
                 <Checkbox
                   label={`Push ${g.label}`}
@@ -188,6 +194,12 @@ export function PushPolicyEditor({
                 />
                 {configured ? (
                   <>
+                    {g.modifiers.length > 0 ? <Checkbox
+                      label={`Allow modified dice in ${g.label}`}
+                      checked={g.modifiers.every((modifier) => configured.modifiers?.includes(modifier))}
+                      disabled={disabled}
+                      onChange={(e) => change({ modifiers: e.target.checked ? g.modifiers : [] })}
+                    /> : null}
                     <Faces
                       label={`Locked faces for ${g.label}`}
                       value={configured.lockedFaces}

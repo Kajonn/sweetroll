@@ -564,7 +564,9 @@ describe("character HTTP routes", () => {
         apply: async (_ctx, input) => {
           received = input;
           return { ok: true, value: commandResult({
-            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience: "owner_only",
+            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12",
+            breakdown: { version: "1.0", rootId: "root", groups: [], terms: [{ id: "root", operation: "literal", operandIds: [], value: 12 }] },
+            audience: "owner_only",
           } as CharacterCommandResult["roll"]) };
         },
       }),
@@ -608,7 +610,9 @@ describe("character HTTP routes", () => {
         apply: async (_ctx, input) => {
           received = input;
           return { ok: true, value: commandResult({
-            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience: "campaign",
+            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12",
+            breakdown: { version: "1.0", rootId: "root", groups: [], terms: [{ id: "root", operation: "literal", operandIds: [], value: 12 }] },
+            audience: "campaign",
           } as CharacterCommandResult["roll"]) };
         },
       }),

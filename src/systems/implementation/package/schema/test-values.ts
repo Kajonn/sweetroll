@@ -252,10 +252,10 @@ const expressions: CompiledExpressionV1[] = [
     inferredType: "number",
     fallback: 0,
     dependencies: ["attribute", "skill"],
-    cost: 7,
+    cost: 6,
     ast: {
-      kind: "successCount",
-      dice: {
+      kind: "pool",
+      source: {
         kind: "dice",
         count: {
           kind: "binary",
@@ -263,9 +263,10 @@ const expressions: CompiledExpressionV1[] = [
           left: { kind: "reference", scope: "fields", id: "attribute" },
           right: { kind: "reference", scope: "fields", id: "skill" },
         },
-        sides: 6,
+        sides: { kind: "numberLiteral", value: 6 },
       },
-      threshold: 6,
+      modifiers: [],
+      reducer: { kind: "countAtLeast", amount: { kind: "numberLiteral", value: 6 } },
     },
   },
 ];

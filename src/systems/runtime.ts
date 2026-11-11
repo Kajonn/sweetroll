@@ -106,7 +106,7 @@ export type NormalizedRollAudience = "owner_only" | "gm_only" | "campaign";
 
 export type NormalizedRoll = {
   push?: import("./implementation/rules/result.js").PushResult;
-  breakdown?: RollBreakdown;
+  breakdown: RollBreakdown;
   actionId: DefinitionId;
   expression: string;
   dice: NormalizedDie[];
@@ -568,7 +568,7 @@ export function createSystemRuntime(input: {
           actionId: pendingRoll.actionId,
           expression: evaluated.roll.expression,
           dice: evaluated.roll.dice,
-          ...(evaluated.roll.breakdown === undefined ? {} : {breakdown: evaluated.roll.breakdown}),
+          breakdown: evaluated.roll.breakdown,
           bindings: evaluated.bindings,
           total: evaluated.roll.total,
           output: pendingRoll.outputTemplate.split("{total}").join(String(evaluated.roll.total)),

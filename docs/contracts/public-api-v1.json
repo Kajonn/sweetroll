@@ -15926,7 +15926,8 @@
                   "bindings",
                   "total",
                   "output",
-                  "audience"
+                  "audience",
+                  "breakdown"
                 ],
                 "properties": {
                   "rollId": {
@@ -15983,6 +15984,16 @@
                         },
                         "success": {
                           "type": "boolean"
+                        },
+                        "rerolledFrom": {
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "type": "string"
+                        },
+                        "explodedFrom": {
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "type": "string"
                         }
                       }
                     }
@@ -16138,7 +16149,15 @@
                                   "type": "string"
                                 },
                                 {
-                                  "const": "successCount",
+                                  "const": "countAtLeast",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "countAtMost",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "countEqual",
                                   "type": "string"
                                 },
                                 {
@@ -16153,6 +16172,28 @@
                             },
                             "threshold": {
                               "type": "integer"
+                            },
+                            "keepCount": {
+                              "minimum": 0,
+                              "maximum": 100,
+                              "type": "integer"
+                            },
+                            "modifiers": {
+                              "maxItems": 2,
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "const": "explode",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "rerollOnce",
+                                    "type": "string"
+                                  }
+                                ]
+                              }
                             },
                             "diceIds": {
                               "maxItems": 100,
@@ -16233,6 +16274,10 @@
                               "minLength": 1,
                               "maxLength": 256,
                               "type": "string"
+                            },
+                            "reused": {
+                              "const": true,
+                              "type": "boolean"
                             }
                           }
                         }
@@ -16382,7 +16427,8 @@
           "bindings",
           "total",
           "output",
-          "audience"
+          "audience",
+          "breakdown"
         ],
         "properties": {
           "rollId": {
@@ -16439,6 +16485,16 @@
                 },
                 "success": {
                   "type": "boolean"
+                },
+                "rerolledFrom": {
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                "explodedFrom": {
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "type": "string"
                 }
               }
             }
@@ -16594,7 +16650,15 @@
                           "type": "string"
                         },
                         {
-                          "const": "successCount",
+                          "const": "countAtLeast",
+                          "type": "string"
+                        },
+                        {
+                          "const": "countAtMost",
+                          "type": "string"
+                        },
+                        {
+                          "const": "countEqual",
                           "type": "string"
                         },
                         {
@@ -16609,6 +16673,28 @@
                     },
                     "threshold": {
                       "type": "integer"
+                    },
+                    "keepCount": {
+                      "minimum": 0,
+                      "maximum": 100,
+                      "type": "integer"
+                    },
+                    "modifiers": {
+                      "maxItems": 2,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "const": "explode",
+                            "type": "string"
+                          },
+                          {
+                            "const": "rerollOnce",
+                            "type": "string"
+                          }
+                        ]
+                      }
                     },
                     "diceIds": {
                       "maxItems": 100,
@@ -16689,6 +16775,10 @@
                       "minLength": 1,
                       "maxLength": 256,
                       "type": "string"
+                    },
+                    "reused": {
+                      "const": true,
+                      "type": "boolean"
                     }
                   }
                 }
@@ -17549,7 +17639,8 @@
                     "bindings",
                     "total",
                     "output",
-                    "audience"
+                    "audience",
+                    "breakdown"
                   ],
                   "properties": {
                     "rollId": {
@@ -17606,6 +17697,16 @@
                           },
                           "success": {
                             "type": "boolean"
+                          },
+                          "rerolledFrom": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "explodedFrom": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
                           }
                         }
                       }
@@ -17761,7 +17862,15 @@
                                     "type": "string"
                                   },
                                   {
-                                    "const": "successCount",
+                                    "const": "countAtLeast",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countAtMost",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countEqual",
                                     "type": "string"
                                   },
                                   {
@@ -17776,6 +17885,28 @@
                               },
                               "threshold": {
                                 "type": "integer"
+                              },
+                              "keepCount": {
+                                "minimum": 0,
+                                "maximum": 100,
+                                "type": "integer"
+                              },
+                              "modifiers": {
+                                "maxItems": 2,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "const": "explode",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "rerollOnce",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
                               },
                               "diceIds": {
                                 "maxItems": 100,
@@ -17856,6 +17987,10 @@
                                 "minLength": 1,
                                 "maxLength": 256,
                                 "type": "string"
+                              },
+                              "reused": {
+                                "const": true,
+                                "type": "boolean"
                               }
                             }
                           }
@@ -18925,9 +19060,415 @@
           "rolls": {
             "type": "array",
             "items": {
-              "additionalProperties": true,
+              "additionalProperties": false,
               "type": "object",
-              "properties": {}
+              "required": [
+                "rollId",
+                "characterId",
+                "actorId",
+                "actionId",
+                "audience",
+                "expression",
+                "breakdown",
+                "breakdownText",
+                "dice",
+                "bindings",
+                "total",
+                "output",
+                "occurredAt"
+              ],
+              "properties": {
+                "rollId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "characterId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "actorId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "actionId": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "audience": {
+                  "anyOf": [
+                    {
+                      "const": "owner_only",
+                      "type": "string"
+                    },
+                    {
+                      "const": "gm_only",
+                      "type": "string"
+                    },
+                    {
+                      "const": "campaign",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "expression": {
+                  "type": "string"
+                },
+                "breakdown": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "version",
+                    "rootId",
+                    "groups",
+                    "terms"
+                  ],
+                  "properties": {
+                    "version": {
+                      "const": "1.0",
+                      "type": "string"
+                    },
+                    "rootId": {
+                      "minLength": 1,
+                      "maxLength": 256,
+                      "type": "string"
+                    },
+                    "groups": {
+                      "maxItems": 256,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "label",
+                          "count",
+                          "sides",
+                          "operation",
+                          "diceIds",
+                          "total"
+                        ],
+                        "properties": {
+                          "id": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "label": {
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "count": {
+                            "minimum": 0,
+                            "maximum": 100,
+                            "type": "integer"
+                          },
+                          "sides": {
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "type": "integer"
+                          },
+                          "operation": {
+                            "anyOf": [
+                              {
+                                "const": "sum",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countAtLeast",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countAtMost",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countEqual",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keepHighest",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keepLowest",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "threshold": {
+                            "type": "integer"
+                          },
+                          "keepCount": {
+                            "minimum": 0,
+                            "maximum": 100,
+                            "type": "integer"
+                          },
+                          "modifiers": {
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "const": "explode",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "rerollOnce",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "diceIds": {
+                            "maxItems": 100,
+                            "type": "array",
+                            "items": {
+                              "minLength": 1,
+                              "maxLength": 256,
+                              "type": "string"
+                            }
+                          },
+                          "total": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    },
+                    "terms": {
+                      "maxItems": 256,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "operation",
+                          "operandIds",
+                          "value"
+                        ],
+                        "properties": {
+                          "id": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "operation": {
+                            "minLength": 1,
+                            "maxLength": 32,
+                            "type": "string"
+                          },
+                          "operandIds": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "minLength": 1,
+                              "maxLength": 256,
+                              "type": "string"
+                            }
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              {
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            ]
+                          },
+                          "groupId": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "reused": {
+                            "const": true,
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "breakdownText": {
+                  "type": "string"
+                },
+                "dice": {
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "sides",
+                      "value",
+                      "kept"
+                    ],
+                    "properties": {
+                      "sides": {
+                        "minimum": 1,
+                        "maximum": 1000,
+                        "type": "integer"
+                      },
+                      "value": {
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "kept": {
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      },
+                      "groupId": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      },
+                      "success": {
+                        "type": "boolean"
+                      },
+                      "rerolledFrom": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      },
+                      "explodedFrom": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "bindings": {},
+                "total": {
+                  "type": "number"
+                },
+                "output": {
+                  "type": "string"
+                },
+                "push": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "version",
+                    "rollId",
+                    "rootRollId",
+                    "parentRollId",
+                    "attempt",
+                    "maxAttempts",
+                    "rerolledDiceIds",
+                    "faceOutcomes"
+                  ],
+                  "properties": {
+                    "version": {
+                      "const": "1.0",
+                      "type": "string"
+                    },
+                    "rollId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "rootRollId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "parentRollId": {
+                      "anyOf": [
+                        {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "attempt": {
+                      "minimum": 0,
+                      "maximum": 10,
+                      "type": "integer"
+                    },
+                    "maxAttempts": {
+                      "minimum": 1,
+                      "maximum": 10,
+                      "type": "integer"
+                    },
+                    "rerolledDiceIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      }
+                    },
+                    "faceOutcomes": {
+                      "maxItems": 32000,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "groupId",
+                          "face",
+                          "combinedCount",
+                          "rerolledCount"
+                        ],
+                        "properties": {
+                          "groupId": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "face": {
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "type": "integer"
+                          },
+                          "combinedCount": {
+                            "minimum": 0,
+                            "maximum": 100,
+                            "type": "integer"
+                          },
+                          "rerolledCount": {
+                            "minimum": 0,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "occurredAt": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              }
             }
           },
           "templates": {
@@ -20676,6 +21217,23 @@
                                         "minimum": 1,
                                         "maximum": 1000,
                                         "type": "integer"
+                                      }
+                                    },
+                                    "modifiers": {
+                                      "maxItems": 2,
+                                      "uniqueItems": true,
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "rerollOnce",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "explode",
+                                            "type": "string"
+                                          }
+                                        ]
                                       }
                                     }
                                   }
@@ -23387,6 +23945,23 @@
                                   "maximum": 1000,
                                   "type": "integer"
                                 }
+                              },
+                              "modifiers": {
+                                "maxItems": 2,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "const": "rerollOnce",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "explode",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
                               }
                             }
                           }
@@ -24214,6 +24789,23 @@
                                         "minimum": 1,
                                         "maximum": 1000,
                                         "type": "integer"
+                                      }
+                                    },
+                                    "modifiers": {
+                                      "maxItems": 2,
+                                      "uniqueItems": true,
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "rerollOnce",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "explode",
+                                            "type": "string"
+                                          }
+                                        ]
                                       }
                                     }
                                   }
@@ -25471,6 +26063,23 @@
                                   "maximum": 1000,
                                   "type": "integer"
                                 }
+                              },
+                              "modifiers": {
+                                "maxItems": 2,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "const": "rerollOnce",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "explode",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
                               }
                             }
                           }
@@ -26299,6 +26908,23 @@
                                         "maximum": 1000,
                                         "type": "integer"
                                       }
+                                    },
+                                    "modifiers": {
+                                      "maxItems": 2,
+                                      "uniqueItems": true,
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "rerollOnce",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "explode",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
                                     }
                                   }
                                 }
@@ -26893,13 +27519,56 @@
             "type": "object",
             "required": [
               "kind",
-              "count",
-              "sides"
+              "source",
+              "modifiers"
             ],
             "properties": {
               "kind": {
-                "const": "dice",
+                "const": "pool",
                 "type": "string"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "count",
+                      "sides"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "dice",
+                        "type": "string"
+                      },
+                      "count": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      },
+                      "sides": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      }
+                    }
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "groupId"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "rolled",
+                        "type": "string"
+                      },
+                      "groupId": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
               },
               "group": {
                 "additionalProperties": false,
@@ -26920,70 +27589,83 @@
                   }
                 }
               },
-              "count": {
-                "$ref": "#/components/schemas/ExpressionAst"
+              "modifiers": {
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "kind"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "explode",
+                          "type": "string"
+                        },
+                        "face": {
+                          "$ref": "#/components/schemas/ExpressionAst"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "face"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "rerollOnce",
+                          "type": "string"
+                        },
+                        "face": {
+                          "$ref": "#/components/schemas/ExpressionAst"
+                        }
+                      }
+                    }
+                  ]
+                }
               },
-              "sides": {
-                "minimum": 1,
-                "maximum": 1000,
-                "type": "integer"
-              }
-            }
-          },
-          {
-            "additionalProperties": false,
-            "type": "object",
-            "required": [
-              "kind",
-              "mode",
-              "count",
-              "dice"
-            ],
-            "properties": {
-              "kind": {
-                "const": "keep",
-                "type": "string"
-              },
-              "mode": {
-                "anyOf": [
-                  {
-                    "const": "highest",
-                    "type": "string"
+              "reducer": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "kind",
+                  "amount"
+                ],
+                "properties": {
+                  "kind": {
+                    "anyOf": [
+                      {
+                        "const": "keepHighest",
+                        "type": "string"
+                      },
+                      {
+                        "const": "keepLowest",
+                        "type": "string"
+                      },
+                      {
+                        "const": "countAtLeast",
+                        "type": "string"
+                      },
+                      {
+                        "const": "countAtMost",
+                        "type": "string"
+                      },
+                      {
+                        "const": "countEqual",
+                        "type": "string"
+                      }
+                    ]
                   },
-                  {
-                    "const": "lowest",
-                    "type": "string"
+                  "amount": {
+                    "$ref": "#/components/schemas/ExpressionAst"
                   }
-                ]
-              },
-              "count": {
-                "minimum": 1,
-                "maximum": 100,
-                "type": "integer"
-              },
-              "dice": {
-                "$ref": "#/components/schemas/ExpressionAst"
-              }
-            }
-          },
-          {
-            "additionalProperties": false,
-            "type": "object",
-            "required": [
-              "kind",
-              "dice",
-              "threshold"
-            ],
-            "properties": {
-              "kind": {
-                "const": "successCount",
-                "type": "string"
-              },
-              "dice": {
-                "$ref": "#/components/schemas/ExpressionAst"
-              },
-              "threshold": {
-                "type": "integer"
+                }
               }
             }
           }

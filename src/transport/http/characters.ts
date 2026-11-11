@@ -302,7 +302,7 @@ const RollAudienceDto = Type.Union([
 ]);
 const RollDto = Type.Object({
   push:Type.Optional(PushResultSchema),
-  breakdown: Type.Optional(RollBreakdownSchema),
+  breakdown: RollBreakdownSchema,
   actionId: Type.String(),
   expression: Type.String(),
   dice: Type.Array(DiceDto),

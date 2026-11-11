@@ -306,7 +306,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
     expect(roll.statusCode, roll.body).toBe(200);
     const r1 = roll.json().result;
     expect(r1.character.revision).toBe(3);
-    expect(r1.roll).toEqual({
+    expect(r1.roll).toMatchObject({
       actionId: "check",
       expression: "d20 + fields.modifier + inputs.bonus",
       dice: [expect.objectContaining({ sides: 20, kept: true })],
@@ -762,7 +762,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
     const fail = () => execute(-3, baseRevision, "pool-fail");
     const rejected = await fail();
     expect(rejected.statusCode, rejected.body).toBe(422);
-    expect(rejected.json().error).toMatchObject({ code: "invalid_value", actionDiagnostics: [{ code: "arithmetic_failure", actionId, expressionId, message: expect.stringContaining("non-negative integer") }] });
+    expect(rejected.json().error).toMatchObject({ code: "invalid_value", actionDiagnostics: [{ code: "arithmetic_failure", actionId, expressionId, message: expect.stringContaining("dice count must be an integer") }] });
     expect(rejected.json().error).not.toHaveProperty("diagnostics");
     const replay = await fail();
     expect(replay.statusCode).toBe(422);

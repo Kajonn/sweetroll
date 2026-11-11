@@ -17,7 +17,7 @@ describe("parser", () => {
     const r = parse("d20");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.ast).toEqual({ kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: 20 });
+    expect(r.ast).toEqual({ kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: { kind: "numberLiteral", value: 20 } }, modifiers: [] });
   });
 
   it("parses 2d6 + fields.move_stat + inputs.forward", () => {
@@ -28,7 +28,7 @@ describe("parser", () => {
       kind: "binary", operator: "+",
       left: {
         kind: "binary", operator: "+",
-        left: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 6 },
+        left: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 6 } }, modifiers: [] },
         right: { kind: "reference", scope: "fields", id: "move_stat" },
       },
       right: { kind: "reference", scope: "inputs", id: "forward" },
@@ -39,21 +39,14 @@ describe("parser", () => {
     const r = parse("4d6kh3");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.ast).toEqual({
-      kind: "keep", mode: "highest", count: 3,
-      dice: { kind: "dice", count: { kind: "numberLiteral", value: 4 }, sides: 6 },
-    });
+    expect(r.ast).toEqual({ kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 4 }, sides: { kind: "numberLiteral", value: 6 } }, modifiers: [], reducer: { kind: "keepHighest", amount: { kind: "numberLiteral", value: 3 } } });
   });
 
   it("parses successCount", () => {
     const r = parse("countSuccesses(dice(2, 6), 4)");
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.ast).toEqual({
-      kind: "successCount",
-      dice: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 6 },
-      threshold: 4,
-    });
+    expect(r.ast).toEqual({ kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 6 } }, modifiers: [], reducer: { kind: "countAtLeast", amount: { kind: "numberLiteral", value: 4 } } });
   });
 
   it("parses parentheses and unary negation of literal into a negative literal", () => {
@@ -88,15 +81,12 @@ describe("parser", () => {
   });
 
   it.each([
-    ["adv(d20)", "highest"],
-    ["dis(d20)", "lowest"],
+    ["adv(d20)", "keepHighest"],
+    ["dis(d20)", "keepLowest"],
   ])("parses %s as two dice keeping one", (source, mode) => {
     const r = parse(source);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.ast).toEqual({
-      kind: "keep", mode, count: 1,
-      dice: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 20 },
-    });
+    expect(r.ast).toEqual({ kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 20 } }, modifiers: [], reducer: { kind: mode, amount: { kind: "numberLiteral", value: 1 } } });
   });
 });

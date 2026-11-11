@@ -1,4 +1,5 @@
 import { Value } from "@sinclair/typebox/value";
+import { matchesPoolModifiers } from "./push-policy.js";
 import { evaluate } from "./evaluate.js";
 import { PushPolicySchema } from "../package/schema/push-policy.js";
 import type {
@@ -11,10 +12,12 @@ import type {
   Rng,
   RollResult,
 } from "./evaluate.js";
+type SavedPool = Omit<RollResult, "breakdown"> & { breakdown?: RollResult["breakdown"] };
+
 export type PushEvaluationInput = {
   expression: CompiledExpressionV1;
   policy: PushPolicy;
-  parent: RollResult;
+  parent: SavedPool;
   bindings: EvaluationBindings;
   attempt: number;
   rng: Rng;
@@ -36,7 +39,7 @@ export type PushEvaluationResult =
   | { ok: false; reason: string };
 export function pushEligibility(
   policy: PushPolicy,
-  parent: RollResult,
+  parent: SavedPool,
   attempt: number,
 ): { canPush: boolean; reason: string | null; eligibleDiceIds: string[] } {
   const unavailable = (reason: string) => ({
@@ -56,16 +59,17 @@ export function pushEligibility(
   if (!policy.allowOnSuccess && parent.total >= policy.successThreshold)
     return unavailable("successful_roll");
   const groups = new Map(policy.groups.map((g) => [g.groupId, g]));
+  const snapshotGroups = new Map(parent.breakdown.groups.map((group) => [group.id, group]));
   const eligibleDiceIds = parent.dice
-    .filter(
-      (d) =>
-        d.kept &&
-        d.id &&
-        d.groupId &&
-        groups.has(d.groupId) &&
-        !groups.get(d.groupId)!.lockedFaces.includes(d.value),
-    )
-    .map((d) => d.id!);
+    .filter((die) => {
+      if (!die.kept || !die.id || !die.groupId || die.explodedFrom) return false;
+      const policyGroup = groups.get(die.groupId);
+      const snapshot = snapshotGroups.get(die.groupId);
+      return policyGroup !== undefined && snapshot !== undefined &&
+        matchesPoolModifiers(policyGroup.modifiers, snapshot.modifiers) &&
+        !policyGroup.lockedFaces.includes(die.value);
+    })
+    .map((die) => die.rerolledFrom ?? die.id!);
   return eligibleDiceIds.length
     ? { canPush: true, reason: null, eligibleDiceIds }
     : unavailable("no_eligible_dice");
@@ -100,44 +104,37 @@ export function evaluatePush(input: PushEvaluationInput): PushEvaluationResult {
     )
       return { ok: false, reason: "invalid_snapshot" };
     const eligible = new Set(options.eligibleDiceIds);
-    index = 0;
-    const result = evaluate(
-      expression,
-      bindings,
-      () => {
-        const d = parent.dice[index++];
-        if (!d) throw Error("extra die");
-        if (!eligible.has(d.id!)) return (d.value - 0.5) / d.sides;
-        const draw = input.rng();
-        if (!Number.isFinite(draw) || draw < 0 || draw > 1)
-          throw Error("invalid draw");
-        return draw;
-      },
-      limits,
-    );
-    if (
-      !result.ok ||
-      !result.roll ||
-      result.diagnostics.length ||
-      index !== parent.dice.length
-    )
+    const savedDice = new Map(parent.dice.map((die) => [die.id, die]));
+    const redrawn = new Set<string>();
+    const result = evaluate(expression, bindings, undefined, limits, (id, chainId) => {
+      if (!eligible.has(chainId)) {
+        const saved = savedDice.get(id);
+        if (!saved) throw Error("missing retained die");
+        return (saved.value - 0.5) / saved.sides;
+      }
+      const draw = input.rng();
+      if (!Number.isFinite(draw) || draw < 0 || draw > 1) throw Error("invalid draw");
+      redrawn.add(id);
+      return draw;
+    });
+    if (!result.ok || !result.roll || result.diagnostics.length)
       return { ok: false, reason: "invalid_snapshot" };
     return {
       ok: true,
       roll: result.roll,
-      rerolledDiceIds: options.eligibleDiceIds,
+      rerolledDiceIds: [...redrawn],
       faceOutcomes: policy.groups.flatMap((g) =>
         g.reportedFaces.map((face) => ({
           groupId: g.groupId,
           face,
           combinedCount: result.roll!.dice.filter(
-            (d) => d.groupId === g.groupId && d.value === face,
+            (d) => d.kept && d.groupId === g.groupId && d.value === face,
           ).length,
           rerolledCount: result.roll!.dice.filter(
             (d) =>
-              d.groupId === g.groupId &&
+              d.kept && d.groupId === g.groupId &&
               d.value === face &&
-              eligible.has(d.id!),
+              redrawn.has(d.id!),
           ).length,
         })),
       ),

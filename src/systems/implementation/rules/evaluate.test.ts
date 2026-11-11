@@ -15,7 +15,7 @@ function seqRng(seq: number[]): () => number { let i = 0; return () => seq[i++]!
 
 describe("evaluate", () => {
   it("evaluates arithmetic against bindings", () => {
-    const r = evaluate(compile("10 + fields.modifier"), { fields: { modifier: 7 }, inputs: {} });
+    const r = evaluate(compile("10 + fields.modifier", { ...rollOpts, context: "computed" }), { fields: { modifier: 7 }, inputs: {} });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.result).toBe(17);
@@ -29,7 +29,7 @@ describe("evaluate", () => {
     if (!r.ok) return;
     expect(r.roll).not.toBeNull();
     if (!r.roll) return;
-    expect(r.roll.dice).toEqual([{ sides: 20, value: 1, kept: true }]);
+    expect(r.roll.dice).toMatchObject([{ sides: 20, value: 1, kept: true }]);
     expect(r.roll.total).toBe(1);
   });
 

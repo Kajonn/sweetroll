@@ -1295,13 +1295,56 @@
                     "type": "object",
                     "required": [
                       "kind",
-                      "count",
-                      "sides"
+                      "source",
+                      "modifiers"
                     ],
                     "properties": {
                       "kind": {
-                        "const": "dice",
+                        "const": "pool",
                         "type": "string"
+                      },
+                      "source": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "kind",
+                              "count",
+                              "sides"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "dice",
+                                "type": "string"
+                              },
+                              "count": {
+                                "$ref": "ExpressionAstV1"
+                              },
+                              "sides": {
+                                "$ref": "ExpressionAstV1"
+                              }
+                            }
+                          },
+                          {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "kind",
+                              "groupId"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "rolled",
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
                       },
                       "group": {
                         "additionalProperties": false,
@@ -1322,70 +1365,83 @@
                           }
                         }
                       },
-                      "count": {
-                        "$ref": "ExpressionAstV1"
+                      "modifiers": {
+                        "maxItems": 2,
+                        "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "kind"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "explode",
+                                  "type": "string"
+                                },
+                                "face": {
+                                  "$ref": "ExpressionAstV1"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "face"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "rerollOnce",
+                                  "type": "string"
+                                },
+                                "face": {
+                                  "$ref": "ExpressionAstV1"
+                                }
+                              }
+                            }
+                          ]
+                        }
                       },
-                      "sides": {
-                        "minimum": 1,
-                        "maximum": 1000,
-                        "type": "integer"
-                      }
-                    }
-                  },
-                  {
-                    "additionalProperties": false,
-                    "type": "object",
-                    "required": [
-                      "kind",
-                      "mode",
-                      "count",
-                      "dice"
-                    ],
-                    "properties": {
-                      "kind": {
-                        "const": "keep",
-                        "type": "string"
-                      },
-                      "mode": {
-                        "anyOf": [
-                          {
-                            "const": "highest",
-                            "type": "string"
+                      "reducer": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "amount"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "anyOf": [
+                              {
+                                "const": "keepHighest",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keepLowest",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countAtLeast",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countAtMost",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countEqual",
+                                "type": "string"
+                              }
+                            ]
                           },
-                          {
-                            "const": "lowest",
-                            "type": "string"
+                          "amount": {
+                            "$ref": "ExpressionAstV1"
                           }
-                        ]
-                      },
-                      "count": {
-                        "minimum": 1,
-                        "maximum": 100,
-                        "type": "integer"
-                      },
-                      "dice": {
-                        "$ref": "ExpressionAstV1"
-                      }
-                    }
-                  },
-                  {
-                    "additionalProperties": false,
-                    "type": "object",
-                    "required": [
-                      "kind",
-                      "dice",
-                      "threshold"
-                    ],
-                    "properties": {
-                      "kind": {
-                        "const": "successCount",
-                        "type": "string"
-                      },
-                      "dice": {
-                        "$ref": "ExpressionAstV1"
-                      },
-                      "threshold": {
-                        "type": "integer"
+                        }
                       }
                     }
                   }
@@ -1474,6 +1530,23 @@
                                 "minimum": 1,
                                 "maximum": 1000,
                                 "type": "integer"
+                              }
+                            },
+                            "modifiers": {
+                              "maxItems": 2,
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "const": "rerollOnce",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "explode",
+                                    "type": "string"
+                                  }
+                                ]
                               }
                             }
                           }
@@ -2302,6 +2375,23 @@
                                       "minimum": 1,
                                       "maximum": 1000,
                                       "type": "integer"
+                                    }
+                                  },
+                                  "modifiers": {
+                                    "maxItems": 2,
+                                    "uniqueItems": true,
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "const": "rerollOnce",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "explode",
+                                          "type": "string"
+                                        }
+                                      ]
                                     }
                                   }
                                 }

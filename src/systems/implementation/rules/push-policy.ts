@@ -6,16 +6,20 @@ import type {
   ObjectTemplateV1,
 } from "../package/schema/index.js";
 import type { RulesDiagnostic } from "./diagnostic.js";
-import { children } from "./groups.js";
-export function containsDice(n: ExpressionAstV1): boolean {
-  return n.kind === "dice" || children(n).some(containsDice);
+import { children, containsDice } from "./groups.js";
+import type { PoolAst } from "../package/schema/expression.js";
+
+export function matchesPoolModifiers(allowed: readonly string[] = [], actual: readonly string[] = []): boolean {
+  return actual.length === allowed.length && actual.every((modifier) => allowed.includes(modifier));
 }
 /** Only additive dice reductions and bounded literal scaling can vary on a push. */
 function affine(n: ExpressionAstV1, scale = 1): boolean {
   if (!containsDice(n)) return true;
-  if (n.kind === "dice") return !containsDice(n.count);
-  if (n.kind === "successCount")
-    return n.dice.kind === "dice" && !containsDice(n.dice.count);
+  if (n.kind === "pool") {
+    return n.source.kind === "dice" &&
+      n.reducer?.kind !== "keepHighest" && n.reducer?.kind !== "keepLowest" &&
+      !children(n).some(containsDice);
+  }
   if (n.kind === "unary" && n.operator === "-")
     return affine(n.operand, -scale);
   if (n.kind === "binary") {
@@ -86,18 +90,22 @@ export function validatePushPolicies(value: {
       fail(
         "Push requires additive sum/count dice terms and bounded literal scaling; keep and nonlinear dice formulas are unsupported.",
       );
-    const groups = new Map<string, number>();
+    const groups = new Map<string, PoolAst>();
     const walk = (n: ExpressionAstV1) => {
-      if (n.kind === "dice" && n.group) groups.set(n.group.id, n.sides);
+      if (n.kind === "pool" && n.group) groups.set(n.group.id, n);
       children(n).forEach(walk);
     };
     walk(ast);
     for (const g of action.pushPolicy.groups) {
-      const sides = groups.get(g.groupId);
-      if (sides === undefined) fail(`Unknown named push group: ${g.groupId}.`);
-      else if (
-        [...g.lockedFaces, ...g.reportedFaces].some((face) => face > sides)
-      )
+      const pool = groups.get(g.groupId);
+      if (pool?.source.kind !== "dice") {
+        fail(`Unknown named push group: ${g.groupId}.`);
+        continue;
+      }
+      if (!matchesPoolModifiers(g.modifiers, pool.modifiers.map((modifier) => modifier.kind)))
+        fail(`Push policy for ${g.groupId} must explicitly allow its pool modifiers.`);
+      const sides = pool.source.sides;
+      if (sides.kind === "numberLiteral" && [...g.lockedFaces, ...g.reportedFaces].some((face) => face > sides.value))
         fail(`Push face exceeds die sides for ${g.groupId}.`);
     }
   }

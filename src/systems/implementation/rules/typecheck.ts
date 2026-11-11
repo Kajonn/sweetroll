@@ -1,3 +1,4 @@
+import { children, containsDice } from "./groups.js";
 import type { ExpressionAstV1, ValueType, DefinitionId } from "../package/schema/index.js";
 import { aggregateCall, isAggregate, literalId, type RulesDataset, type SlotEnvironment } from "./data.js";
 import type { RulesDiagnostic } from "./diagnostic.js";
@@ -135,21 +136,12 @@ export function inferType(ast: ExpressionAstV1, env: ExpressionCompileEnv): Infe
       }
       return { ok: true, type: "number" };
     }
-    case "dice": {
-      const c = inferType(ast.count, env);
-      if (!c.ok) return c;
-      if (c.type !== "number") return diag("invalid_expression", "dice count must be a number expression");
-      return { ok: true, type: "number" };
-    }
-    case "keep": {
-      const d = inferType(ast.dice, env);
-      if (!d.ok) return d;
-      return { ok: true, type: "number" };
-    }
-    case "successCount": {
-      if (ast.dice.kind !== "dice") return diag("invalid_expression", "countSuccesses expects a direct dice expression");
-      const d = inferType(ast.dice, env);
-      if (!d.ok) return d;
+    case "pool": {
+      for (const parameter of children(ast)) {
+        const result = inferType(parameter, env);
+        if (!result.ok) return result;
+        if (result.type !== "number") return diag("invalid_expression", "dice pool parameters must be numbers");
+      }
       return { ok: true, type: "number" };
     }
   }
@@ -158,45 +150,23 @@ export function inferType(ast: ExpressionAstV1, env: ExpressionCompileEnv): Infe
 export function resolveDependencies(ast: ExpressionAstV1): DefinitionId[] {
   const out: DefinitionId[] = [];
   const seen = new Set<string>();
-  const walk = (n: ExpressionAstV1): void => {
-    switch (n.kind) {
-      case "reference": {
-        const key = `${n.scope}:${n.id}`;
-        if (!seen.has(key)) { seen.add(key); out.push(n.id); }
-        return;
+  const walk = (node: ExpressionAstV1): void => {
+    if (node.kind === "reference") {
+      const key = `${node.scope}:${node.id}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        out.push(node.id);
       }
-      case "unary": walk(n.operand); return;
-      case "binary": walk(n.left); walk(n.right); return;
-      case "call": for (const a of n.arguments) walk(a); return;
-      case "dice": walk(n.count); return;
-      case "keep": walk(n.dice); return;
-      case "successCount": walk(n.dice); return;
-      default: return;
     }
+    children(node).forEach(walk);
   };
   walk(ast);
   return out;
 }
 
 export function checkDeterministic(ast: ExpressionAstV1, context: "computed" | "roll" | "validation"): RulesDiagnostic[] {
-  if (context === "roll") return [];
-  const out: RulesDiagnostic[] = [];
-  const walk = (n: ExpressionAstV1): void => {
-    if (n.kind === "dice" || n.kind === "keep" || n.kind === "successCount") {
-      out.push({ code: "invalid_expression", path: "", message: "dice expressions are only valid in roll contexts" });
-    }
-    switch (n.kind) {
-      case "unary": walk(n.operand); return;
-      case "binary": walk(n.left); walk(n.right); return;
-      case "call": for (const a of n.arguments) walk(a); return;
-      case "dice": walk(n.count); return;
-      case "keep": walk(n.dice); return;
-      case "successCount": walk(n.dice); return;
-      default: return;
-    }
-  };
-  walk(ast);
-  return out;
+  if (context === "roll" || !containsDice(ast)) return [];
+  return [{ code: "invalid_expression", path: "", message: "dice expressions are only valid in roll contexts" }];
 }
 
 export function entityFieldTypes(fields: readonly { id: string; kind?: unknown; valueType?: unknown }[]): Record<string, FieldBindingType> {

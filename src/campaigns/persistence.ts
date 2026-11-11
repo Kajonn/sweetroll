@@ -1,4 +1,4 @@
-import type {RollBreakdown,PushResult} from "../systems/implementation/rules/result.js";
+import type {DieResult,RollBreakdown,PushResult} from "../systems/implementation/rules/result.js";
 import type { Pool, PoolClient } from "pg";
 
 import { notifySceneEvent } from "./scene-events.js";
@@ -92,9 +92,9 @@ export type RollExportRecord = {
   actionId: string;
   audience: "owner_only" | "gm_only" | "campaign";
   expression: string;
-  breakdown?: RollBreakdown;
+  breakdown: RollBreakdown;
   push?: PushResult;
-  dice: unknown;
+  dice: DieResult[];
   bindings: unknown;
   total: number;
   output: string;
@@ -302,9 +302,9 @@ type RollExportRow = {
   action_id: string;
   audience: string;
   expression: string;
-  breakdown_json: RollBreakdown | null;
+  breakdown_json: RollBreakdown;
   push_result_json: PushResult | null;
-  dice_json: unknown;
+  dice_json: DieResult[];
   bindings_json: unknown;
   total: number;
   rendered_output: string;
@@ -480,7 +480,7 @@ function toRollExportRecord(row: RollExportRow): RollExportRecord {
     audience: row.audience,
     expression: row.expression,
     dice: row.dice_json,
-    ...(row.breakdown_json == null ? {} : {breakdown:row.breakdown_json}),
+    breakdown: row.breakdown_json,
     ...(row.push_result_json == null ? {} : {push:row.push_result_json}),
     bindings: row.bindings_json,
     total: row.total,

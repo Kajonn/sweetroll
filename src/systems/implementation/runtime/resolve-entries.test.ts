@@ -446,6 +446,9 @@ describe("granted-action resolution", () => {
 describe("slot projection", () => {
   it("projects slot elements with entries and synthetic granted actions", async () => {
     const document = entryDocument();
+    document.entities[0]!.fields.push({ kind: "boolean", id: "longsword_attack", label: "Training", required: false, default: false });
+    document.expressions.push({ id: "training_expr", context: "validation", resultType: "boolean", source: "fields.longsword_attack", fallback: false });
+    document.validations.push({ id: "check_training", targetId: "longsword_attack", targetEntityId: "character", expressionId: "training_expr", severity: "warning", message: "Training required." });
     (document.sheets[0]!.sections[0]!.elements as unknown[]).push({
       kind: "slot",
       id: "inv_element",
@@ -482,6 +485,7 @@ describe("slot projection", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.projection.projectionVersion).toBe("1.0");
+    expect(result.value.projection.validations).toContainEqual(expect.objectContaining({ validationId: "check_training" }));
     const elements = result.value.projection.sheets[0]!.sections[0]!.elements;
     const slotIndex = elements.findIndex((element) => element.kind === "slot");
     expect(slotIndex).toBeGreaterThanOrEqual(0);

@@ -85,7 +85,7 @@ function projectElement(
   validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement[] {
   if (element.kind === "heading") return [{ ...element }];
-  if (element.kind === "slot") return projectSlot(element.slotId, element.id, lookups, state, validationsFor);
+  if (element.kind === "slot") return projectSlot(element.slotId, element.id, lookups, state);
   if (element.kind === "action") {
     const action = lookups.actions.get(element.actionId)!;
     return [{
@@ -136,7 +136,6 @@ function projectSlot(
     packageValue: SystemPackageV1;
   },
   state: RuntimeStateV1,
-  validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement[] {
   const slot = lookups.slots.get(slotId);
   const slotEntries = Object.values(state.entries)
@@ -167,7 +166,7 @@ function projectSlot(
     const template = effectiveEntryDefinition(lookups.packageValue, entry);
     if (template === undefined) continue;
     for (const action of template.grantedActions) {
-      elements.push(projectGrantedAction(entry.entryId, action, validationsFor));
+      elements.push(projectGrantedAction(entry.entryId, action));
     }
   }
   return elements;
@@ -176,7 +175,6 @@ function projectSlot(
 function projectGrantedAction(
   entryId: string,
   action: GrantedActionV1,
-  validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement {
   return {
     kind: "action",
@@ -186,7 +184,7 @@ function projectGrantedAction(
     label: action.label,
     actionKind: action.kind,
     inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
-    validations: validationsFor(action.id),
+    validations: [],
   };
 }
 

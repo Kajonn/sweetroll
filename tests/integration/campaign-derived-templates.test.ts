@@ -221,12 +221,12 @@ db("derived campaign templates", () => {
     expect(hit.roll?.bindings).toEqual(
       expect.arrayContaining([
         { scope: "fields", definitionId: "modifier", value: 0 },
-        { scope: "fields", definitionId: "damage_bonus", value: 4 },
+        { scope: "item", definitionId: "damage_bonus", value: 4 },
       ]),
     );
     const damage = value(await act(hit.character, entryId, "sword_damage"));
     expect(damage.roll?.bindings).toContainEqual({
-      scope: "fields",
+      scope: "item",
       definitionId: "damage_bonus",
       value: 4,
     });

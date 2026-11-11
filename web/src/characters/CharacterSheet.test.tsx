@@ -100,6 +100,19 @@ describe("CharacterSheet", () => {
     expect(screen.queryByRole("heading", { name: "Roll result" })).not.toBeInTheDocument();
   });
 
+  it("labels a nominal action by its entry when templates share the action ID", () => {
+    const current = snapshot({ lastNominal: { actionId: "activate", entryId: "torch-1", output: "Result: {total}" } });
+    current.confirmed!.projection.sheets[1]!.sections[0]!.elements.push({
+      kind: "action", id: "torch-1__activate", actionId: "activate", entryId: "torch-1",
+      label: "Raise Torch", actionKind: "roll", inputs: [], validations: [],
+    });
+    render(<CharacterSheet snapshot={current} templates={[
+      { id: "horn", label: "Horn", kind: "item", grantedActions: [{ id: "activate", label: "Sound Horn", actionKind: "roll", inputs: [] }] },
+      { id: "torch", label: "Torch", kind: "item", grantedActions: [{ id: "activate", label: "Raise Torch", actionKind: "roll", inputs: [] }] },
+    ]} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByText("Raise Torch recorded")).toBeVisible();
+  });
+
   it.each([
     ["gm_only", "GM only"],
     ["campaign", "Campaign"],

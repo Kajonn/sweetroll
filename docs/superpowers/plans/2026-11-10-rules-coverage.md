@@ -359,7 +359,8 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
 - Modified push groups require explicit policy opt-in. Pushes redraw eligible
   chains and replay retained draws from the saved roll.
 - The creator builder supports dynamic sides, keep counts and thresholds, rerolls
-  and explosions. The free-form editor supports reuse and compound formulas.
+  and explosions. Try it accepts sample values for numeric fields used by a pool.
+  The free-form editor supports reuse and compound formulas.
 - Glass Observatory, Midnight Dispatch, Far Beacon and Lantern Court cover M5–M8
   in PostgreSQL API scenarios and creator/player/GM browser journeys. The M5
   fixture uses a numeric doubles result. Outcome bands are scheduled in R5.

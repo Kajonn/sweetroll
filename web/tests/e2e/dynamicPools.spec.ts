@@ -33,6 +33,9 @@ for (const fixture of dynamicPoolFixtures) {
         await builder.getByRole("checkbox", { name: "Reroll one face once" }).check();
         await expect(builder.getByLabel("Reroll face", { exact: true })).toHaveValue("1");
       }
+      if (fixture.id === "step") await page.getByLabel("Sample Trait die").fill("8");
+      if (fixture.id === "difficulty" || fixture.id === "keep") await page.getByLabel("Sample Pool size").fill("4");
+      if (fixture.id === "keep") await page.getByLabel("Sample Keep count").fill("2");
       await page.getByTestId("roll-action-try-check").click();
       for (const group of fixture.groups) await expect(page.getByTestId(`roll-group-${group}`)).toBeVisible();
 

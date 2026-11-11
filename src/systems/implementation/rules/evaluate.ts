@@ -82,8 +82,11 @@ export type PoolDraw = (id: string, chainId: string) => number;
 function integer(node: ExpressionAstV1, ctx: Ctx, name: string, min: number, max = Number.MAX_SAFE_INTEGER): number | undefined {
   const value = evalNode(node, ctx);
   if (value === undefined) return undefined;
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < min || value > max)
-    return fail(ctx, `${name} must be an integer between ${min} and ${max}`);
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < min || value > max) {
+    if (max !== Number.MAX_SAFE_INTEGER) return fail(ctx, `${name} must be an integer between ${min} and ${max}`);
+    if (min !== -Number.MAX_SAFE_INTEGER) return fail(ctx, `${name} must be an integer of at least ${min}`);
+    return fail(ctx, `${name} must be a safe integer`);
+  }
   return value;
 }
 

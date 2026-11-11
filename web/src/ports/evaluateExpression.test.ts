@@ -19,6 +19,7 @@ describe("evaluateExpression", () => {
   it("evaluates a simple numeric expression", () => {
     const result = evaluateExpression({
       source: "2 + 3",
+      context: "computed",
       env: numberEnv,
       resultType: "number",
       fallback: 0,
@@ -57,7 +58,20 @@ describe("evaluateExpression", () => {
     if (!result.ok) return;
     expect(result.roll).not.toBeNull();
     expect(result.roll?.total).toBe(15);
-    expect(result.roll?.dice).toEqual([{ sides: 20, value: 15, kept: true }]);
+    expect(result.roll?.dice).toEqual([{ id: "@root:0", groupId: "@root", sides: 20, value: 15, kept: true }]);
+  });
+
+  it("uses scoped numeric samples for dynamic sides and action inputs with the same ID", () => {
+    const result = evaluateExpression({
+      source: "dice(1, fields.sides) + inputs.sides",
+      env: { fields: { sides: "number" }, inputs: { sides: "number" } },
+      resultType: "number",
+      fallback: 0,
+      fieldBindings: { sides: 8 },
+      bindings: { sides: 2 },
+      rng: fixedRng(1),
+    });
+    expect(result).toMatchObject({ ok: true, value: 10, roll: { dice: [{ sides: 8, value: 8 }] } });
   });
 
   it("computes the modifier as total minus dice sum for arithmetic rolls", () => {
@@ -138,6 +152,6 @@ describe("truthful roll breakdown", () => {
 
 it("preserves scalar preview fallbacks while rejecting the same arithmetic failure as an action", () => {
   const input = { source: "1 / 0", env: { fields: {}, inputs: {} }, resultType: "number" as const, fallback: 7, bindings: {} };
-  expect(evaluateExpression(input)).toMatchObject({ ok: true, value: 7, roll: null, diagnostics: [{ code: "arithmetic_failure" }] });
+  expect(evaluateExpression({ ...input, context: "computed" })).toMatchObject({ ok: true, value: 7, roll: null, diagnostics: [{ code: "arithmetic_failure" }] });
   expect(evaluateRoll(input).result).toMatchObject({ ok: false, diagnostics: [{ code: "arithmetic_failure" }] });
 });

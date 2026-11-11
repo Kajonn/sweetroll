@@ -27,6 +27,7 @@ export type EvaluateExpressionInput = {
   resultType: ValueType;
   fallback: ScalarValue;
   bindings: Record<string, BindingValue>;
+  fieldBindings?: Record<string, BindingValue>;
   itemBindings?: Record<string, BindingValue>;
   rng?: Rng;
   /** Where the expression is used. Computed fields and validations may be text or boolean; rolls must be numbers. */
@@ -75,7 +76,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
   }
   const body = compiled.value;
   const scopedBindings: EvaluateExpressionBindings = {
-    fields: pickBindings(input.bindings, input.env.fields),
+    fields: pickBindings(input.fieldBindings ?? input.bindings, input.env.fields),
     inputs: pickBindings(input.bindings, input.env.inputs),
     ...(input.env.item === undefined ? {} : { item: pickBindings(input.itemBindings ?? {}, input.env.item) }),
     ...(input.env.datasets === undefined ? {} : { datasets: input.env.datasets }),

@@ -1,4 +1,4 @@
-import type { RulesDataset, SlotEnvironment } from "@sweetroll/rules";
+import { children, parse, type ExpressionAstV1, type RulesDataset, type SlotEnvironment } from "@sweetroll/rules";
 import { DebugOnly } from "../../ui/debugMode.js";
 import { Disclosure } from "../../ui/Disclosure.js";
 import {PushPolicyEditor} from "./PushPolicyEditor.js";
@@ -132,6 +132,21 @@ function defaultBinding(valueType: FieldBindingType): BindingValue {
   }
 }
 
+function poolParameterFields(source: string) {
+  const fields = new Map<string, { scope: "fields" | "item"; id: string }>();
+  const parsed = parse(source);
+  if (!parsed.ok) return fields;
+  function walk(node: ExpressionAstV1, parameter = false): void {
+    if (parameter && node.kind === "reference" && node.scope !== "inputs") {
+      const id = node.part ? `${node.id}.${node.part}` : node.id;
+      fields.set(`${node.scope}.${id}`, { scope: node.scope, id });
+    }
+    for (const child of children(node)) walk(child, parameter || node.kind === "pool");
+  }
+  walk(parsed.ast);
+  return fields;
+}
+
 function formatOutput(template: string, total: number | null): string {
   if (total === null) return template;
   return template.replace(/\{total\}/g, String(total));
@@ -155,6 +170,7 @@ export function RollActionEditor({
   onDiceKindChange,
 }: RollActionEditorProps) {
   const [tryItResult, setTryItResult] = useState<ReturnType<typeof evaluateRoll> | null>(null);
+  const [sampleOverrides, setSampleOverrides] = useState<Record<string, number>>({});
   const [tryItBindings, setTryItBindings] = useState<Record<string, BindingValue> | null>(null);
   // Local custom-edit mode: picking "custom" reveals the inline formula
   // editor on the current source without persisting anything. It clears
@@ -187,14 +203,26 @@ export function RollActionEditor({
     updateInputs([...action.inputs, defaultActionInput(action.inputs)]);
   };
 
+  const poolFields = useMemo(() => poolParameterFields(expressionSource), [expressionSource]);
+  const sampleFields = [...poolFields].filter(([, { scope, id }]) =>
+    (scope === "fields" ? fieldTypes : itemTypes)?.[id] === "number");
+  const characterSamples = buildTryItBindings([], fieldTypes);
+  const itemSamples = buildTryItBindings([], itemTypes ?? {});
+  for (const [key, { scope, id }] of sampleFields) {
+    const samples = scope === "fields" ? characterSamples : itemSamples;
+    samples[id] = sampleOverrides[key] ?? 0;
+  }
+  const sampleBindingsNow = { ...characterSamples, ...buildTryItBindings(action.inputs, {}) };
+
   const runTryIt = () => {
-    const bindings = buildTryItBindings(action.inputs, fieldTypes);
+    const bindings = sampleBindingsNow;
     setTryItBindings(bindings);
     setTryItResult(
       evaluateRoll({
         source: expressionSource,
         env: { fields: fieldTypes, inputs: inputTypes, ...(itemTypes && { item: itemTypes }), ...(datasets && { datasets }), ...(slots && { slots }) },
-        ...(itemTypes && { itemBindings: buildTryItBindings([], itemTypes) }),
+        fieldBindings: characterSamples,
+        ...(itemTypes && { itemBindings: itemSamples }),
         resultType: "number",
         fallback: 0,
         bindings,
@@ -204,7 +232,7 @@ export function RollActionEditor({
 
   const modifiers = tryItResult === null ? null : additiveRollModifier(tryItResult.result);
   const simpleSource = /^d(?:4|6|8|10|12|20)(?:\s*\+\s*fields\.[a-z][a-z0-9_]{0,63})?(?:\s*\+\s*inputs\.[a-z][a-z0-9_]{0,63})*$/.test(expressionSource);
-  const sampleBindings = tryItBindings ?? buildTryItBindings(action.inputs, fieldTypes);
+  const sampleBindings = tryItBindings ?? sampleBindingsNow;
 
   const showEmpty = tryItResult === null;
   const numericFields = Object.entries(fieldTypes).filter(([id, valueType]) => !id.includes(".") && valueType === "number");
@@ -295,11 +323,12 @@ export function RollActionEditor({
       <PushPolicyEditor source={expressionSource} policy={action.pushPolicy} disabled={disabled || ("nominal" in action && action.nominal===true)} onChange={policy=>{const {pushPolicy:_old,...rest}=action;onChange(policy?{...rest,pushPolicy:policy}:rest);}}/>
       <GroupedPoolEditor source={expressionSource} onChange={onExpressionSourceChange} disabled={disabled} choices={[
         ...numericFields.map(([id])=>({value:`fields.${id}`,label:fieldLabels?.[id]??id})),
+        ...Object.entries(itemTypes ?? {}).filter(([, type]) => type === "number").map(([id]) => ({ value: `item.${id}`, label: `item.${id}` })),
         ...action.inputs.filter(input=>input.valueType==="integer"||input.valueType==="decimal").map(input=>({value:`inputs.${input.id}`,label:input.label})),
       ]}/>
       {guided !== true || diceKind === "custom" || customEditing ? (
         <ExpressionEditor
-                  roll
+          roll
           references={[...Object.keys(fieldTypes).map(id => `fields.${id}`), ...Object.keys(inputTypes).map(id => `inputs.${id}`), ...Object.keys(itemTypes ?? {}).map(id => `item.${id}`)]}
           client={client}
           systemId={systemId}
@@ -462,6 +491,14 @@ export function RollActionEditor({
         </Button>
       </div>
       <p data-testid={`roll-action-try-sample-note-${action.id}`}>{t("editor.action.roll.tryIt.sampleNote")}</p>
+      {sampleFields.map(([key, { scope, id }]) => <NumberInput
+        key={key}
+        label={t("editor.action.roll.tryIt.sampleField", { field: scope === "fields" ? fieldLabels?.[id] ?? id : key })}
+        value={sampleOverrides[key] ?? 0}
+        step={1}
+        disabled={disabled === true}
+        onChange={(value) => setSampleOverrides((current) => ({ ...current, [key]: value ?? 0 }))}
+      />)}
       <ul data-testid={`roll-action-try-bindings-${action.id}`}>
         {Object.entries(sampleBindings).map(([id, value]) => <li key={id}>{action.inputs.find(input => input.id === id)?.label || fieldLabels?.[id] || id}: {String(value)}</li>)}
       </ul>

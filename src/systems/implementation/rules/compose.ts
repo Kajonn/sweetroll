@@ -1,7 +1,12 @@
+import { aggregateCall } from "./data.js";
+import { children } from "./groups.js";
+import { slotEnvironment } from "./slots.js";
+import { inferType } from "./typecheck.js";
 import { canonicalChecksum } from "../package/canonical.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import type {
   CompiledExpressionV1,
+  ExpressionAstV1,
   ExtensionPackageV1,
   ObjectTemplateV1,
   SystemPackageV1,
@@ -90,6 +95,26 @@ export function composeRules(
       };
     }
     warnings.push(...check.value.warnings.map((warning) => ({ ...warning, path: `${path}${warning.path}` })));
+  }
+
+  if (sorted.length > 0) {
+    const templates = [...base.templates, ...sorted.flatMap(extension => extension.templates)];
+    const slots = Object.assign({}, ...base.entities.map(entity => slotEnvironment(base, entity.id, templates)));
+    const checkAggregates = (ast: ExpressionAstV1): PackageDiagnostic[] => {
+      if (ast.kind === "call" && aggregateCall(ast) !== undefined) {
+        const checked = inferType(ast, { fields: {}, inputs: {}, slots });
+        return checked.ok ? [] : checked.diagnostics;
+      }
+      return children(ast).flatMap(checkAggregates);
+    };
+    for (const [index, expression] of base.expressions.entries()) {
+      const diagnostics = checkAggregates(expression.ast);
+      if (diagnostics.length > 0) {
+        return { ok: false, diagnostics: diagnostics.map(diagnostic => ({
+          ...diagnostic, code: "extension_incompatible", path: `/expressions/${index}`,
+        })) };
+      }
+    }
   }
 
   const templateIndex = new Map<RulesOrigin, Map<string, ObjectTemplateV1>>([

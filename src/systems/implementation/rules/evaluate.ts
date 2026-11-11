@@ -1,5 +1,6 @@
 import type {DieResult, RollBreakdown} from "./result.js";
 export type {DieResult, RollBreakdown} from "./result.js";
+import { aggregateCall, aggregateKey, aggregateValue, isAggregate, literalId, lookupValue, type AggregateEntry, type RulesDataset } from "./data.js";
 import {referenceKey} from "./typecheck.js";
 import {children, hasDiceGroups} from "./groups.js";
 import type { CompiledExpressionV1, ExpressionAstV1, ScalarValue } from "../package/schema/index.js";
@@ -13,10 +14,14 @@ export type BindingValue = ScalarValue | string[];
 export type EvaluationBindings = {
   fields: Record<string, BindingValue>;
   inputs: Record<string, BindingValue>;
+  item?: Record<string, BindingValue>;
+  datasets?: readonly RulesDataset[];
+  slotEntries?: (slot: string) => readonly AggregateEntry[];
+  aggregates?: Record<string, BindingValue>;
 };
 
 export type EvaluationBinding = {
-  scope: "fields" | "inputs";
+  scope: "fields" | "inputs" | "item" | "aggregates";
   definitionId: string;
   value: BindingValue;
 };
@@ -151,7 +156,7 @@ function evalValueNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefine
       return node.value;
     case "reference": {
       const key = referenceKey(node);
-      const scope = ctx.bindings[node.scope];
+      const scope = ctx.bindings[node.scope] ?? {};
       const val = Object.hasOwn(scope, key) ? scope[key] : undefined;
       if (val === undefined) return fail(ctx, `missing reference ${node.scope}.${key}`);
       ctx.bindingTrace.push({ scope: node.scope, definitionId: key, value: val });
@@ -246,6 +251,31 @@ function evalValueNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefine
       }
     }
     case "call": {
+      if (node.function === "lookup" || node.function === "lookupBand") {
+        const dataset = ctx.bindings.datasets?.find(table => table.id === literalId(node.arguments[0]));
+        const column = literalId(node.arguments[2]);
+        if (dataset === undefined || column === undefined || node.arguments[1] === undefined) {
+          return fail(ctx, "unknown lookup dataset or column");
+        }
+        const key = evalNode(node.arguments[1], ctx);
+        if (key === undefined) return undefined;
+        if (key === null || Array.isArray(key)) return fail(ctx, "lookup needs a scalar key");
+        const value = lookupValue(dataset, key, column, node.function === "lookupBand");
+        return value === undefined || value === null
+          ? fail(ctx, `no row in '${dataset.id}' for the lookup key`)
+          : value;
+      }
+      if (isAggregate(node.function)) {
+        const call = aggregateCall(node);
+        if (!call) return fail(ctx, "invalid aggregate arguments");
+        const key = aggregateKey(call);
+        const value = ctx.bindings.slotEntries
+          ? aggregateValue(call, ctx.bindings.slotEntries(call.slot))
+          : ctx.bindings.aggregates?.[key];
+        if (typeof value !== "number" || !Number.isFinite(value)) return fail(ctx, "slot aggregate is unavailable");
+        ctx.bindingTrace.push({ scope: "aggregates", definitionId: key, value });
+        return value;
+      }
       if (node.function === "if") {
         const condition = evalNode(node.arguments[0]!, ctx);
         if (condition === undefined) return undefined;

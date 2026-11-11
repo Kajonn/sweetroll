@@ -1,4 +1,5 @@
 import type { ExpressionAstV1, ValueType, DefinitionId } from "../package/schema/index.js";
+import { aggregateCall, isAggregate, literalId, type RulesDataset, type SlotEnvironment } from "./data.js";
 import type { RulesDiagnostic } from "./diagnostic.js";
 
 export type FieldBindingType = ValueType | "choiceSet";
@@ -6,6 +7,9 @@ export type FieldBindingType = ValueType | "choiceSet";
 export type ExpressionCompileEnv = {
   fields: Record<string, FieldBindingType>;
   inputs: Record<string, ValueType>;
+  item?: Record<string, FieldBindingType>;
+  datasets?: readonly RulesDataset[];
+  slots?: SlotEnvironment;
 };
 
 export type InferResult =
@@ -26,7 +30,7 @@ export function inferType(ast: ExpressionAstV1, env: ExpressionCompileEnv): Infe
     case "stringLiteral": return { ok: true, type: "text" };
     case "booleanLiteral": return { ok: true, type: "boolean" };
     case "reference": {
-      const map = ast.scope === "fields" ? env.fields : env.inputs;
+      const map = env[ast.scope] ?? {};
       const key = referenceKey(ast);
       if (!Object.hasOwn(map, key)) return diag("missing_reference", `unknown ${ast.scope} reference '${key}'`);
       return { ok: true, type: map[key]! };
@@ -60,6 +64,38 @@ export function inferType(ast: ExpressionAstV1, env: ExpressionCompileEnv): Infe
       const nargs = ast.arguments.length;
       if (ast.roundMode !== undefined && ast.function !== "round") {
         return diag("invalid_expression", "only round supports a rounding mode");
+      }
+      if (ast.function === "lookup" || ast.function === "lookupBand") {
+        const [datasetArg, key, columnArg] = ast.arguments;
+        const datasetId = literalId(datasetArg);
+        const column = literalId(columnArg);
+        if (nargs !== 3 || !datasetId || !column || !key) {
+          return diag("invalid_expression", `${ast.function} expects a quoted dataset ID, a key and a quoted column ID`);
+        }
+        const dataset = env.datasets?.find(candidate => candidate.id === datasetId);
+        if (!dataset?.keyColumn || !dataset.columns || !Object.hasOwn(dataset.columns, column)) {
+          return diag("missing_reference", `Unknown typed dataset or column '${datasetId}.${column}'`);
+        }
+        const keyType = dataset.columns[dataset.keyColumn];
+        const inferredKey = inferType(key, env);
+        if (!inferredKey.ok) return inferredKey;
+        if (inferredKey.type !== keyType || (ast.function === "lookupBand" && keyType !== "number")) {
+          return diag("invalid_expression", `${ast.function} key must match the dataset key type; lookupBand requires numbers`);
+        }
+        return { ok: true, type: dataset.columns[column]! };
+      }
+      if (isAggregate(ast.function)) {
+        const aggregate = aggregateCall(ast);
+        if (!aggregate) return diag("invalid_expression", `${ast.function} expects quoted slot and field IDs`);
+        const slot = env.slots && Object.hasOwn(env.slots, aggregate.slot) ? env.slots[aggregate.slot] : undefined;
+        if (!slot) return diag("missing_reference", `Unknown slot '${aggregate.slot}' for this entity`);
+        if (aggregate.field && (!Object.hasOwn(slot.fields, aggregate.field) || slot.fields[aggregate.field] !== "number")) {
+          return diag("invalid_expression", `Aggregate field '${aggregate.field}' must be numeric across templates accepted by '${aggregate.slot}'`);
+        }
+        if (aggregate.flag && (!Object.hasOwn(slot.fields, aggregate.flag) || slot.fields[aggregate.flag] !== "boolean")) {
+          return diag("invalid_expression", `Aggregate filter '${aggregate.flag}' must be boolean across templates accepted by '${aggregate.slot}'`);
+        }
+        return { ok: true, type: "number" };
       }
       if (ast.function === "if" || ast.function === "has") {
         const conditional = ast.function === "if";

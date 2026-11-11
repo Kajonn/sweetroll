@@ -1,4 +1,4 @@
-import type { BindingValue, FieldBindingType } from "@sweetroll/rules";
+import type { BindingValue, FieldBindingType, RulesDataset, SlotEnvironment } from "@sweetroll/rules";
 import { DebugOnly } from "../../ui/debugMode.js";
 import { useEffect, useMemo, useRef, useState, type Dispatch } from "react";
 
@@ -48,6 +48,9 @@ export type ComputedFieldEditorProps = {
   document?: SystemDocumentV1 | undefined;
   dispatch?: Dispatch<DocumentAction> | undefined;
   /** Sibling fields available as `fields.<id>` references in the formula. */
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
+  referenceScope?: "fields" | "item";
   siblingFields?: ReadonlyArray<{ id: string; valueType: FieldBindingType }> | undefined;
   referencedBy?: number | undefined;
   disabled?: boolean | undefined;
@@ -62,6 +65,9 @@ export function ComputedFieldEditor({
   onFallbackChange,
   document,
   dispatch,
+  datasets,
+  slots,
+  referenceScope = "fields",
   siblingFields,
   referencedBy,
   disabled,
@@ -118,13 +124,14 @@ export function ComputedFieldEditor({
             : "";
     return evaluateExpression({
       source: draftSource,
-      env: { fields, inputs: {} },
+      env: { fields: referenceScope === "fields" ? fields : {}, inputs: {}, ...(referenceScope === "item" && { item: fields }), ...(datasets && { datasets }), ...(slots && { slots }) },
       resultType,
       fallback: fb,
       bindings,
+      ...(referenceScope === "item" && { itemBindings: bindings }),
       context: "computed",
     });
-  }, [field, syntaxOk, draftSource, siblingFields, fallback]);
+  }, [field, syntaxOk, draftSource, siblingFields, fallback, datasets, slots, referenceScope]);
 
   if (!isComputed(field)) {
     return (
@@ -222,7 +229,7 @@ export function ComputedFieldEditor({
             <Button
               key={s.id}
               variant="secondary"
-              onClick={() => insertSource(`fields.${s.id}`)}
+              onClick={() => insertSource(`${referenceScope}.${s.id}`)}
               data-testid={`computed-field-insert-${field.id}-${s.id}`}
               disabled={disabled}
             >

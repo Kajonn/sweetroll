@@ -15,6 +15,7 @@ export type UnplacedDefinition = {
   kind: "field" | "resource" | "action" | "slot";
   id: DefinitionId;
   label: string;
+  ownerId?: string;
 };
 
 export type SheetEditorProps = {

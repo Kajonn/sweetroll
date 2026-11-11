@@ -13,6 +13,7 @@ export type ValidationV1 = {
   severity: ValidationSeverityV1;
   message: string;
   targetId: DefinitionId;
+  targetEntityId?: DefinitionId;
 };
 
 export type ValidationExpressionOption = {
@@ -22,6 +23,7 @@ export type ValidationExpressionOption = {
 
 export type ValidationTargetOption = {
   id: DefinitionId;
+  entityId?: DefinitionId;
   label: string;
 };
 
@@ -60,8 +62,13 @@ export function ValidationEditor({
     onChange({ ...validation, message });
   };
 
-  const setTargetId = (targetId: DefinitionId) => {
-    onChange({ ...validation, targetId });
+  const targetKey = (target: ValidationTargetOption) => target.entityId === undefined ? target.id : `${target.entityId}.${target.id}`;
+  const current = availableTargets.find(target => target.id === validation.targetId &&
+    (validation.targetEntityId === undefined || (target.entityId ?? target.id) === validation.targetEntityId));
+  const setTargetId = (key: string) => {
+    const target = availableTargets.find(candidate => targetKey(candidate) === key);
+    const { targetEntityId: _previousOwner, ...rest } = validation;
+    onChange({ ...rest, targetId: target?.id ?? "", ...(target?.entityId && { targetEntityId: target.entityId }) });
   };
 
   return (
@@ -103,13 +110,13 @@ export function ValidationEditor({
           <Select
             label={t("editor.validation.targetId")}
             id={`validation-target-id-${validation.id}`}
-            value={validation.targetId}
+            value={current === undefined ? "" : targetKey(current)}
             onChange={(e) => setTargetId(e.target.value)}
             data-testid={`validation-target-id-${validation.id}`}
             disabled={disabled}
             options={[
               { value: "", label: t("editor.validation.targetId.empty") },
-              ...availableTargets.map((target) => ({ value: target.id, label: `${target.label} (${target.id})` })),
+              ...availableTargets.map((target) => ({ value: targetKey(target), label: `${target.label} (${targetKey(target)})` })),
             ]}
           />
         </div>

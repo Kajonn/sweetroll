@@ -26,7 +26,7 @@ export function sortDiagnostics(values: PackageDiagnostic[]): PackageDiagnostic[
     const key = `${value.code}\0${value.path}`;
     if (!unique.has(key)) unique.set(key, value);
   }
-  return [...unique.values()].toSorted(
+  return [...unique.values()].sort(
     (a, b) => a.path.localeCompare(b.path) || a.code.localeCompare(b.code),
   );
 }

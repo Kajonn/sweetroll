@@ -7898,6 +7898,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -8814,6 +8815,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -9297,6 +9299,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -9476,7 +9479,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -9929,6 +9932,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -10108,7 +10112,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -10561,6 +10565,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -10740,7 +10745,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -11193,6 +11198,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -11372,7 +11378,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -11826,6 +11832,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -12005,7 +12012,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -12300,7 +12307,7 @@ export interface operations {
                                 success?: boolean;
                             }[];
                             bindings: {
-                                scope: "fields" | "inputs";
+                                scope: "fields" | "inputs" | "item" | "aggregates";
                                 definitionId: string;
                                 value: (string | number | boolean | null) | string[];
                             }[];
@@ -12985,6 +12992,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -13164,7 +13172,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -13629,6 +13637,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -13808,7 +13817,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -14287,6 +14296,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -14466,7 +14476,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -14918,6 +14928,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -15097,7 +15108,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -15553,6 +15564,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -15732,7 +15744,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -16046,6 +16058,7 @@ export interface operations {
                                     id: string;
                                     label: string;
                                 }[];
+                                optionsFrom?: string;
                             } | {
                                 /** @constant */
                                 kind: "multiChoice";
@@ -16057,6 +16070,7 @@ export interface operations {
                                     id: string;
                                     label: string;
                                 }[];
+                                optionsFrom?: string;
                             } | {
                                 /** @constant */
                                 kind: "resource";
@@ -16069,6 +16083,7 @@ export interface operations {
                                 min: number;
                                 max: number;
                                 step: number;
+                                maxExpressionId?: string;
                                 resetTo: "min" | "max";
                             } | {
                                 /** @constant */
@@ -16472,6 +16487,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -16651,7 +16667,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -17637,6 +17653,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -17816,7 +17833,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -18265,6 +18282,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -18678,7 +18696,7 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -20641,6 +20659,7 @@ export interface operations {
                             };
                             label: string;
                             kind: "item" | "spell" | "talent" | "effect";
+                            aggregateQuantity?: boolean;
                             description?: string;
                             fields: ({
                                 /** @constant */
@@ -20689,6 +20708,7 @@ export interface operations {
                                     id: string;
                                     label: string;
                                 }[];
+                                optionsFrom?: string;
                             } | {
                                 /** @constant */
                                 kind: "multiChoice";
@@ -20700,6 +20720,7 @@ export interface operations {
                                     id: string;
                                     label: string;
                                 }[];
+                                optionsFrom?: string;
                             } | {
                                 /** @constant */
                                 kind: "resource";
@@ -20712,6 +20733,7 @@ export interface operations {
                                 min: number;
                                 max: number;
                                 step: number;
+                                maxExpressionId?: string;
                                 resetTo: "min" | "max";
                             } | {
                                 /** @constant */
@@ -26659,6 +26681,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -27220,6 +27243,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -27685,6 +27709,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -28152,6 +28177,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";

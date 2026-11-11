@@ -34,7 +34,7 @@ function extension(base: SystemPackageV1, versionId = EXT_V1, bonus = 5): Extens
     schemaVersion: "2.0",
     metadata: { name: "Frost pack", description: "", language: "en" },
     expressions: [
-      { id: "sword_hit_expr", context: "roll", resultType: "number", source: `d20 + fields.modifier + fields.edge + ${bonus}`, fallback: 0 },
+      { id: "sword_hit_expr", context: "roll", resultType: "number", source: `d20 + fields.modifier + item.edge + ${bonus}`, fallback: 0 },
       { id: "frost_pool_expr", context: "roll", resultType: "number", source: 'countSuccesses(group("attribute", "Attribute", dice(fields.ability, 6)), 6)', fallback: 0 },
     ],
     templates: [{

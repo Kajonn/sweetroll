@@ -167,6 +167,7 @@ const ProjectionElementDto = Type.Union([
     max: Type.Number(),
     step: Type.Number(),
     resetTo: Type.Union([Type.Literal("min"), Type.Literal("max")]),
+    computedMaximum: Type.Optional(Type.Boolean()),
     validations: Type.Array(RuntimeValidationDto),
   }),
   Type.Object({
@@ -290,7 +291,7 @@ const CharacterCreationVersionsDto = Type.Object({
 
 const DiceDto = DieResultSchema;
 const RollBindingDto = Type.Object({
-  scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
+  scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]),
   definitionId: Type.String(),
   value: BindingValueSchema,
 });

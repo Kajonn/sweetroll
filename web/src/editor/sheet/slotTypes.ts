@@ -19,6 +19,7 @@ export type ObjectTemplateV1 = {
   id: string;
   label: string;
   kind: TemplateKind;
+  aggregateQuantity?: boolean;
   description?: string;
   fields: FieldV1[];
   grantedActions: GrantedActionV1[];

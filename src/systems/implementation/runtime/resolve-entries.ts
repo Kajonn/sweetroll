@@ -1,3 +1,4 @@
+import { characterRuleBindings } from "./rule-bindings.js";
 import type { EvaluationBindings } from "../rules/evaluate.js";
 import {derivedEntryError,effectiveEntryDefinition} from "./effective-entry.js";
 import {makePushContext} from "./push.js";
@@ -20,9 +21,8 @@ import type {
   RuntimeStateV1,
 } from "../../runtime.js";
 import { createDeterministicRng } from "./deterministic-rng.js";
-import { buildEntryScope, validateEntryForSlot } from "./entries.js";
+import { validateEntryForSlot } from "./entries.js";
 import { resolveObservedValues } from "./resolve.js";
-import { buildFieldBindings } from "./state.js";
 import { actionEvaluationFailure } from "./action-evaluation.js";
 import { evaluate } from "../rules/evaluate.js";
 
@@ -137,10 +137,15 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
   if (expression === undefined || expression.context !== "roll") return invalidPackage(action.expressionId);
   const observed = resolveObservedValues(request.packageValue, request.entity, request.state);
   if (!observed.ok) return observed;
-  const fields = grantedFieldScope(request, template, entry, observed.value.derivedValues);
+  const bindings = characterRuleBindings(request.packageValue, request.entity, observed.value.state);
+  Object.assign(bindings.fields, observed.value.derivedValues);
+  bindings.inputs = actionInputs.value;
+  const item = itemRuleBindings(request.packageValue, template, entry);
+  if (!item.ok) return item;
+  bindings.item = item.value;
   const evaluated = evaluate(
     expression,
-    { fields, inputs: actionInputs.value },
+    bindings,
     createDeterministicRng(request.authoritativeRollSecret, request.executionId),
     request.packageValue.effectiveLimits,
   );
@@ -254,35 +259,41 @@ function resolveGrantedBump(
   };
 }
 
-/**
- * Merged roll scope for granted actions: character bindings (stored fields,
- * resources as their current value, plus derived values) under entry values.
- * Entry resource objects bind as their current value, mirroring
- * `buildFieldBindings`, so `fields.<resource>` stays numeric in both scopes.
- */
-function grantedFieldScope(
-  request: GrantedActionRequest,
+function itemRuleBindings(
+  pkg: SystemPackageV1,
   template: ObjectTemplateV1,
   entry: CharacterEntryV1,
-  derivedValues: Record<string, RuntimeScalar>,
-): EvaluationBindings["fields"] {
-  const characterFields: Record<string, unknown> = {
-    ...buildFieldBindings(request.entity, request.state),
-    ...derivedValues,
-  };
-  const templateFields = new Map(template.fields.map((field) => [field.id, field]));
-  const entryScope: Record<string, unknown> = {};
-  for (const [id, value] of Object.entries(entry.values)) {
-    const field = templateFields.get(id);
-    if (field?.kind === "resource" && isResourceValue(value)) {
-      entryScope[id] = value.current;
-      entryScope[`${id}.current`] = value.current;
-      entryScope[`${id}.max`] = value.max;
+): RuntimeResult<EvaluationBindings["fields"]> {
+  const item: EvaluationBindings["fields"] = {};
+  const computed = new Map(template.fields.flatMap(field =>
+    field.kind === "computed" ? [[field.id, field.expressionId] as const] : [],
+  ));
+  for (const field of template.fields) {
+    if (field.kind === "computed" || field.kind === "image") continue;
+    const value = Object.hasOwn(entry.values, field.id) ? entry.values[field.id] : field.default;
+    if (field.kind === "resource" && isResourceValue(value)) {
+      item[field.id] = value.current;
+      item[`${field.id}.current`] = value.current;
+      item[`${field.id}.max`] = value.max;
     } else {
-      entryScope[id] = value;
+      item[field.id] = value as EvaluationBindings["fields"][string];
     }
   }
-  return buildEntryScope(characterFields, entryScope) as EvaluationBindings["fields"];
+  const visiting = new Set<string>();
+  const derive = (id: string): boolean => {
+    const expressionId = computed.get(id);
+    if (expressionId === undefined || Object.hasOwn(item, id)) return true;
+    if (visiting.has(id)) return false;
+    visiting.add(id);
+    const expression = pkg.expressions.find(candidate => candidate.id === expressionId);
+    if (!expression || !expression.dependencies.every(derive)) return false;
+    const result = evaluate(expression, { fields: {}, inputs: {}, item, datasets: pkg.referenceData });
+    if (!result.ok) return false;
+    item[id] = result.result;
+    visiting.delete(id);
+    return true;
+  };
+  return [...computed.keys()].every(derive) ? { ok: true, value: item } : invalidPackage(template.id);
 }
 
 function isResourceValue(value: unknown): value is { current: number; max: number } {

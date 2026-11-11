@@ -17,8 +17,8 @@ export const roll = s.object({
   expression: s.text,
   dice: Type.Array(DieResultSchema),
   bindings: Type.Array(s.object({
-    scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
-    definitionId: Type.String({ pattern: "^[a-z][a-z0-9_]{0,63}(\\.(current|max))?$" }),
+    scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]),
+    definitionId: Type.String({ minLength: 1, maxLength: 205 }),
     value: BindingValueSchema,
   })),
   total: Type.Number(),

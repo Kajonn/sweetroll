@@ -1,4 +1,4 @@
-import { entityFieldTypes, type BindingValue } from "@sweetroll/rules";
+import { entityFieldTypes, resolveDependencies, type BindingValue, type RulesDataset, type SlotEnvironment } from "@sweetroll/rules";
 import type {
   ExpressionAstV1,
   ScalarValue,
@@ -83,6 +83,7 @@ export type ResourceFieldV1 = {
   max: number;
   step: number;
   resetTo: "min" | "max";
+  maxExpressionId?: DefinitionId;
 };
 
 export type ComputedFieldV1 = {
@@ -138,6 +139,8 @@ export type SystemPackageV1 = {
   presentation?: import("../theme/SystemPresentation.js").SystemPresentation;
   entities: EntityDefinitionV1[];
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[];
+  slotsByEntity?: Record<string, SlotEnvironment>;
 };
 
 export type SampleScalarValue = number | string | boolean | null;
@@ -235,26 +238,35 @@ export function generateSample(pkg: SystemPackageV1): SampleData {
         applyComputedFallback(field, pkg.expressions, fields);
       }
     }
-    const env = { fields: entityFieldTypes(entity.fields), inputs: {} };
-    for (const field of entity.fields) {
-      if (field.kind !== "computed") continue;
-      const expr = pkg.expressions.find((e) => e.id === field.expressionId);
-      if (!expr || expr.context !== "computed") continue;
-      const bindings = buildSampleBindings(fields);
-      const safeFallback = normalizeFallback(expr.fallback);
+    const slots = pkg.slotsByEntity?.[entity.id];
+    const env = { fields: entityFieldTypes(entity.fields), inputs: {},
+      ...(pkg.datasets && { datasets: pkg.datasets }), ...(slots && { slots }),
+    };
+    const completed = new Set<string>();
+    const visited = new Set<string>();
+    const evaluateField = (id: string) => {
+      if (completed.has(id) || visited.has(id)) return;
+      const field = entity.fields.find(candidate => candidate.id === id);
+      const expressionId = field?.kind === "computed" ? field.expressionId : field?.kind === "resource" ? field.maxExpressionId : undefined;
+      const expr = pkg.expressions.find(candidate => candidate.id === expressionId && candidate.context === "computed");
+      if (field === undefined || expr === undefined) return;
+      visited.add(id);
+      resolveDependencies(expr.ast).forEach(evaluateField);
       const result = evaluateExpression({
-        source: renderExpression(expr.ast),
-        env,
-        resultType: expr.resultType,
-        fallback: safeFallback,
-        bindings,
-        rng: FIXED_RNG,
-        context: "computed",
+        source: renderExpression(expr.ast), env, resultType: expr.resultType,
+        fallback: normalizeFallback(expr.fallback), bindings: buildSampleBindings(fields), rng: FIXED_RNG, context: "computed",
       });
       if (result.ok) {
-        fields[field.id] = result.value;
+        if (field.kind === "resource" && typeof result.value === "number") {
+          const bounded = Math.min(field.max, Math.max(field.min, result.value));
+          const max = field.min + Math.floor((bounded - field.min) / field.step + 1e-8) * field.step;
+          fields[id] = { max, current: Math.min(field.default.current, max) };
+        } else if (field.kind === "computed") fields[id] = result.value;
       }
-    }
+      visited.delete(id);
+      completed.add(id);
+    };
+    entity.fields.forEach(field => evaluateField(field.id));
     sample[entity.id] = { fields };
   }
   return sample;

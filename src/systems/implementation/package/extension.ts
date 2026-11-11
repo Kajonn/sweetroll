@@ -46,7 +46,7 @@ export function validateExtensionDocumentStructure(value: ExtensionDocumentV1): 
     templates: value.templates,
     slots: [],
   };
-  return sortDiagnostics([...validateDocumentStructure(asSystem), ...validationExpressions(value.expressions)]);
+  return sortDiagnostics([...validateDocumentStructure(asSystem, true), ...validationExpressions(value.expressions)]);
 }
 
 export function validateExtensionPackageStructure(value: ExtensionPackageV1): PackageDiagnostic[] {
@@ -70,7 +70,7 @@ export function validateExtensionPackageStructure(value: ExtensionPackageV1): Pa
     effectiveLimits: value.effectiveLimits,
     integrity: value.integrity,
   } satisfies SystemPackageV1;
-  return sortDiagnostics([...validatePackageStructure(asSystem), ...validationExpressions(value.expressions)]);
+  return sortDiagnostics([...validatePackageStructure(asSystem, "", true), ...validationExpressions(value.expressions)]);
 }
 
 export function decodeExtensionDocument(input: unknown): DecodeResult<ExtensionDocumentV1> {

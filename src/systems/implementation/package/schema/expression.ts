@@ -30,7 +30,7 @@ export const ExpressionAstV1Schema = Type.Recursive(
       Type.Object(
         {
           kind: Type.Literal("reference"),
-          scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
+          scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item")]),
           id: DefinitionIdSchema,
           part: Type.Optional(Type.Union([Type.Literal("current"), Type.Literal("max")])),
         },
@@ -79,6 +79,13 @@ export const ExpressionAstV1Schema = Type.Recursive(
             Type.Literal("abs"),
             Type.Literal("if"),
             Type.Literal("has"),
+            Type.Literal("lookup"),
+            Type.Literal("lookupBand"),
+            Type.Literal("sum"),
+            Type.Literal("count"),
+            Type.Literal("sumWhere"),
+            Type.Literal("countWhere"),
+            Type.Literal("maxOf"),
           ]),
           arguments: Type.Array(ExpressionAstV1, { maxItems: 8 }),
           roundMode: Type.Optional(

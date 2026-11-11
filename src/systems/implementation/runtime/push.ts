@@ -142,8 +142,12 @@ export function resolveRuntimePush(input: {
   const expressionKey = qualifiedId(context.extensionId, context.expressionId);
   const expression = pkg.expressions.find((e) => e.id === expressionKey);
   if (!expression) return fail("invalid_snapshot");
-  const bindings: EvaluationBindings = { fields: {}, inputs: {} };
-  for (const b of parent.bindings) bindings[b.scope][b.definitionId] = b.value;
+  const saved = { fields: {}, inputs: {}, item: {}, aggregates: {} } satisfies Record<string, Record<string, unknown>>;
+  const bindings: EvaluationBindings = { ...saved, datasets: pkg.referenceData };
+  for (const b of parent.bindings) {
+    const scope: EvaluationBindings["fields"] = saved[b.scope];
+    scope[b.definitionId] = b.value;
+  }
   const result = evaluatePush({
     expression,
     policy: context.policy,

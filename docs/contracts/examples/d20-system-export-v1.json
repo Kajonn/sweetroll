@@ -317,6 +317,7 @@
         "expressionId": "ability_valid_expr",
         "severity": "error",
         "message": "Ability score must be between 3 and 18",
+        "targetEntityId": "character",
         "targetId": "ability"
       }
     ],
@@ -329,7 +330,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:44a4d3930c93c2c86351e2e53a2d548ce4b7b46833a474950e60a8eceea3ad02"
+      "checksum": "sha256:da1eff8a3ef0dd68e91b841744245c4d747d0151361ba6331ff6e70b690d3090"
     }
   }
 }

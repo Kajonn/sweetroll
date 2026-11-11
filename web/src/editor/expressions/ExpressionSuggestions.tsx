@@ -9,6 +9,13 @@ const forms = [
   "min(a, b)",
   "max(a, b)",
   "value % divisor",
+  'lookup("table", key, "column")',
+  'lookupBand("table", fields.level, "column")',
+  'sum("slot", "field")',
+  'count("slot")',
+  'sumWhere("slot", "field", "flag")',
+  'countWhere("slot", "flag")',
+  'maxOf("slot", "field")',
 ];
 
 export function ExpressionSuggestions({

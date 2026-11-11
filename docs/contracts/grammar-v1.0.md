@@ -69,9 +69,30 @@ Arithmetic and ordering require numbers. Equality operands have the same scalar 
 | Validations | 256 |
 | Expressions | 1,024 |
 
+## Tables and slots
+
+Use quoted definition IDs in data functions. `lookup("levels", fields.level,
+"bonus")` matches the key exactly. `lookupBand("levels", fields.level, "bonus")`
+selects the highest numeric key at or below the supplied level. Missing keys
+produce an arithmetic diagnostic. Computed values then use their declared
+fallback.
+
+| Form | Result |
+| --- | --- |
+| `sum("equipment", "weight")` | Sum a stored numeric field |
+| `count("equipment")` | Count entries |
+| `sumWhere("equipment", "armor", "equipped")` | Sum values for entries with a true boolean flag |
+| `countWhere("equipment", "equipped")` | Count entries with a true boolean flag |
+| `maxOf("equipment", "armor")` | Largest individual value, or zero for an empty set |
+
+Entries missing a requested field make no contribution. Sums and counts use
+quantity when the template sets `aggregateQuantity`. Each call scans one
+slot, and its declared capacity is charged to the sheet evaluation budget.
+`fields.<id>` resolves character fields and `item.<id>` resolves the entry
+for a granted roll or template formula. Both scopes support resource parts.
+
 ## Exclusions
 
 Configurable pushes reroll eligible dice from a recorded named pool under its action policy.
-Exploding dice, custom faces, arbitrary property traversal, collection lookups and
-aggregates, effects, loops, assignment, and user-defined functions are outside
+Exploding dice, custom faces, arbitrary property traversal, effects, loops, assignment, and user-defined functions are outside
 this grammar. See the [rules coverage plan](../superpowers/plans/2026-11-10-rules-coverage.md).

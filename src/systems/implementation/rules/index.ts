@@ -27,3 +27,8 @@ export type {PushResult} from "./result.js";
 export {SavedPushRollSchema} from "./result.js";
 
 export { entityFieldTypes, type FieldBindingType } from "./typecheck.js";
+
+export { slotEnvironment } from "./slots.js";
+export { type RulesDataset, type SlotEnvironment } from "./data.js";
+export { resolveDependencies } from "./typecheck.js";
+export { fieldWithDatasetOptions } from "../package/reference-data.js";

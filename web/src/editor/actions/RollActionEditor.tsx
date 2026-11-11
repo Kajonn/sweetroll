@@ -1,3 +1,4 @@
+import type { RulesDataset, SlotEnvironment } from "@sweetroll/rules";
 import { DebugOnly } from "../../ui/debugMode.js";
 import { Disclosure } from "../../ui/Disclosure.js";
 import {PushPolicyEditor} from "./PushPolicyEditor.js";
@@ -42,6 +43,9 @@ export type RollActionEditorProps = {
   expressionSource: string;
   onExpressionSourceChange: (next: string) => void;
   fieldTypes: Record<string, FieldBindingType>;
+  itemTypes?: Record<string, FieldBindingType>;
+  datasets?: readonly RulesDataset[];
+  slots?: SlotEnvironment;
   fieldLabels?: Record<string, string> | undefined;
   disabled?: boolean | undefined;
   /**
@@ -141,6 +145,9 @@ export function RollActionEditor({
   expressionSource,
   onExpressionSourceChange,
   fieldTypes,
+  itemTypes,
+  datasets,
+  slots,
   fieldLabels,
   disabled,
   guided,
@@ -186,7 +193,8 @@ export function RollActionEditor({
     setTryItResult(
       evaluateRoll({
         source: expressionSource,
-        env: { fields: fieldTypes, inputs: inputTypes },
+        env: { fields: fieldTypes, inputs: inputTypes, ...(itemTypes && { item: itemTypes }), ...(datasets && { datasets }), ...(slots && { slots }) },
+        ...(itemTypes && { itemBindings: buildTryItBindings([], itemTypes) }),
         resultType: "number",
         fallback: 0,
         bindings,
@@ -291,7 +299,7 @@ export function RollActionEditor({
       ]}/>
       {guided !== true || diceKind === "custom" || customEditing ? (
         <ExpressionEditor
-          references={[...Object.keys(fieldTypes).map(id => `fields.${id}`), ...Object.keys(inputTypes).map(id => `inputs.${id}`)]}
+          references={[...Object.keys(fieldTypes).map(id => `fields.${id}`), ...Object.keys(inputTypes).map(id => `inputs.${id}`), ...Object.keys(itemTypes ?? {}).map(id => `item.${id}`)]}
           client={client}
           systemId={systemId}
           source={expressionSource}

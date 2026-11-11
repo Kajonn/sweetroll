@@ -166,8 +166,8 @@ A system version is a validated declarative package with stable identifiers for 
 | **Category** | **MVP types**                              | **Notes**                                         |
 |--------------|--------------------------------------------|---------------------------------------------------|
 | Scalar       | text, integer, decimal, boolean            | movable; numeric constraints and step supported   |
-| Choice       | single choice, multi-choice                | Static options only; reference-data source        |
-| Resource     | current/max pair                           | Optional min/max and reset action                 |
+| Choice       | single choice, multi-choice                | Manual options or options from dataset rows        |
+| Resource     | current/max pair                           | Bounded current and a manual or computed maximum                 |
 | Computed     | number, text, boolean                      | Read-only result of a math-only expression        |
 | Media        | image attachment reference                 | Reserved image field; character portraits and item art delivered in M1/M2 (Section 7.8) |
 
@@ -192,17 +192,18 @@ The basic builder exposes an explicit “not on this character sheet” list for
 
 > **Security invariant.** System packages contain data and simple expressions only. They cannot execute JavaScript, make network requests, access files, or run server commands.
 
-Expressions are **math plus basic dice** only, parsed into a lightweight typed AST and evaluated by the platform with hard budgets:
+Expressions are declarative math, conditionals, and dice, parsed into a lightweight typed AST and evaluated by the platform with hard budgets:
 
-- Arithmetic, comparison, and boolean composition: `+ - * /`, `== != < <= > >=`, `&& ||`, `min`, `max`, and `round`; division-by-zero fallback
-- Field access: stable identifiers of sibling fields and current action inputs only
+- Arithmetic, comparison, and boolean composition: `+ - * / %`, `== != < <= > >=`, `&& ||`, `min`, `max`, `round`, `floor`, `ceil`, and `abs`
+- Field access: stable identifiers of sibling fields and current action inputs. Resources expose `.current` and `.max`. Double-quoted choice IDs work with equality and multi-choice fields use `has`.
+- Conditionals: `if(condition, a, b)` requires two branches of the same scalar type and evaluates only the selected branch.
 - Dice: standard notation (`2d6`, `d20 + 2`), keep-high/low (`4d6kh3`), advantage-style helpers, field-derived pools, and counted successes at a threshold; server-side deterministic dice
 - Computed fields may depend on other computed fields of the same owner; dependency cycles are rejected at publish
-- **No** lookup/aggregation over collections (`equipped.armor.bonus` is out)
+- Typed dataset lookups and bounded single-slot aggregates read reference data and equipped or carried items.
 - **No** effect engine (set/increment/append) — resource changes are simple built-in "bump" actions
 - **No** `against target.defense` action chains
 
-Grammar v0.1 is fixed by `docs/superpowers/specs/2026-09-04-system-package-contract-design.md`. It excludes rerolls, exploding dice, push mechanics, custom faces, arbitrary property traversal, and executable extension points. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 dice per roll, and 1,000 sides per die.
+[Grammar 1.0](docs/contracts/grammar-v1.0.md) is the current contract for system and extension document/package 2.0. It includes named groups and bounded push policies, and excludes exploding dice, custom faces, arbitrary property traversal, and executable extension points. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 dice per roll, and 1,000 sides per die.
 
 **Rolls** are a button press → server evaluates → result shows normalized expression, individual dice, modifiers, total, and audience. Rolls are factual; the platform does **not** auto-apply outcomes to state.
 
@@ -219,14 +220,13 @@ The [2026-10-27 scoped acceptance](docs/acceptance/configurable-push-rolls-2026-
 
 **Pre-release scope decision (2026-10-27):** The owner confirms there has been no release and there are no existing users. Character/campaign version upgrades were removed on that date and reinstated for non-breaking system versions on 2026-11-07 (Section 6.7). Application/database migration and historical-client compatibility are deferred until after the first release tag under Section 17.0. Fresh system authoring/publishing, play, permissions, saved-pool pushes and offline recovery remain in scope. Existing version checks remain defensive constraints; no upgrade workflow is added by this decision.
 
-**Planned rules coverage (owner request 2026-11-10, not yet implemented):** the
+**Rules coverage (owner request 2026-11-10):** the
 [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md) records
 the 2026-11-10 review defects and a staged widening of this contract. Because no system is published yet (owner statement
-2026-11-10), the plan replaces the contract in place (one package version 2.0,
-grammar 1.0, no legacy paths) so that d20 with tables and equipment, banded outcomes, d100
+2026-11-10), R2 replaces the contract in place with document/package 2.0 and grammar 1.0. Later stages cover d20 with tables and equipment, banded outcomes, d100
 roll-under, variable-target and exploding pools, roll-and-keep, custom dice, cards
-and opposed rolls can be implemented. The owner confirmed all decisions C1–C13 on
-2026-11-10. Stages R1–R8 change the exclusions listed above; each stage updates
+and opposed rolls. The owner confirmed all decisions C1–C13 on
+2026-11-10. Stages R3–R8 change the exclusions listed above. Each stage updates
 this section when it is delivered.
 
 **Rules defects, stage R0 (2026-11-10, implemented):** `adv(d20)`/`dis(d20)` roll
@@ -237,6 +237,31 @@ package's effective limits; publishing rejects a sheet above it with a
 `limit_exceeded` diagnostic at the entity, so a published system can no longer
 fail every character with `budget_exceeded`. The 256-node ceiling remains per
 expression. The sheet's increase control stops at the character's stored maximum.
+
+**Grammar core, stage R2:** creator previews and the server compile the same
+grammar. Choice sets and resource parts are recorded in roll bindings for saved
+push replay. Changes to an expression remain non-breaking when its context and
+declared result type stay the same.
+
+**Data-driven rules, stage R3.** Fields are scoped to an entity or item template.
+Option IDs are local to their choice field, inputs are local to their action,
+and granted action IDs are local to their template. Sheet and validation
+pickers identify a field by its owner and field ID. A granted roll reads common
+character fields through `fields.` and its own entry through `item.`. A
+template formula reads its own fields through `item.`.
+
+Tables can declare a key column and typed columns. `lookup` finds an exact
+key and `lookupBand` finds the highest numeric key at or below its argument.
+A choice field can populate its options from the IDs and labels of dataset rows.
+Slot aggregates read one slot and charge its maximum capacity against the sheet
+evaluation budget. Sums and counts multiply by entry quantity when the template
+opts in. `maxOf` selects the largest individual value. Compose checks the
+field types of all templates accepted by a referenced slot, including extensions.
+
+A resource's calculated maximum is rounded down to its step within its bounds.
+The sheet permits edits to the current value and clamps it when the maximum
+decreases. Version dry runs evaluate the target version's data and formulas
+before saving the new pin.
 
 ## 6.5 Draft, validation, and publishing
 

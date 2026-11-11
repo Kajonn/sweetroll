@@ -70,7 +70,7 @@ function createAstGen(rng: Lcg): AstGen {
 function compileExpr(ast: ExpressionAstV1, resultType: "number" | "boolean"): CompiledExpressionV1 {
   return {
     id: "prop_test",
-    context: "computed",
+    context: "computed", languageVersion: "1.0",
     resultType,
     inferredType: resultType,
     fallback: resultType === "number" ? 0 : false,

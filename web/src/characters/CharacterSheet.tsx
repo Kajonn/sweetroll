@@ -88,7 +88,7 @@ function ResourceEditor({ element, current, max, disabled, invoke, onAdjustResou
     setAmount("");
   };
   const draftCurrent = draft === null ? null : parseAmount(draft.current);
-  const draftMax = draft === null ? null : parseAmount(draft.max);
+  const draftMax = draft === null ? null : element.computedMaximum ? max : parseAmount(draft.max);
   const draftValid = draftCurrent !== null && draftMax !== null
     && draftMax >= element.min && draftMax <= element.max && draftCurrent >= element.min && draftCurrent <= draftMax;
   const label = element.label;
@@ -114,8 +114,10 @@ function ResourceEditor({ element, current, max, disabled, invoke, onAdjustResou
     }}>
       <label className={styles.resourceLabel} htmlFor={`${element.id}-current`}>{t("character.resource.current", { label })}</label>
       <input id={`${element.id}-current`} className={styles.resourceInput} type="number" inputMode="decimal" min={element.min} max={draftMax ?? element.max} step={element.step} value={draft.current} disabled={disabled} onChange={(event) => setDraft({ ...draft, current: event.target.value })} />
+      {element.computedMaximum ? null : <>
       <label className={styles.resourceLabel} htmlFor={`${element.id}-max`}>{t("character.resource.maximum", { label })}</label>
       <input id={`${element.id}-max`} className={styles.resourceInput} type="number" inputMode="decimal" min={element.min} max={element.max} step={element.step} value={draft.max} disabled={disabled} onChange={(event) => setDraft({ ...draft, max: event.target.value })} />
+      </>}
       <Button type="submit" variant="primary" disabled={disabled || !draftValid}>{t("character.resource.save", { label })}</Button>
       <Button onClick={() => setDraft(null)}>{t("character.resource.cancel")}</Button>
       {draftValid ? null : <p className={styles.stale} role="alert">{t("character.resource.range", { min: element.min, max: element.max })}</p>}
@@ -204,6 +206,22 @@ function audienceLabel(audience: NonNullable<CharacterSnapshot["lastRoll"]>["aud
   return t(`character.rollResult.audience.${audience}`);
 }
 
+function nominalActionLabel(
+  nominal: NonNullable<CharacterSnapshot["lastNominal"]>,
+  sheets: NonNullable<CharacterSnapshot["confirmed"]>["projection"]["sheets"],
+  templates: SlotTemplate[],
+): string | null {
+  for (const sheet of sheets) {
+    for (const section of sheet.sections) {
+      const action = section.elements.find(element => element.kind === "action"
+        && element.entryId === nominal.entryId && element.actionId === nominal.actionId);
+      if (action?.kind === "action") return action.label;
+    }
+  }
+  const matches = templates.flatMap(template => template.grantedActions.filter(action => action.id === nominal.actionId));
+  return matches.length === 1 ? matches[0]!.label : null;
+}
+
 function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot["lastRoll"]>; fieldLabels: ReadonlyMap<string, string> }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const expression = roll.expression.replace(/\bfields\.([A-Za-z_][A-Za-z0-9_]*)\b/g, (reference, fieldId: string) => fieldLabels.get(fieldId) ?? reference);
@@ -283,9 +301,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource,
           : null;
   const stale = snapshot.tentative !== null;
   const nominal = snapshot.lastNominal;
-  const nominalLabel = nominal === null
-    ? null
-    : templates?.flatMap((template) => template.grantedActions).find((action) => action.id === nominal.actionId)?.label ?? null;
+  const nominalLabel = nominal === null ? null : nominalActionLabel(nominal, projection.sheets, templates ?? []);
   const showEstimateNote = resourceEstimateActive(snapshot);
   // Last-confirmed diagnostics: derived values, validations and bounds stay
   // exactly as the server projected them; only field/resource inputs carry

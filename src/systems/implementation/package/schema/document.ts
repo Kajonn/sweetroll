@@ -92,6 +92,7 @@ export const SingleChoiceFieldV1Schema = Type.Object(
     required: Type.Boolean(),
     default: Type.Union([DefinitionIdSchema, Type.Null()]),
     options: Type.Array(ChoiceOptionV1Schema),
+    optionsFrom: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );
@@ -105,6 +106,7 @@ export const MultiChoiceFieldV1Schema = Type.Object(
     required: Type.Boolean(),
     default: Type.Array(DefinitionIdSchema),
     options: Type.Array(ChoiceOptionV1Schema),
+    optionsFrom: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );
@@ -128,6 +130,7 @@ export const ResourceFieldV1Schema = Type.Object(
     min: Type.Number(),
     max: Type.Number(),
     step: Type.Number(),
+    maxExpressionId: Type.Optional(DefinitionIdSchema),
     resetTo: Type.Union([Type.Literal("min"), Type.Literal("max")]),
   },
   { additionalProperties: false },
@@ -198,6 +201,8 @@ export const ReferenceDataV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
     label: LabelSchema,
+    keyColumn: Type.Optional(DefinitionIdSchema),
+    columns: Type.Optional(Type.Record(DefinitionIdSchema, ValueTypeSchema, { additionalProperties: false, maxProperties: PACKAGE_LIMITS.referenceRecordValues })),
     records: Type.Array(ReferenceRecordV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceRecordsPerSet,
     }),
@@ -424,6 +429,7 @@ export const ObjectTemplateV1Schema = Type.Object(
     image: Type.Optional(ImageDescriptorSchema),
     label: LabelSchema,
     kind: TemplateKindSchema,
+    aggregateQuantity: Type.Optional(Type.Boolean()),
     description: Type.Optional(Type.String({ maxLength: LONG_TEXT_MAX_LENGTH })),
     fields: Type.Array(FieldV1Schema, { maxItems: 64 }),
     grantedActions: Type.Array(GrantedActionV1Schema, { maxItems: 16 }),
@@ -450,6 +456,7 @@ export const ValidationV1Schema = Type.Object(
     severity: Type.Union([Type.Literal("error"), Type.Literal("warning")]),
     message: Type.String({ maxLength: LONG_TEXT_MAX_LENGTH }),
     targetId: DefinitionIdSchema,
+    targetEntityId: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );
@@ -475,7 +482,7 @@ export type SystemMetadataV1 = Static<typeof SystemMetadataV1Schema>;
 
 export const SystemDocumentV1Schema = Type.Object(
   {
-    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1"), Type.Literal("1.2")]),
+    schemaVersion: Type.Literal("2.0"),
     metadata: SystemMetadataV1Schema,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
     referenceData: Type.Array(ReferenceDataV1Schema, {
@@ -489,8 +496,8 @@ export const SystemDocumentV1Schema = Type.Object(
     validations: Type.Array(ValidationV1Schema, {
       maxItems: PACKAGE_LIMITS.validations,
     }),
-    templates: Type.Optional(Type.Array(ObjectTemplateV1Schema, { maxItems: 128 })),
-    slots: Type.Optional(Type.Array(SlotDefinitionV1Schema, { maxItems: 64 })),
+    templates: Type.Array(ObjectTemplateV1Schema, { maxItems: 128 }),
+    slots: Type.Array(SlotDefinitionV1Schema, { maxItems: 64 }),
   },
   { additionalProperties: false },
 );

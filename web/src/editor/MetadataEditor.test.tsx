@@ -10,7 +10,7 @@ import { MetadataEditor } from "./MetadataEditor.js";
 
 function docWithName(name: string): SystemDocumentV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0", templates: [], slots: [],
     metadata: { name, description: "d", language: "en", defaultDice: "d20" },
     entities: [],
     referenceData: [],
@@ -26,7 +26,7 @@ describe("MetadataEditor", () => {
     render(
       <MetadataEditor
         document={{
-          schemaVersion: "1.0",
+          schemaVersion: "2.0", templates: [], slots: [],
           metadata: {
             name: "Pocket Quest",
             description: "A brave little game",
@@ -53,7 +53,7 @@ describe("MetadataEditor", () => {
     render(
       <MetadataEditor
         document={{
-          schemaVersion: "1.0",
+          schemaVersion: "2.0", templates: [], slots: [],
           metadata: { name: "", description: "", language: "en", defaultDice: "d20" },
           entities: [],
           referenceData: [],
@@ -84,7 +84,7 @@ describe("MetadataEditor", () => {
     render(
       <MetadataEditor
         document={{
-          schemaVersion: "1.0",
+          schemaVersion: "2.0", templates: [], slots: [],
           metadata: { name: "", description: "", language: "en", defaultDice: "d20" },
           entities: [],
           referenceData: [],
@@ -110,7 +110,9 @@ describe("MetadataEditor", () => {
   it("does not call onChange when no edits were made", async () => {
     const onChange = vi.fn();
     const document = {
-      schemaVersion: "1.0" as const,
+      schemaVersion: "2.0" as const,
+      templates: [],
+      slots: [],
       metadata: { name: "Untouched", description: "d", language: "en", defaultDice: "d20" },
       entities: [],
       referenceData: [],

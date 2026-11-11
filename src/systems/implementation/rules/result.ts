@@ -1,6 +1,8 @@
 import { Type, type Static } from "@sinclair/typebox";
-import { ScalarValueSchema } from "../package/schema/common.js";
+import { ScalarValueSchema, DefinitionIdSchema } from "../package/schema/common.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
+
+export const BindingValueSchema = Type.Union([ScalarValueSchema, Type.Array(DefinitionIdSchema, { uniqueItems: true })]);
 
 const Identity = Type.String({ minLength: 1, maxLength: 256 });
 export const DieResultSchema = Type.Object(
@@ -53,8 +55,8 @@ export const RollBreakdownSchema = Type.Object(
         {
           id: Identity,
           operation: Type.String({ minLength: 1, maxLength: 32 }),
-          operandIds: Type.Array(Identity, { maxItems: 2 }),
-          value: ScalarValueSchema,
+          operandIds: Type.Array(Identity, { maxItems: 8 }),
+          value: BindingValueSchema,
           groupId: Type.Optional(Identity),
         },
         { additionalProperties: false },
@@ -76,7 +78,7 @@ export type PushResult=Static<typeof PushResultSchema>;
 export const SavedPushRollSchema = Type.Object({
   actionId: Type.String({ minLength: 1 }), expression: Type.String({ minLength: 1 }),
   dice: Type.Array(DieResultSchema, { maxItems: 100 }),
-  bindings: Type.Array(Type.Object({scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]), definitionId: Type.String({minLength:1}), value: ScalarValueSchema}), {maxItems:256}),
+  bindings: Type.Array(Type.Object({scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]), definitionId: Type.String({minLength:1}), value: BindingValueSchema}), {maxItems:256}),
   total: Type.Number(), output: Type.String(),
   audience: Type.Union([Type.Literal("owner_only"),Type.Literal("gm_only"),Type.Literal("campaign")]),
   breakdown: RollBreakdownSchema, push: PushResultSchema,

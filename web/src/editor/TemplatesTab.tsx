@@ -1,3 +1,4 @@
+import { entityFieldTypes, type FieldBindingType } from "@sweetroll/rules";
 import { DebugOnly } from "../ui/debugMode.js";
 import { useState, type ReactNode } from "react";
 
@@ -18,6 +19,7 @@ import {
   RollActionEditor,
 } from "./actions/RollActionEditor.js";
 import { BooleanFieldEditor } from "./fields/BooleanFieldEditor.js";
+import { ComputedFieldEditor } from "./fields/ComputedFieldEditor.js";
 import { ChoiceFieldEditor } from "./fields/ChoiceFieldEditor.js";
 import { ResourceFieldEditor } from "./fields/ResourceFieldEditor.js";
 import { ScalarFieldEditor } from "./fields/ScalarFieldEditor.js";
@@ -38,7 +40,7 @@ import {
   type TemplateKind,
 } from "./sheet/slotTypes.js";
 
-/** Template field kinds: the existing field union minus computed/image. */
+/** Template fields can use scalar values, resources, or item formulas. */
 const TEMPLATE_FIELD_KINDS: ReadonlyArray<FieldV1["kind"]> = [
   "text",
   "integer",
@@ -47,6 +49,7 @@ const TEMPLATE_FIELD_KINDS: ReadonlyArray<FieldV1["kind"]> = [
   "singleChoice",
   "multiChoice",
   "resource",
+  "computed",
 ];
 
 export type TemplatesTabProps = {
@@ -201,11 +204,17 @@ function TemplateDetail({
   };
 
   const addField = () => {
-    const id = nextScopedId(collectUsedIds(document), "field");
+    const id = nextScopedId(new Set(template.fields.map(field => field.id)), "field");
     const field = defaultField(fieldKind);
     field.id = id;
     field.label = t("editor.entity.newFieldLabel");
-    onChange({ fields: [...template.fields, field] });
+    if (field.kind === "computed") {
+      field.expressionId = nextScopedId(collectUsedIds(document), "computed_expr");
+      onChange({ fields: [...template.fields, field] });
+      dispatch({ type: "addExpression", expression: { id: field.expressionId, context: "computed", resultType: "number", source: "0", fallback: 0 } });
+    } else {
+      onChange({ fields: [...template.fields, field] });
+    }
   };
   const replaceField = (originalFieldId: string, field: FieldV1) => {
     onChange({
@@ -294,6 +303,10 @@ function TemplateDetail({
           {t("editor.sheet.removeConfirm.confirm")}
         </Button>
       </div>
+      <label>
+        <input type="checkbox" checked={template.aggregateQuantity ?? false} onChange={event => onChange({ aggregateQuantity: event.target.checked })} />
+        {t("editor.templates.aggregateQuantity")}
+      </label>
       <FormField label={t("editor.templates.description")}>
         <input
           id={`template-description-${template.id}`}
@@ -328,10 +341,21 @@ function TemplateDetail({
       <div data-testid={`template-fields-${template.id}`}>
         {template.fields.map((field) => (
           <div key={field.id}>
-            <TemplateFieldEditor
+            {field.kind === "computed" ? <ComputedFieldEditor
               field={field}
+              onChange={next => replaceField(field.id, next)}
+              referenceScope="item"
+              datasets={document.referenceData}
+              siblingFields={Object.entries(entityFieldTypes(template.fields.filter(sibling => sibling.id !== field.id))).map(([id, valueType]) => ({ id, valueType }))}
+              expressionSource={expressionSourceFor(field.expressionId)}
+              fallback={expressions.find(expression => expression.id === field.expressionId)?.fallback}
+              document={document}
+              dispatch={dispatch}
+            /> : <TemplateFieldEditor
+              field={field}
+              datasets={document.referenceData}
               onChange={(next) => replaceField(field.id, next)}
-            />
+            />}
             <Button
               variant="secondary"
               className={styles.removeButton}
@@ -379,6 +403,8 @@ function TemplateDetail({
                   commitExpressionSource(action.expressionId, next);
                 }}
                 fieldTypes={templateFieldTypeMap(template, document)}
+                itemTypes={entityFieldTypes(template.fields)}
+                datasets={document.referenceData}
                 fieldLabels={templateFieldLabels(template, document)}
                 guided
                 diceKind={guidedDiceKindFor(expressionSourceFor(action.expressionId))}
@@ -485,15 +511,16 @@ function withNominal(action: GrantedActionV1, nominal: boolean | undefined): Gra
 
 /**
  * Template field editing composed from the shared field editors (same
- * components `EntityList` routes through). Computed/image kinds are not
- * offered for templates, so no expression props are needed; unknown kinds
- * render the preserved notice instead of throwing.
+ * components `EntityList` routes through). Template formulas are handled
+ * by the computed field editor in item scope.
  */
 function TemplateFieldEditor({
   field,
+  datasets,
   onChange,
 }: {
   field: FieldV1;
+  datasets: SystemDocumentV1["referenceData"];
   onChange: (next: FieldV1) => void;
 }) {
   switch (field.kind) {
@@ -505,7 +532,7 @@ function TemplateFieldEditor({
       return <BooleanFieldEditor field={field} onChange={onChange} />;
     case "singleChoice":
     case "multiChoice":
-      return <ChoiceFieldEditor field={field} onChange={onChange} />;
+      return <ChoiceFieldEditor field={field} onChange={onChange} datasets={datasets} />;
     case "resource":
       return <ResourceFieldEditor field={field} onChange={onChange} />;
     default:
@@ -611,18 +638,8 @@ function guidedDiceKindFor(source: string): string {
 function templateFieldTypeMap(
   template: ObjectTemplateV1,
   document: SystemDocumentV1,
-): Record<string, "number" | "text" | "boolean"> {
-  const out: Record<string, "number" | "text" | "boolean"> = {};
-  for (const field of [...eligibleCharacterFields(template, document), ...template.fields]) {
-    if (field.kind === "integer" || field.kind === "decimal" || field.kind === "resource") {
-      out[field.id] = "number";
-    } else if (field.kind === "boolean") {
-      out[field.id] = "boolean";
-    } else if (field.kind === "text" || field.kind === "singleChoice" || field.kind === "multiChoice") {
-      out[field.id] = "text";
-    }
-  }
-  return out;
+): Record<string, FieldBindingType> {
+  return entityFieldTypes(eligibleCharacterFields(template, document));
 }
 
 function templateFieldLabels(template: ObjectTemplateV1, document: SystemDocumentV1): Record<string, string> {

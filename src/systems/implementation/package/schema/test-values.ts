@@ -6,7 +6,7 @@ import type { SystemPackageV1, UnsignedSystemPackageV1 } from "./package.js";
 
 export function validDocument(): SystemDocumentV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0", templates: [], slots: [],
     metadata: {
       name: "Pocket Quest",
       description: "Original fixture",
@@ -212,7 +212,7 @@ export function validDocument(): SystemDocumentV1 {
 const expressions: CompiledExpressionV1[] = [
   {
     id: "literal_expr",
-    context: "computed",
+    context: "computed", languageVersion: "1.0",
     resultType: "number",
     inferredType: "number",
     fallback: 0,
@@ -222,7 +222,7 @@ const expressions: CompiledExpressionV1[] = [
   },
   {
     id: "reference_expr",
-    context: "computed",
+    context: "computed", languageVersion: "1.0",
     resultType: "number",
     inferredType: "number",
     fallback: 0,
@@ -232,7 +232,7 @@ const expressions: CompiledExpressionV1[] = [
   },
   {
     id: "binary_expr",
-    context: "computed",
+    context: "computed", languageVersion: "1.0",
     resultType: "number",
     inferredType: "number",
     fallback: 0,
@@ -247,7 +247,7 @@ const expressions: CompiledExpressionV1[] = [
   },
   {
     id: "pool_expr",
-    context: "computed",
+    context: "computed", languageVersion: "1.0",
     resultType: "number",
     inferredType: "number",
     fallback: 0,
@@ -272,7 +272,7 @@ const expressions: CompiledExpressionV1[] = [
 
 export function validUnsignedPackage(): UnsignedSystemPackageV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0", templates: [], slots: [],
     systemId: "00000000-0000-4000-8000-000000000001",
     versionId: "00000000-0000-4000-8000-000000000002",
     semanticVersion: "1.0.0",

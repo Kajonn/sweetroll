@@ -26,7 +26,6 @@ export function hasDiceGroups(ast: ExpressionAstV1): boolean {
 }
 export function validateDiceGroups(
   ast: ExpressionAstV1,
-  version: string = "0.1",
 ): RulesDiagnostic[] {
   const diagnostics: RulesDiagnostic[] = [];
   const ids = new Set<string>();
@@ -37,8 +36,6 @@ export function validateDiceGroups(
     children(n).every(deterministic);
   const walk = (node: ExpressionAstV1) => {
     if (node.kind === "dice" && node.group !== undefined) {
-      if (version !== "0.2")
-        fail("Named dice groups require grammar 0.2 and package 1.1.");
       if (
         !/^[a-z][a-z0-9_]{0,63}$/.test(node.group.id) ||
         node.group.label.length < 1 ||

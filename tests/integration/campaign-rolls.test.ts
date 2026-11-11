@@ -773,7 +773,7 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
   });
 
   async function setupPushCampaign(){
-    const headers={cookie:h.users.gm.cookie};const doc=namedDicePoolDocument();doc.schemaVersion="1.2";
+    const headers={cookie:h.users.gm.cookie};const doc=namedDicePoolDocument();
     const action=doc.actions.find(a=>a.kind==="roll")!;if(action.kind!=="roll")throw Error("fixture");action.pushPolicy={version:"1.0",maxAttempts:2,successThreshold:1,allowOnSuccess:true,groups:[{groupId:"attribute",lockedFaces:[],reportedFaces:[1]}]};
     const created=await h.app.inject({method:"POST",url:"/systems",headers,payload:{source:{kind:"blank",name:"Push campaign"},idempotencyKey:randomUUID()}});expect(created.statusCode,created.body).toBe(201);const w=created.json().workspace;
     const saved=await h.app.inject({method:"PUT",url:`/systems/${w.system.systemId}/draft`,headers,payload:{expectedRevision:w.draft.revision,document:doc}});expect(saved.statusCode,saved.body).toBe(200);

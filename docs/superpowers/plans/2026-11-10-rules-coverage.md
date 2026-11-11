@@ -326,4 +326,27 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
   keeps one-tap steps; the GM can open the sheet), and corrections of these two
   intents in conflict review (they can be reapplied or discarded, not edited).
 
-R2–R8: not started.
+**R2 — implemented.**
+
+- System and extension documents/packages use schema version 2.0 and compiled
+  expressions use grammar 1.0. Template, slot, and character entry collections
+  are explicit. Generated contracts and reference fixtures use the current shape.
+- Shared grammar supports typed conditionals, quoted text, choice membership,
+  resource parts, remainder, rounding helpers, and two to eight operands in
+  min/max. Creator help and suggestions use the same parser as publishing.
+- The conditional d20 scenario exercises publication, proficiency and class
+  bonuses, choice sets, and resource bindings through the public API.
+- Compatibility classification still uses expression context and result type.
+
+**R3 — implemented.**
+
+- Scoped field, option, input, and granted-action IDs. Version comparison already
+  compares fields inside their owner, and regression tests cover shared IDs.
+- Typed datasets, exact and banded lookup, dataset choice options, and bounded
+  slot aggregates. Extension composition rechecks aggregate field types.
+- Computed resource maxima follow the character's current rules. Version dry
+  runs use target-version table data and normalize the maximum.
+- Roadwardens is the M2 fixture with an API scenario and a browser journey for
+  the creator, player sheet, and GM session.
+
+R4–R8: not started.

@@ -1,4 +1,5 @@
-import {parse,hasDiceGroups} from "@sweetroll/rules";
+import type { ObjectTemplateV1, SlotDefinitionV1 } from "../editor/sheet/slotTypes.js";
+
 export type SystemMetadataV1 = {
   name: string;
   description: string;
@@ -17,14 +18,14 @@ export type EntityDefinitionV1 = {
   kind?: "playable" | "npc";
   fields: EntityFieldV1[];
 };
-export type ReferenceDataV1 = { id: string; label: string; records: unknown[] };
+export type ReferenceDataV1 = import("../editor/referenceData/ReferenceDataEditor.js").ReferenceDataV1;
 export type SheetV1 = { id: string; label: string; targetEntityId: string; sections: unknown[] };
 export type SourceExpressionV1 = { id: string; context: string; resultType: string; source: string; fallback: unknown };
 export type ActionV1 = { id: string; label: string; kind: string } & Record<string, unknown>;
-export type ValidationV1 = { id: string; expressionId: string; severity: string; message: string; targetId: string };
+export type ValidationV1 = { id: string; expressionId: string; severity: string; message: string; targetId: string; targetEntityId?: string };
 
 export type SystemDocumentV1 = {
-  schemaVersion: "1.0" | "1.1" | "1.2";
+  schemaVersion: "2.0";
   metadata: SystemMetadataV1;
   entities: EntityDefinitionV1[];
   referenceData: ReferenceDataV1[];
@@ -32,6 +33,8 @@ export type SystemDocumentV1 = {
   expressions: SourceExpressionV1[];
   actions: ActionV1[];
   validations: ValidationV1[];
+  templates: ObjectTemplateV1[];
+  slots: SlotDefinitionV1[];
 };
 
 export type DocumentAction =
@@ -61,7 +64,7 @@ export type DocumentAction =
 
 export function blankDocument(): SystemDocumentV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     metadata: {
       name: "",
       description: "",
@@ -74,13 +77,15 @@ export function blankDocument(): SystemDocumentV1 {
     expressions: [],
     actions: [],
     validations: [],
+    templates: [],
+    slots: [],
   };
 }
 
 export function documentReducer(state: SystemDocumentV1, action: DocumentAction): SystemDocumentV1 {
   switch (action.type) {
     case "replace":
-      return hasPolicy(action.document)?{...action.document,schemaVersion:"1.2"}:action.document;
+      return action.document;
     case "setMetadata":
       return {
         ...state,
@@ -114,7 +119,7 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
     case "setReferenceData":
       return { ...state, referenceData: action.referenceData };
     case "setActions":
-      return { ...state, actions: action.actions, ...(action.actions.some(a=>a.pushPolicy!==undefined)?{schemaVersion:"1.2" as const}:{}) };
+      return { ...state, actions: action.actions };
     case "setValidations":
       return { ...state, validations: action.validations };
     case "setExpressionSource": {
@@ -129,8 +134,7 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
         };
       });
       if (!mutated) return state;
-      const parsed=action.source===undefined?null:parse(action.source);
-      return { ...state, expressions, ...(state.schemaVersion==="1.0" && parsed?.ok && hasDiceGroups(parsed.ast)?{schemaVersion:"1.1" as const}:{}) };
+      return { ...state, expressions };
     }
     case "addExpression": {
       if (state.expressions.some((entry) => entry.id === action.expression.id)) return state;
@@ -138,5 +142,3 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
     }
   }
 }
-
-function hasPolicy(doc:SystemDocumentV1):boolean{return doc.actions.some(a=>a.pushPolicy!==undefined)||((doc as unknown as {templates?:{grantedActions:{pushPolicy?:unknown}[]}[]}).templates??[]).some(t=>t.grantedActions.some(a=>a.pushPolicy!==undefined));}

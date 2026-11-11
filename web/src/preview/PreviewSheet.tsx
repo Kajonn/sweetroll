@@ -1,3 +1,5 @@
+import { entityFieldTypes, type BindingValue, type RulesDataset, type SlotEnvironment } from "@sweetroll/rules";
+import { buildSampleBindings } from "./sampleData.js";
 import { DebugOnly } from "../ui/debugMode.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
@@ -118,7 +120,6 @@ type SheetWithMeta = {
   actions: ActionV1[];
 };
 
-type FieldTypeMap = Record<DefinitionId, ValueType>;
 
 function isResourceValue(
   v: SampleFieldValue | undefined,
@@ -153,35 +154,6 @@ function findSheet(
   return { sheet: target, entity, actions };
 }
 
-function fieldType(field: FieldV1): ValueType | undefined {
-  switch (field.kind) {
-    case "text":
-      return "text";
-    case "integer":
-    case "decimal":
-    case "resource":
-      return "number";
-    case "boolean":
-      return "boolean";
-    case "singleChoice":
-    case "multiChoice":
-      return "text";
-    case "computed":
-      return field.valueType;
-    case "image":
-      return undefined;
-  }
-}
-
-function buildFieldTypes(entity: EntityDefinitionV1): FieldTypeMap {
-  const out: FieldTypeMap = {};
-  for (const field of entity.fields) {
-    const vt = fieldType(field);
-    if (vt !== undefined) out[field.id] = vt;
-  }
-  return out;
-}
-
 function findField(
   entity: EntityDefinitionV1,
   fieldId: DefinitionId,
@@ -200,55 +172,14 @@ function findExpression(
   return expressions.find((e) => e.id === expressionId) ?? null;
 }
 
-function defaultBinding(valueType: ValueType): ScalarValue {
-  switch (valueType) {
-    case "number":
-      return 0;
-    case "text":
-      return "";
-    case "boolean":
-      return false;
-  }
-}
-
-function coerceScalar(
-  value: SampleScalarValue,
-  valueType: ValueType,
-): ScalarValue {
-  if (value === null) return defaultBinding(valueType);
-  switch (valueType) {
-    case "number":
-      return typeof value === "number" ? value : Number(value);
-    case "text":
-      return typeof value === "string" ? value : String(value);
-    case "boolean":
-      return typeof value === "boolean" ? value : value === "true";
-  }
-}
-
 function buildActionBindings(
   entity: EntityDefinitionV1,
   record: { fields: Record<DefinitionId, SampleFieldValue> } | undefined,
   action: ActionV1 | null,
-): Record<string, ScalarValue> {
-  const out: Record<string, ScalarValue> = {};
-  const fieldTypes = buildFieldTypes(entity);
-  for (const [id, vt] of Object.entries(fieldTypes)) {
-    const v = record === undefined ? undefined : record.fields[id];
-    if (v === undefined) {
-      out[id] = defaultBinding(vt);
-      continue;
-    }
-    if (isResourceValue(v)) {
-      out[id] = v.current;
-      continue;
-    }
-    if (isMultiChoiceValue(v)) continue;
-    if (v === null) {
-      out[id] = defaultBinding(vt);
-      continue;
-    }
-    out[id] = coerceScalar(v, vt);
+): Record<string, BindingValue> {
+  const out = buildSampleBindings(record?.fields ?? {});
+  for (const [id, type] of Object.entries(entityFieldTypes(entity.fields))) {
+    if (!Object.hasOwn(out, id)) out[id] = type === "choiceSet" ? [] : type === "number" ? 0 : type === "boolean" ? false : "";
   }
   if (action !== null && action.kind === "roll") {
     for (const input of action.inputs) {
@@ -366,6 +297,8 @@ export function PreviewSheet({ pkg, sample, sheetId }: PreviewSheetProps) {
           entity={entity}
           actions={actions}
           expressions={pkg.expressions}
+          datasets={pkg.datasets}
+          slots={pkg.slotsByEntity?.[entity.id]}
           sample={sample}
         />
       ))}
@@ -378,6 +311,8 @@ type PreviewSectionProps = {
   entity: EntityDefinitionV1;
   actions: ActionV1[];
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
   sample: SampleData;
 };
 
@@ -386,6 +321,8 @@ function PreviewSection({
   entity,
   actions,
   expressions,
+  datasets,
+  slots,
   sample,
 }: PreviewSectionProps) {
   const record = sample[entity.id];
@@ -405,6 +342,8 @@ function PreviewSection({
           entity={entity}
           actions={actions}
           expressions={expressions}
+          datasets={datasets}
+          slots={slots}
           record={record}
         />
       ))}
@@ -417,6 +356,8 @@ type PreviewElementProps = {
   entity: EntityDefinitionV1;
   actions: ActionV1[];
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
   record: { fields: Record<DefinitionId, SampleFieldValue> } | undefined;
 };
 
@@ -425,6 +366,8 @@ function PreviewElement({
   entity,
   actions,
   expressions,
+  datasets,
+  slots,
   record,
 }: PreviewElementProps) {
   switch (element.kind) {
@@ -465,6 +408,8 @@ function PreviewElement({
           action={action}
           entity={entity}
           expressions={expressions}
+          datasets={datasets}
+          slots={slots}
           record={record}
         />
       );
@@ -573,6 +518,8 @@ type PreviewActionProps = {
   action: ActionV1 | null;
   entity: EntityDefinitionV1;
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
   record: { fields: Record<DefinitionId, SampleFieldValue> } | undefined;
 };
 
@@ -581,6 +528,8 @@ function PreviewAction({
   action,
   entity,
   expressions,
+  datasets,
+  slots,
   record,
 }: PreviewActionProps) {
   const [openRollResult, setOpenRollResult] = useState(false);
@@ -607,6 +556,8 @@ function PreviewAction({
           action={action}
           entity={entity}
           expressions={expressions}
+          datasets={datasets}
+          slots={slots}
           record={record}
           onClose={() => setOpenRollResult(false)}
         />
@@ -619,6 +570,8 @@ type RollResultSheetProps = {
   action: RollActionV1;
   entity: EntityDefinitionV1;
   expressions: CompiledExpressionSummary[];
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
   record: { fields: Record<DefinitionId, SampleFieldValue> };
   onClose: () => void;
 };
@@ -627,14 +580,16 @@ function RollResultSheet({
   action,
   entity,
   expressions,
+  datasets,
+  slots,
   record,
   onClose,
 }: RollResultSheetProps) {
   const expression = findExpression(expressions, action.expressionId);
   const source = expression === null ? "0" : renderExpression(expression.ast);
-  const fieldTypes = buildFieldTypes(entity);
+  const fieldTypes = entityFieldTypes(entity.fields);
   const inputTypes = expressionInputTypes(action);
-  const env = { fields: fieldTypes, inputs: inputTypes };
+  const env = { fields: fieldTypes, inputs: inputTypes, ...(datasets && { datasets }), ...(slots && { slots }) };
   const bindings = buildActionBindings(entity, record, action);
   const evaluation = evaluateRoll({
     source,

@@ -12,8 +12,7 @@ import { EffectivePackageLimitsV1Schema } from "./package.js";
 // decision X1): an extension adds templates (item, spell, talent, effect) to
 // one system, plus the computed/roll expressions those templates use. It never
 // adds character fields, entities, sheets, slots, entity actions or
-// validations. Its own format version is independent of the system package
-// version; extension expressions always use grammar 0.2 and push policies.
+// validations. Its expressions use the same grammar as system expressions.
 
 const UUID_PATTERN = "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 const SEMANTIC_VERSION_PATTERN =
@@ -34,7 +33,7 @@ export type ExtensionMetadataV1 = Static<typeof ExtensionMetadataV1Schema>;
 
 export const ExtensionDocumentV1Schema = Type.Object(
   {
-    schemaVersion: Type.Literal("1.0"),
+    schemaVersion: Type.Literal("2.0"),
     metadata: ExtensionMetadataV1Schema,
     expressions: Type.Array(SourceExpressionV1Schema, {
       maxItems: PACKAGE_LIMITS.expressions,
@@ -47,7 +46,7 @@ export type ExtensionDocumentV1 = Static<typeof ExtensionDocumentV1Schema>;
 
 export const ExtensionPackageV1Schema = Type.Object(
   {
-    schemaVersion: Type.Literal("1.0"),
+    schemaVersion: Type.Literal("2.0"),
     extensionId: UuidSchema,
     versionId: UuidSchema,
     semanticVersion: Type.String({ pattern: SEMANTIC_VERSION_PATTERN }),

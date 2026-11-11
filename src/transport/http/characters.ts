@@ -1,3 +1,4 @@
+import { BindingValueSchema } from "../../systems/implementation/rules/result.js";
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
 import { characterImageHandlers, characterImageRoutes } from "./characterImages.js";
 import { ImageDescriptorSchema } from "../../platform/image-attachment.js";
@@ -57,9 +58,7 @@ const RuntimeValidationDto = Type.Object({
 const RuntimeStateDto = Type.Object({
   schemaVersion: Type.Literal("1.0"),
   values: Type.Object({}, { additionalProperties: true }),
-  // Task 7: entries ride the state over the wire (plain values, same as
-  // offline snapshots). Optional so pre-entry clients keep validating.
-  entries: Type.Optional(Type.Record(Type.String(), Type.Object({
+  entries: Type.Record(Type.String(), Type.Object({
     entryId: Type.String(),
     image: Type.Optional(ImageDescriptorSchema),
     slotId: Type.String(),
@@ -68,7 +67,7 @@ const RuntimeStateDto = Type.Object({
     source:Type.Optional(EntrySourceSchema),snapshot:Type.Optional(EntrySnapshotSchema),
     values: Type.Object({}, { additionalProperties: true }),
     quantity: Type.Optional(Type.Integer({ minimum: 1 })),
-  }))),
+  })),
 });
 const RecordDto = Type.Record(Type.String(), RuntimeScalarDto);
 
@@ -168,6 +167,7 @@ const ProjectionElementDto = Type.Union([
     max: Type.Number(),
     step: Type.Number(),
     resetTo: Type.Union([Type.Literal("min"), Type.Literal("max")]),
+    computedMaximum: Type.Optional(Type.Boolean()),
     validations: Type.Array(RuntimeValidationDto),
   }),
   Type.Object({
@@ -291,9 +291,9 @@ const CharacterCreationVersionsDto = Type.Object({
 
 const DiceDto = DieResultSchema;
 const RollBindingDto = Type.Object({
-  scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
+  scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]),
   definitionId: Type.String(),
-  value: RuntimeScalarDto,
+  value: BindingValueSchema,
 });
 const RollAudienceDto = Type.Union([
   Type.Literal("owner_only"),

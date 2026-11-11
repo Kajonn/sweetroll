@@ -1,10 +1,14 @@
+import { validateDataset, fieldWithDatasetOptions } from "../package/reference-data.js";
+import { dataObservationCost } from "./data.js";
+import { sheetActionOwners, validationOwner } from "./owners.js";
+import { slotEnvironment } from "./slots.js";
 import {validatePushPolicies} from "./push-policy.js";
-import type { ActionV1, FieldV1, SystemDocumentV1, SystemPackageV1, TemplateKind, ValueType } from "../package/schema/index.js";
+import type { ActionV1, SystemDocumentV1, SystemPackageV1, TemplateKind, ValueType } from "../package/schema/index.js";
 import type { UnsignedSystemPackageV1 } from "../package/schema/index.js";
 import { signSystemPackage } from "../package/canonical.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import { compileExpression, type CompileResult, type CompiledExpressionBody } from "./compile.js";
-import type { ExpressionCompileEnv } from "./typecheck.js";
+import { entityFieldTypes, type ExpressionCompileEnv, type FieldBindingType } from "./typecheck.js";
 
 export type CompileDocumentOpts = {
   systemId: string;
@@ -21,8 +25,8 @@ export type CompileDocumentOpts = {
 export function grantedEntityFieldsForKind(
   rules: Pick<SystemDocumentV1, "entities" | "sheets" | "slots">,
   kind: TemplateKind,
-): Record<string, ValueType> {
-  const eligibleSlots = new Set((rules.slots ?? [])
+): Record<string, FieldBindingType> {
+  const eligibleSlots = new Set(rules.slots
     .filter((slot) => slot.accepts.includes(kind)).map((slot) => slot.id));
   const targets = new Set(rules.sheets.filter((sheet) => sheet.sections.some((section) =>
     section.elements.some((element) => element.kind === "slot" && eligibleSlots.has(element.slotId)),
@@ -37,33 +41,10 @@ export function grantedEntityFieldsForKind(
   return common;
 }
 
-export function entityFieldTypes(fields: readonly FieldV1[]): Record<string, ValueType> {
-  const types: Record<string, ValueType> = {};
-  for (const field of fields) {
-    const valueType = fieldToValueType(field);
-    if (valueType !== undefined) types[field.id] = valueType;
-  }
-  return types;
-}
-
 export function actionInputTypes(inputs: readonly { id: string; valueType: string }[]): Record<string, ValueType> {
   const types: Record<string, ValueType> = {};
   for (const input of inputs) types[input.id] = actionInputToValueType(input);
   return types;
-}
-
-function fieldToValueType(field: FieldV1): ValueType | undefined {
-  switch (field.kind) {
-    case "text": return "text";
-    case "integer": return "number";
-    case "decimal": return "number";
-    case "boolean": return "boolean";
-    case "singleChoice": return "text";
-    case "multiChoice": return "text";
-    case "resource": return "number";
-    case "computed": return field.valueType;
-    case "image": return undefined;
-  }
 }
 
 function actionInputToValueType(input: { valueType: string }): ValueType {
@@ -78,15 +59,21 @@ function actionInputToValueType(input: { valueType: string }): ValueType {
 
 export function compileDocument(document: SystemDocumentV1, opts: CompileDocumentOpts): CompileResult<SystemPackageV1> {
   const entityEnvironments = new Map<string, ExpressionCompileEnv>();
-  const fieldOwners = new Map<string, string>();
-  for (const entity of document.entities) {
-    const fields: Record<string, ValueType> = {};
-    for (const field of entity.fields) {
-      fieldOwners.set(field.id, entity.id);
-      const valueType = fieldToValueType(field);
-      if (valueType !== undefined) fields[field.id] = valueType;
+  const invalidData = document.referenceData.flatMap((dataset, index) => validateDataset(dataset, `/referenceData/${index}`));
+  if (invalidData.length > 0) return { ok: false, diagnostics: invalidData };
+  for (const owner of [...document.entities, ...document.templates]) {
+    for (const field of owner.fields) {
+      if ((field.kind !== "singleChoice" && field.kind !== "multiChoice") || field.optionsFrom === undefined) continue;
+      const resolved = fieldWithDatasetOptions(field, document.referenceData);
+      const defaults = Array.isArray(field.default) ? field.default : field.default === null ? [] : [field.default];
+      if (resolved === field || !("options" in resolved) || defaults.some(id => !resolved.options.some(option => option.id === id))) {
+        return scopeDiagnostic("invalid_expression", `${owner.id}.${field.id}`, "Choice defaults must belong to the selected dataset.");
+      }
     }
-    entityEnvironments.set(entity.id, { fields, inputs: {} });
+  }
+  const entityFields = new Map(document.entities.map(entity => [entity.id, new Map(entity.fields.map(field => [field.id, field]))]));
+  for (const entity of document.entities) {
+    entityEnvironments.set(entity.id, { fields: entityFieldTypes(entity.fields), inputs: {}, slots: slotEnvironment(document, entity.id) });
   }
 
   const actionsById = new Map(document.actions.map((action) => [action.id, action]));
@@ -95,17 +82,17 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     for (const [sectionIndex, section] of sheet.sections.entries()) {
       for (const [elementIndex, element] of section.elements.entries()) {
         const path = `/sheets/${sheetIndex}/sections/${sectionIndex}/elements/${elementIndex}`;
-        if (element.kind === "field" && fieldOwners.get(element.fieldId) !== sheet.targetEntityId) {
+        if (element.kind === "field" && !entityFields.get(sheet.targetEntityId)?.has(element.fieldId)) {
           return scopeDiagnostic("missing_reference", `${path}/fieldId`, "Field does not belong to the sheet target entity.");
         }
-        if (element.kind === "resource" && fieldOwners.get(element.resourceId) !== sheet.targetEntityId) {
+        if (element.kind === "resource" && entityFields.get(sheet.targetEntityId)?.get(element.resourceId)?.kind !== "resource") {
           return scopeDiagnostic("missing_reference", `${path}/resourceId`, "Resource does not belong to the sheet target entity.");
         }
         if (element.kind === "action") {
           const action = actionsById.get(element.actionId);
           if (
             action?.kind === "resourceBump"
-            && fieldOwners.get(action.resourceId) !== sheet.targetEntityId
+            && entityFields.get(sheet.targetEntityId)?.get(action.resourceId)?.kind !== "resource"
           ) {
             return scopeDiagnostic("missing_reference", `${path}/actionId`, "Action does not belong to the sheet target entity.");
           }
@@ -123,21 +110,23 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   for (const entity of document.entities) {
     for (const field of entity.fields) {
       if (field.kind === "computed") addOwner(computedOwners, field.expressionId, entity.id);
+      if (field.kind === "resource" && field.maxExpressionId !== undefined) {
+        const formula = document.expressions.find(expression => expression.id === field.maxExpressionId);
+        if (formula?.context !== "computed" || formula.resultType !== "number") {
+          return scopeDiagnostic("invalid_expression", field.maxExpressionId, "A resource maximum requires a computed numeric expression.");
+        }
+        addOwner(computedOwners, field.maxExpressionId, entity.id);
+      }
     }
   }
   // Dynamic sheet objects: template computed fields and granted roll actions
   // reference the same global expression pool. Templates own their expressions
   // exactly like entities — one expression id, one owner — so the shared-id
   // rejection and env scoping below apply unchanged.
-  const templates = document.templates ?? [];
+  const templates = document.templates;
   const templateEnvironments = new Map<string, ExpressionCompileEnv>();
   for (const template of templates) {
-    const fields: Record<string, ValueType> = {};
-    for (const field of template.fields) {
-      const valueType = fieldToValueType(field);
-      if (valueType !== undefined) fields[field.id] = valueType;
-    }
-    templateEnvironments.set(template.id, { fields, inputs: {} });
+    templateEnvironments.set(template.id, { fields: {}, item: entityFieldTypes(template.fields), inputs: {} });
     for (const field of template.fields) {
       if (field.kind === "computed") addOwner(computedOwners, field.expressionId, template.id);
     }
@@ -145,16 +134,20 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   // A granted roll runs on the character carrying its entry. Only fields
   // present on every entity that can display this template's slot are safe to
   // reference; a template may be used by more than one sheet/entity.
-  const grantedEntityFields = new Map<string, Record<string, ValueType>>();
+  const grantedEntityFields = new Map<string, Record<string, FieldBindingType>>();
   for (const template of templates) {
     grantedEntityFields.set(template.id, grantedEntityFieldsForKind(document, template.kind));
   }
   const validationOwners = new Map<string, Set<string>>();
+  const actionOwners = sheetActionOwners(document);
+  const validationTargets = new Map<string, string>();
   for (const validation of document.validations) {
-    const owner = fieldOwners.get(validation.targetId)
-      ?? (entityEnvironments.has(validation.targetId) ? validation.targetId : undefined)
-      ?? actionTargets.get(validation.targetId);
-    if (owner !== undefined) addOwner(validationOwners, validation.expressionId, owner);
+    const owner = validationOwner(document, validation, actionOwners);
+    if (owner === undefined) {
+      return scopeDiagnostic("missing_reference", `/validations/${document.validations.indexOf(validation)}/targetId`, "Select the entity that owns this validation target.");
+    }
+    validationTargets.set(validation.id, owner);
+    addOwner(validationOwners, validation.expressionId, owner);
   }
   const rollActions = new Map<string, Array<Extract<SystemDocumentV1["actions"][number], { kind: "roll" }>>>();
   for (const action of document.actions) {
@@ -195,10 +188,11 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     const entityEnv = owner === undefined ? undefined : entityEnvironments.get(owner);
     const templateEnv = owner === undefined ? undefined : templateEnvironments.get(owner);
     const env: ExpressionCompileEnv = {
-      fields: templateRolls.length > 0
-        ? { ...grantedEntityFields.get(owner ?? ""), ...templateEnv?.fields }
-        : entityEnv?.fields ?? templateEnv?.fields ?? {},
+      fields: templateRolls.length > 0 ? grantedEntityFields.get(owner ?? "") ?? {} : entityEnv?.fields ?? {},
       inputs: {},
+      datasets: document.referenceData,
+      ...(templateEnv?.item === undefined ? {} : { item: templateEnv.item }),
+      ...(entityEnv?.slots === undefined ? {} : { slots: entityEnv.slots }),
     };
     const action = actions[0];
     if (action !== undefined) {
@@ -208,7 +202,6 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     }
     const result = compileExpression(expr.source, {
       env,
-      languageVersion: document.schemaVersion !== "1.0" ? "0.2" : "0.1",
       resultType: expr.resultType,
       context: expr.context,
       fallback: expr.fallback,
@@ -229,17 +222,20 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   // The runtime evaluates every computed field and owned validation of an
   // entity on each observation (runtime/resolve.ts). Reject a sheet that could
   // never be observed instead of publishing it.
-  const costs = new Map(document.expressions.map((expression, index) => [expression.id, compiled[index]!.cost]));
+  const compiledById = new Map(document.expressions.map((expression, index) => [expression.id, compiled[index]!]));
   for (const [entityIndex, entity] of document.entities.entries()) {
+    const capacities = new Map(Object.entries(entityEnvironments.get(entity.id)?.slots ?? {}).map(([id, slot]) => [id, slot.capacity]));
+    const costOf = (id: string) => {
+      const expression = compiledById.get(id);
+      return expression === undefined ? 0 : expression.cost + dataObservationCost(expression.ast, capacities);
+    };
     let cost = 0;
     for (const field of entity.fields) {
-      if (field.kind === "computed") cost += costs.get(field.expressionId) ?? 0;
+      if (field.kind === "computed") cost += costOf(field.expressionId);
+      if (field.kind === "resource" && field.maxExpressionId !== undefined) cost += costOf(field.maxExpressionId);
     }
     for (const validation of document.validations) {
-      const owner = fieldOwners.get(validation.targetId)
-        ?? (entityEnvironments.has(validation.targetId) ? validation.targetId : undefined)
-        ?? actionTargets.get(validation.targetId);
-      if (owner === entity.id) cost += costs.get(validation.expressionId) ?? 0;
+      if (validationTargets.get(validation.id) === entity.id) cost += costOf(validation.expressionId);
     }
     if (cost > PACKAGE_LIMITS.sheetEvaluationNodes) {
       return scopeDiagnostic(
@@ -260,14 +256,14 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     language: document.metadata.language,
     defaultDice: document.metadata.defaultDice,
     ...(document.metadata.presentation === undefined ? {} : { presentation: document.metadata.presentation }),
-    entities: document.entities,
+    entities: document.entities.map(entity => ({ ...entity, fields: entity.fields.map(field => fieldWithDatasetOptions(field, document.referenceData)) })),
     referenceData: document.referenceData,
     sheets: document.sheets,
     expressions: compiled.map((b, i) => ({ id: document.expressions[i]!.id, ...b })),
     actions: document.actions,
-    validations: document.validations,
-    ...(document.templates !== undefined ? { templates: document.templates } : {}),
-    ...(document.slots !== undefined ? { slots: document.slots } : {}),
+    validations: document.validations.map(validation => ({ ...validation, targetEntityId: validationTargets.get(validation.id)! })),
+    templates: document.templates.map(template => ({ ...template, fields: template.fields.map(field => fieldWithDatasetOptions(field, document.referenceData)) })),
+    slots: document.slots,
     effectiveLimits: {
       expressionBytes: PACKAGE_LIMITS.expressionBytes,
       expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
@@ -295,13 +291,15 @@ function computedCycle(
 ): string | undefined {
   const compiledById = new Map(document.expressions.map((expression, index) => [expression.id, compiled[index]!]));
   for (const entity of document.entities) {
-    const computed = new Map(entity.fields
-      .filter((field) => field.kind === "computed")
-      .map((field) => [field.id, field]));
+    const computed = new Map(entity.fields.flatMap(field => {
+      const expressionId = field.kind === "computed" ? field.expressionId
+        : field.kind === "resource" ? field.maxExpressionId : undefined;
+      return expressionId === undefined ? [] : [[field.id, { expressionId }] as const];
+    }));
     const cycle = cycleInComputedFields(computed, compiledById);
     if (cycle !== undefined) return cycle;
   }
-  for (const template of document.templates ?? []) {
+  for (const template of document.templates) {
     const computed = new Map(template.fields
       .filter((field) => field.kind === "computed")
       .map((field) => [field.id, field]));

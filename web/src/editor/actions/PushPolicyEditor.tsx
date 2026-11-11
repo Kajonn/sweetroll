@@ -92,7 +92,7 @@ export function PushPolicyEditor({
   const candidate = policy ?? suggested;
   const errors = parsed.ok
     ? validatePushPolicies({
-        schemaVersion: "1.2",
+        templates: [],
         actions: [
           {
             kind: "roll",

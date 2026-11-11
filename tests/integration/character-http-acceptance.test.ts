@@ -259,7 +259,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
     expect(c1.requestId).toBeTruthy();
     const createView = c1.character;
     expect(createView.revision).toBe(1);
-    expect(createView.state).toMatchObject({ schemaVersion: "1.0", values: { ability: 10 } });
+    expect(createView.state).toMatchObject({ schemaVersion: "1.0", entries: {}, values: { ability: 10 } });
     expect(createView.state.values.health).toEqual({ current: 10, max: 10 });
     expect(createView.derivedValues.defense).toBe(10);
     expect(createView.projection.entityLabel).toBe("Character");
@@ -446,7 +446,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
     expect(pinned.statusCode, pinned.body).toBe(200);
     expect(pinned.json().character).toMatchObject({
       revision: 6,
-      state: { schemaVersion: "1.0", values: { ability: 15, proficient: false } },
+      state: { schemaVersion: "1.0", entries: {}, values: { ability: 15, proficient: false } },
     });
     expect(pinned.json().character.systemVersionId).toBe(v1Id);
 
@@ -928,7 +928,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
 
   it("pushes exactly one child for competing keys at an unchanged character revision",async()=>{
     const app=await makeApp();apps.push(app);const ada=app.users.ada;
-    const doc=namedDicePoolDocument();doc.schemaVersion="1.2";
+    const doc=namedDicePoolDocument();
     const action=doc.actions.find(a=>a.kind==="roll")!;if(action.kind!=="roll")throw Error("action");
     action.pushPolicy={version:"1.0",maxAttempts:2,successThreshold:1,allowOnSuccess:true,groups:[{groupId:"attribute",lockedFaces:[],reportedFaces:[1]}]};
     const {versionId}=await publishVersion(app,ada,doc,{name:"Push races",semanticVersion:"1.0.0"});

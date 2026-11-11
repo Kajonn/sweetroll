@@ -44,9 +44,8 @@ function affine(n: ExpressionAstV1, scale = 1): boolean {
   return false;
 }
 export function validatePushPolicies(value: {
-  schemaVersion: string;
   actions: ActionV1[];
-  templates?: ObjectTemplateV1[];
+  templates: ObjectTemplateV1[];
   expressions: { id: string; ast?: ExpressionAstV1 }[];
 }): RulesDiagnostic[] {
   const errors: RulesDiagnostic[] = [];
@@ -55,7 +54,7 @@ export function validatePushPolicies(value: {
       action,
       path: `/actions/${i}/pushPolicy`,
     })),
-    ...(value.templates ?? []).flatMap((t, i) =>
+    ...value.templates.flatMap((t, i) =>
       t.grantedActions.map((action, j) => ({
         action,
         path: `/templates/${i}/grantedActions/${j}/pushPolicy`,
@@ -66,10 +65,6 @@ export function validatePushPolicies(value: {
     if (action.kind !== "roll" || action.pushPolicy === undefined) continue;
     const fail = (message: string) =>
       errors.push({ code: "invalid_expression", path, message });
-    if (value.schemaVersion !== "1.2") {
-      fail("Push policies require package 1.2.");
-      continue;
-    }
     if (!Value.Check(PushPolicySchema, action.pushPolicy)) {
       fail("Invalid bounded push policy.");
       continue;

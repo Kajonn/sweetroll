@@ -27,7 +27,6 @@ test("named groups survive guided authoring, publishing, both action sources and
   const systemId = workspace.system.systemId;
   try {
     const doc = namedDicePoolDocument();
-    doc.schemaVersion = "1.0";
     doc.expressions.find((e) => e.id === "pool_roll_expr")!.source =
       "countSuccesses(dice(fields.attribute + fields.skill + inputs.bonus_dice, 6), 6)";
     const saved = await page.request.put(`/api/systems/${systemId}/draft`, {
@@ -84,7 +83,7 @@ test("named groups survive guided authoring, publishing, both action sources and
         return false;
       const d = r.request().postDataJSON()?.document;
       return (
-        d?.schemaVersion === "1.1" &&
+        d?.schemaVersion === "2.0" &&
         d.expressions.some((e: { source: string }) =>
           e.source.endsWith('group("group_3", "Gear", dice(fields.gear, 4))'),
         )

@@ -160,7 +160,7 @@ const errors = {
 
 export function blankExtensionDocument(name: string, language: string): ExtensionDocumentV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     metadata: { name, description: "", language },
     expressions: [],
     templates: [],

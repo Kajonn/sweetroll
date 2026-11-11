@@ -31,10 +31,10 @@ function basePackage(): SystemPackageV1 {
 /** Extension whose template deliberately reuses the base template ID "sword". */
 function extension(base: SystemPackageV1, versionId = EXT_V1, bonus = 5): ExtensionPackageV1 {
   const document: ExtensionDocumentV1 = {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     metadata: { name: "Frost pack", description: "", language: "en" },
     expressions: [
-      { id: "sword_hit_expr", context: "roll", resultType: "number", source: `d20 + fields.modifier + fields.edge + ${bonus}`, fallback: 0 },
+      { id: "sword_hit_expr", context: "roll", resultType: "number", source: `d20 + fields.modifier + item.edge + ${bonus}`, fallback: 0 },
       { id: "frost_pool_expr", context: "roll", resultType: "number", source: 'countSuccesses(group("attribute", "Attribute", dice(fields.ability, 6)), 6)', fallback: 0 },
     ],
     templates: [{

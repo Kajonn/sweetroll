@@ -1,3 +1,4 @@
+import { Button } from "../../ui/index.js";
 import { Disclosure } from "../../ui/Disclosure.js";
 import { t } from "../../i18n/index.js";
 import type { FieldV1, ResourceFieldV1 } from "../../state/documentFieldTypes.js";
@@ -12,6 +13,10 @@ export type ResourceFieldEditorProps = {
   field: FieldV1;
   onChange: (next: FieldV1) => void;
   referencedBy?: number | undefined;
+  createNumericExpression?: ((initial: number) => string) | undefined;
+  expressionSourceFor?: ((id: string) => string) | undefined;
+  onExpressionSourceChange?: ((id: string, source: string) => void) | undefined;
+  maximumExpressions?: readonly { id: string; source: string }[] | undefined;
   disabled?: boolean | undefined;
 };
 
@@ -19,6 +24,10 @@ export function ResourceFieldEditor({
   field,
   onChange,
   referencedBy,
+  createNumericExpression,
+  expressionSourceFor,
+  onExpressionSourceChange,
+  maximumExpressions,
   disabled,
 }: ResourceFieldEditorProps) {
   if (!isResource(field)) {
@@ -77,6 +86,29 @@ export function ResourceFieldEditor({
           />
         </label>
       </div>
+      {createNumericExpression ? <Disclosure label={t("editor.fields.resource.maximumExpression")}>
+        <label>
+          {t("editor.fields.resource.maximumExpression")}
+          <select value={field.maxExpressionId ?? ""} disabled={disabled} onChange={event => {
+            const { maxExpressionId: _previous, ...next } = field;
+            onChange(event.target.value === "" ? next : { ...next, maxExpressionId: event.target.value });
+          }}>
+            <option value="">{t("editor.fields.resource.manualMaximum")}</option>
+            {maximumExpressions?.map(expression => <option key={expression.id} value={expression.id}>{expression.id} · {expression.source}</option>)}
+          </select>
+        </label>
+        {field.maxExpressionId === undefined ? <Button variant="secondary" disabled={disabled} onClick={() =>
+          update({ maxExpressionId: createNumericExpression(field.default.max) })
+        }>{t("editor.fields.resource.addMaximumExpression")}</Button> : <label>
+          {t("editor.fields.computed.expression")}
+          <textarea
+            key={field.maxExpressionId}
+            defaultValue={expressionSourceFor?.(field.maxExpressionId)}
+            disabled={disabled}
+            onBlur={event => onExpressionSourceChange?.(field.maxExpressionId!, event.target.value)}
+          />
+        </label>}
+      </Disclosure> : null}
       <Disclosure label={t("disclosure.constraints")}>
 <div className={styles.row}>
         <label className={styles.field} htmlFor={`resource-field-min-${field.id}`}>

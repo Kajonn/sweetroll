@@ -5,7 +5,7 @@ import type {
   SlotDefinitionV1,
 } from "../package/schema/index.js";
 import type { CharacterEntryV1 } from "../package/schema/dynamic.js";
-import { buildEntryScope, validateEntryForSlot } from "./entries.js";
+import { validateEntryForSlot } from "./entries.js";
 
 const swordTemplate: ObjectTemplateV1 = {
   id: "longsword",
@@ -154,13 +154,5 @@ describe("validateEntryForSlot", () => {
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.code).toBe("slot_full");
-  });
-});
-
-describe("buildEntryScope", () => {
-  it("merges character and entry values with entry winning on collision", () => {
-    expect(
-      buildEntryScope({ strength_mod: 2, bonus: 0 }, { bonus: 1 }),
-    ).toEqual({ strength_mod: 2, bonus: 1 });
   });
 });

@@ -1,3 +1,4 @@
+import { fieldWithDatasetOptions } from "../package/reference-data.js";
 import { signExtensionPackage } from "../package/canonical.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import type {
@@ -7,7 +8,6 @@ import type {
   ObjectTemplateV1,
   SystemPackageV1,
   UnsignedExtensionPackageV1,
-  ValueType,
 } from "../package/schema/index.js";
 import { validateExtensionDocumentStructure } from "../package/extension.js";
 import type { PackageDiagnostic } from "../package/diagnostics.js";
@@ -15,10 +15,9 @@ import { compileAst, compileExpression, type CompileResult, type CompiledExpress
 import {
   actionInputTypes,
   cycleInComputedFields,
-  entityFieldTypes,
   grantedEntityFieldsForKind,
 } from "./compile-document.js";
-import type { ExpressionCompileEnv } from "./typecheck.js";
+import { entityFieldTypes, type ExpressionCompileEnv } from "./typecheck.js";
 
 // System extensions (plan 2026-11-07-system-extensions, stage E1). An
 // extension is compiled and validated against one published base package
@@ -44,8 +43,6 @@ type ExpressionOwner =
   | { kind: "computed"; template: ObjectTemplateV1 }
   | { kind: "roll"; template: ObjectTemplateV1; action: GrantedRollActionV1 };
 
-const LANGUAGE_VERSION = "0.2" as const;
-
 export function compileExtensionDocument(
   document: ExtensionDocumentV1,
   base: SystemPackageV1,
@@ -54,6 +51,15 @@ export function compileExtensionDocument(
   const structural = validateExtensionDocumentStructure(document);
   if (structural.length > 0) return { ok: false, diagnostics: structural };
 
+  for (const template of document.templates) {
+    for (const field of template.fields) {
+      if ((field.kind === "singleChoice" || field.kind === "multiChoice") && field.optionsFrom !== undefined
+        && !base.referenceData.some(dataset => dataset.id === field.optionsFrom)) {
+        return fail("missing_reference", `/templates/${template.id}/fields/${field.id}/optionsFrom`, "Dataset does not exist in the base system.");
+      }
+    }
+  }
+
   const owners = expressionOwners(document.expressions, document.templates);
   if (!owners.ok) return owners;
 
@@ -61,7 +67,6 @@ export function compileExtensionDocument(
   for (const [index, expression] of document.expressions.entries()) {
     const result = compileExpression(expression.source, {
       env: environmentFor(owners.value.get(expression.id), base),
-      languageVersion: LANGUAGE_VERSION,
       resultType: expression.resultType,
       context: expression.context,
       fallback: expression.fallback,
@@ -90,7 +95,7 @@ export function compileExtensionDocument(
   }
 
   const unsigned: UnsignedExtensionPackageV1 = {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0",
     extensionId: opts.extensionId,
     versionId: opts.versionId,
     semanticVersion: opts.semanticVersion,
@@ -100,7 +105,7 @@ export function compileExtensionDocument(
     description: document.metadata.description,
     language: document.metadata.language,
     expressions: compiled.map((body, index) => ({ id: document.expressions[index]!.id, ...body })),
-    templates: document.templates,
+    templates: document.templates.map(template => ({ ...template, fields: template.fields.map(field => fieldWithDatasetOptions(field, base.referenceData)) })),
     effectiveLimits: {
       expressionBytes: PACKAGE_LIMITS.expressionBytes,
       expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
@@ -128,13 +133,26 @@ export function validateExtensionAgainst(
   if (extension.baseSystemId !== base.systemId) {
     return fail("extension_base_mismatch", "/baseSystemId", "Extension belongs to a different system.");
   }
+  for (const template of extension.templates) {
+    for (const field of template.fields) {
+      if ((field.kind !== "singleChoice" && field.kind !== "multiChoice") || field.optionsFrom === undefined) continue;
+      const resolved = fieldWithDatasetOptions(field, base.referenceData);
+      const defaults = Array.isArray(field.default) ? field.default : field.default === null ? [] : [field.default];
+      if (resolved === field || !("options" in resolved)
+        || defaults.some(id => !resolved.options.some(option => option.id === id))
+        || resolved.options.length !== field.options.length
+        || resolved.options.some((option, index) => option.id !== field.options[index]?.id || option.label !== field.options[index]?.label)) {
+        return fail("extension_incompatible", `/templates/${template.id}/fields/${field.id}/optionsFrom`, "The extension choice options differ from the base dataset.");
+      }
+    }
+  }
+
   const owners = expressionOwners(extension.expressions, extension.templates);
   if (!owners.ok) return owners;
 
   for (const [index, expression] of extension.expressions.entries()) {
     const result = compileAst(expression.ast, {
       env: environmentFor(owners.value.get(expression.id), base),
-      languageVersion: LANGUAGE_VERSION,
       resultType: expression.resultType,
       context: expression.context,
       fallback: expression.fallback,
@@ -199,25 +217,20 @@ function expressionOwners(
 }
 
 function environmentFor(owner: ExpressionOwner | undefined, base: SystemPackageV1): ExpressionCompileEnv {
-  if (owner === undefined) return { fields: {}, inputs: {} };
-  const templateFields = entityFieldTypes(owner.template.fields);
-  if (owner.kind === "computed") return { fields: templateFields, inputs: {} };
-  // Granted rolls see stored entry values only: the entry runtime scope
-  // (`grantedFieldScope`) never evaluates computed template fields.
-  for (const field of owner.template.fields) {
-    if (field.kind === "computed") delete templateFields[field.id];
-  }
-  const fields: Record<string, ValueType> = {
-    ...grantedEntityFieldsForKind(base, owner.template.kind),
-    ...templateFields,
+  const datasets = base.referenceData;
+  if (owner === undefined) return { fields: {}, inputs: {}, datasets };
+  const item = entityFieldTypes(owner.template.fields);
+  if (owner.kind === "computed") return { fields: {}, inputs: {}, item, datasets };
+  return {
+    fields: grantedEntityFieldsForKind(base, owner.template.kind),
+    inputs: actionInputTypes(owner.action.inputs), item, datasets,
   };
-  return { fields, inputs: actionInputTypes(owner.action.inputs) };
 }
 
 function placeableKinds(base: SystemPackageV1): Set<string> {
   const placed = new Set(base.sheets.flatMap((sheet) => sheet.sections.flatMap((section) =>
     section.elements.flatMap((element) => (element.kind === "slot" ? [element.slotId] : [])))));
-  return new Set((base.slots ?? [])
+  return new Set(base.slots
     .filter((slot) => placed.has(slot.id))
     .flatMap((slot) => slot.accepts));
 }

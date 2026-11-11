@@ -1158,11 +1158,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const packaged = await loadEntryPackage(resolveSource, executionId, replayExpiresAt, resultScope);
     if (!packaged.ok) return packaged;
     const packageValue=packaged.value;
-    const slots: SlotDefinitionV1[] = packaged.value.slots ?? [];
+    const slots: SlotDefinitionV1[] = packaged.value.slots;
     const allowedSlots = standaloneOnly ? slotsForEntity(packageValue, resolveSource.entityDefinitionId) : slots;
-    const templates: ObjectTemplateV1[] = packaged.value.templates ?? [];
+    const templates: ObjectTemplateV1[] = packaged.value.templates;
     // RuntimeStateV1.entries is optional: legacy rows decode without it.
-    const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries ?? {};
+    const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries;
 
     let nextEntries: Record<string, CharacterEntryV1>;
     let selectedSource: Extract<EntrySource, {kind:"campaign"}> | undefined;
@@ -2449,7 +2449,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         }
         const packageValue: SystemPackageV1 = loaded.value;
         // Design 6.8: extension templates are listed by plain ID with their extension.
-        const systemChoices: EntryTemplateSummary[] = (packageValue.templates ?? []).map((template) => {
+        const systemChoices: EntryTemplateSummary[] = packageValue.templates.map((template) => {
           const key = unqualifiedId(template.id);
           return {
             id: key.id,
@@ -2478,7 +2478,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               if(template.content.base){
                 const entity=packageValue.entities.find(e=>e.id===record!.entityDefinitionId);
                 const baseRef=template.content.base;
-                base=(packageValue.templates ?? []).find(t=>t.id===baseRef.templateId);
+                base=packageValue.templates.find(t=>t.id===baseRef.templateId);
                 if(!base || !entity || !validDefaults(base,template.content.defaultValues ?? {}) || baseRef.versionId!==record.systemVersionId || baseRef.packageChecksum!==packageValue.integrity.checksum || !templateApplicable(packageValue,entity,base)) continue;
               }
               campaignChoices.push({id:template.templateId,label:template.content.name,kind:template.kind,

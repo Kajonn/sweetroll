@@ -396,7 +396,7 @@ export function createSystemAuthoringModule(input: CreateSystemAuthoringInput): 
             newImages = importedImages.prepared;
           }
           document = documentFromPackage(pkg);
-          if (importedImages) for (const template of document.templates ?? []) {
+          if (importedImages) for (const template of document.templates) {
             if (template.image) template.image = { ...importedImages.descriptors.get(template.image.fileId)!, description: template.image.description };
           }
           name = document.metadata.name;

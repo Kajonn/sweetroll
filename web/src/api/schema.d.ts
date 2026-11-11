@@ -7730,7 +7730,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -7898,6 +7898,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -8646,7 +8647,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -8814,6 +8815,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -9129,7 +9131,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -9297,6 +9299,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -9461,7 +9464,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -9476,9 +9479,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -9761,7 +9764,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -9929,6 +9932,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -10093,7 +10097,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -10108,9 +10112,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -10393,7 +10397,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -10561,6 +10565,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -10725,7 +10730,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -10740,9 +10745,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -11025,7 +11030,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -11193,6 +11198,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -11357,7 +11363,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -11372,9 +11378,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -11658,7 +11664,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -11826,6 +11832,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -11990,7 +11997,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -12005,9 +12012,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -12285,7 +12292,7 @@ export interface operations {
                                     id: string;
                                     operation: string;
                                     operandIds: string[];
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                     groupId?: string;
                                 }[];
                             };
@@ -12300,9 +12307,9 @@ export interface operations {
                                 success?: boolean;
                             }[];
                             bindings: {
-                                scope: "fields" | "inputs";
+                                scope: "fields" | "inputs" | "item" | "aggregates";
                                 definitionId: string;
-                                value: string | number | boolean | null;
+                                value: (string | number | boolean | null) | string[];
                             }[];
                             total: number;
                             output: string;
@@ -12817,7 +12824,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -12985,6 +12992,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -13149,7 +13157,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -13164,9 +13172,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -13461,7 +13469,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -13629,6 +13637,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -13793,7 +13802,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -13808,9 +13817,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -14119,7 +14128,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -14287,6 +14296,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -14451,7 +14461,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -14466,9 +14476,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -14750,7 +14760,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -14918,6 +14928,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -15082,7 +15093,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -15097,9 +15108,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -15385,7 +15396,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -15553,6 +15564,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -15717,7 +15729,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -15732,9 +15744,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -16046,6 +16058,7 @@ export interface operations {
                                     id: string;
                                     label: string;
                                 }[];
+                                optionsFrom?: string;
                             } | {
                                 /** @constant */
                                 kind: "multiChoice";
@@ -16057,6 +16070,7 @@ export interface operations {
                                     id: string;
                                     label: string;
                                 }[];
+                                optionsFrom?: string;
                             } | {
                                 /** @constant */
                                 kind: "resource";
@@ -16069,6 +16083,7 @@ export interface operations {
                                 min: number;
                                 max: number;
                                 step: number;
+                                maxExpressionId?: string;
                                 resetTo: "min" | "max";
                             } | {
                                 /** @constant */
@@ -16304,7 +16319,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -16472,6 +16487,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -16636,7 +16652,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -16651,9 +16667,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -17469,7 +17485,7 @@ export interface operations {
                                     values: {
                                         [key: string]: unknown;
                                     };
-                                    entries?: {
+                                    entries: {
                                         [key: string]: {
                                             entryId: string;
                                             image?: {
@@ -17637,6 +17653,7 @@ export interface operations {
                                                 max: number;
                                                 step: number;
                                                 resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
                                                 validations: {
                                                     validationId: string;
                                                     severity: "error" | "warning";
@@ -17801,7 +17818,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -17816,9 +17833,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -18097,7 +18114,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -18265,6 +18282,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -18663,7 +18681,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };
@@ -18678,9 +18696,9 @@ export interface operations {
                                     success?: boolean;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs";
+                                    scope: "fields" | "inputs" | "item" | "aggregates";
                                     definitionId: string;
-                                    value: string | number | boolean | null;
+                                    value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
                                 output: string;
@@ -18893,7 +18911,7 @@ export interface operations {
                             values: {
                                 [key: string]: unknown;
                             };
-                            entries?: {
+                            entries: {
                                 [key: string]: {
                                     entryId: string;
                                     image?: {
@@ -20641,6 +20659,7 @@ export interface operations {
                             };
                             label: string;
                             kind: "item" | "spell" | "talent" | "effect";
+                            aggregateQuantity?: boolean;
                             description?: string;
                             fields: ({
                                 /** @constant */
@@ -20689,6 +20708,7 @@ export interface operations {
                                     id: string;
                                     label: string;
                                 }[];
+                                optionsFrom?: string;
                             } | {
                                 /** @constant */
                                 kind: "multiChoice";
@@ -20700,6 +20720,7 @@ export interface operations {
                                     id: string;
                                     label: string;
                                 }[];
+                                optionsFrom?: string;
                             } | {
                                 /** @constant */
                                 kind: "resource";
@@ -20712,6 +20733,7 @@ export interface operations {
                                 min: number;
                                 max: number;
                                 step: number;
+                                maxExpressionId?: string;
                                 resetTo: "min" | "max";
                             } | {
                                 /** @constant */
@@ -26491,7 +26513,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -26659,6 +26681,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -27052,7 +27075,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -27220,6 +27243,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -27517,7 +27541,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -27685,6 +27709,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -27984,7 +28009,7 @@ export interface operations {
                                 values: {
                                     [key: string]: unknown;
                                 };
-                                entries?: {
+                                entries: {
                                     [key: string]: {
                                         entryId: string;
                                         image?: {
@@ -28152,6 +28177,7 @@ export interface operations {
                                             max: number;
                                             step: number;
                                             resetTo: "min" | "max";
+                                            computedMaximum?: boolean;
                                             validations: {
                                                 validationId: string;
                                                 severity: "error" | "warning";
@@ -29851,7 +29877,7 @@ export interface operations {
                                         id: string;
                                         operation: string;
                                         operandIds: string[];
-                                        value: string | number | boolean | null;
+                                        value: (string | number | boolean | null) | string[];
                                         groupId?: string;
                                     }[];
                                 };

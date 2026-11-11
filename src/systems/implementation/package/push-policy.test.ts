@@ -7,7 +7,6 @@ import {
   decodeSystemPackage,
 } from "./codec.js";
 import { documentFromPackage } from "../authoring/assess.js";
-import { signSystemPackage } from "./canonical.js";
 const ids = {
   systemId: "10000000-0000-4000-8000-000000000001",
   versionId: "10000000-0000-4000-8000-000000000002",
@@ -15,7 +14,6 @@ const ids = {
 };
 export function pushDocument() {
   const doc = namedDicePoolDocument();
-  Object.assign(doc, { schemaVersion: "1.2" });
   Object.assign(doc.actions.find((a) => a.kind === "roll")!, {
     pushPolicy: {
       version: "1.0",
@@ -32,13 +30,13 @@ export function pushDocument() {
   return doc;
 }
 describe("versioned push policy", () => {
-  it("round trips package 1.2 without a new grammar or loss of policy", () => {
+  it("round trips the current package and preserves the push policy", () => {
     const doc = pushDocument();
     expect(decodeSystemDocument(doc).ok).toBe(true);
     const c = compileDocument(doc, ids);
     expect(c.ok).toBe(true);
     if (!c.ok) return;
-    expect(c.value.schemaVersion).toBe("1.2");
+    expect(c.value.schemaVersion).toBe("2.0");
     expect(decodeSystemPackage(c.value).ok).toBe(true);
     const clone = documentFromPackage(c.value);
     expect(clone.actions).toEqual(doc.actions);
@@ -51,11 +49,6 @@ describe("versioned push policy", () => {
         package: c.value,
       }).ok,
     ).toBe(true);
-  });
-  it.each(["1.0", "1.1"] as const)("rejects a push policy in %s", (v) => {
-    const doc = pushDocument();
-    doc.schemaVersion = v;
-    expect(compileDocument(doc, ids).ok).toBe(false);
   });
   it.each(["duplicate", "unknown", "face", "attempt", "nonlinear", "keep"])(
     "rejects invalid %s policies",
@@ -83,14 +76,4 @@ describe("versioned push policy", () => {
       expect(compileDocument(doc, ids).ok).toBe(false);
     },
   );
-  it("rejects a signed package downgraded around its policy", () => {
-    const c = compileDocument(pushDocument(), ids);
-    expect(c.ok).toBe(true);
-    if (!c.ok) return;
-    expect(
-      decodeSystemPackage(
-        signSystemPackage({ ...c.value, schemaVersion: "1.1" }),
-      ).ok,
-    ).toBe(false);
-  });
 });

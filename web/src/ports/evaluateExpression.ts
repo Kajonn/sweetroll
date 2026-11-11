@@ -11,21 +11,22 @@ import {
   type DieResult as SharedDieResult,
   type ScalarValue,
   type ValueType,
+  type BindingValue,
+  type FieldBindingType,
+  type ExpressionCompileEnv,
 } from "@sweetroll/rules";
 
-export type { ScalarValue, ValueType };
+export type { ScalarValue, ValueType, BindingValue, FieldBindingType };
 
-export type ExpressionEnv = {
-  fields: Record<string, ValueType>;
-  inputs: Record<string, ValueType>;
-};
+export type ExpressionEnv = ExpressionCompileEnv;
 
 export type EvaluateExpressionInput = {
   source: string;
   env: ExpressionEnv;
   resultType: ValueType;
   fallback: ScalarValue;
-  bindings: Record<string, ScalarValue>;
+  bindings: Record<string, BindingValue>;
+  itemBindings?: Record<string, BindingValue>;
   rng?: Rng;
   /** Where the expression is used. Computed fields and validations may be text or boolean; rolls must be numbers. */
   context?: "computed" | "roll" | "validation";
@@ -39,10 +40,10 @@ export type DieResult = SharedDieResult;
 type EvaluateExpressionBindings = EvaluationBindings;
 
 function pickBindings(
-  all: Record<string, ScalarValue>,
-  scope: Record<string, ValueType>,
-): Record<string, ScalarValue> {
-  const picked: Record<string, ScalarValue> = {};
+  all: Record<string, BindingValue>,
+  scope: Record<string, FieldBindingType>,
+): Record<string, BindingValue> {
+  const picked: Record<string, BindingValue> = {};
   for (const id of Object.keys(all)) {
     if (Object.prototype.hasOwnProperty.call(scope, id)) picked[id] = all[id]!;
   }
@@ -65,7 +66,7 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     env: input.env,
     resultType: input.resultType,
     context: input.context ?? "roll",
-    languageVersion: "0.2",
+
     fallback: input.fallback,
   });
   if (!compiled.ok) {
@@ -75,6 +76,9 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
   const scopedBindings: EvaluateExpressionBindings = {
     fields: pickBindings(input.bindings, input.env.fields),
     inputs: pickBindings(input.bindings, input.env.inputs),
+    ...(input.env.item === undefined ? {} : { item: pickBindings(input.itemBindings ?? {}, input.env.item) }),
+    ...(input.env.datasets === undefined ? {} : { datasets: input.env.datasets }),
+    ...(input.env.slots === undefined ? {} : { slotEntries: () => [] }),
   };
   const evaluated: EvalResult = evaluate(
     { id: "try_it", ...body } as CompiledExpressionV1,

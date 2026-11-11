@@ -1,21 +1,29 @@
 import type {DieResult, RollBreakdown} from "./result.js";
 export type {DieResult, RollBreakdown} from "./result.js";
-import {children} from "./groups.js";
+import { aggregateCall, aggregateKey, aggregateValue, isAggregate, literalId, lookupValue, type AggregateEntry, type RulesDataset } from "./data.js";
+import {referenceKey} from "./typecheck.js";
+import {children, hasDiceGroups} from "./groups.js";
 import type { CompiledExpressionV1, ExpressionAstV1, ScalarValue } from "../package/schema/index.js";
 import { PACKAGE_LIMITS } from "../package/limits.js";
 import { renderExpression } from "./render.js";
 
 export type Rng = () => number;
 
+export type BindingValue = ScalarValue | string[];
+
 export type EvaluationBindings = {
-  fields: Record<string, ScalarValue>;
-  inputs: Record<string, ScalarValue>;
+  fields: Record<string, BindingValue>;
+  inputs: Record<string, BindingValue>;
+  item?: Record<string, BindingValue>;
+  datasets?: readonly RulesDataset[];
+  slotEntries?: (slot: string) => readonly AggregateEntry[];
+  aggregates?: Record<string, BindingValue>;
 };
 
 export type EvaluationBinding = {
-  scope: "fields" | "inputs";
+  scope: "fields" | "inputs" | "item" | "aggregates";
   definitionId: string;
-  value: ScalarValue;
+  value: BindingValue;
 };
 
 export type EvaluationLimits = {
@@ -45,6 +53,7 @@ type Ctx = {
   diagnostics: RuntimeDiagnostic[];
   expression: string;
   nodeIds: Map<ExpressionAstV1, string>;
+  evaluatedNodes: Set<ExpressionAstV1>;
   breakdown?: RollBreakdown;
 };
 
@@ -58,11 +67,11 @@ function budgetExceeded(ctx: Ctx, message: string): undefined {
   return undefined;
 }
 
-function num(v: ScalarValue): number | undefined {
+function num(v: BindingValue): number | undefined {
   return typeof v === "number" ? v : undefined;
 }
 
-function bool(v: ScalarValue): boolean | undefined {
+function bool(v: BindingValue): boolean | undefined {
   return typeof v === "boolean" ? v : undefined;
 }
 
@@ -104,14 +113,10 @@ function containsRoll(ast: ExpressionAstV1): boolean {
   }
 }
 
-function equalValues(a: ScalarValue, b: ScalarValue): boolean {
-  if (typeof a === "number" && typeof b === "number") return a === b;
-  return a === b;
-}
-
-function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
+function evalNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefined {
   const value = evalValueNode(node, ctx);
   if (value !== undefined && ctx.breakdown !== undefined) {
+    ctx.evaluatedNodes.add(node);
     const reduction = node.kind === "keep" || node.kind === "successCount";
     const dice = node.kind === "dice" ? node : reduction && node.dice.kind === "dice" ? node.dice : undefined;
     const operands = reduction && dice !== undefined ? [dice.count] : children(node);
@@ -122,7 +127,7 @@ function evalNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
         : node.kind === "call" ? node.function === "round" ? `round_${node.roundMode ?? "nearest"}` : node.function
         : node.kind === "dice" ? "sum" : node.kind === "keep" ? node.mode === "highest" ? "keepHighest" : "keepLowest"
         : node.kind === "reference" ? "binding" : node.kind.endsWith("Literal") ? "literal" : node.kind,
-      operandIds: operands.map(n => ctx.nodeIds.get(n)!), value,
+      operandIds: operands.filter(n => ctx.evaluatedNodes.has(n)).map(n => ctx.nodeIds.get(n)!), value,
       ...(groupId === undefined ? {} : {groupId}),
     });
   }
@@ -141,7 +146,7 @@ function recordGroup(node: Extract<ExpressionAstV1, {kind:"dice"}>, ctx: Ctx, di
     total,diceIds:dice.map(d => d.id!),...(threshold === undefined ? {} : {threshold})});
 }
 
-function evalValueNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined {
+function evalValueNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefined {
   switch (node.kind) {
     case "numberLiteral":
       return node.value;
@@ -150,9 +155,11 @@ function evalValueNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined
     case "booleanLiteral":
       return node.value;
     case "reference": {
-      const val = ctx.bindings[node.scope][node.id];
-      if (val === undefined || val === null) return fail(ctx, `missing reference ${node.scope}.${node.id}`);
-      ctx.bindingTrace.push({ scope: node.scope, definitionId: node.id, value: val });
+      const key = referenceKey(node);
+      const scope = ctx.bindings[node.scope] ?? {};
+      const val = Object.hasOwn(scope, key) ? scope[key] : undefined;
+      if (val === undefined) return fail(ctx, `missing reference ${node.scope}.${key}`);
+      ctx.bindingTrace.push({ scope: node.scope, definitionId: key, value: val });
       return val;
     }
     case "unary": {
@@ -205,12 +212,13 @@ function evalValueNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined
           if (ln === undefined || rn === undefined) return fail(ctx, "'*' expects numbers");
           return ln * rn;
         }
-        case "/": {
+        case "/":
+        case "%": {
           const ln = num(l);
           const rn = num(r);
-          if (ln === undefined || rn === undefined) return fail(ctx, "'/' expects numbers");
-          if (rn === 0) return fail(ctx, "division by zero");
-          return ln / rn;
+          if (ln === undefined || rn === undefined) return fail(ctx, `'${op}' expects numbers`);
+          if (rn === 0) return fail(ctx, op === "/" ? "division by zero" : "remainder by zero");
+          return op === "/" ? ln / rn : ln % rn;
         }
         case "<": {
           const ln = num(l);
@@ -237,12 +245,51 @@ function evalValueNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined
           return ln >= rn;
         }
         case "==":
-          return equalValues(l, r);
+          return (l === r);
         case "!=":
-          return !equalValues(l, r);
+          return !(l === r);
       }
     }
     case "call": {
+      if (node.function === "lookup" || node.function === "lookupBand") {
+        const dataset = ctx.bindings.datasets?.find(table => table.id === literalId(node.arguments[0]));
+        const column = literalId(node.arguments[2]);
+        if (dataset === undefined || column === undefined || node.arguments[1] === undefined) {
+          return fail(ctx, "unknown lookup dataset or column");
+        }
+        const key = evalNode(node.arguments[1], ctx);
+        if (key === undefined) return undefined;
+        if (key === null || Array.isArray(key)) return fail(ctx, "lookup needs a scalar key");
+        const value = lookupValue(dataset, key, column, node.function === "lookupBand");
+        return value === undefined || value === null
+          ? fail(ctx, `no row in '${dataset.id}' for the lookup key`)
+          : value;
+      }
+      if (isAggregate(node.function)) {
+        const call = aggregateCall(node);
+        if (!call) return fail(ctx, "invalid aggregate arguments");
+        const key = aggregateKey(call);
+        const value = ctx.bindings.slotEntries
+          ? aggregateValue(call, ctx.bindings.slotEntries(call.slot))
+          : ctx.bindings.aggregates?.[key];
+        if (typeof value !== "number" || !Number.isFinite(value)) return fail(ctx, "slot aggregate is unavailable");
+        ctx.bindingTrace.push({ scope: "aggregates", definitionId: key, value });
+        return value;
+      }
+      if (node.function === "if") {
+        const condition = evalNode(node.arguments[0]!, ctx);
+        if (condition === undefined) return undefined;
+        if (typeof condition !== "boolean") return fail(ctx, "if expects a boolean condition");
+        return evalNode(node.arguments[condition ? 1 : 2]!, ctx);
+      }
+      if (node.function === "has") {
+        const choices = evalNode(node.arguments[0]!, ctx);
+        if (choices === undefined) return undefined;
+        const option = evalNode(node.arguments[1]!, ctx);
+        if (option === undefined) return undefined;
+        if (!Array.isArray(choices) || typeof option !== "string") return fail(ctx, "has expects a multi-choice field and option ID");
+        return choices.includes(option);
+      }
       if (node.function === "round") {
         const v = evalNode(node.arguments[0]!, ctx);
         if (v === undefined) return undefined;
@@ -253,14 +300,21 @@ function evalValueNode(node: ExpressionAstV1, ctx: Ctx): ScalarValue | undefined
         if (mode === "down") return Math.floor(n);
         return Math.round(n);
       }
-      const a = evalNode(node.arguments[0]!, ctx);
-      if (a === undefined) return undefined;
-      const b = evalNode(node.arguments[1]!, ctx);
-      if (b === undefined) return undefined;
-      const an = num(a);
-      const bn = num(b);
-      if (an === undefined || bn === undefined) return fail(ctx, `${node.function} expects numbers`);
-      return node.function === "min" ? Math.min(an, bn) : Math.max(an, bn);
+      const numbers: number[] = [];
+      for (const argument of node.arguments) {
+        const value = evalNode(argument, ctx);
+        if (value === undefined) return undefined;
+        const number = num(value);
+        if (number === undefined) return fail(ctx, `${node.function} expects numbers`);
+        numbers.push(number);
+      }
+      switch (node.function) {
+        case "min": return Math.min(...numbers);
+        case "max": return Math.max(...numbers);
+        case "floor": return Math.floor(numbers[0]!);
+        case "ceil": return Math.ceil(numbers[0]!);
+        case "abs": return Math.abs(numbers[0]!);
+      }
     }
     case "dice": {
       const count = evalNode(node.count, ctx);
@@ -329,7 +383,8 @@ export function evaluate(
   identify(compiled.ast, "root");
   const ctx: Ctx = {
     nodeIds,
-    ...(compiled.languageVersion === "0.2" ? {breakdown:{version:"1.0" as const,rootId:"root",groups:[],terms:[]}} : {}),
+    evaluatedNodes: new Set(),
+    ...(hasDiceGroups(compiled.ast) ? {breakdown:{version:"1.0" as const,rootId:"root",groups:[],terms:[]}} : {}),
     bindings,
     bindingTrace: [],
     limits,
@@ -339,7 +394,8 @@ export function evaluate(
     expression,
   };
   const value = evalNode(compiled.ast, ctx);
-  if (value === undefined) {
+  if (value === null || Array.isArray(value)) fail(ctx, "expression did not produce a scalar result");
+  if (value === undefined || value === null || Array.isArray(value)) {
     if (ctx.diagnostics.some((diagnostic) => diagnostic.code === "budget_exceeded")) {
       return { ok: false, diagnostics: ctx.diagnostics };
     }

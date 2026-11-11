@@ -8,7 +8,6 @@ import {
   decodeSystemExport,
 } from "./codec.js";
 import { documentFromPackage } from "../authoring/assess.js";
-import { signSystemPackage } from "./canonical.js";
 const ids = {
   systemId: "10000000-0000-4000-8000-000000000001",
   versionId: "10000000-0000-4000-8000-000000000002",
@@ -22,10 +21,10 @@ describe("versioned named-group package round trips", () => {
     expect(compiled.ok).toBe(true);
     if (!compiled.ok) return;
     const pkg = compiled.value;
-    expect(pkg.schemaVersion).toBe("1.1");
+    expect(pkg.schemaVersion).toBe("2.0");
     expect(decodeSystemPackage(pkg).ok).toBe(true);
     expect(documentFromPackage(pkg).expressions).toEqual(doc.expressions);
-    expect(documentFromPackage(pkg).schemaVersion).toBe("1.1");
+    expect(documentFromPackage(pkg).schemaVersion).toBe("2.0");
     const exported = {
       schemaVersion: "1.0",
       mediaType: "application/vnd.sweetroll.system+json;version=1",
@@ -36,17 +35,11 @@ describe("versioned named-group package round trips", () => {
     const roundtrip = compileDocument(documentFromPackage(pkg), ids);
     expect(roundtrip.ok && roundtrip.value.integrity).toEqual(pkg.integrity);
   });
-  it("rejects new features in old versions, unknown package/grammar and forged group metadata", () => {
+  it("rejects unsupported package and grammar metadata", () => {
     const doc = namedDicePoolDocument();
-    doc.schemaVersion = "1.0";
-    expect(compileDocument(doc, ids).ok).toBe(false);
-    doc.schemaVersion = "1.1";
     const result = compileDocument(doc, ids);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    const downgrade = structuredClone(result.value);
-    downgrade.schemaVersion = "1.0";
-    expect(decodeSystemPackage(signSystemPackage(downgrade)).ok).toBe(false);
     const unknown = { ...result.value, schemaVersion: "1.3" };
     expect(decodeSystemPackage(unknown).ok).toBe(false);
     const expr = result.value.expressions.find(
@@ -65,7 +58,7 @@ describe("versioned named-group package round trips", () => {
     expect(JSON.stringify(d6SuccessPoolPackage)).toBe(before);
     expect(
       d6SuccessPoolPackage.expressions.every(
-        (e) => e.languageVersion === undefined,
+        (e) => e.languageVersion === "1.0",
       ),
     ).toBe(true);
   });

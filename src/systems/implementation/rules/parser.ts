@@ -1,8 +1,8 @@
 import type { ExpressionAstV1 } from "../package/schema/index.js";
-import { tokenize, type Token } from "./tokenizer.js";
+import { tokenize, type Token, type FunctionName } from "./tokenizer.js";
 import type { RulesDiagnostic } from "./diagnostic.js";
 
-type BinaryOp = "+" | "-" | "*" | "/" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||";
+type BinaryOp = "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||";
 
 export type ParseResult =
   | { ok: true; ast: ExpressionAstV1 }
@@ -123,7 +123,7 @@ class Parser {
   }
   private parseMultiplicative(): ExpressionAstV1 | undefined {
     let left = this.parseUnary();
-    while (left && this.peekOpIn(["*", "/"])) {
+    while (left && this.peekOpIn(["*", "/", "%"])) {
       const op = this.take()! as Extract<Token, { kind: "operator" }>;
       const right = this.parseUnary();
       if (!right) return undefined;
@@ -149,8 +149,9 @@ class Parser {
     if (!t) { this.fail("unexpected end of input"); return undefined; }
     switch (t.kind) {
       case "number": return { kind: "numberLiteral", value: t.value };
+      case "string": return { kind: "stringLiteral", value: t.value };
       case "boolean": return { kind: "booleanLiteral", value: t.value };
-      case "id": return { kind: "reference", scope: t.scope, id: t.id };
+      case "id": return { kind: "reference", scope: t.scope, id: t.id, ...(t.part && { part: t.part }) };
       case "dice": {
         const diceAst: ExpressionAstV1 = { kind: "dice", count: { kind: "numberLiteral", value: t.count }, sides: t.sides };
         if (t.keep) return { kind: "keep", mode: t.keep.mode, count: t.keep.count, dice: diceAst };
@@ -170,7 +171,7 @@ class Parser {
         return undefined;
     }
   }
-  private parseCall(name: "min" | "max" | "round" | "dice" | "countSuccesses" | "group"): ExpressionAstV1 | undefined {
+  private parseCall(name: FunctionName): ExpressionAstV1 | undefined {
     if (!this.at("lparen")) { this.fail(`expected '(' after ${name}`); return undefined; }
     this.take();
     if (name === "group") {

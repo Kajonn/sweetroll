@@ -5,7 +5,7 @@ import type { SystemExportV1 } from "../schema/export.js";
 import type { SystemPackageV1, UnsignedSystemPackageV1 } from "../schema/package.js";
 
 export const d20Document: SystemDocumentV1 = {
-  schemaVersion: "1.0",
+  schemaVersion: "2.0", templates: [], slots: [],
   metadata: {
     name: "D20 System",
     description: "Classic d20-based fantasy system",
@@ -174,13 +174,14 @@ export const d20Document: SystemDocumentV1 = {
       expressionId: "ability_valid_expr",
       severity: "error",
       message: "Ability score must be between 3 and 18",
+      targetEntityId: "character",
       targetId: "ability",
     },
   ],
 };
 
 const unsignedPackage: UnsignedSystemPackageV1 = {
-  schemaVersion: "1.0",
+  schemaVersion: "2.0", templates: [], slots: [],
   systemId: "a0000000-0000-5000-8000-000000000001",
   versionId: "a0000000-0000-5000-8000-000000000002",
   semanticVersion: "1.0.0",
@@ -292,7 +293,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
   expressions: [
     {
       id: "defense_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 10,
@@ -307,7 +308,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "check_expr",
-      context: "roll",
+      context: "roll", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -327,7 +328,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "ability_valid_expr",
-      context: "validation",
+      context: "validation", languageVersion: "1.0",
       resultType: "boolean",
       inferredType: "boolean",
       fallback: false,
@@ -389,6 +390,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       expressionId: "ability_valid_expr",
       severity: "error",
       message: "Ability score must be between 3 and 18",
+      targetEntityId: "character",
       targetId: "ability",
     },
   ],

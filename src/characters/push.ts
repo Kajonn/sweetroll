@@ -12,7 +12,7 @@ import {
   PushContextSchema,
   type PushContext,
 } from "../systems/implementation/runtime/push-context.js";
-import { ScalarValueSchema } from "../systems/implementation/package/schema/common.js";
+import { BindingValueSchema } from "../systems/implementation/rules/result.js";
 import type {
   NormalizedRoll,
   NormalizedRollAudience,
@@ -25,9 +25,9 @@ const SavedResultSchema = Type.Object({
   bindings: Type.Array(
     Type.Object(
       {
-        scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
-        definitionId: Type.String({ maxLength: 64 }),
-        value: ScalarValueSchema,
+        scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]),
+        definitionId: Type.String({ maxLength: 205 }),
+        value: BindingValueSchema,
       },
       { additionalProperties: false },
     ),

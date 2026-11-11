@@ -133,7 +133,7 @@ describe("ExpressionEditor", () => {
                 expressions: [
                   {
                     id: "modifier",
-                    context: "computed",
+                    context: "computed", languageVersion: "1.0",
                     resultType: "number",
                     inferredType: "number",
                     fallback: 0,

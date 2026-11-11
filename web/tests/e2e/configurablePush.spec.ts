@@ -58,7 +58,7 @@ test("creator publishes push rules; entity and item pushes preserve the original
     const current = (
       await json(page.request, "GET", `/api/systems/${systemId}`)
     ).workspace;
-    expect(current.draft.document.schemaVersion).toBe("1.2");
+    expect(current.draft.document.schemaVersion).toBe("2.0");
     await json(page.request, "PUT", `/api/systems/${systemId}/draft`, {
       expectedRevision: current.draft.revision,
       document: withItem(current.draft.document),

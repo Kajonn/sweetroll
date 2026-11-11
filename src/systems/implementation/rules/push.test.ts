@@ -8,7 +8,6 @@ const expression = compileExpression(
     context: "roll",
     resultType: "number",
     fallback: 0,
-    languageVersion: "0.2",
     env: {
       fields: { attribute: "number", skill: "number", gear: "number" },
       inputs: { modifier: "number" },

@@ -95,7 +95,7 @@ function characterView(overrides: Partial<CharacterView> = {}): CharacterView {
     archivedAt: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
-    state: { schemaVersion: "1.0", values: { ability: 10 } },
+    state: { schemaVersion: "1.0", entries: {}, values: { ability: 10 } },
     derivedValues: { defense: 0 },
     validations: [],
     projection: makeProjection(systemVersionId),
@@ -133,7 +133,7 @@ function characterExport(): CharacterExportV1 {
     systemVersionId: randomUUID(),
     packageChecksum: d20Package.integrity.checksum,
     revision: 1,
-    state: { schemaVersion: "1.0", values: { ability: 10 } },
+    state: { schemaVersion: "1.0", entries: {}, values: { ability: 10 } },
   };
 }
 

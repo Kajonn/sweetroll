@@ -301,7 +301,7 @@ describe("compileDocument", () => {
     const document = templateDocument();
     document.sheets[0]!.sections[0]!.elements.push({ kind: "slot", id: "inventory_element", slotId: "inventory" });
     document.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source =
-      "d20 + fields.modifier + fields.bonus";
+      "d20 + fields.modifier + item.bonus";
     document.templates![0]!.grantedActions.push({
       kind: "roll", id: "longsword_damage", label: "Longsword Damage",
       expressionId: "longsword_damage_expr", inputs: [], outputTemplate: "Damage: {total}",
@@ -436,14 +436,14 @@ describe("compileDocument", () => {
         id: "power_expr",
         context: "computed",
         resultType: "number",
-        source: "fields.might + 1",
+        source: "item.might + 1",
         fallback: 0,
       },
       {
         id: "might_expr",
         context: "computed",
         resultType: "number",
-        source: "fields.power + 1",
+        source: "item.power + 1",
         fallback: 0,
       },
     );
@@ -471,20 +471,20 @@ describe("compileDocument", () => {
     expect(roundTripped.templates).toEqual(document.templates);
     expect(roundTripped.slots).toEqual(document.slots);
     expect(roundTripped.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source)
-      .toBe("d20 + fields.bonus + inputs.edge");
+      .toBe("d20 + item.bonus + inputs.edge");
   });
 
-  it("omits optional templates and slots when the source document omits them", () => {
+  it("preserves empty template and slot collections", () => {
     const document = validDocument();
     document.expressions = document.expressions.filter((expression) => expression.id !== "title_expr");
     const result = compileDocument(document, opts);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.templates).toBeUndefined();
-    expect(result.value.slots).toBeUndefined();
-    expect(documentFromPackage(result.value).templates).toBeUndefined();
-    expect(documentFromPackage(result.value).slots).toBeUndefined();
+    expect(result.value.templates).toEqual([]);
+    expect(result.value.slots).toEqual([]);
+    expect(documentFromPackage(result.value).templates).toEqual([]);
+    expect(documentFromPackage(result.value).slots).toEqual([]);
   });
 });
 
@@ -525,7 +525,7 @@ function templateDocument(): SystemDocumentV1 {
     id: "longsword_attack_expr",
     context: "roll",
     resultType: "number",
-    source: "d20 + fields.bonus + inputs.edge",
+    source: "d20 + item.bonus + inputs.edge",
     fallback: 0,
   });
   return document;

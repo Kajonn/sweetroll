@@ -1,3 +1,4 @@
+import type { BindingValue, FieldBindingType, RulesDataset, SlotEnvironment } from "@sweetroll/rules";
 import { DebugOnly } from "../../ui/debugMode.js";
 import { useEffect, useMemo, useRef, useState, type Dispatch } from "react";
 
@@ -6,7 +7,7 @@ import type { ScalarValue, ValueType } from "../../ports/evaluateExpression.js";
 import { t } from "../../i18n/index.js";
 import { Button } from "../../ui/index.js";
 import {
-  tokenizeExpression,
+  parseExpression,
   type ExpressionDiagnostic,
 } from "../../ports/expressions.js";
 import type {
@@ -18,6 +19,7 @@ import type {
   FieldV1,
 } from "../../state/documentFieldTypes.js";
 import { commitComputedSource } from "../DocumentEditor.js";
+import { ExpressionSuggestions } from "../expressions/ExpressionSuggestions.js";
 import { DefinitionIdInput } from "./DefinitionIdInput.js";
 import styles from "./FieldEditor.module.css";
 
@@ -46,7 +48,10 @@ export type ComputedFieldEditorProps = {
   document?: SystemDocumentV1 | undefined;
   dispatch?: Dispatch<DocumentAction> | undefined;
   /** Sibling fields available as `fields.<id>` references in the formula. */
-  siblingFields?: ReadonlyArray<{ id: string; valueType: "number" | "text" | "boolean" }> | undefined;
+  datasets?: readonly RulesDataset[] | undefined;
+  slots?: SlotEnvironment | undefined;
+  referenceScope?: "fields" | "item";
+  siblingFields?: ReadonlyArray<{ id: string; valueType: FieldBindingType }> | undefined;
   referencedBy?: number | undefined;
   disabled?: boolean | undefined;
 };
@@ -60,6 +65,9 @@ export function ComputedFieldEditor({
   onFallbackChange,
   document,
   dispatch,
+  datasets,
+  slots,
+  referenceScope = "fields",
   siblingFields,
   referencedBy,
   disabled,
@@ -72,14 +80,13 @@ export function ComputedFieldEditor({
   useEffect(() => {
     setDraftSource(expressionSource ?? "");
   }, [expressionSource]);
-  const tokenizeResult = tokenizeExpression(draftSource);
-  const tokenizeOk = tokenizeResult.ok;
-  const diagnostics: ReadonlyArray<ExpressionDiagnostic> = tokenizeResult.ok
-    ? []
-    : tokenizeResult.diagnostics;
+  const parsed = draftSource.trim() === "" ? null : parseExpression(draftSource);
+  const syntaxOk = parsed?.ok === true;
+  const diagnostics: ReadonlyArray<ExpressionDiagnostic> = parsed?.ok === false
+    ? parsed.diagnostics
+    : [];
   const sourceRef = useRef<HTMLTextAreaElement | null>(null);
-  const insertField = (id: string) => {
-    const token = `fields.${id}`;
+  const insertSource = (token: string) => {
     const el = sourceRef.current;
     if (el === null) {
       setDraftSource((d) => `${d}${token}`);
@@ -99,12 +106,12 @@ export function ComputedFieldEditor({
   // their types (bindings default to 0/""/false), evaluated client-side
   // through the same compile+evaluate path as the sheet preview.
   const preview = useMemo(() => {
-    if (field.kind !== "computed" || !tokenizeOk) return null;
-    const fields: Record<string, ValueType> = {};
-    const bindings: Record<string, ScalarValue> = {};
+    if (field.kind !== "computed" || !syntaxOk) return null;
+    const fields: Record<string, FieldBindingType> = {};
+    const bindings: Record<string, BindingValue> = {};
     for (const s of siblingFields ?? []) {
       fields[s.id] = s.valueType;
-      bindings[s.id] = s.valueType === "number" ? 0 : s.valueType === "boolean" ? false : "";
+      bindings[s.id] = s.valueType === "number" ? 0 : s.valueType === "boolean" ? false : s.valueType === "choiceSet" ? [] : "";
     }
     const resultType: ValueType = field.valueType;
     const fb: ScalarValue =
@@ -117,13 +124,14 @@ export function ComputedFieldEditor({
             : "";
     return evaluateExpression({
       source: draftSource,
-      env: { fields, inputs: {} },
+      env: { fields: referenceScope === "fields" ? fields : {}, inputs: {}, ...(referenceScope === "item" && { item: fields }), ...(datasets && { datasets }), ...(slots && { slots }) },
       resultType,
       fallback: fb,
       bindings,
+      ...(referenceScope === "item" && { itemBindings: bindings }),
       context: "computed",
     });
-  }, [field, tokenizeOk, draftSource, siblingFields, fallback]);
+  }, [field, syntaxOk, draftSource, siblingFields, fallback, datasets, slots, referenceScope]);
 
   if (!isComputed(field)) {
     return (
@@ -213,6 +221,7 @@ export function ComputedFieldEditor({
       >
         {t("editor.fields.computed.grammarHint")}
       </p>
+      <ExpressionSuggestions disabled={disabled} onInsert={insertSource} />
       {(siblingFields ?? []).length > 0 ? (
         <div className={styles.row} data-testid={`computed-field-insert-${field.id}`}>
           <span className={styles.field}>{t("editor.fields.computed.insertField")}</span>
@@ -220,7 +229,7 @@ export function ComputedFieldEditor({
             <Button
               key={s.id}
               variant="secondary"
-              onClick={() => insertField(s.id)}
+              onClick={() => insertSource(`${referenceScope}.${s.id}`)}
               data-testid={`computed-field-insert-${field.id}-${s.id}`}
               disabled={disabled}
             >

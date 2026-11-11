@@ -26,7 +26,7 @@ scenario("Dice pool: salvage the relay and push a saved roll", async ({ actor, p
   await phase("Publish the expedition rules");
   const document = namedDicePoolDocument();
   document.metadata.name = "Relay Salvage";
-  document.schemaVersion = "1.2";
+
   const action = document.actions.find((entry) => entry.id === "test_pool");
   if (action?.kind !== "roll") throw new Error("Missing the named-pool roll action");
   action.pushPolicy = {

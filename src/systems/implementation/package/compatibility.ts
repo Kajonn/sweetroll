@@ -120,10 +120,10 @@ export function comparePackages(prev: SystemPackageV1, next: SystemPackageV1): C
   // without them compare exactly as before. Adding templates, slots, or
   // granted actions is non-breaking; removals and slot-kind narrowing break
   // live entries and take the acknowledge-breaking path.
-  compareTemplates(prev.templates ?? [], next.templates ?? [], findings);
+  compareTemplates(prev.templates, next.templates, findings);
 
-  const prevSlots = indexById(prev.slots ?? []);
-  const nextSlots = indexById(next.slots ?? []);
+  const prevSlots = indexById(prev.slots);
+  const nextSlots = indexById(next.slots);
   for (const [id, prevSlot] of prevSlots) {
     const nextSlot = nextSlots.get(id);
     if (nextSlot === undefined) {

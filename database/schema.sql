@@ -409,6 +409,8 @@ CREATE TABLE character_rolls (
   request_id         text NOT NULL,
   occurred_at        timestamptz NOT NULL DEFAULT now(),
   scope_campaign_id uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
+  target_character_id uuid REFERENCES characters(id) ON DELETE RESTRICT,
+  responds_to_roll_id uuid,
   parent_roll_id uuid,
   root_roll_id uuid,
   push_attempt integer,
@@ -416,6 +418,13 @@ CREATE TABLE character_rolls (
   push_result_json jsonb,
   audience_actor_id uuid REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT character_rolls_character_identity UNIQUE (character_id,id),
+  CONSTRAINT character_rolls_campaign_identity UNIQUE (scope_campaign_id,id),
+  CONSTRAINT character_rolls_response_parent FOREIGN KEY (scope_campaign_id,responds_to_roll_id)
+    REFERENCES character_rolls(scope_campaign_id,id) ON DELETE RESTRICT,
+  CONSTRAINT character_rolls_campaign_context CHECK (
+    (target_character_id IS NULL AND responds_to_roll_id IS NULL)
+    OR (scope_campaign_id IS NOT NULL AND responds_to_roll_id IS DISTINCT FROM id)
+  ),
   CONSTRAINT character_rolls_push_parent FOREIGN KEY (character_id,parent_roll_id) REFERENCES character_rolls(character_id,id) ON DELETE RESTRICT,
   CONSTRAINT character_rolls_push_root FOREIGN KEY (character_id,root_roll_id) REFERENCES character_rolls(character_id,id) ON DELETE RESTRICT,
   CONSTRAINT character_rolls_push_shape CHECK (
@@ -426,6 +435,11 @@ CREATE TABLE character_rolls (
   )
 );
 
+CREATE INDEX character_rolls_recent_campaign
+  ON character_rolls(scope_campaign_id, occurred_at DESC, id DESC) WHERE scope_campaign_id IS NOT NULL;
+CREATE UNIQUE INDEX character_rolls_one_response_per_actor
+  ON character_rolls(responds_to_roll_id,actor_id)
+  WHERE responds_to_roll_id IS NOT NULL AND COALESCE(push_attempt, 0) = 0;
 CREATE UNIQUE INDEX character_rolls_one_push_child ON character_rolls(parent_roll_id) WHERE parent_roll_id IS NOT NULL;
 CREATE UNIQUE INDEX character_rolls_push_attempt ON character_rolls(root_roll_id,push_attempt) WHERE root_roll_id IS NOT NULL;
 CREATE FUNCTION character_push_rolls_prevent_mutation() RETURNS trigger LANGUAGE plpgsql AS $$

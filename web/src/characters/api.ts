@@ -2,7 +2,7 @@ import { createImageEditorApi, type ImageEditorApi } from "../ui/imageEditorApi.
 import { ApiError, type ApiClient } from "../api/client.js";
 import { createCharacterImagesApi, type CharacterImagesApi } from "./imageApi.js";
 import type {
-  PushOptionsResponse,ReadRollResponse,
+  PushOptionsResponse,ReadRollResponse,RollOptionsResponse,
   ActivityResponse,
   AddCharacterEntryBody,
   AddCharacterEntryResponse,
@@ -43,6 +43,7 @@ export type CharacterListQuery = {
 export type CharactersApi = {
   images?: CharacterImagesApi;
   entryImages?: (characterId: string, entryId: string) => ImageEditorApi;
+  rollOptions?(characterId: string, actionId: string, entryId?: string): Promise<RollOptionsResponse>;
   pushOptions(characterId:string,rollId:string):Promise<PushOptionsResponse>;
   readRoll(characterId:string,rollId:string):Promise<ReadRollResponse>;
   open(characterId: string): Promise<OpenCharacterResponse>;
@@ -102,6 +103,10 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
   return {
     images: createCharacterImagesApi(client),
     entryImages: (characterId, entryId) => createImageEditorApi(client, `/characters/${encodeURIComponent(characterId)}/entries/${encodeURIComponent(entryId)}/image`, "entry"),
+    rollOptions: (characterId, actionId, entryId) => client.fetch<RollOptionsResponse>(
+      "GET", `/characters/${encodeURIComponent(characterId)}/actions/${encodeURIComponent(actionId)}/roll-options`,
+      entryId === undefined ? undefined : { query: { entryId } },
+    ),
     pushOptions:(characterId,rollId)=>client.fetch<PushOptionsResponse>("GET",`/characters/${characterId}/rolls/${rollId}/push-options`),
     readRoll:(characterId,rollId)=>client.fetch<ReadRollResponse>("GET",`/characters/${characterId}/rolls/${rollId}`),
     open: (characterId) => client.fetch<OpenCharacterResponse>("GET", `/characters/${characterId}`),

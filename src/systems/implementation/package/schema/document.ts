@@ -347,6 +347,8 @@ export type RollOutcomeV1 = Static<typeof RollOutcomeV1Schema>;
 
 export const RollActionV1Schema = Type.Object(
   {
+    target: Type.Optional(Type.Object({ entityId: DefinitionIdSchema }, { additionalProperties: false })),
+    respondsTo: Type.Optional(Type.Literal(true)),
     outcomes: Type.Optional(Type.Array(RollOutcomeV1Schema, { maxItems: 16 })),
     details: Type.Optional(Type.Array(RollOutcomeV1Schema, { maxItems: 8 })),
     pushPolicy: Type.Optional(PushPolicySchema),

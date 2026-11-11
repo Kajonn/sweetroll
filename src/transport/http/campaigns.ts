@@ -319,6 +319,8 @@ const CampaignExportDto = Type.Object({
       expression: Type.String(),
       breakdown: RollBreakdownSchema,
       breakdownText: Type.String(),
+      targetCharacterId: Type.Optional(Type.String({ format: UUID_FORMAT })),
+      respondsTo: Type.Optional(Type.String({ format: UUID_FORMAT })),
       push:Type.Optional(PushResultSchema),
       dice: Type.Array(DieResultSchema),
       bindings: Type.Unknown(),

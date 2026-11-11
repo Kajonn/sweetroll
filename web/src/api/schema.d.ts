@@ -612,6 +612,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/characters/{characterId}/actions/{actionId}/roll-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_character_roll_options"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/characters/{characterId}/rolls/{rollId}": {
         parameters: {
             query?: never;
@@ -7912,6 +7928,11 @@ export interface operations {
                                             actionId: string;
                                             label: string;
                                             actionKind: "roll" | "resourceBump";
+                                            target?: {
+                                                entityId: string;
+                                            };
+                                            /** @constant */
+                                            respondsTo?: true;
                                             inputs: {
                                                 id: string;
                                                 label: string;
@@ -7958,6 +7979,11 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "roll" | "resourceBump";
+                                                        target?: {
+                                                            entityId: string;
+                                                        };
+                                                        /** @constant */
+                                                        respondsTo?: true;
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -8829,6 +8855,11 @@ export interface operations {
                                             actionId: string;
                                             label: string;
                                             actionKind: "roll" | "resourceBump";
+                                            target?: {
+                                                entityId: string;
+                                            };
+                                            /** @constant */
+                                            respondsTo?: true;
                                             inputs: {
                                                 id: string;
                                                 label: string;
@@ -8875,6 +8906,11 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "roll" | "resourceBump";
+                                                        target?: {
+                                                            entityId: string;
+                                                        };
+                                                        /** @constant */
+                                                        respondsTo?: true;
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -9313,6 +9349,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -9359,6 +9400,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -9430,6 +9476,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -9492,7 +9542,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -9968,6 +10018,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -10014,6 +10069,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -10085,6 +10145,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -10147,7 +10211,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -10623,6 +10687,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -10669,6 +10738,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -10740,6 +10814,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -10802,7 +10880,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -11278,6 +11356,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -11324,6 +11407,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -11395,6 +11483,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -11457,7 +11549,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -11934,6 +12026,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -11980,6 +12077,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -12051,6 +12153,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -12113,7 +12219,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -12349,6 +12455,248 @@ export interface operations {
             };
         };
     };
+    get_character_roll_options: {
+        parameters: {
+            query?: {
+                entryId?: string;
+            };
+            header?: never;
+            path: {
+                characterId: string;
+                actionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        targets: {
+                            /** Format: uuid */
+                            characterId: string;
+                            name: string;
+                        }[];
+                        rolls: {
+                            /** Format: uuid */
+                            rollId: string;
+                            output: string;
+                        }[];
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     get_characters_characterId_rolls_rollId: {
         parameters: {
             query?: never;
@@ -12368,6 +12716,10 @@ export interface operations {
                 content: {
                     "application/json": {
                         roll: {
+                            /** Format: uuid */
+                            targetCharacterId?: string;
+                            /** Format: uuid */
+                            respondsTo?: string;
                             push?: {
                                 /** @constant */
                                 version: "1.0";
@@ -12430,7 +12782,7 @@ export interface operations {
                                 explodedFrom?: string;
                             }[];
                             bindings: {
-                                scope: "fields" | "inputs" | "item" | "aggregates";
+                                scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                 definitionId: string;
                                 value: (string | number | boolean | null) | string[];
                             }[];
@@ -13138,6 +13490,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -13184,6 +13541,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -13255,6 +13617,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -13317,7 +13683,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -13566,6 +13932,10 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
+                    /** Format: uuid */
+                    targetCharacterId?: string;
+                    /** Format: uuid */
+                    respondsTo?: string;
                     push?: unknown;
                     pushContext?: unknown;
                     pushPolicy?: unknown;
@@ -13805,6 +14175,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -13851,6 +14226,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -13922,6 +14302,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -13984,7 +14368,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -14486,6 +14870,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -14532,6 +14921,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -14603,6 +14997,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -14665,7 +15063,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -15140,6 +15538,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -15186,6 +15589,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -15257,6 +15665,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -15319,7 +15731,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -15798,6 +16210,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -15844,6 +16261,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -15915,6 +16337,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -15977,7 +16403,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -16345,6 +16771,11 @@ export interface operations {
                                 id: string;
                                 label: string;
                                 actionKind: "roll" | "resourceBump";
+                                target?: {
+                                    entityId: string;
+                                };
+                                /** @constant */
+                                respondsTo?: true;
                                 inputs: {
                                     id: string;
                                     label: string;
@@ -16743,6 +17174,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -16789,6 +17225,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -16860,6 +17301,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -16922,7 +17367,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -17931,6 +18376,11 @@ export interface operations {
                                                 actionId: string;
                                                 label: string;
                                                 actionKind: "roll" | "resourceBump";
+                                                target?: {
+                                                    entityId: string;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
                                                 inputs: {
                                                     id: string;
                                                     label: string;
@@ -17977,6 +18427,11 @@ export interface operations {
                                                             id: string;
                                                             label: string;
                                                             kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
                                                             inputs: {
                                                                 id: string;
                                                                 label: string;
@@ -18048,6 +18503,10 @@ export interface operations {
                                 };
                             };
                             roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -18110,7 +18569,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -18582,6 +19041,11 @@ export interface operations {
                                             actionId: string;
                                             label: string;
                                             actionKind: "roll" | "resourceBump";
+                                            target?: {
+                                                entityId: string;
+                                            };
+                                            /** @constant */
+                                            respondsTo?: true;
                                             inputs: {
                                                 id: string;
                                                 label: string;
@@ -18628,6 +19092,11 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "roll" | "resourceBump";
+                                                        target?: {
+                                                            entityId: string;
+                                                        };
+                                                        /** @constant */
+                                                        respondsTo?: true;
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -18933,6 +19402,10 @@ export interface operations {
                     "application/json": {
                         events: {
                             roll?: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";
@@ -18995,7 +19468,7 @@ export interface operations {
                                     explodedFrom?: string;
                                 }[];
                                 bindings: {
-                                    scope: "fields" | "inputs" | "item" | "aggregates";
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
                                     definitionId: string;
                                     value: (string | number | boolean | null) | string[];
                                 }[];
@@ -21058,6 +21531,11 @@ export interface operations {
                                 required: boolean;
                             })[];
                             grantedActions: ({
+                                target?: {
+                                    entityId: string;
+                                };
+                                /** @constant */
+                                respondsTo?: true;
                                 outcomes?: {
                                     id: string;
                                     label: string;
@@ -27014,6 +27492,11 @@ export interface operations {
                                             actionId: string;
                                             label: string;
                                             actionKind: "roll" | "resourceBump";
+                                            target?: {
+                                                entityId: string;
+                                            };
+                                            /** @constant */
+                                            respondsTo?: true;
                                             inputs: {
                                                 id: string;
                                                 label: string;
@@ -27060,6 +27543,11 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "roll" | "resourceBump";
+                                                        target?: {
+                                                            entityId: string;
+                                                        };
+                                                        /** @constant */
+                                                        respondsTo?: true;
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -27576,6 +28064,11 @@ export interface operations {
                                             actionId: string;
                                             label: string;
                                             actionKind: "roll" | "resourceBump";
+                                            target?: {
+                                                entityId: string;
+                                            };
+                                            /** @constant */
+                                            respondsTo?: true;
                                             inputs: {
                                                 id: string;
                                                 label: string;
@@ -27622,6 +28115,11 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "roll" | "resourceBump";
+                                                        target?: {
+                                                            entityId: string;
+                                                        };
+                                                        /** @constant */
+                                                        respondsTo?: true;
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -28042,6 +28540,11 @@ export interface operations {
                                             actionId: string;
                                             label: string;
                                             actionKind: "roll" | "resourceBump";
+                                            target?: {
+                                                entityId: string;
+                                            };
+                                            /** @constant */
+                                            respondsTo?: true;
                                             inputs: {
                                                 id: string;
                                                 label: string;
@@ -28088,6 +28591,11 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "roll" | "resourceBump";
+                                                        target?: {
+                                                            entityId: string;
+                                                        };
+                                                        /** @constant */
+                                                        respondsTo?: true;
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -28510,6 +29018,11 @@ export interface operations {
                                             actionId: string;
                                             label: string;
                                             actionKind: "roll" | "resourceBump";
+                                            target?: {
+                                                entityId: string;
+                                            };
+                                            /** @constant */
+                                            respondsTo?: true;
                                             inputs: {
                                                 id: string;
                                                 label: string;
@@ -28556,6 +29069,11 @@ export interface operations {
                                                         id: string;
                                                         label: string;
                                                         kind: "roll" | "resourceBump";
+                                                        target?: {
+                                                            entityId: string;
+                                                        };
+                                                        /** @constant */
+                                                        respondsTo?: true;
                                                         inputs: {
                                                             id: string;
                                                             label: string;
@@ -30208,6 +30726,10 @@ export interface operations {
                                     }[];
                                 };
                                 breakdownText: string;
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
                                 push?: {
                                     /** @constant */
                                     version: "1.0";

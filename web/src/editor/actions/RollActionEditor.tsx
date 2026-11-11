@@ -34,6 +34,8 @@ export type RollActionV1 = {
   expressionId: DefinitionId;
   inputs: ActionInputV1[];
   outputTemplate: string;
+  target?: { entityId: string };
+  respondsTo?: true;
   outcomes?: RollOutcomeEntry[];
   details?: RollOutcomeEntry[];
 };
@@ -47,6 +49,7 @@ export type RollActionEditorProps = {
   onExpressionSourceChange: (next: string) => void;
   fieldTypes: Record<string, FieldBindingType>;
   itemTypes?: Record<string, FieldBindingType>;
+  targetEntities?: readonly { id: string; label: string; fields: Record<string, FieldBindingType> }[] | undefined;
   dice?: readonly CustomDie[] | undefined;
   datasets?: readonly RulesDataset[];
   slots?: SlotEnvironment;
@@ -138,12 +141,14 @@ function defaultBinding(valueType: FieldBindingType): BindingValue {
   }
 }
 
-function poolParameterFields(source: string) {
-  const fields = new Map<string, { scope: "fields" | "item"; id: string }>();
+function sampledReferences(source: string) {
+  const fields = new Map<string, { scope: "fields" | "item" | "target" | "opposed"; id: string }>();
   const parsed = parse(source);
   if (!parsed.ok) return fields;
   function walk(node: ExpressionAstV1, parameter = false): void {
-    if (parameter && node.kind === "reference" && node.scope !== "inputs" && node.scope !== "roll") {
+    if (node.kind === "reference" && (
+      node.scope === "target" || node.scope === "opposed" || (parameter && (node.scope === "fields" || node.scope === "item"))
+    )) {
       const id = node.part ? `${node.id}.${node.part}` : node.id;
       fields.set(`${node.scope}.${id}`, { scope: node.scope, id });
     }
@@ -166,6 +171,7 @@ export function RollActionEditor({
   onExpressionSourceChange,
   fieldTypes,
   itemTypes,
+  targetEntities,
   dice,
   datasets,
   slots,
@@ -210,26 +216,39 @@ export function RollActionEditor({
     updateInputs([...action.inputs, defaultActionInput(action.inputs)]);
   };
 
-  const poolFields = useMemo(() => poolParameterFields(expressionSource), [expressionSource]);
-  const sampleFields = [...poolFields].filter(([, { scope, id }]) =>
-    (scope === "fields" ? fieldTypes : itemTypes)?.[id] === "number");
+  const targetTypes = targetEntities?.find(entity => entity.id === action.target?.entityId)?.fields;
+  const opposedTypes: Record<string, ValueType> | undefined = action.respondsTo ? { total: "number" } : undefined;
+  const contextualTypes = { target: targetTypes, opposed: opposedTypes };
+  const types = { fields: fieldTypes, item: itemTypes, ...contextualTypes };
+  const references = useMemo(() => sampledReferences(expressionSource), [expressionSource]);
+  const sampleFields = [...references].filter(([, { scope, id }]) => types[scope]?.[id] === "number");
   const characterSamples = buildTryItBindings([], fieldTypes);
   const itemSamples = buildTryItBindings([], itemTypes ?? {});
-  for (const [key, { scope, id }] of sampleFields) {
-    const samples = scope === "fields" ? characterSamples : itemSamples;
-    samples[id] = sampleOverrides[key] ?? 0;
-  }
+  const targetSamples = buildTryItBindings([], targetTypes ?? {});
+  const opposedSamples = buildTryItBindings([], opposedTypes ?? {});
+  const samples = { fields: characterSamples, item: itemSamples, target: targetSamples, opposed: opposedSamples };
+  for (const [key, { scope, id }] of sampleFields) samples[scope][id] = sampleOverrides[key] ?? 0;
+  const contextualReferences = [
+    ...Object.keys(targetTypes ?? {}).map(id => `target.${id}`),
+    ...(opposedTypes ? ["opposed.total"] : []),
+  ];
   const sampleBindingsNow = { ...characterSamples, ...buildTryItBindings(action.inputs, {}) };
 
   const runTryIt = () => {
     const bindings = sampleBindingsNow;
-    setTryItBindings(bindings);
+    setTryItBindings({
+      ...bindings,
+      ...Object.fromEntries([...references].flatMap(([key, { scope, id }]) =>
+        (scope === "target" || scope === "opposed") && Object.hasOwn(samples[scope], id) ? [[key, samples[scope][id]!]] : [])),
+    });
     setTryItResult(
       evaluateRoll({
         source: expressionSource,
-        env: { fields: fieldTypes, inputs: inputTypes, dice, ...(itemTypes && { item: itemTypes }), ...(datasets && { datasets }), ...(slots && { slots }) },
+        env: { fields: fieldTypes, inputs: inputTypes, dice, ...(itemTypes && { item: itemTypes }), ...(targetTypes && { target: targetTypes }), ...(opposedTypes && { opposed: opposedTypes }), ...(datasets && { datasets }), ...(slots && { slots }) },
         fieldBindings: characterSamples,
         ...(itemTypes && { itemBindings: itemSamples }),
+        ...(targetTypes && { targetBindings: targetSamples }),
+        ...(opposedTypes && { opposedBindings: opposedSamples }),
         resultType: "number",
         fallback: 0,
         bindings,
@@ -327,6 +346,29 @@ export function RollActionEditor({
           </div>
         )}
       </div>
+      {targetEntities && !("nominal" in action && action.nominal === true) ? (
+        <div className={styles.row}>
+          <Select
+            label={t("editor.action.roll.targetEntity")}
+            value={action.target?.entityId ?? ""}
+            options={[{ value: "", label: t("editor.action.roll.targetNone") }, ...targetEntities.map(entity => ({ value: entity.id, label: entity.label }))]}
+            onChange={(event) => {
+              const { target: _target, ...rest } = action;
+              onChange(event.target.value ? { ...rest, target: { entityId: event.target.value } } : rest);
+            }}
+            disabled={disabled}
+          />
+          <Checkbox
+            label={t("editor.action.roll.respondsTo")}
+            checked={action.respondsTo === true}
+            onChange={(event) => {
+              const { respondsTo: _respondsTo, ...rest } = action;
+              onChange(event.target.checked ? { ...rest, respondsTo: true } : rest);
+            }}
+            disabled={disabled}
+          />
+        </div>
+      ) : null}
       <PushPolicyEditor source={expressionSource} policy={action.pushPolicy} disabled={disabled || ("nominal" in action && action.nominal===true)} onChange={policy=>{const {pushPolicy:_old,...rest}=action;onChange(policy?{...rest,pushPolicy:policy}:rest);}}/>
       <GroupedPoolEditor dice={dice} source={expressionSource} onChange={onExpressionSourceChange} disabled={disabled} choices={[
         ...numericFields.map(([id])=>({value:`fields.${id}`,label:fieldLabels?.[id]??id})),
@@ -336,7 +378,7 @@ export function RollActionEditor({
       {guided !== true || diceKind === "custom" || customEditing ? (
         <ExpressionEditor
           roll
-          references={[...Object.keys(fieldTypes).map(id => `fields.${id}`), ...Object.keys(inputTypes).map(id => `inputs.${id}`), ...Object.keys(itemTypes ?? {}).map(id => `item.${id}`)]}
+          references={[...Object.keys(fieldTypes).map(id => `fields.${id}`), ...Object.keys(inputTypes).map(id => `inputs.${id}`), ...Object.keys(itemTypes ?? {}).map(id => `item.${id}`), ...contextualReferences]}
           client={client}
           systemId={systemId}
           source={expressionSource}

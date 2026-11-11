@@ -23,12 +23,15 @@ export type EntryInput = {
   quantity?: number;
 };
 
+export type RollOptionsResponse = operations["get_character_roll_options"]["responses"][200]["content"]["application/json"];
+export type CampaignRollSelection = { targetCharacterId?: string; respondsTo?: string };
+
 export type EditIntent =
   | { kind: "setField"; fieldId: string; value: unknown }
   | { kind: "bumpResource"; resourceId: string; direction: "up" | "down" }
   | { kind: "adjustResource"; resourceId: string; delta: number }
   | { kind: "setResource"; resourceId: string; current?: number; max?: number }
-  | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown>; entryId?: string }
+  | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown>; entryId?: string; campaignRoll?: CampaignRollSelection }
   | { kind: "addEntry"; entry: EntryInput }
   | { kind: "removeEntry"; entryId: string }
   | { kind: "updateEntryValues"; entryId: string; values: Record<string, unknown>; quantity?: number };

@@ -529,8 +529,8 @@ function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
       return hasOnlyKeys(node, ["kind", "value"]) && typeof node.value === "boolean";
     case "reference":
       return hasOnlyKeys(node, ["kind", "scope", "id"], ["part"])
-        && (node.scope === "fields" || node.scope === "inputs" || node.scope === "item" || node.scope === "roll")
-        && (node.part === undefined || (node.scope !== "inputs" && node.scope !== "roll" && (node.part === "current" || node.part === "max")))
+        && (node.scope === "fields" || node.scope === "inputs" || node.scope === "item" || node.scope === "roll" || node.scope === "target" || node.scope === "opposed")
+        && (node.part === undefined || ((node.scope === "fields" || node.scope === "item" || node.scope === "target") && (node.part === "current" || node.part === "max")))
         && typeof node.id === "string"
         && /^[a-z][a-z0-9_]{0,63}$/.test(node.id);
     case "unary":

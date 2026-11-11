@@ -6,6 +6,7 @@ import { characterEntryImageHandlers, characterEntryImageRoutes } from "./charac
 import {DieResultSchema, RollBreakdownSchema, PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
+import { RollOptionsQuery, RollOptionsSchema } from "./roll-options.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
@@ -136,7 +137,7 @@ const TemplateKindDto = Type.Union([
 const ProjectedEntryDefinitionDto=Type.Object({
  id:Type.String(),label:Type.String(),kind:TemplateKindDto,
  fields:Type.Array(Type.Object({...ProjectionFieldConstraintsDto.properties,id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("text"),Type.Literal("integer"),Type.Literal("decimal"),Type.Literal("boolean"),Type.Literal("singleChoice"),Type.Literal("multiChoice"),Type.Literal("resource")]),default:Type.Unknown()}),{maxItems:64}),
- grantedActions:Type.Array(Type.Object({id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("roll"),Type.Literal("resourceBump")]),inputs:Type.Array(ProjectionActionInputDto)}),{maxItems:16}),
+ grantedActions:Type.Array(Type.Object({id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("roll"),Type.Literal("resourceBump")]),target:Type.Optional(Type.Object({entityId:Type.String()})),respondsTo:Type.Optional(Type.Literal(true)),inputs:Type.Array(ProjectionActionInputDto)}),{maxItems:16}),
 });
 const ProjectionSlotEntryDto = Type.Object({
   definition:Type.Optional(ProjectedEntryDefinitionDto),
@@ -176,6 +177,8 @@ const ProjectionElementDto = Type.Union([
     actionId: Type.String(),
     label: Type.String(),
     actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
+    target: Type.Optional(Type.Object({ entityId: Type.String() })),
+    respondsTo: Type.Optional(Type.Literal(true)),
     inputs: Type.Array(ProjectionActionInputDto),
     validations: Type.Array(RuntimeValidationDto),
     // Task 7: set on synthetic granted-action elements projected after
@@ -291,7 +294,7 @@ const CharacterCreationVersionsDto = Type.Object({
 
 const DiceDto = DieResultSchema;
 const RollBindingDto = Type.Object({
-  scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]),
+  scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates"), Type.Literal("target"), Type.Literal("opposed")]),
   definitionId: Type.String(),
   value: BindingValueSchema,
 });
@@ -301,6 +304,8 @@ const RollAudienceDto = Type.Union([
   Type.Literal("campaign"),
 ]);
 const RollDto = Type.Object({
+  targetCharacterId: Type.Optional(Type.String({ format: "uuid" })),
+  respondsTo: Type.Optional(Type.String({ format: "uuid" })),
   push:Type.Optional(PushResultSchema),
   breakdown: RollBreakdownSchema,
   actionId: Type.String(),
@@ -464,6 +469,8 @@ const PushParams=Type.Object({characterId:Type.String({format:"uuid"}),rollId:Ty
 const PushBody=Type.Object({expectedRevision:Type.Integer({minimum:1}),idempotencyKey:Type.String({minLength:1,maxLength:200})},{additionalProperties:false});
 const PushOptionsDto=Type.Object({canPush:Type.Boolean(),reason:Type.Union([Type.String({maxLength:120}),Type.Null()]),eligibleDiceIds:Type.Array(Type.String({maxLength:256}),{maxItems:100}),revision:Type.Integer({minimum:1}),nextAttempt:Type.Integer({minimum:1,maximum:11}),maxAttempts:Type.Integer({minimum:1,maximum:10})});
 const ExecuteActionBody = Type.Object({
+  targetCharacterId: Type.Optional(Type.String({ format: "uuid" })),
+  respondsTo: Type.Optional(Type.String({ format: "uuid" })),
   // Outcomes and randomness belong to the server; never admit replacement
   // dice/group/calculation data, even when another JSON field is tolerated.
   push:Type.Optional(Type.Never()),pushContext:Type.Optional(Type.Never()),pushPolicy:Type.Optional(Type.Never()),
@@ -530,6 +537,8 @@ const EntryTemplateDto = Type.Object({
     id: Type.String(),
     label: Type.String(),
     actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
+    target: Type.Optional(Type.Object({ entityId: Type.String() })),
+    respondsTo: Type.Optional(Type.Literal(true)),
     inputs: Type.Array(EntryGrantedActionInputDto),
   })),
 });
@@ -769,6 +778,11 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
       },
     },
   },
+  {method:"get",path:"/characters/:characterId/actions/:actionId/roll-options",operationId:"get_character_roll_options",schema:{
+    params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }), actionId: Type.String() }),
+    querystring: RollOptionsQuery,
+    response: { "200": RollOptionsSchema, ...ErrorResponses },
+  }},
   {method:"get",path:"/characters/:characterId/rolls/:rollId",operationId:"get_characters_characterId_rolls_rollId",schema:{params:PushParams,response:{"200":Type.Object({roll:RollDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"get",path:"/characters/:characterId/rolls/:rollId/push-options",operationId:"get_characters_characterId_rolls_rollId_push_options",schema:{params:PushParams,response:{"200":Type.Object({options:PushOptionsDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"post",path:"/characters/:characterId/rolls/:rollId/push",operationId:"post_characters_characterId_rolls_rollId_push",schema:{params:PushParams,body:PushBody,response:{"200":Type.Object({result:CharacterCommandResultDto,requestId:Type.String()}),...ErrorResponses}}},
@@ -1230,6 +1244,14 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },
 
+      get_character_roll_options: async (request, reply) => {
+        const params = request.params as { characterId: string; actionId: string };
+        const query = request.query as { entryId?: string };
+        const result = await characters.rollOptions(ctxOf(request), { ...params, ...query });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "no-store");
+        return result.value;
+      },
       get_characters_characterId_rolls_rollId:async(request,reply)=>{
         const result=await characters.readRoll(ctxOf(request),request.params as {characterId:string;rollId:string});
         if(!result.ok)return sendError(reply,result.error,request.id);reply.header("cache-control","no-store");return {roll:result.value,requestId:request.id};
@@ -1247,6 +1269,8 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const params = request.params as { characterId: string; actionId: string };
         const body = request.body as {
           inputs?: Record<string, unknown>;
+          targetCharacterId?: string;
+          respondsTo?: string;
           audience?: "owner_only" | "gm_only" | "campaign";
           entryId?: string;
           expectedRevision: number;
@@ -1257,6 +1281,8 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           characterId: params.characterId,
           actionId: params.actionId,
           inputs: body.inputs ?? {},
+          ...(body.targetCharacterId === undefined ? {} : { targetCharacterId: body.targetCharacterId }),
+          ...(body.respondsTo === undefined ? {} : { respondsTo: body.respondsTo }),
           expectedRevision: body.expectedRevision,
           idempotencyKey: body.idempotencyKey,
           ...(body.audience === undefined ? {} : { audience: body.audience }),

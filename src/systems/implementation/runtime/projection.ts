@@ -1,3 +1,4 @@
+import { campaignRollRequirements } from "./roll-context.js";
 import {effectiveEntryDefinition} from "./effective-entry.js";
 import type {
   CharacterProjectionElement,
@@ -94,6 +95,7 @@ function projectElement(
       actionId: action.id,
       label: action.label,
       actionKind: action.kind,
+      ...campaignRollRequirements(action),
       inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
       validations: validationsFor(action.id),
     }];
@@ -183,7 +185,8 @@ function projectGrantedAction(
     entryId,
     label: action.label,
     actionKind: action.kind,
-    inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
+    ...campaignRollRequirements(action),
+      inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
     validations: [],
   };
 }
@@ -241,5 +244,5 @@ function fieldConstraints(
 function projectEntryDefinition(template:ObjectTemplateV1):NonNullable<CharacterProjectionSlotEntry["definition"]>{
  return {id:template.id,label:template.label,kind:template.kind,
   fields:template.fields.filter((f):f is Exclude<FieldV1,{kind:"computed"}|{kind:"image"}>=>f.kind!=="computed" && f.kind!=="image").map(f=>({id:f.id,label:f.label,kind:f.kind,default:structuredClone(f.default),...(f.kind==="resource"?{min:f.min,max:f.max,step:f.step}:fieldConstraints(f))})),
-  grantedActions:template.grantedActions.map(a=>({id:a.id,label:a.label,kind:a.kind,inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]}))};
+  grantedActions:template.grantedActions.map(a=>({id:a.id,label:a.label,kind:a.kind,...campaignRollRequirements(a),inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]}))};
 }

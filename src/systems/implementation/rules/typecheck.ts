@@ -10,6 +10,8 @@ export type ExpressionCompileEnv = {
   fields: Record<string, FieldBindingType>;
   inputs: Record<string, ValueType>;
   item?: Record<string, FieldBindingType>;
+  target?: Record<string, FieldBindingType>;
+  opposed?: Record<string, ValueType>;
   /** Outcome expressions only: values of the roll being described (`roll.total`). */
   roll?: Record<string, ValueType>;
   dice?: readonly CustomDie[] | undefined;

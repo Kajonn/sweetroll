@@ -86,6 +86,8 @@ export type ActivityEventRecord = {
  * other members never enter the projection.
  */
 export type RollExportRecord = {
+  targetCharacterId?: string;
+  respondsTo?: string;
   rollId: string;
   characterId: string;
   actorId: string;
@@ -296,6 +298,8 @@ type ActivityEventRow = {
 };
 
 type RollExportRow = {
+  target_character_id: string | null;
+  responds_to_roll_id: string | null;
   id: string;
   character_id: string;
   actor_id: string;
@@ -474,6 +478,8 @@ function toRollExportRecord(row: RollExportRow): RollExportRecord {
   }
   return {
     rollId: row.id,
+    ...(row.target_character_id ? { targetCharacterId: row.target_character_id } : {}),
+    ...(row.responds_to_roll_id ? { respondsTo: row.responds_to_roll_id } : {}),
     characterId: row.character_id,
     actorId: row.actor_id,
     actionId: row.action_id,
@@ -579,7 +585,7 @@ const CONTENT_VISIBILITY_PREDICATE = `(
  * override); `gm_only` admits the roller plus current GMs; `campaign`
  * admits every active member (callers already require active membership).
  */
-const ROLL_VISIBILITY_PREDICATE = `(
+export const ROLL_VISIBILITY_PREDICATE = `(
   r.audience = 'campaign'
   OR (r.audience = 'gm_only' AND ($2::boolean OR COALESCE(r.audience_actor_id,r.actor_id) = $1))
   OR (r.audience = 'owner_only' AND COALESCE(r.audience_actor_id,r.actor_id) = $1)
@@ -1627,7 +1633,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
     ): Promise<RollExportRecord[]> {
       const result = await client.query<RollExportRow>(
         `SELECT r.id, r.character_id, r.actor_id, r.action_id, r.audience,
-                r.expression, r.dice_json, r.bindings_json, r.breakdown_json, r.push_result_json, r.total, r.rendered_output, r.occurred_at
+                r.expression, r.dice_json, r.bindings_json, r.breakdown_json, r.push_result_json, r.target_character_id, r.responds_to_roll_id, r.total, r.rendered_output, r.occurred_at
            FROM character_rolls r
           WHERE r.scope_campaign_id = $3 AND ${ROLL_VISIBILITY_PREDICATE}
           ORDER BY r.id

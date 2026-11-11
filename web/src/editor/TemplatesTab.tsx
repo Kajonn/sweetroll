@@ -427,6 +427,7 @@ function TemplateDetail({
                   commitExpressionSource(action.expressionId, next);
                 }}
                 fieldTypes={templateFieldTypeMap(template, document)}
+                targetEntities={document.entities.map(entity => ({ id: entity.id, label: entity.label, fields: entityFieldTypes(entity.fields) }))}
                 itemTypes={entityFieldTypes(template.fields)}
                 dice={document.dice}
                 datasets={document.referenceData}

@@ -179,7 +179,7 @@
           "move_stat",
           "forward"
         ],
-        "cost": 6,
+        "cost": 7,
         "ast": {
           "kind": "binary",
           "operator": "+",
@@ -187,12 +187,19 @@
             "kind": "binary",
             "operator": "+",
             "left": {
-              "kind": "dice",
-              "count": {
-                "kind": "numberLiteral",
-                "value": 2
+              "kind": "pool",
+              "source": {
+                "kind": "dice",
+                "count": {
+                  "kind": "numberLiteral",
+                  "value": 2
+                },
+                "sides": {
+                  "kind": "numberLiteral",
+                  "value": 6
+                }
               },
-              "sides": 6
+              "modifiers": []
             },
             "right": {
               "kind": "reference",
@@ -297,7 +304,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:e01c171a009193b56407cdc7d219129317481f01f740fb7b120918c71cc8c609"
+      "checksum": "sha256:7855f04769226852cfcaf8ccdab73ae1ace694c7ce5b87dec80a71d42f2fdfe5"
     }
   }
 }

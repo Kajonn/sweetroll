@@ -212,10 +212,10 @@
           "skill",
           "bonus_dice"
         ],
-        "cost": 7,
+        "cost": 8,
         "ast": {
-          "kind": "successCount",
-          "dice": {
+          "kind": "pool",
+          "source": {
             "kind": "dice",
             "count": {
               "kind": "binary",
@@ -240,9 +240,19 @@
                 "id": "bonus_dice"
               }
             },
-            "sides": 6
+            "sides": {
+              "kind": "numberLiteral",
+              "value": 6
+            }
           },
-          "threshold": 6
+          "modifiers": [],
+          "reducer": {
+            "kind": "countAtLeast",
+            "amount": {
+              "kind": "numberLiteral",
+              "value": 6
+            }
+          }
         }
       },
       {
@@ -344,7 +354,7 @@
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:e7b4d8352c366101a7a5a253459918e45ede054c75fd62ee0ab97704e30be939"
+      "checksum": "sha256:83462b8bdff2deed7128c7d9e4b91fc8851078e6377d68aa291c2323857596d8"
     }
   }
 }

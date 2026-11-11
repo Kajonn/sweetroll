@@ -1,3 +1,5 @@
+import { hasRollSelection, RollContextFields } from "../rolls/RollContextFields.js";
+import type { CampaignRollSelection } from "./types.js";
 import { ItemArtwork } from "../ui/ItemArtwork.js";
 import type { CharactersApi } from "./api.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
@@ -20,7 +22,7 @@ export type CharacterSheetCallbacks = {
   /** Design 6.3: direct input of current value and maximum. The editor is hidden when absent. */
   onSetResource?(resourceId: string, values: { current?: number; max?: number }): void | Promise<void>;
   /** Optional so standalone routes can bind fields/resources without owning action execution. */
-  onExecuteAction?(actionId: string, inputs?: Record<string, unknown>): void | Promise<void>;
+  onExecuteAction?(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): void | Promise<void>;
   /**
    * Task 7: entry intents. Optional like onExecuteAction; slot controls
    * disable while any entry callback is absent.
@@ -28,10 +30,11 @@ export type CharacterSheetCallbacks = {
   onAddEntry?(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
   onRemoveEntry?(entryId: string): void | Promise<void>;
   onUpdateEntry?(entryId: string, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
-  onExecuteGranted?(entryId: string, actionId: string, inputs?: Record<string, unknown>): void | Promise<void>;
+  onExecuteGranted?(entryId: string, actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): void | Promise<void>;
 };
 
 export type CharacterSheetProps = { snapshot: CharacterSnapshot;pushApi?:PushApi|undefined;onPushRoll?:((id:string)=>Promise<void>)|undefined;onRefreshRoll?:(()=>Promise<void>)|undefined;onDeniedRoll?:((id:string)=>Promise<void>)|undefined } & CharacterSheetCallbacks & {
+  loadRollOptions?: CharactersApi["rollOptions"];
   /** Offline availability once determined; omitted while unknown. */
   offlineAvailable?: boolean | undefined;
   /** Template catalog for slot pickers and granted-action buttons; omitted while unknown. */
@@ -174,19 +177,29 @@ function describeCommandError(error: unknown): string {
   return t("character.command.failed", { message });
 }
 
-function ActionControl({ element, disabled, disabledReason, onExecuteAction }: { element: Extract<Element, { kind: "action" }>; disabled: boolean; disabledReason: string | null; onExecuteAction: NonNullable<CharacterSheetCallbacks["onExecuteAction"]> }) {
+function ActionControl({ element, disabled, disabledReason, onExecuteAction, characterId, loadRollOptions }: {
+  element: Extract<Element, { kind: "action" }>;
+  disabled: boolean;
+  disabledReason: string | null;
+  onExecuteAction: NonNullable<CharacterSheetCallbacks["onExecuteAction"]>;
+  characterId?: string | undefined;
+  loadRollOptions?: CharactersApi["rollOptions"];
+}) {
+  const [selection, setSelection] = useState<CampaignRollSelection>({});
+  const contextual = Boolean(element.target || element.respondsTo);
+  const blocked = disabled || (contextual && (!characterId || !hasRollSelection(element, selection)));
   const [inputs, setInputs] = useState<Record<string, unknown>>(() => Object.fromEntries(element.inputs.map(input => [input.id, input.default])));
   const [commandError, setCommandError] = useState<string | null>(null);
   return <form className={styles.action} onSubmit={(event) => {
     event.preventDefault();
-    if (disabled) return;
+    if (blocked) return;
     // Catch rejected UI command promises locally: surface them persistently
     // and keep the entered inputs instead of dropping them or rejecting
     // without handling.
     setCommandError(null);
     let result: void | Promise<void>;
     try {
-      result = onExecuteAction(element.actionId, inputs);
+      result = contextual ? onExecuteAction(element.actionId, inputs, selection) : onExecuteAction(element.actionId, inputs);
     } catch (error) {
       setCommandError(describeCommandError(error));
       return;
@@ -196,7 +209,9 @@ function ActionControl({ element, disabled, disabledReason, onExecuteAction }: {
     }
   }}>
     {element.inputs.map(input => <label key={input.id}>{input.label}<input type={input.valueType === "integer" || input.valueType === "decimal" ? "number" : input.valueType === "boolean" ? "checkbox" : "text"} required={input.required} value={input.valueType === "boolean" ? undefined : String(inputs[input.id] ?? "")} checked={input.valueType === "boolean" ? inputs[input.id] === true : undefined} onChange={(event) => setInputs(current => ({ ...current, [input.id]: input.valueType === "boolean" ? event.target.checked : input.valueType === "integer" || input.valueType === "decimal" ? Number(event.target.value) : event.target.value }))} disabled={disabled} aria-describedby={disabledReason === null ? undefined : "character-action-unavailable"} /></label>)}
-    <Button type="submit" variant="primary" disabled={disabled} aria-describedby={disabledReason === null ? undefined : "character-action-unavailable"}>{element.label}</Button>
+    <RollContextFields requirements={element} selection={selection} onChange={setSelection} disabled={disabled}
+      characterId={characterId} actionId={element.actionId} loadOptions={loadRollOptions} />
+    <Button type="submit" variant="primary" disabled={blocked} aria-describedby={disabledReason === null ? undefined : "character-action-unavailable"}>{element.label}</Button>
     {commandError !== null ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}
     <ValidationList validations={element.validations} />
   </form>;
@@ -224,7 +239,7 @@ function nominalActionLabel(
 
 function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot["lastRoll"]>; fieldLabels: ReadonlyMap<string, string> }) {
   const expression = roll.expression.replace(/\bfields\.([A-Za-z_][A-Za-z0-9_]*)\b/g, (reference, fieldId: string) => fieldLabels.get(fieldId) ?? reference);
-  const bindings = <ul>{roll.bindings.map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>
+  const bindings = <ul>{roll.bindings.filter(binding => binding.scope !== "target" && binding.scope !== "opposed").map(binding => <li key={`${binding.scope}-${binding.definitionId}`}>
     {binding.scope === "fields" ? fieldLabels.get(binding.definitionId) ?? `${binding.scope}.${binding.definitionId}` : `${binding.scope}.${binding.definitionId}`}: {String(binding.value)}
   </li>)}</ul>;
   return <section className={styles.rollResult} aria-labelledby="character-roll-result">
@@ -241,7 +256,7 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
   </section>;
 }
 
-export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource, onSetResource, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource, onSetResource, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, loadRollOptions, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
   const characterIdForImages = snapshot.confirmed?.characterId;
   const imageFactory = useMemo(() => entryImages && characterIdForImages ? (id: string) => entryImages(characterIdForImages, id) : undefined, [entryImages, characterIdForImages]);
   const character = snapshot.confirmed;
@@ -337,7 +352,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource,
           && onRemoveEntry !== undefined
           && onUpdateEntry !== undefined;
         return <SlotListControl
-          key={element.id}
+          key={`${character.placementGeneration}:${element.id}`}
           slotId={element.slotId}
           label={element.label}
           accepts={[...element.accepts]}
@@ -345,16 +360,19 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource,
           templates={templates ?? []}
           renderEntryImage={imageFactory ? entry => <ItemArtwork key={entry.entryId} resourceId={entry.entryId} createApi={imageFactory} online={snapshot.connected} canEdit={snapshot.editing.owned && character.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} parentRevision={character.revision} /> : undefined}
           disabled={!entriesEditable}
+          characterId={character.campaignId ? character.characterId : undefined}
+          loadRollOptions={loadRollOptions}
           actionsDisabled={!(editable && snapshot.phase === "ready" && onExecuteGranted !== undefined)}
           onAddEntry={onAddEntry ?? (async () => {})}
           onRemoveEntry={onRemoveEntry ?? (async () => {})}
           onUpdateEntry={onUpdateEntry ?? (async () => {})}
-          onExecuteGranted={async (entryId, actionId, inputs) => invokeCommand(() => (onExecuteGranted ?? (async () => {}))(entryId, actionId, inputs))}
+          onExecuteGranted={(entryId, actionId, inputs, selection) => invokeCommand(() => selection ? onExecuteGranted?.(entryId, actionId, inputs, selection) : onExecuteGranted?.(entryId, actionId, inputs))}
         />;
       }
       case "action": {
         if (element.entryId !== undefined) return null;
-        return <ActionControl key={element.id} element={element} disabled={!actionsAvailable} disabledReason={actionUnavailableReason} onExecuteAction={executeAction} />;
+        return <ActionControl key={`${character.characterId}:${character.placementGeneration}:${element.id}`} element={element}
+          characterId={character.campaignId ? character.characterId : undefined} loadRollOptions={loadRollOptions} disabled={!actionsAvailable} disabledReason={actionUnavailableReason} onExecuteAction={executeAction} />;
       }
     }
   };

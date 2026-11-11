@@ -315,6 +315,7 @@ function CharacterDetailLoaded({
           online={online} canEdit={snapshot.editing.owned && snapshot.confirmed.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} onRefresh={session.refresh} /> : null}
         snapshot={snapshot}
         pushApi={api}
+        loadRollOptions={api.rollOptions}
         onPushRoll={session.pushRoll}
         onRefreshRoll={session.refresh}
         onDeniedRoll={session.forgetRoll}
@@ -326,7 +327,7 @@ function CharacterDetailLoaded({
         onAddEntry={(slotId, templateId, values, quantity, source) => session.addEntry(slotId, templateId, values, quantity, source)}
         onRemoveEntry={session.removeEntry}
         onUpdateEntry={session.updateEntryValues}
-        onExecuteGranted={(entryId, actionId, inputs) => session.executeGrantedAction(entryId, actionId, inputs)}
+        onExecuteGranted={session.executeGrantedAction}
         templates={templates}
         offlineAvailable={offline.available}
       />

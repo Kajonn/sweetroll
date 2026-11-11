@@ -178,6 +178,12 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
       action.kind === "roll" ? [{ action, path: `/templates/${templateIndex}/grantedActions/${index}` }] : [])),
   ];
   for (const { action, path } of describedActions) {
+    if (action.target && !entityEnvironments.has(action.target.entityId)) {
+      return scopeDiagnostic("missing_reference", `${path}/target/entityId`, "Select an existing target entity.");
+    }
+    if ((action.target || action.respondsTo) && "nominal" in action && action.nominal === true) {
+      return scopeDiagnostic("invalid_expression", path, "A nominal action cannot use a campaign roll context.");
+    }
     for (const list of ["outcomes", "details"] as const) {
       for (const [index, entry] of (action[list] ?? []).entries()) {
         const uses = outcomeUses.get(entry.expressionId) ?? [];
@@ -227,6 +233,8 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     };
     const action = actions[0];
     if (action !== undefined) {
+      if (action.target) env.target = entityEnvironments.get(action.target.entityId)!.fields;
+      if (action.respondsTo) env.opposed = { total: "number" };
       for (const actionInput of action.inputs) {
         env.inputs[actionInput.id] = actionInputToValueType(actionInput);
       }

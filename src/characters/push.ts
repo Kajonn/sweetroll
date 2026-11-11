@@ -25,7 +25,7 @@ const SavedResultSchema = Type.Object({
   bindings: Type.Array(
     Type.Object(
       {
-        scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]),
+        scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates"), Type.Literal("target"), Type.Literal("opposed")]),
         definitionId: Type.String({ maxLength: 205 }),
         value: BindingValueSchema,
       },
@@ -48,7 +48,7 @@ export async function readPushRoll(
   rollId: string,
 ): Promise<StoredPushRoll | null> {
   const { rows } = await db.query(
-    `SELECT id,actor_id,action_id,expression,dice_json,bindings_json,breakdown_json,total,rendered_output,audience,scope_campaign_id,parent_roll_id,root_roll_id,push_attempt,push_context_json,push_result_json,audience_actor_id FROM character_rolls WHERE character_id=$1 AND id=$2`,
+    `SELECT id,actor_id,action_id,expression,dice_json,bindings_json,breakdown_json,total,rendered_output,audience,scope_campaign_id,parent_roll_id,root_roll_id,push_attempt,push_context_json,push_result_json,audience_actor_id,target_character_id,responds_to_roll_id FROM character_rolls WHERE character_id=$1 AND id=$2`,
     [characterId, rollId],
   );
   const r = rows[0];
@@ -87,6 +87,8 @@ export async function readPushRoll(
       output: r.rendered_output,
       audience: r.audience,
       push: r.push_result_json,
+      ...(r.target_character_id ? { targetCharacterId: r.target_character_id } : {}),
+      ...(r.responds_to_roll_id ? { respondsTo: r.responds_to_roll_id } : {}),
     },
   };
 }
@@ -254,7 +256,7 @@ export async function insertPushRoll(
   const r = input.roll!,
     p = r.push!;
   await client.query(
-    `INSERT INTO character_rolls (id,character_id,actor_id,action_id,execution_id,expression,dice_json,bindings_json,total,rendered_output,audience,request_id,scope_campaign_id,breakdown_json,parent_roll_id,root_roll_id,push_attempt,push_context_json,push_result_json,audience_actor_id) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18::jsonb,$19::jsonb,$20)`,
+    `INSERT INTO character_rolls (id,character_id,actor_id,action_id,execution_id,expression,dice_json,bindings_json,total,rendered_output,audience,request_id,scope_campaign_id,breakdown_json,parent_roll_id,root_roll_id,push_attempt,push_context_json,push_result_json,audience_actor_id,target_character_id,responds_to_roll_id) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9,$10,$11,$12,$13,$14::jsonb,$15,$16,$17,$18::jsonb,$19::jsonb,$20,$21,$22)`,
     [
       p.rollId,
       input.characterId,
@@ -276,6 +278,8 @@ export async function insertPushRoll(
       JSON.stringify(commit.context),
       JSON.stringify(p),
       commit.principalId,
+      r.targetCharacterId ?? null,
+      r.respondsTo ?? null,
     ],
   );
   await client.query(

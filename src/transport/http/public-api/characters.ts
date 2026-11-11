@@ -5,10 +5,13 @@ import { EntrySourceSchema } from "../../../systems/implementation/package/schem
 import { FieldV1Schema, TemplateKindSchema } from "../../../systems/implementation/package/schema/document.js";
 import { BindingValueSchema, DieResultSchema, PushResultSchema, RollBreakdownSchema } from "../../../systems/implementation/rules/result.js";
 import { map, wire, type Route } from "./router.js";
+import { RollOptionsQuery, RollOptionsSchema } from "../roll-options.js";
 import * as s from "./schemas.js";
 
 const audience = Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]);
 export const roll = s.object({
+  targetCharacterId: Type.Optional(s.uuid),
+  respondsTo: Type.Optional(s.uuid),
   rollId: Type.Union([s.uuid, Type.Null()], {
     description: "Saved roll ID of a push-tracked roll, for reads and pushes. Null for rolls without a push policy, "
       + "and when the reader may not correlate the roll; those appear in the activity feed.",
@@ -17,7 +20,7 @@ export const roll = s.object({
   expression: s.text,
   dice: Type.Array(DieResultSchema),
   bindings: Type.Array(s.object({
-    scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates")]),
+    scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates"), Type.Literal("target"), Type.Literal("opposed")]),
     definitionId: Type.String({ minLength: 1, maxLength: 205 }),
     value: BindingValueSchema,
   })),
@@ -41,6 +44,7 @@ const looseObject = Type.Object({}, { additionalProperties: true });
 export const characterSchemas = {
   CharacterCommandResult: commandResult,
   Roll: roll,
+  RollOptions: RollOptionsSchema,
   PushOptions: s.object({
     canPush: Type.Boolean(),
     reason: Type.Union([s.text, Type.Null()]),
@@ -61,6 +65,8 @@ export const characterSchemas = {
         id: s.definitionId,
         label: s.text,
         actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
+        target: Type.Optional(s.object({ entityId: s.definitionId })),
+        respondsTo: Type.Optional(Type.Literal(true)),
         inputs: Type.Array(s.object({
           id: s.definitionId,
           label: s.text,
@@ -113,6 +119,8 @@ const manage = Type.Union([
 const actionParams = s.object({ characterId: s.uuid, actionId: s.definitionId });
 const rollParams = s.object({ characterId: s.uuid, rollId: s.uuid });
 const executeAction = s.object({
+  targetCharacterId: Type.Optional(s.uuid),
+  respondsTo: Type.Optional(s.uuid),
   inputs: Type.Optional(Type.Record(s.definitionId, s.scalar, { maxProperties: 64 })),
   audience: Type.Optional(audience),
   entryId: Type.Optional(s.uuid),
@@ -154,17 +162,25 @@ export function registerCharacterRoutes(route: Route, { characters }: { characte
   }, async (ctx, { params }) => map(await characters.listEntryTemplates(ctx, params), (templates) => ({ templates: wire(templates) })));
 
   route({
+    method: "GET", path: "/characters/:characterId/actions/:actionId/roll-options", id: "listCharacterRollOptions",
+    description: "List eligible targets and recent visible rolls for a campaign action on a character the caller controls.",
+    scope: "characters:read", input: { params: actionParams, querystring: RollOptionsQuery }, output: "RollOptions",
+  }, async (ctx, { params, query }) => map(await characters.rollOptions(ctx, { ...params, ...query }), wire));
+
+  route({
     method: "POST", path: "/characters/:characterId/actions/:actionId", id: "executeCharacterAction",
     description: "Execute an entity action, or a template-granted action with entryId. Rolls are server-side. "
       + "Attached characters accept a roll audience; standalone characters accept only owner_only.",
     scope: "characters:write", input: { params: actionParams, body: executeAction }, output: "CharacterCommandResult",
     example: { inputs: {}, expectedRevision: 3, idempotencyKey: "roll-1" },
   }, async (ctx, { params, body }) => {
-    const { inputs = {}, audience: requested, entryId, expectedRevision, idempotencyKey } = body;
+    const { inputs = {}, audience: requested, entryId, expectedRevision, idempotencyKey, targetCharacterId, respondsTo } = body;
     return map(await characters.apply(ctx, {
       kind: "executeAction", ...params, inputs, expectedRevision, idempotencyKey,
       ...(requested === undefined ? {} : { audience: requested }),
       ...(entryId === undefined ? {} : { entryId }),
+      ...(targetCharacterId === undefined ? {} : { targetCharacterId }),
+      ...(respondsTo === undefined ? {} : { respondsTo }),
     }), commandView);
   });
 

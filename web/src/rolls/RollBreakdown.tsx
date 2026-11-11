@@ -10,6 +10,7 @@ export function RollBreakdown({
 }: {
   children?: ReactNode;
   roll: {
+    bindings?: { scope: string; definitionId: string; value: unknown }[];
     push?:PushResult | undefined;
     dice: DieResult[];
     breakdown?: Breakdown | undefined;
@@ -18,6 +19,8 @@ export function RollBreakdown({
 }) {
   const b = roll.breakdown;
   if (b === undefined || b.version !== "1.0") return null;
+  const contextual = new Map(roll.bindings?.filter(binding => binding.scope === "target" || binding.scope === "opposed")
+    .map(binding => [`${binding.scope}.${binding.definitionId}`, binding.value]));
   const terms = new Map(b.terms.map((term) => [term.id, term]));
   const groups = new Map(b.groups.map((group) => [group.id, group]));
   const dice = new Map(roll.dice.map((die) => [die.id, die]));
@@ -90,6 +93,7 @@ export function RollBreakdown({
           </li>)}
         </ul>
         <p>{t("roll.groups.calculation")}: {explain(b.rootId)} = {String(terms.get(b.rootId)?.value ?? roll.total ?? "?")}</p>
+        {contextual.size > 0 ? <ul>{[...contextual].map(([id, value]) => <li key={id}>{id}: {String(value)}</li>)}</ul> : null}
         {children}
       </Disclosure>
     </section>

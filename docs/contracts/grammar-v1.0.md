@@ -185,6 +185,19 @@ Values an outcome reads that the roll formula did not are saved with the
 roll's bindings. Rolls never change characters. Extensions cannot define
 outcomes yet.
 
+## Campaign roll references
+
+A roll action can declare `target: { entityId: "character" }`. Its roll and
+outcome expressions can use fields on that entity through `target.<fieldId>`,
+including resource parts such as `target.health.current`. The roll command
+supplies `targetCharacterId`. For example, `d20 - target.defense` reports an
+attack margin.
+
+A roll action declared with `respondsTo: true` can use `opposed.total` in its
+roll and outcome expressions. The command supplies `respondsTo` with the ID
+of a saved campaign roll. For example, `d20 - opposed.total` compares a new
+roll with the stored total. Both scopes record the values actually read.
+
 ## Exclusions
 
 Arbitrary property traversal, effects, loops, assignment, and

@@ -1,3 +1,4 @@
+import { resolveRollContext, rollContextReferences } from "./implementation/runtime/roll-context.js";
 import { characterRuleBindings } from "./implementation/runtime/rule-bindings.js";
 import { derivedEntryError, slotsForEntity } from "./implementation/runtime/effective-entry.js";
 import {findOwnedAction} from "./implementation/runtime/action-ownership.js";
@@ -50,6 +51,11 @@ export type RuntimeStateV1 = {
   entries: Record<string, CharacterEntryV1>;
 };
 
+export type CampaignRollContext = {
+  target?: { characterId: string; entityId: DefinitionId; state: RuntimeStateV1 };
+  opposed?: { rollId: string; total: number };
+};
+
 export type RuntimeIntent =
   | {kind:"push";parent:NormalizedRoll;context:PushContext;executionId:string;optionsOnly?:boolean}
   | { kind: "initialize"; values?: Record<DefinitionId, unknown> }
@@ -71,6 +77,7 @@ export type RuntimeIntent =
        * (add/remove/edit) belong to Task 7; only execution wires through here.
        */
       entryId?: string;
+      campaignRoll?: CampaignRollContext;
     };
 
 export type RuntimeRequest = {
@@ -92,7 +99,7 @@ export type RuntimeValidation = {
 export type NormalizedDie = DieResult;
 
 export type NormalizedRollBinding = {
-  scope: "fields" | "inputs" | "item" | "aggregates";
+  scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
   definitionId: DefinitionId;
   value: BindingValue;
 };
@@ -106,6 +113,8 @@ export type NormalizedRollBinding = {
 export type NormalizedRollAudience = "owner_only" | "gm_only" | "campaign";
 
 export type NormalizedRoll = {
+  targetCharacterId?: string;
+  respondsTo?: string;
   push?: import("./implementation/rules/result.js").PushResult;
   breakdown: RollBreakdown;
   actionId: DefinitionId;
@@ -201,6 +210,8 @@ export type CharacterProjectionElement =
       actionId: DefinitionId;
       label: string;
       actionKind: "roll" | "resourceBump";
+      target?: { entityId: DefinitionId };
+      respondsTo?: true;
       inputs: CharacterProjectionActionInput[];
       validations: RuntimeValidation[];
       /**
@@ -223,7 +234,10 @@ export type CharacterProjectionSlotEntry = {
   definition?: {
     id:string;label:string;kind:TemplateKind;
     fields:Array<CharacterProjectionFieldConstraints & {id:string;label:string;kind:Exclude<import("./implementation/package/schema/index.js").FieldV1["kind"],"computed"|"image">;default:unknown}>;
-    grantedActions:Array<{id:string;label:string;kind:"roll"|"resourceBump";inputs:CharacterProjectionActionInput[]}>;
+    grantedActions: Array<{
+      id: string; label: string; kind: "roll" | "resourceBump"; inputs: CharacterProjectionActionInput[];
+      target?: { entityId: DefinitionId }; respondsTo?: true;
+    }>;
   };
   metadata?: {name:string;description?:string;notes?:string};
   entryId: string;
@@ -318,7 +332,12 @@ export type VersionDescription = {
   templates?: Array<Pick<ObjectTemplateV1, "id" | "label" | "kind" | "description" | "fields"> & { extensionId?: string }>;
 };
 
+type PrepareResolution = (scope: Pick<RuntimeRequest, "versionId" | "extensions" | "entityId">) =>
+  Promise<RuntimeResult<(command: Pick<RuntimeRequest, "state" | "intent">) => RuntimeResult<RuntimeResolution>>>;
+
 export interface SystemRuntime {
+  /** Load the immutable composition before a transaction takes row locks. */
+  prepareResolve: PrepareResolution;
   resolve(input: RuntimeRequest): Promise<RuntimeResult<RuntimeResolution>>;
   describeVersion(input: {
     versionId: VersionId;
@@ -349,7 +368,7 @@ export function createSystemRuntime(input: {
     ...(input.loadExtensionPackage === undefined ? {} : { loadExtensionPackage: input.loadExtensionPackage }),
   });
 
-  return {
+  const runtime: SystemRuntime = {
     async checkVersionChange(checkInput) {
       const from = await loadPublishedPackage(input.loadPackage, checkInput.fromVersionId);
       if (!from.ok) return from;
@@ -398,221 +417,244 @@ export function createSystemRuntime(input: {
       };
     },
 
-    async resolve(request) {
-      const loaded = await loadEffectivePackage(loadEffective, request.versionId, request.extensions);
+    async prepareResolve(scope) {
+      const loaded = await loadEffectivePackage(loadEffective, scope.versionId, scope.extensions);
       if (!loaded.ok) return loaded;
       const packageValue = loaded.value;
-
-      const entity = packageValue.entities.find((candidate) => candidate.id === request.entityId);
+      const entity = packageValue.entities.find((candidate) => candidate.id === scope.entityId);
       if (entity === undefined) {
         return { ok: false, error: { code: "not_found", message: "Entity definition not found." } };
       }
 
-      let stateResult: RuntimeResult<RuntimeStateV1>;
-      let changedDefinitionIds: DefinitionId[] = [];
-      let pendingRoll: {
-        actionId: DefinitionId;
-        expressionId: DefinitionId;
-        inputs: Record<DefinitionId, RuntimeScalar>;
-        executionId: CommandExecutionId;
-        outputTemplate: string;
-        action: Extract<SystemPackageV1["actions"][number],{kind:"roll"}>;
-      } | null = null;
-      let roll: NormalizedRoll | null = null;
-      let nominal: NominalActionResult | null = null;
-      let pushContext: PushContext | undefined;
-      if (request.intent.kind === "initialize") {
-        if (request.state !== undefined) {
-          return { ok: false, error: { code: "bad_request", message: "Initialize does not accept existing state." } };
-        }
-        stateResult = initializeState(entity, request.intent.values);
-      } else if (request.intent.kind === "observe") {
-        if (request.state === undefined) {
-          return { ok: false, error: { code: "bad_request", message: "Observe requires state." } };
-        }
-        stateResult = decodeRuntimeState(entity, request.state);
-      } else {
-        if (request.state === undefined) {
-          return { ok: false, error: { code: "bad_request", message: "Runtime command requires state." } };
-        }
-        stateResult = decodeRuntimeState(entity, request.state);
-        if (!stateResult.ok) return stateResult;
+      return {
+        ok: true,
+        value: (request) => resolveCharacter(packageValue, entity, request),
+      };
+    },
+    async resolve(request) {
+      const prepared = await runtime.prepareResolve(request);
+      return prepared.ok ? prepared.value(request) : prepared;
+    },
+  };
+  return runtime;
 
-        if(request.intent.kind==="push"){
-          const pushed=resolveRuntimePush({pkg:packageValue,entity,state:stateResult.value,parent:request.intent.parent,context:request.intent.context,executionId:request.intent.executionId,secret:input.authoritativeRollSecret,...(request.intent.optionsOnly?{optionsOnly:true}:{})});
-          if(!pushed.ok)return pushed;roll=pushed.value.roll;pushContext=pushed.value.context;
-        } else if (request.intent.kind === "set") {
-          const fieldId = request.intent.fieldId;
-          const field = entity.fields.find((candidate) => candidate.id === fieldId);
-          if (field === undefined || field.kind === "computed" || field.kind === "resource") {
-            return badRequest("Field is not editable.", request.intent.fieldId);
-          }
-          if (field.kind === "image" && request.intent.value !== null) {
-            return unsupportedImage(field.id);
-          }
-          const nextState = structuredClone(stateResult.value);
-          nextState.values[field.id] = request.intent.value as RuntimeStoredValue;
-          const decoded = decodeRuntimeState(entity, nextState);
-          if (!decoded.ok) return badRequest("Field value is invalid.", field.id);
-          changedDefinitionIds = sameValue(stateResult.value.values[field.id]!, decoded.value.values[field.id]!)
-            ? []
-            : [field.id];
-          stateResult = decoded;
-        } else if (request.intent.kind === "bump") {
-          const bumped = changeResource(
-            entity,
-            stateResult.value,
-            request.intent.resourceId,
-            request.intent.direction === "up" ? 1 : -1,
-          );
-          if (!bumped.ok) return bumped;
-          stateResult = { ok: true, value: bumped.value };
-          changedDefinitionIds = [request.intent.resourceId];
-        } else if (request.intent.kind === "adjust" || request.intent.kind === "setResource") {
-          const edited = request.intent.kind === "adjust"
-            ? adjustResource(entity, stateResult.value, request.intent.resourceId, request.intent.delta)
-            : setResource(entity, stateResult.value, request.intent.resourceId, request.intent);
-          if (!edited.ok) return edited;
-          changedDefinitionIds = sameValue(
-            stateResult.value.values[request.intent.resourceId]!,
-            edited.value.values[request.intent.resourceId]!,
-          ) ? [] : [request.intent.resourceId];
-          stateResult = { ok: true, value: edited.value };
-        } else if (request.intent.kind === "action" && request.intent.entryId !== undefined) {
-          const granted = resolveGrantedAction({
-            packageValue,
-            entity,
-            state: stateResult.value,
-            entryId: request.intent.entryId,
-            actionId: request.intent.actionId,
-            inputs: request.intent.inputs,
-            executionId: request.intent.executionId,
-            authoritativeRollSecret: input.authoritativeRollSecret,
-          });
-          if (!granted.ok) return granted;
-          stateResult = { ok: true, value: granted.value.state };
-          changedDefinitionIds = granted.value.changedDefinitionIds;
-          roll = granted.value.roll;
-          nominal = granted.value.nominal;
-          pushContext = granted.value.pushContext;
-        } else {
-          const action = findOwnedAction(packageValue, entity.id, request.intent.actionId);
-          if (action === undefined) return badRequest("Action does not belong to the entity.", request.intent.actionId);
-          if (action.kind === "resourceBump") {
-            if (Object.keys(request.intent.inputs).length > 0) {
-              const definitionId = Object.keys(request.intent.inputs)[0]!;
-              return badRequest("Resource actions do not accept inputs.", definitionId);
-            }
-            const resource = entity.fields.find((field) => field.id === action.resourceId);
-            if (resource?.kind !== "resource") return invalidPackage(action.resourceId);
-            const current = stateResult.value.values[resource.id] as RuntimeResourceValue;
-            const target = action.operation.kind === "reset"
-              ? resource.resetTo === "max" ? current.max : resource.min
-              : current.current + action.operation.amount;
-            const changed = target !== current.current;
-            const nextState = structuredClone(stateResult.value);
-            nextState.values[resource.id] = { current: target, max: current.max };
-            const decoded = decodeRuntimeState(entity, nextState);
-            if (!decoded.ok) return badRequest("Resource action exceeds its bounds.", resource.id);
-            stateResult = decoded;
-            changedDefinitionIds = changed ? [resource.id] : [];
-          } else {
-            const actionInputs = decodeActionInputs(action.inputs, request.intent.inputs);
-            if (!actionInputs.ok) return actionInputs;
-            pendingRoll = {
-              action,
-              actionId: action.id,
-              expressionId: action.expressionId,
-              inputs: actionInputs.value,
-              executionId: request.intent.executionId,
-              outputTemplate: action.outputTemplate,
-            };
-          }
-        }
+  function resolveCharacter(
+    packageValue: SystemPackageV1,
+    entity: EntityDefinitionV1,
+    request: Pick<RuntimeRequest, "state" | "intent">,
+  ): RuntimeResult<RuntimeResolution> {
+    let stateResult: RuntimeResult<RuntimeStateV1>;
+    let changedDefinitionIds: DefinitionId[] = [];
+    let pendingRoll: {
+      actionId: DefinitionId;
+      expressionId: DefinitionId;
+      inputs: Record<DefinitionId, RuntimeScalar>;
+      executionId: CommandExecutionId;
+      outputTemplate: string;
+      action: Extract<SystemPackageV1["actions"][number],{kind:"roll"}>;
+      campaignRoll?: CampaignRollContext;
+    } | null = null;
+    let roll: NormalizedRoll | null = null;
+    let nominal: NominalActionResult | null = null;
+    let pushContext: PushContext | undefined;
+    if (request.intent.kind === "initialize") {
+      if (request.state !== undefined) {
+        return { ok: false, error: { code: "bad_request", message: "Initialize does not accept existing state." } };
       }
+      stateResult = initializeState(entity, request.intent.values);
+    } else if (request.intent.kind === "observe") {
+      if (request.state === undefined) {
+        return { ok: false, error: { code: "bad_request", message: "Observe requires state." } };
+      }
+      stateResult = decodeRuntimeState(entity, request.state);
+    } else {
+      if (request.state === undefined) {
+        return { ok: false, error: { code: "bad_request", message: "Runtime command requires state." } };
+      }
+      stateResult = decodeRuntimeState(entity, request.state);
       if (!stateResult.ok) return stateResult;
 
-      for(const entry of Object.values(stateResult.value.entries)) {
-        const siblings=Object.values(stateResult.value.entries).filter(e=>e.slotId===entry.slotId && e.entryId!==entry.entryId).length;
-        const error=derivedEntryError(packageValue,entity,entry,siblings);
-        if(error) return {ok:false,error:{code:"invalid_state",message:error}};
-      }
-      const observed = resolveObservedValues(packageValue, entity, stateResult.value);
-      if (!observed.ok) return observed;
-      const observedState = observed.value.state;
-      for (const field of entity.fields) {
-        if (field.kind === "resource" && field.maxExpressionId !== undefined
-          && !sameValue(stateResult.value.values[field.id]!, observedState.values[field.id]!)
-          && !changedDefinitionIds.includes(field.id)) {
-          changedDefinitionIds.push(field.id);
+      if(request.intent.kind==="push"){
+        const pushed=resolveRuntimePush({pkg:packageValue,entity,state:stateResult.value,parent:request.intent.parent,context:request.intent.context,executionId:request.intent.executionId,secret:input.authoritativeRollSecret,...(request.intent.optionsOnly?{optionsOnly:true}:{})});
+        if(!pushed.ok)return pushed;roll=pushed.value.roll;pushContext=pushed.value.context;
+      } else if (request.intent.kind === "set") {
+        const fieldId = request.intent.fieldId;
+        const field = entity.fields.find((candidate) => candidate.id === fieldId);
+        if (field === undefined || field.kind === "computed" || field.kind === "resource") {
+          return badRequest("Field is not editable.", request.intent.fieldId);
         }
-      }
-      stateResult = { ok: true, value: observedState };
-      if (pendingRoll !== null) {
-        const expression = packageValue.expressions.find((candidate) => candidate.id === pendingRoll.expressionId);
-        if (expression === undefined || expression.context !== "roll") return invalidPackage(pendingRoll.expressionId);
-        const bindings = characterRuleBindings(packageValue, entity, stateResult.value);
-        Object.assign(bindings.fields, observed.value.derivedValues);
-        bindings.inputs = pendingRoll.inputs;
-        const evaluated = evaluate(
-          expression,
-          bindings,
-          createDeterministicRng(input.authoritativeRollSecret, pendingRoll.executionId),
-          packageValue.effectiveLimits,
+        if (field.kind === "image" && request.intent.value !== null) {
+          return unsupportedImage(field.id);
+        }
+        const nextState = structuredClone(stateResult.value);
+        nextState.values[field.id] = request.intent.value as RuntimeStoredValue;
+        const decoded = decodeRuntimeState(entity, nextState);
+        if (!decoded.ok) return badRequest("Field value is invalid.", field.id);
+        changedDefinitionIds = sameValue(stateResult.value.values[field.id]!, decoded.value.values[field.id]!)
+          ? []
+          : [field.id];
+        stateResult = decoded;
+      } else if (request.intent.kind === "bump") {
+        const bumped = changeResource(
+          entity,
+          stateResult.value,
+          request.intent.resourceId,
+          request.intent.direction === "up" ? 1 : -1,
         );
-        if (!evaluated.ok) {
-          return evaluated.diagnostics.some((diagnostic) => diagnostic.code === "budget_exceeded")
-            ? budgetExceeded()
-            : invalidPackage(expression.id);
+        if (!bumped.ok) return bumped;
+        stateResult = { ok: true, value: bumped.value };
+        changedDefinitionIds = [request.intent.resourceId];
+      } else if (request.intent.kind === "adjust" || request.intent.kind === "setResource") {
+        const edited = request.intent.kind === "adjust"
+          ? adjustResource(entity, stateResult.value, request.intent.resourceId, request.intent.delta)
+          : setResource(entity, stateResult.value, request.intent.resourceId, request.intent);
+        if (!edited.ok) return edited;
+        changedDefinitionIds = sameValue(
+          stateResult.value.values[request.intent.resourceId]!,
+          edited.value.values[request.intent.resourceId]!,
+        ) ? [] : [request.intent.resourceId];
+        stateResult = { ok: true, value: edited.value };
+      } else if (request.intent.kind === "action" && request.intent.entryId !== undefined) {
+        const granted = resolveGrantedAction({
+          packageValue,
+          entity,
+          state: stateResult.value,
+          entryId: request.intent.entryId,
+          actionId: request.intent.actionId,
+          inputs: request.intent.inputs,
+          executionId: request.intent.executionId,
+          authoritativeRollSecret: input.authoritativeRollSecret,
+          ...(request.intent.campaignRoll ? { campaignRoll: request.intent.campaignRoll } : {}),
+        });
+        if (!granted.ok) return granted;
+        stateResult = { ok: true, value: granted.value.state };
+        changedDefinitionIds = granted.value.changedDefinitionIds;
+        roll = granted.value.roll;
+        nominal = granted.value.nominal;
+        pushContext = granted.value.pushContext;
+      } else {
+        const action = findOwnedAction(packageValue, entity.id, request.intent.actionId);
+        if (action === undefined) return badRequest("Action does not belong to the entity.", request.intent.actionId);
+        if (action.kind === "resourceBump") {
+          if (request.intent.campaignRoll) return badRequest("A resource action cannot use a campaign roll context.", action.id);
+          if (Object.keys(request.intent.inputs).length > 0) {
+            const definitionId = Object.keys(request.intent.inputs)[0]!;
+            return badRequest("Resource actions do not accept inputs.", definitionId);
+          }
+          const resource = entity.fields.find((field) => field.id === action.resourceId);
+          if (resource?.kind !== "resource") return invalidPackage(action.resourceId);
+          const current = stateResult.value.values[resource.id] as RuntimeResourceValue;
+          const target = action.operation.kind === "reset"
+            ? resource.resetTo === "max" ? current.max : resource.min
+            : current.current + action.operation.amount;
+          const changed = target !== current.current;
+          const nextState = structuredClone(stateResult.value);
+          nextState.values[resource.id] = { current: target, max: current.max };
+          const decoded = decodeRuntimeState(entity, nextState);
+          if (!decoded.ok) return badRequest("Resource action exceeds its bounds.", resource.id);
+          stateResult = decoded;
+          changedDefinitionIds = changed ? [resource.id] : [];
+        } else {
+          const actionInputs = decodeActionInputs(action.inputs, request.intent.inputs);
+          if (!actionInputs.ok) return actionInputs;
+          pendingRoll = {
+            action,
+            actionId: action.id,
+            expressionId: action.expressionId,
+            inputs: actionInputs.value,
+            executionId: request.intent.executionId,
+            outputTemplate: action.outputTemplate,
+            ...(request.intent.campaignRoll ? { campaignRoll: request.intent.campaignRoll } : {}),
+          };
         }
-        const failure = actionEvaluationFailure(evaluated, pendingRoll.actionId, expression.id);
-        if (failure !== null) return { ok: false, error: failure };
-        if (evaluated.roll === null) return invalidPackage(expression.id);
-        pushContext=makePushContext(packageValue,entity.id,pendingRoll.action);
-        roll = {
-          actionId: pendingRoll.actionId,
-          expression: evaluated.roll.expression,
-          dice: evaluated.roll.dice,
-          breakdown: evaluated.roll.breakdown,
-          total: evaluated.roll.total,
-          ...(() => {
-            const { bindings: read, ...described } = describeRoll({
-              action: pendingRoll.action,
-              expression: (id) => packageValue.expressions.find((candidate) => candidate.id === id),
-              total: evaluated.roll.total,
-              bindings,
-              rolled: evaluated.rolled,
-              limits: packageValue.effectiveLimits,
-            });
-            return { ...described, bindings: mergeBindings(evaluated.bindings, read) };
-          })(),
-          audience: "owner_only",
-        };
       }
-      const projection = buildCharacterProjection({
-        packageValue,
-        entity,
+    }
+    if (!stateResult.ok) return stateResult;
+
+    for(const entry of Object.values(stateResult.value.entries)) {
+      const siblings=Object.values(stateResult.value.entries).filter(e=>e.slotId===entry.slotId && e.entryId!==entry.entryId).length;
+      const error=derivedEntryError(packageValue,entity,entry,siblings);
+      if(error) return {ok:false,error:{code:"invalid_state",message:error}};
+    }
+    const observed = resolveObservedValues(packageValue, entity, stateResult.value);
+    if (!observed.ok) return observed;
+    const observedState = observed.value.state;
+    for (const field of entity.fields) {
+      if (field.kind === "resource" && field.maxExpressionId !== undefined
+        && !sameValue(stateResult.value.values[field.id]!, observedState.values[field.id]!)
+        && !changedDefinitionIds.includes(field.id)) {
+        changedDefinitionIds.push(field.id);
+      }
+    }
+    stateResult = { ok: true, value: observedState };
+    if (pendingRoll !== null) {
+      const expression = packageValue.expressions.find((candidate) => candidate.id === pendingRoll.expressionId);
+      if (expression === undefined || expression.context !== "roll") return invalidPackage(pendingRoll.expressionId);
+      const bindings = characterRuleBindings(packageValue, entity, stateResult.value);
+      Object.assign(bindings.fields, observed.value.derivedValues);
+      bindings.inputs = pendingRoll.inputs;
+      const context = resolveRollContext(packageValue, pendingRoll.action, pendingRoll.campaignRoll);
+      if (!context.ok) return context;
+      Object.assign(bindings, context.value);
+      const evaluated = evaluate(
+        expression,
+        bindings,
+        createDeterministicRng(input.authoritativeRollSecret, pendingRoll.executionId),
+        packageValue.effectiveLimits,
+      );
+      if (!evaluated.ok) {
+        return evaluated.diagnostics.some((diagnostic) => diagnostic.code === "budget_exceeded")
+          ? budgetExceeded()
+          : invalidPackage(expression.id);
+      }
+      const failure = actionEvaluationFailure(evaluated, pendingRoll.actionId, expression.id);
+      if (failure !== null) return { ok: false, error: failure };
+      if (evaluated.roll === null) return invalidPackage(expression.id);
+      pushContext=makePushContext(packageValue,entity.id,pendingRoll.action);
+      roll = {
+        ...rollContextReferences(pendingRoll.campaignRoll),
+        actionId: pendingRoll.actionId,
+        expression: evaluated.roll.expression,
+        dice: evaluated.roll.dice,
+        breakdown: evaluated.roll.breakdown,
+        total: evaluated.roll.total,
+        ...(() => {
+          const { bindings: read, ...described } = describeRoll({
+            action: pendingRoll.action,
+            expression: (id) => packageValue.expressions.find((candidate) => candidate.id === id),
+            total: evaluated.roll.total,
+            bindings,
+            rolled: evaluated.rolled,
+            limits: packageValue.effectiveLimits,
+          });
+          return { ...described, bindings: mergeBindings(evaluated.bindings, read) };
+        })(),
+        audience: "owner_only",
+      };
+    }
+    const projection = buildCharacterProjection({
+      packageValue,
+      entity,
+      state: stateResult.value,
+      derivedValues: observed.value.derivedValues,
+      validations: observed.value.validations,
+    });
+    return {
+      ok: true,
+      value: {
+        versionId: packageValue.versionId,
+        packageChecksum: packageValue.integrity.checksum,
         state: stateResult.value,
         derivedValues: observed.value.derivedValues,
         validations: observed.value.validations,
-      });
-      return {
-        ok: true,
-        value: {
-          versionId: packageValue.versionId,
-          packageChecksum: packageValue.integrity.checksum,
-          state: stateResult.value,
-          derivedValues: observed.value.derivedValues,
-          validations: observed.value.validations,
-          changedDefinitionIds,
-          roll,
-          nominal,
-          ...(pushContext?{pushContext}:{}),
-          projection,
-        },
-      };
-    },
-  };
+        changedDefinitionIds,
+        roll,
+        nominal,
+        ...(pushContext?{pushContext}:{}),
+        projection,
+      },
+    };
+  }
 }
 
 async function loadEffectivePackage(

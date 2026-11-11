@@ -254,6 +254,7 @@ export const campaignSchemas = {
     content: Type.Array(looseObject),
     activity: Type.Array(looseObject),
     rolls: Type.Array(object({
+      targetCharacterId: Type.Optional(uuid), respondsTo: Type.Optional(uuid),
       rollId: uuid, characterId: uuid, actorId: uuid, actionId: s.definitionId,
       audience: Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]),
       expression: text, breakdown: RollBreakdownSchema, breakdownText: text,

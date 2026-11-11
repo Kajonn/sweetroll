@@ -95,6 +95,7 @@ describe("buildOpenApiDocument", () => {
       "/characters/creation-versions",
       "/characters/{characterId}",
       "/characters/{characterId}/actions/{actionId}",
+      "/characters/{characterId}/actions/{actionId}/roll-options",
       "/characters/{characterId}/activity",
       "/characters/{characterId}/duplicate",
       "/characters/{characterId}/entries",

@@ -399,4 +399,15 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
 - Winter Compass and Signal Forge cover Fudge-style sums and net symbols.
   Both fixtures have public API scenarios and creator → player → GM journeys.
 
-R7 is next, followed by R8.
+**R7 — 2026-11-11, implemented.**
+
+- Roll actions can declare a target entity or respond to an existing roll.
+  The server resolves target values under the campaign and character locks,
+  applies current roll visibility and records the source references and bindings.
+- The creator edits both declarations. The sheet and GM board offer eligible
+  targets and recent visible rolls. One account can respond once per source
+  roll, including across multiple controlled sheets.
+- Bridge Contest exercises targeted and opposed rolls through the PostgreSQL
+  API scenario and creator → players → GM browser journey.
+
+R8 is next.

@@ -1,4 +1,7 @@
-import {preparePushCommit,insertPushRoll} from "./push.js";
+import { ROLL_VISIBILITY_PREDICATE } from "../campaigns/persistence.js";
+import { canReadRoll, type MembershipRecord } from "../campaigns/policy.js";
+import type { CampaignRollContext } from "../systems/runtime.js";
+import {preparePushCommit,insertPushRoll,narrowerAudience} from "./push.js";
 import type {PushContext, ExtensionRef} from "../systems/runtime.js";
 import type { Pool, PoolClient } from "pg";
 
@@ -136,15 +139,33 @@ export type TxBuildArgs = {
   rollAudience?: RollAudience | null;
 };
 
-export type ApplyCommandInput = {
-  /** Revision of the source state validated by Systems, checked under the character lock. */
-  pushResolutionRevision?: number;
-  pushContext?: PushContext;
-  precondition?: (client: PoolClient) => Promise<import("./index.js").CharacterError | null>;
+export type CampaignRollOptions = {
+  targets: { characterId: string; name: string }[];
+  rolls: { rollId: string; output: string }[];
+};
+export type CampaignRollSelection = { targetCharacterId?: string; respondsTo?: string };
+type CommandTransaction = {
   executionId: ExecutionId;
   characterId: CharacterId;
   actorId: UserId;
   expectedRevision: number;
+};
+
+export type DeferredCampaignRoll = CommandTransaction & {
+  campaign: { campaignId: string };
+  selection: CampaignRollSelection & { targetEntityId?: string };
+  source: CharacterRecord;
+  membershipGeneration: number;
+  resolve: (context: CampaignRollContext) =>
+    | { ok: true; value: ApplyCommandInput }
+    | { ok: false; error: import("./index.js").CharacterError; retryable: boolean };
+};
+
+export type ApplyCommandInput = CommandTransaction & {
+  /** Revision of the source state validated by Systems, checked under the character lock. */
+  pushResolutionRevision?: number;
+  pushContext?: PushContext;
+  precondition?: (client: PoolClient) => Promise<import("./index.js").CharacterError | null>;
   nextState: RuntimeStateV1;
   stateChanged: boolean;
   roll: NormalizedRoll | null;
@@ -178,7 +199,7 @@ export type ApplyCommandInput = {
 };
 
 export type ApplyCommandOutcome =
-  | {kind:"precondition_failed";error:import("./index.js").CharacterError}
+  | {kind:"precondition_failed";error:import("./index.js").CharacterError;retryable?:boolean}
   | { kind: "applied"; record: CharacterRecord; resultJson: unknown }
   | { kind: "already_completed"; resultJson: unknown }
   | { kind: "not_found" }
@@ -364,7 +385,10 @@ export interface CharacterPersistenceRepository {
     page: { limit: number; cursor: CharacterPageCursor | null },
   ): Promise<Array<CharacterRecord & { updatedAtCursor: string }>>;
 
-  applyCommandTx(input: ApplyCommandInput): Promise<ApplyCommandOutcome>;
+  loadCampaignRollOptions(input: {
+    source: CharacterRecord; member: MembershipRecord; targetEntityId?: string; includeRolls: boolean;
+  }): Promise<CampaignRollOptions | null>;
+  applyCommandTx(input: ApplyCommandInput | DeferredCampaignRoll): Promise<ApplyCommandOutcome>;
 
   applyManagementCommandTx(input: ApplyManagementCommandInput): Promise<ApplyManagementCommandOutcome>;
 
@@ -456,6 +480,62 @@ type ExecutionRow = {
   expires_at: Date;
 };
 
+function sameComposition(left: CharacterRecord, right: CharacterRecord): boolean {
+  return left.systemVersionId === right.systemVersionId
+    && left.extensions.length === right.extensions.length
+    && left.extensions.every((extension, index) => {
+      const other = right.extensions[index];
+      return other?.extensionId === extension.extensionId && other.versionId === extension.versionId;
+    });
+}
+
+async function loadCampaignRollContext(
+  client: PoolClient,
+  record: CharacterRecord,
+  member: MembershipRecord,
+  selection: DeferredCampaignRoll["selection"],
+): Promise<
+  | { ok: true; context: CampaignRollContext; audience: RollAudience | null }
+  | { ok: false; error: import("./index.js").CharacterError }
+> {
+  const context: CampaignRollContext = {};
+  let audience: RollAudience | null = null;
+  if (selection.targetCharacterId) {
+    const { rows: [row] } = await client.query<CharacterRow>(
+      `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id,
+              entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at,
+              created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
+         FROM characters WHERE id = $1 AND campaign_id = $2 AND entity_definition_id = $3 AND lifecycle = 'active' FOR UPDATE`,
+      [selection.targetCharacterId, member.campaignId, selection.targetEntityId],
+    );
+    if (!row || !sameComposition(record, toCharacterRecord(row))) {
+      return { ok: false, error: { code: "not_found", message: "Target character not found." } };
+    }
+    context.target = { characterId: row.id, entityId: row.entity_definition_id, state: toCharacterRecord(row).state };
+  }
+  if (selection.respondsTo) {
+    const { rows: [roll] } = await client.query<{ total: number; audience: RollAudience; principal_id: string }>(
+      `SELECT total, audience, COALESCE(audience_actor_id, actor_id) AS principal_id
+         FROM character_rolls WHERE id = $1 AND scope_campaign_id = $2`,
+      [selection.respondsTo, member.campaignId],
+    );
+    if (!roll || !canReadRoll({
+      roll: { campaignId: member.campaignId, actorId: roll.principal_id, audience: roll.audience }, membership: member,
+    })) {
+      return { ok: false, error: { code: "not_found", message: "Recorded roll not found." } };
+    }
+    const prior = await client.query(
+      `SELECT 1 FROM character_rolls
+        WHERE responds_to_roll_id = $1 AND actor_id = $2 AND COALESCE(push_attempt, 0) = 0`,
+      [selection.respondsTo, member.userId],
+    );
+    if (prior.rowCount) return { ok: false, error: { code: "conflict", message: "You already responded to this roll." } };
+    context.opposed = { rollId: selection.respondsTo, total: roll.total };
+    audience = roll.audience;
+  }
+  return { ok: true, context, audience };
+}
+
 /**
  * I6 Task 5 attached-sheet command path. The caller holds an open
  * transaction with the execution row already locked; this locks the campaign
@@ -467,11 +547,11 @@ type ExecutionRow = {
  */
 async function applyCommandCampaignTx(
   client: PoolClient,
-  input: ApplyCommandInput,
+  transaction: ApplyCommandInput | DeferredCampaignRoll,
   campaignId: string,
 ): Promise<ApplyCommandOutcome> {
   const campaign = await lockCampaignForWrite(client, campaignId);
-  const membership = campaign === null ? null : await loadTxMembership(client, campaignId, input.actorId);
+  const membership = campaign === null ? null : await loadTxMembership(client, campaignId, transaction.actorId);
   if (campaign === null || membership === null || membership.status !== "active") {
     await client.query("ROLLBACK");
     return { kind: "not_found" };
@@ -479,15 +559,15 @@ async function applyCommandCampaignTx(
   const charResult = await client.query<CharacterRow>(
     `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
        FROM characters WHERE id = $1 FOR UPDATE`,
-    [input.characterId],
+    [transaction.characterId],
   );
   const charRow = charResult.rows[0];
   if (charRow === undefined || charRow.campaign_id !== campaignId) {
     await client.query("ROLLBACK");
     return { kind: "not_found" };
   }
-  const controllers = await loadTxControllers(client, input.characterId);
-  if (!isTxManager(membership.role) && !controllers.includes(input.actorId)) {
+  const controllers = await loadTxControllers(client, transaction.characterId);
+  if (!isTxManager(membership.role) && !controllers.includes(transaction.actorId)) {
     await client.query("ROLLBACK");
     return { kind: "not_found" };
   }
@@ -499,17 +579,53 @@ async function applyCommandCampaignTx(
     await client.query("ROLLBACK");
     return { kind: "archived" };
   }
-  if (charRow.revision !== input.expectedRevision) {
+  if (charRow.revision !== transaction.expectedRevision) {
     const latestRevision = charRow.revision;
     await client.query("ROLLBACK");
     return { kind: "conflict", latestRevision };
+  }
+
+  const txMember: MembershipRecord = {
+    campaignId, userId: transaction.actorId, role: membership.role as MembershipRecord["role"],
+    status: "active", generation: membership.generation, createdAt: new Date(0), updatedAt: new Date(0),
+  };
+  let input: ApplyCommandInput;
+  let opposedAudience: RollAudience | null = null;
+  if ("selection" in transaction) {
+    const record = toCharacterRecord(charRow);
+    if (transaction.source.revision !== record.revision) {
+      await client.query("ROLLBACK");
+      return { kind: "conflict", latestRevision: record.revision };
+    }
+    if (transaction.membershipGeneration !== membership.generation
+      || transaction.source.placementGeneration !== record.placementGeneration
+      || !sameComposition(transaction.source, record)) {
+      await client.query("ROLLBACK");
+      return { kind: "not_found" };
+    }
+    const selected = await loadCampaignRollContext(client, record, txMember, transaction.selection);
+    if (!selected.ok) {
+      await client.query("ROLLBACK");
+      return { kind: "precondition_failed", error: selected.error };
+    }
+    opposedAudience = selected.audience;
+    const resolved = transaction.resolve(selected.context);
+    if (!resolved.ok) {
+      await client.query("ROLLBACK");
+      return { kind: "precondition_failed", error: resolved.error, retryable: resolved.retryable };
+    }
+    input = resolved.value;
+  } else {
+    input = transaction;
   }
 
   if (input.precondition !== undefined) {
     const error = await input.precondition(client);
     if (error !== null) { await client.query("ROLLBACK"); return {kind:"precondition_failed",error}; }
   }
-  const pushCommit=await preparePushCommit(client,input,toCharacterRecord(charRow),input.rollAudience?.requested??campaign.rollAudienceDefault,{campaignId,userId:input.actorId,role:membership.role as "owner"|"co_gm"|"player",status:membership.status as "active"|"removed",generation:membership.generation,createdAt:new Date(0),updatedAt:new Date(0)});
+  const requested = input.rollAudience?.requested ?? campaign.rollAudienceDefault;
+  const audience = opposedAudience === null ? requested : narrowerAudience(requested, opposedAudience);
+  const pushCommit = await preparePushCommit(client, input, toCharacterRecord(charRow), audience, txMember);
   if(!pushCommit.ok){await client.query("ROLLBACK");return {kind:"precondition_failed",error:pushCommit.error};}
   let updatedRow = charRow;
   if (input.stateChanged) {
@@ -529,16 +645,15 @@ async function applyCommandCampaignTx(
   // current campaign default applies. Same-key replays never reach this
   // path (early replay / already_completed), so later default changes
   // cannot move the recorded audience or dice.
-  const requested = input.rollAudience?.requested ?? null;
-  const effectiveAudience: RollAudience = pushCommit.value?.audience ?? requested ?? campaign.rollAudienceDefault;
+  const effectiveAudience: RollAudience = pushCommit.value?.audience ?? audience;
 
   let rollId: string | null = null;
   if(input.roll?.push&&pushCommit.value){rollId=await insertPushRoll(client,input,pushCommit.value);}
   else if (input.roll !== null) {
     const insertedRoll = await client.query<{ id: string }>(
       `INSERT INTO character_rolls
-         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, scope_campaign_id, breakdown_json)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13::jsonb)
+         (character_id, actor_id, action_id, execution_id, expression, dice_json, bindings_json, total, rendered_output, audience, request_id, scope_campaign_id, breakdown_json, target_character_id, responds_to_roll_id)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8, $9, $10, $11, $12, $13::jsonb, $14, $15)
        RETURNING id`,
       [
         updatedRow.id,
@@ -554,6 +669,8 @@ async function applyCommandCampaignTx(
         input.activity.requestId,
         campaignId,
         JSON.stringify(input.roll.breakdown),
+        input.roll.targetCharacterId ?? null,
+        input.roll.respondsTo ?? null,
       ],
     );
     rollId = requireRow(insertedRoll.rows[0], "applyCommandCampaignTx.roll").id;
@@ -1053,6 +1170,44 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       return result.rows.map((row) => ({ ...toCharacterRecord(row), updatedAtCursor: row.updated_at_cursor }));
     },
 
+    async loadCampaignRollOptions({ source, member, targetEntityId, includeRolls }) {
+      const { rows: [options] } = await pool.query<CampaignRollOptions>(
+        `WITH access AS (
+           SELECT c.campaign_id FROM characters c
+           JOIN campaigns cp ON cp.id = c.campaign_id AND cp.status = 'active'
+           JOIN campaign_members m ON m.campaign_id = cp.id AND m.user_id = $1
+           WHERE c.id = $3 AND c.campaign_id = $4 AND c.revision = $5
+             AND c.placement_generation = $6 AND c.lifecycle = 'active'
+             AND m.status = 'active' AND m.generation = $7
+             AND (m.role IN ('owner','co_gm')) = $2::boolean
+             AND ($2::boolean OR EXISTS (
+               SELECT 1 FROM character_controllers cc WHERE cc.character_id = c.id AND cc.user_id = $1
+             ))
+         )
+         SELECT ARRAY(
+           SELECT jsonb_build_object('characterId', id, 'name', name)
+           FROM characters WHERE campaign_id = access.campaign_id
+             AND lifecycle = 'active' AND system_version_id = $8 AND entity_definition_id = $9
+             AND (SELECT ${CHARACTER_EXTENSIONS_COLUMN}) = $10::jsonb
+           ORDER BY name, id LIMIT 100
+         ) AS targets,
+         ARRAY(
+           SELECT jsonb_build_object('rollId', r.id, 'output', r.rendered_output)
+           FROM character_rolls r WHERE $11::boolean AND r.scope_campaign_id = access.campaign_id
+             AND ${ROLL_VISIBILITY_PREDICATE}
+             AND NOT EXISTS (
+               SELECT 1 FROM character_rolls child WHERE child.responds_to_roll_id = r.id
+                 AND child.actor_id = $1 AND COALESCE(child.push_attempt, 0) = 0
+             )
+           ORDER BY r.occurred_at DESC, r.id DESC LIMIT 50
+         ) AS rolls FROM access`,
+        [member.userId, isTxManager(member.role), source.characterId, source.campaignId, source.revision,
+          source.placementGeneration, member.generation, source.systemVersionId, targetEntityId ?? null,
+          JSON.stringify(source.extensions), includeRolls],
+      );
+      return options ?? null;
+    },
+
     async applyCommandTx(input) {
       const client = await pool.connect();
       try {
@@ -1076,6 +1231,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         // retain existing behavior. The module validates before claim; this
         // second layer holds even if that check ever widens.
         // Deliberately `not_found` (not `bad_request`): persistence outcomes carry no validation variant, so this unreachable fail-closed denial collapses exactly like a foreign id.
+        if ("selection" in input) throw new Error("Campaign roll context requires a campaign transaction.");
         const standaloneRequested = input.rollAudience?.requested ?? null;
         if (standaloneRequested !== null && standaloneRequested !== "owner_only") {
           await client.query("ROLLBACK");
@@ -1325,7 +1481,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       const rowShape = `e.id, e.character_revision, e.kind, e.payload_json, e.roll_id, e.request_id,
              e.occurred_at, to_char(e.occurred_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS occurred_at_cursor,
              COALESCE(r.audience_actor_id,r.actor_id) AS roll_actor_id, r.audience AS roll_audience,
-             r.action_id, r.expression, r.dice_json, r.bindings_json, r.total, r.rendered_output, r.breakdown_json, r.push_result_json`;
+             r.action_id, r.expression, r.dice_json, r.bindings_json, r.total, r.rendered_output, r.breakdown_json, r.push_result_json, r.target_character_id, r.responds_to_roll_id`;
       type ActivityRowShape = {
         id: string;
         character_revision: number;
@@ -1341,6 +1497,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
         bindings_json: NormalizedRoll["bindings"]; total: number; rendered_output: string;
         breakdown_json: NormalizedRoll["breakdown"] | null;
         push_result_json: NormalizedRoll["push"] | null;
+        target_character_id: string | null;
+        responds_to_roll_id: string | null;
       };
       const scopeValue = scope?.scopeCampaignId;
       const filters: string[] = [`e.character_id = $1`];
@@ -1382,6 +1540,8 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           actionId: row.action_id, expression: row.expression, dice: row.dice_json,bindings: row.bindings_json,
           total: row.total, output: row.rendered_output, audience: parseRollAudienceOrNull(row.roll_audience)!,
           breakdown: row.breakdown_json,
+          ...(row.target_character_id ? { targetCharacterId: row.target_character_id } : {}),
+          ...(row.responds_to_roll_id ? { respondsTo: row.responds_to_roll_id } : {}),
           ...(row.push_result_json?{push:row.push_result_json}:{}),
         }}),
       }));

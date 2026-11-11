@@ -17,6 +17,8 @@ export type EvaluationBindings = {
   fields: Record<string, BindingValue>;
   inputs: Record<string, BindingValue>;
   item?: Record<string, BindingValue>;
+  target?: Record<string, BindingValue>;
+  opposed?: Record<string, BindingValue>;
   /** Outcome expressions: values of the finished roll (`roll.total`). */
   roll?: Record<string, BindingValue>;
   /** Outcome expressions: the finished roll's named groups, for rolled("group"). */
@@ -28,7 +30,7 @@ export type EvaluationBindings = {
 };
 
 export type EvaluationBinding = {
-  scope: "fields" | "inputs" | "item" | "aggregates";
+  scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
   definitionId: string;
   value: BindingValue;
 };

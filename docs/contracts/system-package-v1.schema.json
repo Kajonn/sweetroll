@@ -1091,6 +1091,14 @@
                       {
                         "const": "roll",
                         "type": "string"
+                      },
+                      {
+                        "const": "target",
+                        "type": "string"
+                      },
+                      {
+                        "const": "opposed",
+                        "type": "string"
                       }
                     ]
                   },
@@ -1543,6 +1551,23 @@
               "outputTemplate"
             ],
             "properties": {
+              "target": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "entityId"
+                ],
+                "properties": {
+                  "entityId": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  }
+                }
+              },
+              "respondsTo": {
+                "const": true,
+                "type": "boolean"
+              },
               "outcomes": {
                 "maxItems": 16,
                 "type": "array",
@@ -2448,6 +2473,23 @@
                     "outputTemplate"
                   ],
                   "properties": {
+                    "target": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "entityId"
+                      ],
+                      "properties": {
+                        "entityId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "respondsTo": {
+                      "const": true,
+                      "type": "boolean"
+                    },
                     "outcomes": {
                       "maxItems": 16,
                       "type": "array",

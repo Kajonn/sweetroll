@@ -29,6 +29,8 @@ export type EvaluateExpressionInput = {
   bindings: Record<string, BindingValue>;
   fieldBindings?: Record<string, BindingValue>;
   itemBindings?: Record<string, BindingValue>;
+  targetBindings?: Record<string, BindingValue>;
+  opposedBindings?: Record<string, BindingValue>;
   rng?: Rng;
   /** Where the expression is used. Computed fields and validations may be text or boolean; rolls must be numbers. */
   context?: "computed" | "roll" | "validation";
@@ -79,6 +81,8 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
     fields: pickBindings(input.fieldBindings ?? input.bindings, input.env.fields),
     inputs: pickBindings(input.bindings, input.env.inputs),
     ...(input.env.item === undefined ? {} : { item: pickBindings(input.itemBindings ?? {}, input.env.item) }),
+    ...(input.env.target === undefined ? {} : { target: pickBindings(input.targetBindings ?? {}, input.env.target) }),
+    ...(input.env.opposed === undefined ? {} : { opposed: pickBindings(input.opposedBindings ?? {}, input.env.opposed) }),
     ...(input.env.dice === undefined ? {} : { dice: input.env.dice }),
     ...(input.env.datasets === undefined ? {} : { datasets: input.env.datasets }),
     ...(input.env.slots === undefined ? {} : { slotEntries: () => [] }),

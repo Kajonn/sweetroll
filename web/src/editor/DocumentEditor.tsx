@@ -1063,6 +1063,7 @@ function DiceTab({
                   }}
                   outcomeExpressions={outcomeExpressionStore(document, dispatch)}
                   fieldTypes={buildFieldTypeMap(document, action.id)}
+                  targetEntities={document.entities.map(entity => ({ id: entity.id, label: entity.label, fields: entityFieldTypes(entity.fields) }))}
                   dice={document.dice}
                   datasets={document.referenceData}
                   slots={previewSlots(document, actionOwner(document, action.id)?.id)}

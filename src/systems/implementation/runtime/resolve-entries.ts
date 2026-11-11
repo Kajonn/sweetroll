@@ -1,3 +1,4 @@
+import { resolveRollContext, rollContextReferences } from "./roll-context.js";
 import { characterRuleBindings } from "./rule-bindings.js";
 import type { EvaluationBindings } from "../rules/evaluate.js";
 import {derivedEntryError,effectiveEntryDefinition} from "./effective-entry.js";
@@ -12,6 +13,7 @@ import type {
   SystemPackageV1,
 } from "../package/schema/index.js";
 import type {
+  CampaignRollContext,
   CommandExecutionId,
   DefinitionId,
   NominalActionResult,
@@ -36,6 +38,7 @@ export type GrantedActionRequest = {
   inputs: Record<DefinitionId, unknown>;
   executionId: CommandExecutionId;
   authoritativeRollSecret: string;
+  campaignRoll?: CampaignRollContext;
 };
 
 export type GrantedActionOutcome = {
@@ -112,6 +115,9 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
     return badRequest(validation.message, validation.definitionId ?? request.actionId);
   }
 
+  if (request.campaignRoll && (action.nominal === true || action.kind !== "roll")) {
+    return badRequest("This action cannot use a campaign roll context.", action.id);
+  }
   if (action.nominal === true) {
     return {
       ok: true,
@@ -141,6 +147,9 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
   const bindings = characterRuleBindings(request.packageValue, request.entity, observed.value.state);
   Object.assign(bindings.fields, observed.value.derivedValues);
   bindings.inputs = actionInputs.value;
+  const context = resolveRollContext(request.packageValue, action, request.campaignRoll);
+  if (!context.ok) return context;
+  Object.assign(bindings, context.value);
   const item = itemRuleBindings(request.packageValue, template, entry);
   if (!item.ok) return item;
   bindings.item = item.value;
@@ -164,6 +173,7 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
       state: request.state,
       changedDefinitionIds: [],
       roll: {
+        ...rollContextReferences(request.campaignRoll),
         actionId: action.id,
         expression: evaluated.roll.expression,
         dice: evaluated.roll.dice,

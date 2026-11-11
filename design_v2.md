@@ -209,6 +209,17 @@ Expressions are declarative math, conditionals, and dice, parsed into a lightwei
 
 **Custom dice (rules coverage R6, 2026-11-11):** systems can define up to 16 custom dice with up to 20 equally likely faces each. Each face has a numeric value, an optional label and optional symbol counts. `dice(4, "fudge")` sums four custom draws. `countSymbol` counts a named symbol across the final faces in a pool, including previously rolled named pools. The creator manages definitions in the Dice tab. Creator previews, the player sheet, the GM board, activity and exports use the saved face labels and symbols. Configurable push policies apply to standard dice.
 
+**Targeted and opposed rolls (rules coverage R7, 2026-11-11):** a roll action
+can declare a target entity and use its fields through `target.<fieldId>`.
+A response action can read `opposed.total` from a saved roll visible to the
+responder. These actions run on active campaign sheets. The server locks the
+campaign before reading the actor and target sheets and requires the target to
+use the same pinned rules composition. Each account can respond once per source
+roll. Responses and pushes share stored roll lineage, with distinct links for
+the source of a response and the parent of a push. Rolls leave sheet state to
+the players to update. The creator configures both action types, and players
+select targets and recent rolls from the sheet or GM board.
+
 **Roll outcomes (rules coverage R5, 2026-11-11, implemented):** a roll action can list ordered outcome bands and named details, each an `outcome` expression evaluated after the roll with `roll.total`, the action's values and its named groups (`rolled("group")`), never new dice. The first true band names the result (a PbtA miss / weak hit / strong hit, or a d100 critical / success / fumble / failure); details are numbers such as a margin or success level. The command result carries `outcome { id, label }` and `details`; the output template accepts `{outcome}`, `{detail.id}`, `{fields.id}` and `{inputs.id}` (and `{item.id}` for granted actions), checked at publish, and the outcome label is appended when the template omits it, so saved rolls, activity and exports show it through their output text. Pushed rolls are described again. The creator edits bands (ordered) and details per action; the sheet and the GM session board show the outcome. Players still apply effects by hand (owner decision 2026-11-10). Extensions cannot define outcomes yet.
 
 **Dice-pool reliability, slice A (2026-10-23 CI and isolated deployed acceptance):** success counts require direct dice operands; valid zero pools remain legal. Entity and item-granted roll actions reject arithmetic failures with a reviewable HTTP 422 error, without recording a fallback or partial roll. Error receipts preserve retry identity. Computed/validation scalar fallbacks remain unchanged. Custom pool formulas retain their expression editor; previews show their sample bindings and omit modifiers where the AST cannot prove an additive interpretation. See [slice A acceptance](docs/acceptance/dice-pool-reliability-2026-10-22.md) for verification and remaining release gates.
@@ -894,6 +905,12 @@ process.
 - Campaign content uploads default to GM only; player notes default to owner only.
 - Do not use private campaign or character content for model training or recommendation features without explicit consent and a separate design review.
 - Provide account, character, system, and campaign export in documented formats.
+- A targeted roll shows the target field values it read to the roll's normal
+  audience. The target picker shows eligible character names, and direct sheet
+  access follows the existing controller and GM permissions.
+- A response can use the recorded roll's audience or a narrower one. The
+  responder must be able to see the source roll under current campaign membership.
+
 - Publish a clear ownership model for system definitions, user uploads, and copies derived from shared systems.
 
 # 15. Non-functional requirements

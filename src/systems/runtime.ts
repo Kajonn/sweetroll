@@ -610,7 +610,15 @@ export function createSystemRuntime(input: {
       const failure = actionEvaluationFailure(evaluated, pendingRoll.actionId, expression.id);
       if (failure !== null) return { ok: false, error: failure };
       if (evaluated.roll === null) return invalidPackage(expression.id);
-      pushContext=makePushContext(packageValue,entity.id,pendingRoll.action);
+      const { bindings: read, outputValues, ...described } = describeRoll({
+        action: pendingRoll.action,
+        expression: (id) => packageValue.expressions.find((candidate) => candidate.id === id),
+        total: evaluated.roll.total,
+        bindings,
+        rolled: evaluated.rolled,
+        limits: packageValue.effectiveLimits,
+      });
+      pushContext = makePushContext(packageValue, entity.id, pendingRoll.action, outputValues);
       roll = {
         ...rollContextReferences(pendingRoll.campaignRoll),
         actionId: pendingRoll.actionId,
@@ -618,17 +626,8 @@ export function createSystemRuntime(input: {
         dice: evaluated.roll.dice,
         breakdown: evaluated.roll.breakdown,
         total: evaluated.roll.total,
-        ...(() => {
-          const { bindings: read, ...described } = describeRoll({
-            action: pendingRoll.action,
-            expression: (id) => packageValue.expressions.find((candidate) => candidate.id === id),
-            total: evaluated.roll.total,
-            bindings,
-            rolled: evaluated.rolled,
-            limits: packageValue.effectiveLimits,
-          });
-          return { ...described, bindings: mergeBindings(evaluated.bindings, read) };
-        })(),
+        ...described,
+        bindings: mergeBindings(evaluated.bindings, read),
         audience: "owner_only",
       };
     }

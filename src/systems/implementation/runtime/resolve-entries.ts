@@ -167,6 +167,15 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
   const failure = actionEvaluationFailure(evaluated, action.id, expression.id);
   if (failure !== null) return { ok: false, error: failure };
   if (evaluated.roll === null) return invalidPackage(expression.id);
+  const { bindings: read, outputValues, ...described } = describeRoll({
+    action,
+    expression: (id) => request.packageValue.expressions.find((candidate) => candidate.id === id),
+    total: evaluated.roll.total,
+    bindings,
+    rolled: evaluated.rolled,
+    limits: request.packageValue.effectiveLimits,
+  });
+  const pushContext = makePushContext(request.packageValue, request.entity.id, action, outputValues, entry);
   return {
     ok: true,
     value: {
@@ -179,21 +188,12 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
         dice: evaluated.roll.dice,
         breakdown: evaluated.roll.breakdown,
         total: evaluated.roll.total,
-        ...(() => {
-          const { bindings: read, ...described } = describeRoll({
-            action: action,
-            expression: (id) => request.packageValue.expressions.find((candidate) => candidate.id === id),
-            total: evaluated.roll.total,
-            bindings,
-            rolled: evaluated.rolled,
-            limits: request.packageValue.effectiveLimits,
-          });
-          return { ...described, bindings: mergeBindings(evaluated.bindings, read) };
-        })(),
+        ...described,
+        bindings: mergeBindings(evaluated.bindings, read),
         audience: "owner_only",
       },
       nominal: null,
-      ...(action.pushPolicy?{pushContext:makePushContext(request.packageValue,request.entity.id,action,entry)!}:{}),
+      ...(pushContext === undefined ? {} : { pushContext }),
     },
   };
 }

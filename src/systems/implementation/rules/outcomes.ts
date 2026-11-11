@@ -10,6 +10,8 @@ export type RollDescription = {
   output: string;
   /** Values the outcomes read that the roll itself did not; saved with the roll so a push can describe its result. */
   bindings: EvaluationBinding[];
+  /** Rendered field, input and item placeholders for the private push snapshot. */
+  outputValues: Record<string, string>;
 };
 
 type OutcomeEntry = { id: string; label: string; expressionId: string };
@@ -64,6 +66,7 @@ export function describeRoll(input: {
   expression: (id: string) => CompiledExpressionV1 | undefined;
   total: number;
   bindings: EvaluationBindings;
+  savedOutputValues?: Readonly<Record<string, string>> | undefined;
   rolled: RolledPools;
   limits: EvaluationLimits;
 }): RollDescription {
@@ -88,6 +91,7 @@ export function describeRoll(input: {
     return typeof value === "number" && Number.isFinite(value) ? [{ id: entry.id, label: entry.label, value }] : [];
   });
   const usesOutcome = outputPlaceholders(action.outputTemplate).includes("outcome");
+  const outputValues: Record<string, string> = {};
   const filled = action.outputTemplate.replace(PLACEHOLDER, (whole, placeholder: string) => {
     if (placeholder === "total") return String(total);
     if (placeholder === "outcome") return outcome?.label ?? "";
@@ -101,7 +105,11 @@ export function describeRoll(input: {
     }
     if (scope === "fields" || scope === "inputs" || scope === "item") {
       const values = input.bindings[scope];
-      return values !== undefined && Object.hasOwn(values, id) ? text(values[id]) : "";
+      const value = input.savedOutputValues?.[placeholder] ??
+        (values !== undefined && Object.hasOwn(values, id) ? text(values[id]) : undefined);
+      if (value === undefined) return "";
+      outputValues[placeholder] = value;
+      return value;
     }
     return whole;
   });
@@ -112,6 +120,7 @@ export function describeRoll(input: {
     ...(details === undefined || details.length === 0 ? {} : { details }),
     output,
     bindings: read,
+    outputValues,
   };
 }
 

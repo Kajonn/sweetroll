@@ -25,6 +25,7 @@ export function makePushContext(
   pkg: SystemPackageV1,
   entityId: string,
   action: RollActionV1,
+  outputValues: Record<string, string>,
   entry?: CharacterEntryV1,
 ): PushContext | undefined {
   if (!action.pushPolicy) return undefined;
@@ -40,6 +41,7 @@ export function makePushContext(
     ...(expression.origin === null ? {} : { extensionId: expression.origin }),
     ...(composition === undefined ? {} : { compositionChecksum: composition.compositionChecksum }),
     outputTemplate: action.outputTemplate,
+    ...(Object.keys(outputValues).length === 0 ? {} : { outputValues }),
     policy: structuredClone(action.pushPolicy),
     ...(entry && effectiveTemplateId(entry)
       ? {
@@ -161,11 +163,12 @@ export function resolveRuntimePush(input: {
   if (!result.ok) return fail(result.reason);
   // The pushed roll is described again: its outcome can differ from the parent's.
   const { outcome: _outcome, details: _details, ...carried } = parent;
-  const { bindings: _read, ...described } = describeRoll({
+  const { bindings: _read, outputValues: _outputValues, ...described } = describeRoll({
     action: source,
     expression: (id) => pkg.expressions.find((candidate) => candidate.id === qualifiedId(context.extensionId, id)),
     total: result.roll.total,
     bindings,
+    savedOutputValues: context.outputValues,
     rolled: result.rolled,
     limits: pkg.effectiveLimits,
   });

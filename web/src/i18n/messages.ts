@@ -391,6 +391,7 @@ export const defaultMessages: MessageTable = {
   "editor.fields.computed.expression.placeholder": "e.g. fields.modifier + inputs.bonus",
   "editor.fields.options.dataset": "Options source",
   "editor.fields.options.static": "Manual options",
+  "editor.fields.options.missingDataset": "Missing dataset ({id})",
   "editor.fields.resource.addMaximumExpression": "Create maximum formula",
   "editor.fields.resource.maximumExpression": "Maximum formula",
   "editor.fields.resource.manualMaximum": "Editable maximum",

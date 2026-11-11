@@ -1,5 +1,8 @@
+import { randomUUID } from "node:crypto";
+
 import { expect } from "vitest";
 
+import { derivedTemplateDocument } from "../../../src/systems/implementation/package/fixtures/campaign-derived.js";
 import {
   gradedPercentileDocument, gradedPushDocument, movesDocument,
 } from "../../../src/systems/implementation/package/fixtures/outcome-systems.js";
@@ -85,3 +88,50 @@ scenario("outcomes: banded moves, graded percentile tests and a graded push", as
   expect(pushed.roll.outcome?.label).toBe(grade(pushed.roll));
   expect(pushed.roll.output.endsWith(` — ${grade(pushed.roll)}`)).toBe(true);
 });
+
+for (const source of ["sheet", "item"] as const) {
+  scenario(`push preserves output-only values from the original ${source} action`, async ({ actor }) => {
+    const author = await actor("ada", ["systems:write", "characters:write"]);
+    const document = derivedTemplateDocument();
+    document.entities[0]!.fields.push({
+      kind: "text", id: "name", label: "Name", required: false, default: "", minLength: 0, maxLength: 100,
+    });
+    const check = document.actions.find((action) => action.id === "check");
+    const pool = document.templates[0]!.grantedActions.find((action) => action.id === "sword_pool");
+    if (check?.kind !== "roll" || pool?.kind !== "roll") throw new Error("Missing fixture actions");
+    check.pushPolicy = structuredClone(pool.pushPolicy!);
+    document.expressions.find((expression) => expression.id === check.expressionId)!.source = 'group("attribute", "Attribute", d20)';
+
+    const action = source === "sheet" ? check : pool;
+    action.inputs = [{ id: "note", label: "Note", valueType: "text", required: true, default: "" }];
+    action.outputTemplate = source === "sheet" ? "{fields.name} ({inputs.note}): {total}"
+      : "{fields.name} ({inputs.note}) with {item.name}: {total}";
+    const expectedPrefix = source === "sheet" ? "Iona (scouting)" : "Iona (scouting) with Old blade";
+    const hero = await author.command<Revision & { characterId: string }>("POST /characters", {
+      name: "Iona", systemVersionId: await publish(author, document), entityDefinitionId: "character", initialValues: { name: "Iona" },
+    }, 201);
+    const path = `/characters/${hero.characterId}` as const;
+    const entryId = source === "item" ? randomUUID() : undefined;
+    let revision = hero.revision;
+    if (entryId) {
+      ({ revision } = await author.command<Revision>(`POST ${path}/entries`, {
+        entryId, slotId: "inventory", templateId: "sword", values: { name: "Old blade" }, expectedRevision: revision,
+      }));
+    }
+    const root = await author.command<Rolled>(`POST ${path}/actions/${action.id}`, {
+      ...(entryId ? { entryId } : {}), inputs: { note: "scouting" }, expectedRevision: revision,
+    });
+    expect(root.roll.output).toBe(`${expectedPrefix}: ${root.roll.total}`);
+
+    ({ revision } = await author.command<Revision>(`POST ${path}/fields/name/set`, {
+      value: "New name", expectedRevision: root.revision,
+    }));
+    if (entryId) {
+      ({ revision } = await author.command<Revision>(`PATCH ${path}/entries/${entryId}`, {
+        values: { name: "New blade" }, expectedRevision: revision,
+      }));
+    }
+    const pushed = await author.command<Rolled>(`POST ${path}/rolls/${root.roll.rollId}/push`, { expectedRevision: revision });
+    expect(pushed.roll.output).toBe(`${expectedPrefix}: ${pushed.roll.total}`);
+  });
+}

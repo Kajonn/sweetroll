@@ -45,8 +45,10 @@ export function ChoiceFieldEditor({
       </p>
     );
   }
-  const fromDataset = field.optionsFrom !== undefined;
-  const options = fromDataset ? datasets?.find(dataset => dataset.id === field.optionsFrom)?.records ?? [] : field.options;
+  const datasetId = field.optionsFrom;
+  const fromDataset = datasetId !== undefined;
+  const selectedDataset = datasets?.find(dataset => dataset.id === datasetId);
+  const options = fromDataset ? selectedDataset?.records ?? [] : field.options;
   const chooseDataset = (id: string) => {
     const { optionsFrom: _old, ...next } = field;
     const defaultValue = field.kind === "singleChoice" ? null : [];
@@ -108,11 +110,14 @@ export function ChoiceFieldEditor({
           {t("editor.fields.required")}
         </label>
       </div>
-      {datasets !== undefined && datasets.length > 0 ? <label>
+      {fromDataset || (datasets?.length ?? 0) > 0 ? <label>
         {t("editor.fields.options.dataset")}
-        <select value={field.optionsFrom ?? ""} onChange={event => chooseDataset(event.target.value)} disabled={disabled}>
+        <select value={datasetId ?? ""} onChange={event => chooseDataset(event.target.value)} disabled={disabled}>
           <option value="">{t("editor.fields.options.static")}</option>
-          {datasets.map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.label} ({dataset.id})</option>)}
+          {fromDataset && selectedDataset === undefined && (
+            <option value={datasetId} disabled>{t("editor.fields.options.missingDataset", { id: datasetId })}</option>
+          )}
+          {datasets?.map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.label} ({dataset.id})</option>)}
         </select>
       </label> : null}
       <div className={styles.row}>

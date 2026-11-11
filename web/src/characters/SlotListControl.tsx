@@ -127,7 +127,8 @@ function GrantedActionForm({ entryId, action, disabled, onExecute, characterId, 
     Object.fromEntries(action.inputs.map((input) => [input.id, input.default])));
   const [commandError, setCommandError] = useState("");
   const [selection, setSelection] = useState<CampaignRollSelection>({});
-  const blocked = disabled || !hasRollSelection(action, selection);
+  const contextual = Boolean(action.target || action.respondsTo);
+  const blocked = disabled || (contextual && (!characterId || !hasRollSelection(action, selection)));
   return (
     <form
       className={styles.action}
@@ -135,7 +136,7 @@ function GrantedActionForm({ entryId, action, disabled, onExecute, characterId, 
       onSubmit={(event) => {
         event.preventDefault();
         if (blocked) return;
-        invokeCommand(() => action.target || action.respondsTo
+        invokeCommand(() => contextual
           ? onExecute(entryId, action.id, inputs, selection) : onExecute(entryId, action.id, inputs), (message) => setCommandError(message));
       }}
     >

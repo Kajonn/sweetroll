@@ -187,7 +187,7 @@ function ActionControl({ element, disabled, disabledReason, onExecuteAction, cha
 }) {
   const [selection, setSelection] = useState<CampaignRollSelection>({});
   const contextual = Boolean(element.target || element.respondsTo);
-  const blocked = disabled || !hasRollSelection(element, selection);
+  const blocked = disabled || (contextual && (!characterId || !hasRollSelection(element, selection)));
   const [inputs, setInputs] = useState<Record<string, unknown>>(() => Object.fromEntries(element.inputs.map(input => [input.id, input.default])));
   const [commandError, setCommandError] = useState<string | null>(null);
   return <form className={styles.action} onSubmit={(event) => {
@@ -352,7 +352,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource,
           && onRemoveEntry !== undefined
           && onUpdateEntry !== undefined;
         return <SlotListControl
-          key={element.id}
+          key={`${character.placementGeneration}:${element.id}`}
           slotId={element.slotId}
           label={element.label}
           accepts={[...element.accepts]}
@@ -371,7 +371,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource,
       }
       case "action": {
         if (element.entryId !== undefined) return null;
-        return <ActionControl key={`${character.characterId}:${element.id}`} element={element}
+        return <ActionControl key={`${character.characterId}:${character.placementGeneration}:${element.id}`} element={element}
           characterId={character.campaignId ? character.characterId : undefined} loadRollOptions={loadRollOptions} disabled={!actionsAvailable} disabledReason={actionUnavailableReason} onExecuteAction={executeAction} />;
       }
     }

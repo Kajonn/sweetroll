@@ -572,6 +572,7 @@ describeWithDatabase("Character replay authorization (I6 Task 1)", () => {
         "open",
         "pushOptions",
         "readRoll",
+        "rollOptions",
         "openPortrait",
         "setPortrait",
         "removePortrait",

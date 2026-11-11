@@ -34,6 +34,7 @@ scenario("Bridge Contest: target a defender and contest a recorded roll", async 
   for (const [player, name] of [[striker, "Striker"], [defender, "Defender"]] as const) {
     const sheet = await player.command<Sheet>("POST /characters", {
       name, systemVersionId: versionId, entityDefinitionId: "character",
+      initialValues: { modifier: player === defender ? 3 : 0 },
     }, 201);
     const invitation = await gm.command<{ token: string }>(`POST ${campaign}/invitations`, {
       intendedRole: "player", expectedCampaignRevision: await revision(),
@@ -70,8 +71,8 @@ scenario("Bridge Contest: target a defender and contest a recorded roll", async 
   });
   const hit = await striker.command<RollResult>(path(a, "attack"), attack);
   expect(hit.roll).toMatchObject({
-    targetCharacterId: b.characterId, total: hit.roll.dice[0]!.value - 10,
-    bindings: [{ scope: "target", definitionId: "defense", value: 10 }],
+    targetCharacterId: b.characterId, total: hit.roll.dice[0]!.value - 13,
+    bindings: [{ scope: "target", definitionId: "defense", value: 13 }],
   });
   expect(hit.revision).toBe(a.revision);
   expect(await striker.command<RollResult>(path(a, "attack"), attack)).toMatchObject({ roll: hit.roll });
@@ -111,6 +112,20 @@ scenario("Bridge Contest: target a defender and contest a recorded roll", async 
     expect.objectContaining({ targetCharacterId: b.characterId, bindings: hit.roll.bindings }),
     expect.objectContaining({ respondsTo: opposedId, bindings: counter.roll.bindings }),
   ]));
+
+  await phase("Reject targets and rolls from a different campaign");
+  const other = await gm.command<Revision & { campaignId: string }>("POST /campaigns", {
+    title: "Other bridge", systemVersionId: versionId,
+  }, 201);
+  const otherSheet = await gm.command<Sheet>(`POST /campaigns/${other.campaignId}/characters`, {
+    name: "Other defender", entityDefinitionId: "character", expectedCampaignRevision: other.revision,
+  }, 201);
+  await gm.status(path(a, "attack"), 404, command(a, { targetCharacterId: otherSheet.characterId }));
+  await gm.command(path(otherSheet, "check"), command(otherSheet, {}));
+  const otherActivity = await gm.json<{ events: { sourceRollId: string | null }[] }>(`GET /campaigns/${other.campaignId}/activity`);
+  const otherRoll = otherActivity.events.find(event => event.sourceRollId)?.sourceRollId;
+  expect(otherRoll).toBeDefined();
+  await gm.status(path(b, "counter"), 404, command(b, { respondsTo: otherRoll }));
 
   await phase("Reject archived targets, removed members and standalone play");
   await gm.command(`PATCH /characters/${b.characterId}`, { command: "archive", expectedRevision: b.revision });

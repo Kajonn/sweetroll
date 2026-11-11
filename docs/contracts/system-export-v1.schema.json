@@ -915,6 +915,10 @@
                   {
                     "const": "validation",
                     "type": "string"
+                  },
+                  {
+                    "const": "outcome",
+                    "type": "string"
                   }
                 ]
               },
@@ -1058,6 +1062,10 @@
                           },
                           {
                             "const": "item",
+                            "type": "string"
+                          },
+                          {
+                            "const": "roll",
                             "type": "string"
                           }
                         ]
@@ -1467,6 +1475,60 @@
                   "outputTemplate"
                 ],
                 "properties": {
+                  "outcomes": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "label",
+                        "expressionId"
+                      ],
+                      "properties": {
+                        "id": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "expressionId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "details": {
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "label",
+                        "expressionId"
+                      ],
+                      "properties": {
+                        "id": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "expressionId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
                   "pushPolicy": {
                     "additionalProperties": false,
                     "type": "object",
@@ -2318,6 +2380,60 @@
                         "outputTemplate"
                       ],
                       "properties": {
+                        "outcomes": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "expressionId"
+                            ],
+                            "properties": {
+                              "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 120,
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "details": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "expressionId"
+                            ],
+                            "properties": {
+                              "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 120,
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "pushPolicy": {
                           "additionalProperties": false,
                           "type": "object",

@@ -1,7 +1,7 @@
 import { sheetActionOwners, validationOwner } from "../rules/owners.js";
 import { fieldWithDatasetOptions, validateDataset } from "./reference-data.js";
 import {validatePushPolicies} from "../rules/push-policy.js";
-import { children, validateDiceGroups } from "../rules/groups.js";
+import { children, namedGroups, validateDiceGroups } from "../rules/groups.js";
 import { Buffer } from "node:buffer";
 
 import { PACKAGE_LIMITS } from "./limits.js";
@@ -84,6 +84,14 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
       ids.add(id);
     }
   };
+  type OutcomeLists = { outcomes?: { id: string }[]; details?: { id: string }[] };
+  // Outcome and detail IDs are scoped to their action, like action inputs.
+  const collectOutcomeIds = (action: OutcomeLists, actionPath: string): void => {
+    for (const list of ["outcomes", "details"] as const) {
+      const ids = new Set<string>();
+      (action[list] ?? []).forEach((entry, index) => collectId(entry.id, `${actionPath}/${list}/${index}/id`, ids));
+    }
+  };
 
   value.entities.forEach((entity, entityIndex) => {
     const entityPath = `/entities/${entityIndex}`;
@@ -139,6 +147,7 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
       action.inputs.forEach((input, inputIndex) => {
         collectId(input.id, `${actionPath}/inputs/${inputIndex}/id`, inputIds);
       });
+      collectOutcomeIds(action, actionPath);
     }
   });
 
@@ -173,6 +182,7 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
         action.inputs.forEach((input, inputIndex) => {
           collectId(input.id, `${actionPath}/inputs/${inputIndex}/id`, inputIds);
         });
+        collectOutcomeIds(action, actionPath);
       }
     });
   });
@@ -189,6 +199,15 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
         path: prefix + path,
         message: "Referenced definition does not exist.",
       });
+    }
+  };
+  const missingOutcomeExpressions = (
+    action: { outcomes?: { expressionId: string }[]; details?: { expressionId: string }[] },
+    actionPath: string,
+  ): void => {
+    for (const list of ["outcomes", "details"] as const) {
+      (action[list] ?? []).forEach((entry, index) =>
+        missing(expressionIds.has(entry.expressionId), `${actionPath}/${list}/${index}/expressionId`));
     }
   };
 
@@ -256,6 +275,7 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
   value.actions.forEach((action, actionIndex) => {
     if (action.kind === "roll") {
       missing(expressionIds.has(action.expressionId), `/actions/${actionIndex}/expressionId`);
+      missingOutcomeExpressions(action, `/actions/${actionIndex}`);
     } else {
       missing(resourceIds.has(action.resourceId), `/actions/${actionIndex}/resourceId`);
     }
@@ -299,6 +319,7 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
       const actionPath = `${templatePath}/grantedActions/${actionIndex}`;
       if (action.kind === "roll") {
         missing(expressionIds.has(action.expressionId), `${actionPath}/expressionId`);
+        missingOutcomeExpressions(action, actionPath);
       } else {
         missing(templateResourceIds.has(action.resourceId), `${actionPath}/resourceId`);
       }
@@ -429,8 +450,19 @@ function validatePackageBudgets(
     }
   }
 
+  // An outcome expression may read the named groups of the roll it describes.
+  const asts = new Map(value.expressions.map((expression) => [expression.id, expression.ast]));
+  const rolledBy = new Map<string, string[]>();
+  const describedActions = [...value.actions, ...value.templates.flatMap((template) => template.grantedActions)];
+  for (const action of describedActions) {
+    if (action.kind !== "roll") continue;
+    const roll = asts.get(action.expressionId);
+    const groups = roll === undefined ? [] : namedGroups(roll);
+    for (const entry of [...(action.outcomes ?? []), ...(action.details ?? [])]) rolledBy.set(entry.expressionId, groups);
+  }
+
   value.expressions.forEach((expression, expressionIndex) => {
-    diagnostics.push(...validateDiceGroups(expression.ast).map(d => ({...d, path: `${prefix}/expressions/${expressionIndex}/ast`})));
+    diagnostics.push(...validateDiceGroups(expression.ast, rolledBy.get(expression.id) ?? []).map(d => ({...d, path: `${prefix}/expressions/${expressionIndex}/ast`})));
     const { depth, nodes } = measureAst(expression.ast);
     const path = `${prefix}/expressions/${expressionIndex}/ast`;
     if (nodes > PACKAGE_LIMITS.expressionAstNodes) {
@@ -491,8 +523,8 @@ function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
       return hasOnlyKeys(node, ["kind", "value"]) && typeof node.value === "boolean";
     case "reference":
       return hasOnlyKeys(node, ["kind", "scope", "id"], ["part"])
-        && (node.scope === "fields" || node.scope === "inputs" || node.scope === "item")
-        && (node.part === undefined || (node.scope !== "inputs" && (node.part === "current" || node.part === "max")))
+        && (node.scope === "fields" || node.scope === "inputs" || node.scope === "item" || node.scope === "roll")
+        && (node.part === undefined || (node.scope !== "inputs" && node.scope !== "roll" && (node.part === "current" || node.part === "max")))
         && typeof node.id === "string"
         && /^[a-z][a-z0-9_]{0,63}$/.test(node.id);
     case "unary":

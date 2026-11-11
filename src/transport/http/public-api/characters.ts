@@ -22,6 +22,9 @@ export const roll = s.object({
     value: BindingValueSchema,
   })),
   total: Type.Number(),
+  // The first outcome band whose condition held. Present on the command result; stored rolls carry it in `output`.
+  outcome: Type.Optional(s.object({ id: s.definitionId, label: s.text })),
+  details: Type.Optional(Type.Array(s.object({ id: s.definitionId, label: s.text, value: Type.Number() }), { maxItems: 8 })),
   output: s.text,
   audience,
   breakdown: RollBreakdownSchema,

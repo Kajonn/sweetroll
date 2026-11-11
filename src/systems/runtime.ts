@@ -12,6 +12,7 @@ export type { ExtensionRef } from "./implementation/rules/compose.js";
 import { buildCharacterProjection } from "./implementation/runtime/projection.js";
 import { decodeActionInputs, resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
 import { resolveObservedValues } from "./implementation/runtime/resolve.js";
+import { describeRoll, mergeBindings, type RollDetail, type RollOutcome } from "./implementation/rules/outcomes.js";
 import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
 import { decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { actionEvaluationFailure } from "./implementation/runtime/action-evaluation.js";
@@ -112,6 +113,10 @@ export type NormalizedRoll = {
   dice: NormalizedDie[];
   bindings: NormalizedRollBinding[];
   total: number;
+  /** Design 6.4: the first outcome band whose condition holds, when the action defines bands. */
+  outcome?: RollOutcome;
+  /** Design 6.4: named numbers shown with the result, such as a margin. */
+  details?: RollDetail[];
   output: string;
   audience: NormalizedRollAudience;
 };
@@ -569,9 +574,18 @@ export function createSystemRuntime(input: {
           expression: evaluated.roll.expression,
           dice: evaluated.roll.dice,
           breakdown: evaluated.roll.breakdown,
-          bindings: evaluated.bindings,
           total: evaluated.roll.total,
-          output: pendingRoll.outputTemplate.split("{total}").join(String(evaluated.roll.total)),
+          ...(() => {
+            const { bindings: read, ...described } = describeRoll({
+              action: pendingRoll.action,
+              expression: (id) => packageValue.expressions.find((candidate) => candidate.id === id),
+              total: evaluated.roll.total,
+              bindings,
+              rolled: evaluated.rolled,
+              limits: packageValue.effectiveLimits,
+            });
+            return { ...described, bindings: mergeBindings(evaluated.bindings, read) };
+          })(),
           audience: "owner_only",
         };
       }

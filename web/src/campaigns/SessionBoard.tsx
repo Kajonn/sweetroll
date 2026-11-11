@@ -227,7 +227,10 @@ function SessionRollRow(props: {
           setResultText(String(raw));
         } else if (raw !== null && typeof raw === "object" &&
           typeof (raw as { total?: unknown }).total === "number") {
-          setResultText(String((raw as { total: number }).total));
+          // Design 6.4: an outcome label, when the action defines bands, reads with the total.
+          const outcome = (raw as { outcome?: { label?: unknown } }).outcome?.label;
+          const total = String((raw as { total: number }).total);
+          setResultText(typeof outcome === "string" && outcome.length > 0 ? `${total} — ${outcome}` : total);
           setLastRoll(response.result.roll);
           props.onRollResult?.(response.result.roll);
         } else {

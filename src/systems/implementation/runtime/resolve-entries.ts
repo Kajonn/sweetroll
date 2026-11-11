@@ -25,6 +25,7 @@ import { validateEntryForSlot } from "./entries.js";
 import { resolveObservedValues } from "./resolve.js";
 import { actionEvaluationFailure } from "./action-evaluation.js";
 import { evaluate } from "../rules/evaluate.js";
+import { describeRoll, mergeBindings } from "../rules/outcomes.js";
 
 export type GrantedActionRequest = {
   packageValue: SystemPackageV1;
@@ -167,9 +168,18 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
         expression: evaluated.roll.expression,
         dice: evaluated.roll.dice,
         breakdown: evaluated.roll.breakdown,
-        bindings: evaluated.bindings,
         total: evaluated.roll.total,
-        output: action.outputTemplate.split("{total}").join(String(evaluated.roll.total)),
+        ...(() => {
+          const { bindings: read, ...described } = describeRoll({
+            action: action,
+            expression: (id) => request.packageValue.expressions.find((candidate) => candidate.id === id),
+            total: evaluated.roll.total,
+            bindings,
+            rolled: evaluated.rolled,
+            limits: request.packageValue.effectiveLimits,
+          });
+          return { ...described, bindings: mergeBindings(evaluated.bindings, read) };
+        })(),
         audience: "owner_only",
       },
       nominal: null,

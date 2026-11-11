@@ -120,7 +120,7 @@ export type EntityDefinitionV1 = {
 
 export type CompiledExpressionSummary = {
   id: DefinitionId;
-  context: "computed" | "roll" | "validation";
+  context: "computed" | "roll" | "validation" | "outcome";
   resultType: ValueType;
   fallback: ScalarValue;
   ast: ExpressionAstV1;

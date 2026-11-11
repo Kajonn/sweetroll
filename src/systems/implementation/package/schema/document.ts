@@ -306,6 +306,8 @@ export const SourceExpressionV1Schema = Type.Object(
       Type.Literal("computed"),
       Type.Literal("roll"),
       Type.Literal("validation"),
+      // Evaluated after a roll: an outcome band's condition or a detail value.
+      Type.Literal("outcome"),
     ]),
     resultType: ValueTypeSchema,
     source: Type.String({ maxLength: PACKAGE_LIMITS.expressionBytes }),
@@ -332,8 +334,20 @@ export const ActionInputV1Schema = Type.Object(
 );
 export type ActionInputV1 = Static<typeof ActionInputV1Schema>;
 
+// Design 6.4 (rules coverage R5). An outcome band names the result of a roll;
+// the first band whose condition is true applies. A detail is a named number
+// shown with the result, such as a margin. Both are `outcome` expressions that
+// may read `roll.total`, the roller's fields and inputs, and rolled("group").
+export const RollOutcomeV1Schema = Type.Object(
+  { id: DefinitionIdSchema, label: LabelSchema, expressionId: DefinitionIdSchema },
+  { additionalProperties: false },
+);
+export type RollOutcomeV1 = Static<typeof RollOutcomeV1Schema>;
+
 export const RollActionV1Schema = Type.Object(
   {
+    outcomes: Type.Optional(Type.Array(RollOutcomeV1Schema, { maxItems: 16 })),
+    details: Type.Optional(Type.Array(RollOutcomeV1Schema, { maxItems: 8 })),
     pushPolicy: Type.Optional(PushPolicySchema),
     kind: Type.Literal("roll"),
     id: DefinitionIdSchema,

@@ -33,3 +33,7 @@ export { slotEnvironment } from "./slots.js";
 export { type RulesDataset, type SlotEnvironment } from "./data.js";
 export { resolveDependencies } from "./typecheck.js";
 export { fieldWithDatasetOptions } from "../package/reference-data.js";
+export { describeRoll, outputPlaceholders, placeholderProblem } from "./outcomes.js";
+export type { RollDescription, RollDetail, RollOutcome } from "./outcomes.js";
+export { namedGroups } from "./groups.js";
+export type { RolledPools } from "./evaluate.js";

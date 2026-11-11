@@ -1,4 +1,4 @@
-import { children, containsDice } from "./groups.js";
+import { children, containsDice, drawsDice } from "./groups.js";
 import type { ExpressionAstV1, ValueType, DefinitionId } from "../package/schema/index.js";
 import { aggregateCall, isAggregate, literalId, type RulesDataset, type SlotEnvironment } from "./data.js";
 import type { RulesDiagnostic } from "./diagnostic.js";
@@ -9,6 +9,8 @@ export type ExpressionCompileEnv = {
   fields: Record<string, FieldBindingType>;
   inputs: Record<string, ValueType>;
   item?: Record<string, FieldBindingType>;
+  /** Outcome expressions only: values of the roll being described (`roll.total`). */
+  roll?: Record<string, ValueType>;
   datasets?: readonly RulesDataset[];
   slots?: SlotEnvironment;
 };
@@ -164,8 +166,14 @@ export function resolveDependencies(ast: ExpressionAstV1): DefinitionId[] {
   return out;
 }
 
-export function checkDeterministic(ast: ExpressionAstV1, context: "computed" | "roll" | "validation"): RulesDiagnostic[] {
+export function checkDeterministic(ast: ExpressionAstV1, context: "computed" | "roll" | "validation" | "outcome"): RulesDiagnostic[] {
   if (context === "roll" || !containsDice(ast)) return [];
+  // An outcome describes a finished roll: it may read rolled("group") but never draws dice.
+  if (context === "outcome") {
+    return drawsDice(ast)
+      ? [{ code: "invalid_expression", path: "", message: "an outcome cannot roll new dice; read the roll with roll.total or rolled(\"group\")" }]
+      : [];
+  }
   return [{ code: "invalid_expression", path: "", message: "dice expressions are only valid in roll contexts" }];
 }
 

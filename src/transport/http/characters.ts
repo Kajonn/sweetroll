@@ -308,6 +308,8 @@ const RollDto = Type.Object({
   dice: Type.Array(DiceDto),
   bindings: Type.Array(RollBindingDto),
   total: Type.Number(),
+  outcome: Type.Optional(Type.Object({ id: Type.String(), label: Type.String() })),
+  details: Type.Optional(Type.Array(Type.Object({ id: Type.String(), label: Type.String(), value: Type.Number() }), { maxItems: 8 })),
   output: Type.String(),
   audience: RollAudienceDto,
 });

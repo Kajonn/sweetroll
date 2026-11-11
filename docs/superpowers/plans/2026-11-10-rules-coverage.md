@@ -365,4 +365,27 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
   in PostgreSQL API scenarios and creator/player/GM browser journeys. The M5
   fixture uses a numeric doubles result. Outcome bands are scheduled in R5.
 
-R5–R8 remain in plan order.
+**R5 — 2026-11-11, implemented.**
+
+- Roll actions (entity and granted) take ordered `outcomes` and `details`, each
+  an expression of the new `outcome` context. Outcome expressions compile after
+  their roll with its environment plus `roll.total`, may read the roll's named
+  groups with `rolled()`, cannot draw dice, and must be used by exactly one band
+  or detail. Bands are boolean, details numeric (`rules/outcomes.ts`).
+- Output templates take `{total}`, `{outcome}`, `{detail.id}`, `{fields.id}`,
+  `{inputs.id}` and `{item.id}`; publishing rejects unknown placeholders.
+  The outcome label is appended when the template omits `{outcome}`, so stored
+  rolls, activity and exports show it through `output` without a schema change.
+- Command results (browser and `/api/v1`) carry `outcome` and `details`.
+  Values read only by outcomes are saved with the roll's bindings so a push
+  can describe its child roll again.
+- Creator: ordered band and detail editor per roll action; previews show `…`
+  for outcome placeholders. Sheet and GM session board show the outcome.
+  The paired display shows scenes, not rolls, so it is unchanged.
+- Extensions reject outcome expressions and actions with outcomes for now.
+- Fixtures `outcome-systems.ts`: Hearthbound (M3 bands), Brass Ledger (M5
+  graded d100 with doubles and success levels) and a graded push. Tests: rules
+  unit tests, `scenarios/rules-outcomes.test.ts`, editor/sheet/board tests and
+  the `rulesOutcomes.spec.ts` browser journey.
+
+R6–R8 remain in plan order.

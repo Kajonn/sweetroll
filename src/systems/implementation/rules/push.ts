@@ -11,6 +11,7 @@ import type {
   EvaluationLimits,
   Rng,
   RollResult,
+  RolledPools,
 } from "./evaluate.js";
 type SavedPool = Omit<RollResult, "breakdown"> & { breakdown?: RollResult["breakdown"] };
 
@@ -33,6 +34,8 @@ export type PushEvaluationResult =
   | {
       ok: true;
       roll: RollResult;
+      /** Named groups of the pushed roll, for its outcome expressions. */
+      rolled: RolledPools;
       rerolledDiceIds: string[];
       faceOutcomes: FaceOutcome[];
     }
@@ -122,6 +125,7 @@ export function evaluatePush(input: PushEvaluationInput): PushEvaluationResult {
     return {
       ok: true,
       roll: result.roll,
+      rolled: result.rolled,
       rerolledDiceIds: [...redrawn],
       faceOutcomes: policy.groups.flatMap((g) =>
         g.reportedFaces.map((face) => ({

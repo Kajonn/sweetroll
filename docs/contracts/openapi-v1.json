@@ -24764,6 +24764,44 @@
                                 "total": {
                                   "type": "number"
                                 },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
+                                },
                                 "output": {
                                   "type": "string"
                                 },
@@ -28027,6 +28065,44 @@
                                 },
                                 "total": {
                                   "type": "number"
+                                },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
                                 },
                                 "output": {
                                   "type": "string"
@@ -31303,6 +31379,44 @@
                                 "total": {
                                   "type": "number"
                                 },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
+                                },
                                 "output": {
                                   "type": "string"
                                 },
@@ -34568,6 +34682,44 @@
                                 },
                                 "total": {
                                   "type": "number"
+                                },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
                                 },
                                 "output": {
                                   "type": "string"
@@ -37837,6 +37989,44 @@
                                 "total": {
                                   "type": "number"
                                 },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
+                                },
                                 "output": {
                                   "type": "string"
                                 },
@@ -39254,6 +39444,44 @@
                         },
                         "total": {
                           "type": "number"
+                        },
+                        "outcome": {
+                          "type": "object",
+                          "required": [
+                            "id",
+                            "label"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "details": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "value"
+                            ],
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "type": "number"
+                              }
+                            }
+                          }
                         },
                         "output": {
                           "type": "string"
@@ -43473,6 +43701,44 @@
                                 "total": {
                                   "type": "number"
                                 },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
+                                },
                                 "output": {
                                   "type": "string"
                                 },
@@ -46783,6 +47049,44 @@
                                 },
                                 "total": {
                                   "type": "number"
+                                },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
                                 },
                                 "output": {
                                   "type": "string"
@@ -50154,6 +50458,44 @@
                                 "total": {
                                   "type": "number"
                                 },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
+                                },
                                 "output": {
                                   "type": "string"
                                 },
@@ -53415,6 +53757,44 @@
                                 },
                                 "total": {
                                   "type": "number"
+                                },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
                                 },
                                 "output": {
                                   "type": "string"
@@ -56685,6 +57065,44 @@
                                 },
                                 "total": {
                                   "type": "number"
+                                },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
                                 },
                                 "output": {
                                   "type": "string"
@@ -61228,6 +61646,44 @@
                                 },
                                 "total": {
                                   "type": "number"
+                                },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
                                 },
                                 "output": {
                                   "type": "string"
@@ -66675,6 +67131,44 @@
                                 "total": {
                                   "type": "number"
                                 },
+                                "outcome": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "details": {
+                                  "maxItems": 8,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "value"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "type": "string"
+                                      },
+                                      "value": {
+                                        "type": "number"
+                                      }
+                                    }
+                                  }
+                                },
                                 "output": {
                                   "type": "string"
                                 },
@@ -70874,6 +71368,44 @@
                               },
                               "total": {
                                 "type": "number"
+                              },
+                              "outcome": {
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "label"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "details": {
+                                "maxItems": 8,
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "id",
+                                    "label",
+                                    "value"
+                                  ],
+                                  "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
+                                    "label": {
+                                      "type": "string"
+                                    },
+                                    "value": {
+                                      "type": "number"
+                                    }
+                                  }
+                                }
                               },
                               "output": {
                                 "type": "string"
@@ -76997,6 +77529,60 @@
                                     "outputTemplate"
                                   ],
                                   "properties": {
+                                    "outcomes": {
+                                      "maxItems": 16,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "expressionId"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "expressionId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "details": {
+                                      "maxItems": 8,
+                                      "type": "array",
+                                      "items": {
+                                        "additionalProperties": false,
+                                        "type": "object",
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "expressionId"
+                                        ],
+                                        "properties": {
+                                          "id": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          },
+                                          "label": {
+                                            "maxLength": 120,
+                                            "type": "string"
+                                          },
+                                          "expressionId": {
+                                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                            "type": "string"
+                                          }
+                                        }
+                                      }
+                                    },
                                     "pushPolicy": {
                                       "additionalProperties": false,
                                       "type": "object",

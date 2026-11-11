@@ -12,7 +12,9 @@ export type CompileResult<T> =
 export type CompileExpressionOpts = {
   env: ExpressionCompileEnv;
   resultType: ValueType;
-  context: "computed" | "roll" | "validation";
+  context: "computed" | "roll" | "validation" | "outcome";
+  /** Outcome expressions: named groups of the roll they describe. */
+  rolledGroups?: readonly string[];
   fallback: ScalarValue;
 };
 
@@ -34,7 +36,7 @@ export function compileAst(ast: ExpressionAstV1, opts: CompileExpressionOpts): C
   if (depth > PACKAGE_LIMITS.expressionAstDepth) {
     return { ok: false, diagnostics: [{ code: "limit_exceeded", path: "", message: "expression exceeds depth budget" }] };
   }
-  const groupDiagnostics = validateDiceGroups(ast);
+  const groupDiagnostics = validateDiceGroups(ast, opts.context === "outcome" ? opts.rolledGroups : []);
   if (groupDiagnostics.length > 0) return {ok: false, diagnostics: groupDiagnostics};
   const det = checkDeterministic(ast, opts.context);
   if (det.length > 0) return { ok: false, diagnostics: det };

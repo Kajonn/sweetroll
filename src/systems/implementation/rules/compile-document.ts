@@ -2,6 +2,8 @@ import { validateDataset, fieldWithDatasetOptions } from "../package/reference-d
 import { dataObservationCost } from "./data.js";
 import { sheetActionOwners, validationOwner } from "./owners.js";
 import { slotEnvironment } from "./slots.js";
+import { namedGroups } from "./groups.js";
+import { outputPlaceholders, placeholderProblem } from "./outcomes.js";
 import {validatePushPolicies} from "./push-policy.js";
 import type { ActionV1, SystemDocumentV1, SystemPackageV1, TemplateKind, ValueType } from "../package/schema/index.js";
 import type { UnsignedSystemPackageV1 } from "../package/schema/index.js";
@@ -166,9 +168,37 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     }
   }
 
-  const compiled: CompiledExpressionBody[] = [];
+  // Outcome bands and details describe one roll action; they compile after it,
+  // with the same fields and inputs plus the finished roll.
+  type OutcomeUse = { action: Extract<ActionV1, { kind: "roll" }>; list: "outcomes" | "details"; path: string };
+  const outcomeUses = new Map<string, OutcomeUse[]>();
+  const describedActions: Array<{ action: Extract<ActionV1, { kind: "roll" }>; path: string }> = [
+    ...document.actions.flatMap((action, index) => action.kind === "roll" ? [{ action, path: `/actions/${index}` }] : []),
+    ...templates.flatMap((template, templateIndex) => template.grantedActions.flatMap((action, index) =>
+      action.kind === "roll" ? [{ action, path: `/templates/${templateIndex}/grantedActions/${index}` }] : [])),
+  ];
+  for (const { action, path } of describedActions) {
+    for (const list of ["outcomes", "details"] as const) {
+      for (const [index, entry] of (action[list] ?? []).entries()) {
+        const uses = outcomeUses.get(entry.expressionId) ?? [];
+        uses.push({ action, list, path: `${path}/${list}/${index}/expressionId` });
+        outcomeUses.set(entry.expressionId, uses);
+      }
+    }
+  }
+  const rollEnvironments = new Map<string, ExpressionCompileEnv>();
 
-  for (const expr of document.expressions) {
+  const compiled: CompiledExpressionBody[] = [];
+  const deferredOutcomes: number[] = [];
+
+  for (const [expressionIndex, expr] of document.expressions.entries()) {
+    if (expr.context === "outcome") {
+      deferredOutcomes.push(expressionIndex);
+      continue;
+    }
+    if (outcomeUses.has(expr.id)) {
+      return scopeDiagnostic("invalid_expression", outcomeUses.get(expr.id)![0]!.path, "An outcome or detail must use an expression of the outcome kind.");
+    }
     const templateRolls = templateRollActions.get(expr.id) ?? [];
     const owners = expr.context === "computed"
       ? computedOwners.get(expr.id)
@@ -212,7 +242,50 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
         diagnostics: result.diagnostics.map((d) => ({ ...d, path: expr.id })),
       };
     }
-    compiled.push(result.value);
+    compiled[expressionIndex] = result.value;
+    if (expr.context === "roll") rollEnvironments.set(expr.id, env);
+  }
+
+  const expressionIndexes = new Map(document.expressions.map((expression, index) => [expression.id, index]));
+  for (const expressionIndex of deferredOutcomes) {
+    const expr = document.expressions[expressionIndex]!;
+    const uses = outcomeUses.get(expr.id) ?? [];
+    if (uses.length !== 1) {
+      return scopeDiagnostic("invalid_expression", expr.id, uses.length === 0
+        ? "An outcome expression must be used by one outcome or detail of a roll action."
+        : "Expression cannot be shared across different owners.");
+    }
+    const { action, list } = uses[0]!;
+    const rollIndex = expressionIndexes.get(action.expressionId);
+    const rollEnv = rollEnvironments.get(action.expressionId);
+    const roll = rollIndex === undefined ? undefined : compiled[rollIndex];
+    if (rollEnv === undefined || roll === undefined) {
+      return scopeDiagnostic("missing_reference", expr.id, "The roll this outcome describes does not compile.");
+    }
+    if (expr.resultType !== (list === "outcomes" ? "boolean" : "number")) {
+      return scopeDiagnostic("invalid_expression", expr.id, list === "outcomes"
+        ? "An outcome condition must be true or false."
+        : "A detail must be a number.");
+    }
+    const result = compileExpression(expr.source, {
+      env: { ...rollEnv, roll: { total: "number" } },
+      resultType: expr.resultType,
+      context: "outcome",
+      rolledGroups: namedGroups(roll.ast),
+      fallback: expr.fallback,
+    });
+    if (!result.ok) {
+      return { ok: false, diagnostics: result.diagnostics.map((d) => ({ ...d, path: expr.id })) };
+    }
+    compiled[expressionIndex] = result.value;
+  }
+  for (const { action, path } of describedActions) {
+    const env = rollEnvironments.get(action.expressionId);
+    if (env === undefined) continue;
+    for (const placeholder of outputPlaceholders(action.outputTemplate)) {
+      const problem = placeholderProblem(placeholder, action, env);
+      if (problem !== null) return scopeDiagnostic("invalid_expression", `${path}/outputTemplate`, problem);
+    }
   }
 
   const cycle = computedCycle(document, compiled);

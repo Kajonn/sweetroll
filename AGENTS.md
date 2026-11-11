@@ -89,4 +89,4 @@ The owner approved the [rules coverage plan](docs/superpowers/plans/2026-11-10-r
 on 2026-11-10 with all decisions C1–C13: the rules contract is replaced in place
 (no systems are published), rolls never change characters, opposed rolls need no
 privacy layer and cards are simple draw/shuffle decks. Linter/formatter tooling is
-not part of it. Stages R0–R4 are implemented. R5 is next in the plan. See the plan's implementation record before changing the rules engine.
+not part of it. Stages R0–R5 are implemented. R6 is next in the plan. See the plan's implementation record before changing the rules engine.

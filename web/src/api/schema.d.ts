@@ -9490,6 +9490,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -10129,6 +10138,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -10768,6 +10786,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -11407,6 +11434,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -12047,6 +12083,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -12348,6 +12393,15 @@ export interface operations {
                                 value: (string | number | boolean | null) | string[];
                             }[];
                             total: number;
+                            outcome?: {
+                                id: string;
+                                label: string;
+                            };
+                            details?: {
+                                id: string;
+                                label: string;
+                                value: number;
+                            }[];
                             output: string;
                             audience: "owner_only" | "gm_only" | "campaign";
                         };
@@ -13219,6 +13273,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -13870,6 +13933,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -14535,6 +14607,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -15173,6 +15254,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -15815,6 +15905,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -16744,6 +16843,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -17916,6 +18024,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
@@ -18785,6 +18902,15 @@ export interface operations {
                                     value: (string | number | boolean | null) | string[];
                                 }[];
                                 total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             };
@@ -20834,6 +20960,16 @@ export interface operations {
                                 required: boolean;
                             })[];
                             grantedActions: ({
+                                outcomes?: {
+                                    id: string;
+                                    label: string;
+                                    expressionId: string;
+                                }[];
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    expressionId: string;
+                                }[];
                                 pushPolicy?: {
                                     /** @constant */
                                     version: "1.0";

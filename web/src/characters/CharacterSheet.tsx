@@ -3,7 +3,7 @@ import type { CharactersApi } from "./api.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
@@ -232,6 +232,8 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
     <dl>
       <dt>{t("character.rollResult.expression")}</dt><dd>{expression}</dd>
       <dt>{t("character.rollResult.total")}</dt><dd>{roll.total}</dd>
+      {roll.outcome ? <><dt>{t("character.rollResult.outcome")}</dt><dd data-testid="roll-outcome">{roll.outcome.label}</dd></> : null}
+      {roll.details?.map(detail => <Fragment key={detail.id}><dt>{detail.label}</dt><dd>{detail.value}</dd></Fragment>)}
       <dt>{t("character.rollResult.output")}</dt><dd>{roll.output}</dd>
       <dt>{t("character.rollResult.audience")}</dt><dd>{audienceLabel(roll.audience)}</dd>
     </dl>

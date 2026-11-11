@@ -60,7 +60,9 @@ export type DocumentAction =
    * a roll expression for a new action). Duplicate ids are a no-op (same
    * state) so double-submits cannot fork the list.
    */
-  | { type: "addExpression"; expression: SourceExpressionV1 };
+  | { type: "addExpression"; expression: SourceExpressionV1 }
+  /** Remove an expression its owner no longer uses (e.g. a deleted outcome). Unknown ids are a no-op. */
+  | { type: "removeExpression"; expressionId: string };
 
 export function blankDocument(): SystemDocumentV1 {
   return {
@@ -139,6 +141,10 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
     case "addExpression": {
       if (state.expressions.some((entry) => entry.id === action.expression.id)) return state;
       return { ...state, expressions: [...state.expressions, action.expression] };
+    }
+    case "removeExpression": {
+      if (!state.expressions.some((entry) => entry.id === action.expressionId)) return state;
+      return { ...state, expressions: state.expressions.filter((entry) => entry.id !== action.expressionId) };
     }
   }
 }

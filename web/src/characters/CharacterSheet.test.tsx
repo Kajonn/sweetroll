@@ -249,6 +249,17 @@ describe("CharacterSheet", () => {
     expect(screen.getByRole("button", { name: "Increase Health" })).toBeEnabled();
   });
 
+  it("shows a roll's outcome and details next to its result", () => {
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: {
+      actionId: "roll-check", expression: "d100", dice: [], breakdown: { version: "1.0", rootId: "root", groups: [], terms: [] }, bindings: [],
+      total: 33, outcome: { id: "critical", label: "Critical" }, details: [{ id: "levels", label: "Success levels", value: 3 }],
+      output: "33 against 60: Critical", audience: "owner_only",
+    } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByTestId("roll-outcome")).toHaveTextContent("Critical");
+    expect(screen.getByText("Success levels")).toBeVisible();
+    expect(screen.getByText("3")).toBeVisible();
+  });
+
   it("shows the same estimate in every duplicate resource control", () => {
     const base = snapshot({ tentative: { health: 5 } });
     const resource = base.confirmed!.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;

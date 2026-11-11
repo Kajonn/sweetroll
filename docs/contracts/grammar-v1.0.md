@@ -124,6 +124,34 @@ A listed group with modifiers is eligible only when its policy lists those
 modifiers. An eligible starting die redraws its entire chain. Unlisted groups
 and locked chains reuse the original draws.
 
+## Roll outcomes and output text
+
+A roll action may list ordered `outcomes` (at most 16) and `details` (at most
+8). Each entry has an ID, a label and an `outcome` expression. Outcome
+expressions run after the roll, with the action's fields, inputs and item
+values plus `roll.total`. They may read the roll's named groups with
+`rolled("group")` but cannot draw dice. A band's condition is a boolean; the
+first true band becomes the roll's `outcome`. A detail is a number, such as a
+margin or success level. A failed outcome expression uses its fallback. Each
+outcome expression belongs to exactly one band or detail.
+
+```text
+outcomes: strong_hit  roll.total >= 10
+          weak_hit    roll.total >= 7
+          miss        true
+details:  levels      floor(fields.skill / 10) - floor(roll.total / 10)
+```
+
+The output template accepts `{total}`, `{outcome}`, `{detail.<id>}`,
+`{fields.<id>}`, `{inputs.<id>}` and, for granted actions, `{item.<id>}`.
+Publishing rejects any other placeholder, a `{detail.<id>}` the action does
+not define and `{outcome}` on an action without outcomes. When an action has
+outcomes and its template omits `{outcome}`, the label is appended to the
+output as ` — <label>`. A pushed roll is described again from its new total.
+Values an outcome reads that the roll formula did not are saved with the
+roll's bindings. Rolls never change characters. Extensions cannot define
+outcomes yet.
+
 ## Exclusions
 
 Custom faces, arbitrary property traversal, effects, loops, assignment, and

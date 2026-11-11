@@ -4,13 +4,14 @@ import { Disclosure } from "../../ui/Disclosure.js";
 import {PushPolicyEditor} from "./PushPolicyEditor.js";
 import type {PushPolicy} from "@sweetroll/rules";
 import {GroupedPoolEditor} from "./GroupedPoolEditor.js";
+import { RollOutcomesEditor, type OutcomeExpressions, type RollOutcomeEntry } from "./RollOutcomesEditor.js";
 import {RollBreakdown} from "../../rolls/RollBreakdown.js";
 import { useMemo, useState } from "react";
 
 import { evaluateRoll } from "../../api/evaluateExpression.js";
 import type { ApiClient } from "../../api/client.js";
 import { t } from "../../i18n/index.js";
-import { additiveRollModifier, type ScalarValue, type ValueType, type BindingValue, type FieldBindingType } from "../../ports/evaluateExpression.js";
+import { additiveRollModifier, previewOutput, type ScalarValue, type ValueType, type BindingValue, type FieldBindingType } from "../../ports/evaluateExpression.js";
 import { Button, Checkbox, FormField, NumberInput, Select } from "../../ui/index.js";
 import { ExpressionEditor } from "../expressions/ExpressionEditor.js";
 import styles from "./RollActionEditor.module.css";
@@ -33,6 +34,8 @@ export type RollActionV1 = {
   expressionId: DefinitionId;
   inputs: ActionInputV1[];
   outputTemplate: string;
+  outcomes?: RollOutcomeEntry[];
+  details?: RollOutcomeEntry[];
 };
 
 export type RollActionEditorProps = {
@@ -48,6 +51,8 @@ export type RollActionEditorProps = {
   slots?: SlotEnvironment;
   fieldLabels?: Record<string, string> | undefined;
   disabled?: boolean | undefined;
+  /** Storage for outcome and detail formulas; the outcomes section is hidden without it. */
+  outcomeExpressions?: OutcomeExpressions | undefined;
   /**
    * Guided (basics-first) mode for the dice tab: hides the grammar surfaces
    * (expression-id input + ExpressionEditor) and shows a dice-kind picker
@@ -137,7 +142,7 @@ function poolParameterFields(source: string) {
   const parsed = parse(source);
   if (!parsed.ok) return fields;
   function walk(node: ExpressionAstV1, parameter = false): void {
-    if (parameter && node.kind === "reference" && node.scope !== "inputs") {
+    if (parameter && node.kind === "reference" && node.scope !== "inputs" && node.scope !== "roll") {
       const id = node.part ? `${node.id}.${node.part}` : node.id;
       fields.set(`${node.scope}.${id}`, { scope: node.scope, id });
     }
@@ -148,8 +153,7 @@ function poolParameterFields(source: string) {
 }
 
 function formatOutput(template: string, total: number | null): string {
-  if (total === null) return template;
-  return template.replace(/\{total\}/g, String(total));
+  return total === null ? template : previewOutput(template, total);
 }
 
 export function RollActionEditor({
@@ -165,6 +169,7 @@ export function RollActionEditor({
   slots,
   fieldLabels,
   disabled,
+  outcomeExpressions,
   guided,
   diceKind,
   onDiceKindChange,
@@ -350,9 +355,13 @@ export function RollActionEditor({
               data-testid={`roll-action-output-${action.id}`}
               disabled={disabled}
             />
+            <small>{t("editor.action.roll.outputTemplate.help")}</small>
           </FormField>
         </div>
       </div>
+      {outcomeExpressions ? (
+        <RollOutcomesEditor action={action} onChange={onChange} expressions={outcomeExpressions} disabled={disabled} />
+      ) : null}
       <div className={styles.row} data-testid={`roll-action-inputs-${action.id}`}>
         <div className={styles.field}>
           {t("editor.action.roll.inputs.title")}

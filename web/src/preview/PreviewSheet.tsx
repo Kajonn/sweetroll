@@ -9,7 +9,7 @@ import { renderExpression } from "@sweetroll/rules";
 
 import { evaluateRoll } from "../api/evaluateExpression.js";
 import { t } from "../i18n/index.js";
-import { additiveRollModifier, type ScalarValue, type ValueType } from "../ports/evaluateExpression.js";
+import { additiveRollModifier, previewOutput, type ScalarValue, type ValueType } from "../ports/evaluateExpression.js";
 
 import type {
   ChoiceOptionV1,
@@ -261,7 +261,7 @@ function renderFieldValue(
 }
 
 function formatOutput(template: string, total: number): string {
-  return template.replace(/\{total\}/g, String(total));
+  return previewOutput(template, total);
 }
 
 function expressionInputTypes(action: RollActionV1): Record<string, ValueType> {

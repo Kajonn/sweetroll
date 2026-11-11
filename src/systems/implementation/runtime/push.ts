@@ -16,6 +16,7 @@ import type {
 } from "../../runtime.js";
 import type { PushContext } from "./push-context.js";
 import { findOwnedAction } from "./action-ownership.js";
+import { describeRoll } from "../rules/outcomes.js";
 import { findGrantedAction } from "./resolve-entries.js";
 import { validateEntryForSlot } from "./entries.js";
 import { createDeterministicRng } from "./deterministic-rng.js";
@@ -58,7 +59,7 @@ export function validatePushSource(
   state: RuntimeStateV1,
   parent: NormalizedRoll,
   context: PushContext,
-): string | null {
+): string | RollActionV1 {
   if (
     pkg.versionId !== context.versionId ||
     pkg.integrity.checksum !== context.packageChecksum ||
@@ -112,7 +113,7 @@ export function validatePushSource(
     !Value.Equal(action.pushPolicy, context.policy)
   )
     return "source_unavailable";
-  return null;
+  return action;
 }
 export function resolveRuntimePush(input: {
   pkg: SystemPackageV1;
@@ -134,7 +135,7 @@ export function resolveRuntimePush(input: {
     },
   });
   const source = validatePushSource(pkg, entity, state, parent, context);
-  if (source) return fail(source);
+  if (typeof source === "string") return fail(source);
   if (!parent.push) return fail("no_policy");
   const options = pushEligibility(context.policy, parent, parent.push.attempt);
   if (!options.canPush) return fail(options.reason!);
@@ -158,16 +159,24 @@ export function resolveRuntimePush(input: {
     limits: pkg.effectiveLimits,
   });
   if (!result.ok) return fail(result.reason);
+  // The pushed roll is described again: its outcome can differ from the parent's.
+  const { outcome: _outcome, details: _details, ...carried } = parent;
+  const { bindings: _read, ...described } = describeRoll({
+    action: source,
+    expression: (id) => pkg.expressions.find((candidate) => candidate.id === qualifiedId(context.extensionId, id)),
+    total: result.roll.total,
+    bindings,
+    rolled: result.rolled,
+    limits: pkg.effectiveLimits,
+  });
   return {
     ok: true,
     value: {
       context,
       roll: {
-        ...parent,
+        ...carried,
         ...result.roll,
-        output: context.outputTemplate
-          .split("{total}")
-          .join(String(result.roll.total)),
+        ...described,
         push: {
           ...parent.push,
           parentRollId: parent.push.rollId,

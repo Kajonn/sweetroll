@@ -16,6 +16,10 @@ export type EvaluationBindings = {
   fields: Record<string, BindingValue>;
   inputs: Record<string, BindingValue>;
   item?: Record<string, BindingValue>;
+  /** Outcome expressions: values of the finished roll (`roll.total`). */
+  roll?: Record<string, BindingValue>;
+  /** Outcome expressions: the finished roll's named groups, for rolled("group"). */
+  rolled?: RolledPools;
   datasets?: readonly RulesDataset[];
   slotEntries?: (slot: string) => readonly AggregateEntry[];
   aggregates?: Record<string, BindingValue>;
@@ -41,8 +45,11 @@ export type RuntimeDiagnostic = {
 
 export type RollResult = { total: number; dice: DieResult[]; expression: string; breakdown: RollBreakdown };
 
+/** Dice of the named groups a roll drew, kept in memory for outcome expressions; never stored. */
+export type RolledPools = ReadonlyMap<string, { total: number; chains: DieResult[][] }>;
+
 export type EvalResult =
-  | { ok: true; roll: RollResult | null; result: ScalarValue; diagnostics: RuntimeDiagnostic[]; bindings: EvaluationBinding[] }
+  | { ok: true; roll: RollResult | null; result: ScalarValue; diagnostics: RuntimeDiagnostic[]; bindings: EvaluationBinding[]; rolled: RolledPools }
   | { ok: false; diagnostics: RuntimeDiagnostic[] };
 
 type Ctx = {
@@ -234,7 +241,8 @@ function evalValueNode(node: ExpressionAstV1, ctx: Ctx): BindingValue | undefine
       const scope = ctx.bindings[node.scope] ?? {};
       const val = Object.hasOwn(scope, key) ? scope[key] : undefined;
       if (val === undefined) return fail(ctx, `missing reference ${node.scope}.${key}`);
-      ctx.bindingTrace.push({ scope: node.scope, definitionId: key, value: val });
+      // `roll.*` is the roll itself, not an input to it, so it is not traced.
+      if (node.scope !== "roll") ctx.bindingTrace.push({ scope: node.scope, definitionId: key, value: val });
       return val;
     }
     case "unary": {
@@ -417,7 +425,7 @@ export function evaluate(
     nodeIds,
     evaluatedNodes: new Set(),
     breakdown,
-    pools: new Map(),
+    pools: new Map(bindings.rolled ?? []),
     bindings,
     bindingTrace: [],
     limits,
@@ -441,8 +449,8 @@ export function evaluate(
       breakdown.terms.push({ id: breakdown.rootId, operation: "fallback", operandIds: [], value: compiled.fallback });
     }
     const roll = breakdown ? { total: num(compiled.fallback) ?? 0, dice: ctx.dice, expression, breakdown } : null;
-    return { ok: true, result: compiled.fallback, roll, diagnostics, bindings: ctx.bindingTrace };
+    return { ok: true, result: compiled.fallback, roll, diagnostics, bindings: ctx.bindingTrace, rolled: ctx.pools };
   }
   const roll = breakdown ? { total: num(value) ?? 0, dice: ctx.dice, expression, breakdown } : null;
-  return { ok: true, result: value, roll, diagnostics: ctx.diagnostics, bindings: ctx.bindingTrace };
+  return { ok: true, result: value, roll, diagnostics: ctx.diagnostics, bindings: ctx.bindingTrace, rolled: ctx.pools };
 }

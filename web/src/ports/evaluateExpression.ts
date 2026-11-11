@@ -121,3 +121,14 @@ export function additiveRollModifier(result: EvaluateExpressionResult): number |
     ? result.roll.total - result.roll.dice.reduce((sum, die) => die.kept ? sum + die.value : sum, 0)
     : null;
 }
+
+/**
+ * Output text for creator previews. The total is real; outcome, detail and
+ * value placeholders are shown as an ellipsis because previews roll sample
+ * dice without evaluating a sheet's outcomes.
+ */
+export function previewOutput(template: string, total: number): string {
+  return template
+    .replace(/\{total\}/g, String(total))
+    .replace(/\{[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\}/g, "…");
+}

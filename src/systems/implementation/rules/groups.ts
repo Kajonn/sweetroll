@@ -19,7 +19,7 @@ export function containsDice(ast: ExpressionAstV1): boolean {
   return ast.kind === "pool" || children(ast).some(containsDice);
 }
 
-function drawsDice(ast: ExpressionAstV1): boolean {
+export function drawsDice(ast: ExpressionAstV1): boolean {
   return (ast.kind === "pool" && ast.source.kind === "dice") || children(ast).some(drawsDice);
 }
 
@@ -27,10 +27,20 @@ export function hasDiceGroups(ast: ExpressionAstV1): boolean {
   return (ast.kind === "pool" && ast.group !== undefined) || children(ast).some(hasDiceGroups);
 }
 
-export function validateDiceGroups(ast: ExpressionAstV1): RulesDiagnostic[] {
+/** Named groups of an expression, in the order they are rolled. */
+export function namedGroups(ast: ExpressionAstV1): string[] {
+  const own = ast.kind === "pool" && ast.group !== undefined && ast.source.kind === "dice" ? [ast.group.id] : [];
+  return [...children(ast).flatMap(namedGroups), ...own];
+}
+
+/**
+ * `rolled` lists groups that were rolled before this expression runs: an
+ * outcome expression reads the groups of the roll it describes.
+ */
+export function validateDiceGroups(ast: ExpressionAstV1, rolled: readonly string[] = []): RulesDiagnostic[] {
   const diagnostics: RulesDiagnostic[] = [];
-  const ids = new Set<string>();
-  const available = new Set<string>();
+  const ids = new Set<string>(rolled);
+  const available = new Set<string>(rolled);
   const fail = (message: string) =>
     diagnostics.push({ code: "invalid_expression", path: "", message });
 

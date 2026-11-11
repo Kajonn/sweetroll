@@ -28,7 +28,8 @@ import { VersionHistory } from "../publish/VersionHistory.js";
 import { ReferenceDataEditor, type ReferenceDataV1 } from "./referenceData/ReferenceDataEditor.js";
 import { SheetEditor, type UnplacedDefinition } from "./sheet/SheetEditor.js";
 import type { SheetEditorV1 } from "./sheet/sheetTypes.js";
-import { collectUsedIds, readSlots } from "./sheet/slotTypes.js";
+import { collectUsedIds, nextScopedId, readSlots } from "./sheet/slotTypes.js";
+import type { OutcomeExpressions } from "./actions/RollOutcomesEditor.js";
 import { TemplatesTab } from "./TemplatesTab.js";
 import { useDraftSync } from "../state/draftSync.js";
 import {
@@ -880,6 +881,28 @@ function nextSheetId(existing: ReadonlyArray<string>): string {
  * edit and rapid successive edits cannot clobber each other. Unknown ids
  * are ignored: no stray entries.
  */
+/** Stores outcome and detail formulas as `outcome` expressions of the document. */
+export function outcomeExpressionStore(
+  document: SystemDocumentV1,
+  dispatch: React.Dispatch<DocumentAction>,
+): OutcomeExpressions {
+  return {
+    sourceFor: (expressionId) => (document.expressions ?? []).find((entry) => entry.id === expressionId)?.source ?? "",
+    add: (kind, source) => {
+      const id = nextScopedId(collectUsedIds(document), kind === "outcomes" ? "outcome_expr" : "detail_expr");
+      dispatch({
+        type: "addExpression",
+        expression: kind === "outcomes"
+          ? { id, context: "outcome", resultType: "boolean", source, fallback: false }
+          : { id, context: "outcome", resultType: "number", source, fallback: 0 },
+      });
+      return id;
+    },
+    setSource: (expressionId, source) => dispatch({ type: "setExpressionSource", expressionId, source }),
+    remove: (expressionId) => dispatch({ type: "removeExpression", expressionId }),
+  };
+}
+
 export function persistExpressionSource(
   document: SystemDocumentV1,
   dispatch: React.Dispatch<DocumentAction>,
@@ -1032,6 +1055,7 @@ function DiceTab({
                   onExpressionSourceChange={(next) => {
                     persistExpressionSource(document, dispatch, action.expressionId, next);
                   }}
+                  outcomeExpressions={outcomeExpressionStore(document, dispatch)}
                   fieldTypes={buildFieldTypeMap(document, action.id)}
                   datasets={document.referenceData}
                   slots={previewSlots(document, actionOwner(document, action.id)?.id)}
@@ -1535,7 +1559,7 @@ function compilePreviewExpressions(
       if (result.ok) {
         out.push({
           id: entry.id,
-          context: result.value.context,
+          context,
           resultType: result.value.resultType,
           fallback: result.value.fallback,
           ast: result.value.ast,

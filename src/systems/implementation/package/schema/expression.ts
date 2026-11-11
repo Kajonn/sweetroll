@@ -30,7 +30,7 @@ export const ExpressionAstV1Schema = Type.Recursive(
       Type.Object(
         {
           kind: Type.Literal("reference"),
-          scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item")]),
+          scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("roll")]),
           id: DefinitionIdSchema,
           part: Type.Optional(Type.Union([Type.Literal("current"), Type.Literal("max")])),
         },
@@ -133,6 +133,7 @@ export const CompiledExpressionV1Schema = Type.Object(
       Type.Literal("computed"),
       Type.Literal("roll"),
       Type.Literal("validation"),
+      Type.Literal("outcome"),
     ]),
     resultType: ValueTypeSchema,
     inferredType: ValueTypeSchema,

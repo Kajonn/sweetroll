@@ -1,5 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
-import { expectCreatorUsable, playAtEachViewport } from "../fixtures/guiChecks";
+import { expectCreatorUsable, expectReadableInDarkAndLargeText, playAtEachViewport } from "../fixtures/guiChecks";
 import { movesDocument } from "../../../src/systems/implementation/package/fixtures/outcome-systems.js";
 import { uid } from "../offline/test-auth.js";
 
@@ -55,6 +55,7 @@ test("Hearthbound names move outcomes in the creator, player sheet and GM sessio
     await playAtEachViewport(page, "outcome roll on the sheet", page.getByRole("button", { name: "Make Move", exact: true }),
       () => expect(page.getByTestId("roll-outcome")).toHaveText(outcome));
     await expect(page.getByText("Margin", { exact: true })).toBeVisible();
+    await expectReadableInDarkAndLargeText(page, "roll result with outcome and details");
     await expect(page.getByText(/^(Strong hit|Weak hit|Miss) \(\d+, margin -?\d+\)$/)).toBeVisible();
 
     await page.goto("/campaigns/new");

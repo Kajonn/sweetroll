@@ -205,7 +205,40 @@ Owner answers of 2026-11-12: D1 all stages, D2 yes, D3 no. D4 is not answered ye
   16 with the container's Chromium. Not verified: CI on the pinned Chromium, and
   whether the two style fixes touch an existing visual baseline.
 
-Open in T1: items 4 (resource editing journey, online and offline), 5 (error and
-edge states), 6 (two-player shared deck), 7 (visual baselines, which must be
-generated with the pinned Chromium and reviewed by a person) and 8 (dark theme
-and enlarged text). T2 and T3 are not started.
+**T1 items 4, 6 and 8, and part of 5 — 2026-11-12, implemented.**
+
+- Item 4: `e2e/resourceEditing.spec.ts` sets current and maximum by direct
+  input, applies 17 damage as one command from the keyboard at phone width,
+  checks that healing stops at the maximum, that out-of-range input is refused
+  and that the GM board offers one-tap steps only.
+  `offline/resourceEditing.spec.ts` queues an amount and a direct input offline
+  against the production build and checks one applied command each. The
+  computed-maximum case stays in `rulesData.spec.ts`.
+- Item 6: a second test in `cardDecks.spec.ts` puts two players in separate
+  browser profiles on one campaign deck, with alternating and simultaneous
+  draws, the count after reload and a GM shuffle. The private-draw case is not
+  in the GUI test: the sheet has no audience control, so it stays in the API
+  scenario.
+- Item 8: `expectReadableInDarkAndLargeText` checks the six states in the dark
+  theme and with text at 200 %. It asserts that the theme really switched.
+- Item 5, done: `adv(3d6)` rejected beside the editor (R2), an answered roll no
+  longer offered for a second response (R7), the empty deck (R8), the bad symbol
+  entry (R6, already present), and `e2e/pushResourcePlaceholder.spec.ts` for
+  reloading and pushing a roll that prints a resource part (R5 regression).
+- Verified locally with the container's Chromium: the nine journey specs
+  (fourteen tests) and the offline resource test pass. Not verified: CI on the
+  pinned Chromium.
+
+**T1 item 5 (rest) and item 1 (rest) — 2026-11-12, implemented.**
+
+- `e2e/rulesEdgeStates.spec.ts`: the sheet budget blocking publish in the
+  creator (R0), a lookup with no row (R3), the 100-dice refusal (R4), a roll
+  with no matching band (R5) and no eligible target (R7).
+- The creator check opens the preview at 360 px and uses the editor/preview
+  switch.
+- Full local run: see the
+  [2026-11-12 record](../../acceptance/rules-coverage-gui-2026-11-12.md), which
+  also lists everything that is left.
+
+Open in T1: item 7 (visual baselines) and the exit condition (three passing CI
+runs on the pinned Chromium). T2 and T3 are not started.

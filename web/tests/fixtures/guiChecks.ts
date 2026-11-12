@@ -85,12 +85,49 @@ export async function playAtEachViewport(
   await expectAccessible(page, `${state}: after use`);
 }
 
-/** The creator page: accessible at desktop size, and no sideways page scroll at tablet and phone widths. */
+/** The creator page: accessible at desktop size, no sideways page scroll at tablet and phone widths, and a working editor/preview switch on the phone. */
 export async function expectCreatorUsable(page: Page, state: string): Promise<void> {
   await expectAccessible(page, state);
-  for (const viewport of [PLAY_VIEWPORTS[1], PLAY_VIEWPORTS[0]]) {
-    await page.setViewportSize(viewport);
-    await expectNoPageOverflow(page);
-  }
+  await page.setViewportSize(PLAY_VIEWPORTS[1]);
+  await expectNoPageOverflow(page);
+  // On a phone the creator is for review and small edits: one pane at a time.
+  await page.setViewportSize(PLAY_VIEWPORTS[0]);
+  await expectNoPageOverflow(page);
+  const preview = page.getByTestId("document-editor-preview-view-preview");
+  const editor = page.getByTestId("document-editor-preview-view-editor");
+  const toggle = page.getByTestId("document-editor-preview-toggle");
+  const wasOpen = await toggle.getAttribute("aria-pressed") === "true";
+  // Opening the preview on a phone lands on the preview pane and shows the switch.
+  if (!wasOpen) await toggle.click();
+  else await preview.click();
+  await expectWithinViewport(preview);
+  await expect(preview).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("document-editor-editor-pane")).toBeHidden();
+  await expectNoPageOverflow(page);
+  await editor.click();
+  await expect(editor).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("document-editor-editor-pane")).toBeVisible();
+  if (!wasOpen) await toggle.click();
   await page.setViewportSize(DESKTOP);
+}
+
+/**
+ * One pass in the dark theme and one with text at 200 %: the current state
+ * stays accessible (contrast included) and the page still does not scroll
+ * sideways. Restores the light theme and normal text size.
+ */
+export async function expectReadableInDarkAndLargeText(page: Page, state: string): Promise<void> {
+  await page.emulateMedia({ colorScheme: "dark" });
+  // The app follows the device preference by default; fail if it did not switch.
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expectAccessible(page, `${state}: dark theme`);
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  try {
+    await expectNoPageOverflow(page);
+    await expectAccessible(page, `${state}: text at 200 %`);
+  } finally {
+    await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+  }
 }

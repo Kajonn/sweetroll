@@ -1,5 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
-import { expectCreatorUsable, playAtEachViewport } from "../fixtures/guiChecks";
+import { expectCreatorUsable, expectReadableInDarkAndLargeText, playAtEachViewport } from "../fixtures/guiChecks";
 import { customDiceDocument, customDiceFixtures } from "../../../src/systems/implementation/package/fixtures/custom-dice.js";
 import { uid } from "../offline/test-auth.js";
 
@@ -63,6 +63,7 @@ for (const fixture of customDiceFixtures) {
       await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
       await playAtEachViewport(page, `${fixture.name} roll on the sheet`, page.getByRole("button", { name: fixture.action, exact: true }),
         () => expect(faces.getByRole("listitem")).toHaveCount(4));
+      await expectReadableInDarkAndLargeText(page, `${fixture.name} faces on the sheet`);
 
       await page.goto("/campaigns/new");
       await page.getByRole("button", { name: `${systemName} 1.0.0` }).click();

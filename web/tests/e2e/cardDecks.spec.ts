@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures/browserTest";
-import { expectAccessible, expectCreatorUsable, playAtEachViewport, pressFromKeyboard } from "../fixtures/guiChecks";
+import { expectAccessible, expectCreatorUsable, expectReadableInDarkAndLargeText, playAtEachViewport, pressFromKeyboard } from "../fixtures/guiChecks";
 import { emberRoadDocument } from "../../../src/systems/implementation/package/fixtures/card-decks.js";
+import { cleanup, json, key, resultOf, signIn } from "../fixtures/configurablePush.js";
 import { uid } from "../offline/test-auth.js";
 
 test("creator, player and GM draw from the Ember Road omen deck", async ({ page }) => {
@@ -33,6 +34,7 @@ test("creator, player and GM draw from the Ember Road omen deck", async ({ page 
     await expect(page.getByTestId("deck-action-gather_omens").getByLabel("Deck")).toHaveValue("omen_deck");
 
     await expectCreatorUsable(page, "card decks creator");
+    await expectReadableInDarkAndLargeText(page, "deck editor in the Dice tab");
     await page.getByTestId("document-editor-publish").click();
     await page.getByTestId("publish-dialog-semver").fill("1.0.0");
     await page.getByTestId("publish-dialog-release-notes").fill("Omen deck");
@@ -56,6 +58,7 @@ test("creator, player and GM draw from the Ember Road omen deck", async ({ page 
     });
     await expect(cards).toContainText("Omen deck: 3 cards left");
     await expect(drawCount).toHaveText("Omen deck: 3 of 12 cards left");
+    await expectReadableInDarkAndLargeText(page, "drawn cards with the count");
     await draw.click();
     await expect(cards).toContainText("Omen deck: 0 cards left");
     await expect(drawCount).toHaveText("Omen deck has no cards left. Shuffle it to draw again.");
@@ -87,5 +90,89 @@ test("creator, player and GM draw from the Ember Road omen deck", async ({ page 
     await expect(page.getByText("Omen deck shuffled.")).toBeVisible();
   } finally {
     if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
+  }
+});
+
+// GUI test plan T1 item 6: a campaign deck shared by two players in separate browser profiles.
+test("two players share the campaign's omen deck and never see the same card", async ({ page, browser }) => {
+  test.setTimeout(120_000);
+  await signIn(page, "code-journey-gm");
+  const document = structuredClone(emberRoadDocument);
+  document.metadata.name = `Ember Road ${key()}`;
+  const { workspace } = await json(page.request, "POST", "/api/systems", {
+    source: { kind: "blank", name: document.metadata.name }, idempotencyKey: key(),
+  });
+  const systemId = workspace.system.systemId as string;
+  const characterIds: string[] = [];
+  const baseURL = new URL(page.url()).origin;
+  const contexts = await Promise.all([browser.newContext({ baseURL }), browser.newContext({ baseURL })]);
+  let campaignId: string | undefined;
+  try {
+    const saved = await json(page.request, "PUT", `/api/systems/${systemId}/draft`, {
+      expectedRevision: workspace.draft.revision, document,
+    });
+    const { version } = await json(page.request, "POST", `/api/systems/${systemId}/publish`, {
+      expectedRevision: saved.workspace.draft.revision, semanticVersion: "1.0.0", releaseNotes: "Shared omen deck",
+      acknowledgeBreaking: true, idempotencyKey: key(),
+    });
+    const { campaign } = await json(page.request, "POST", "/api/campaigns", {
+      systemVersionId: version.versionId, title: document.metadata.name, idempotencyKey: key(),
+    });
+    campaignId = campaign.campaignId;
+    const path = `/api/campaigns/${campaignId}`;
+    const revision = async () => (await json(page.request, "GET", path)).campaign.revision;
+    const [seer, scout] = await Promise.all(contexts.map(context => context.newPage()));
+    for (const [player, code, name] of [[seer!, "code-journey-p1", "Seer"], [scout!, "code-journey-p2", "Scout"]] as const) {
+      const userId = await signIn(player, code);
+      const { invitation } = await json(page.request, "POST", `${path}/invitations`, {
+        intendedRole: "player", expectedCampaignRevision: await revision(), idempotencyKey: key(),
+      });
+      const { review } = await json(player.request, "POST", "/api/invitations/review", { token: invitation.token });
+      await json(player.request, "POST", "/api/invitations/accept", {
+        campaignId, token: invitation.token, expectedInvitationRevision: review.invitationRevision,
+        reviewedAccessRevision: review.accessRevision, idempotencyKey: key(),
+      });
+      const { character } = await json(page.request, "POST", `${path}/characters`, {
+        name, entityDefinitionId: "character", controllerUserIds: [userId],
+        expectedCampaignRevision: await revision(), idempotencyKey: key(),
+      });
+      characterIds.push(character.characterId);
+      await player.goto(`/characters/${character.characterId}`);
+      await expect(player.getByTestId("deck-count-read_omens_element")).toHaveText("Omen deck: 12 of 12 cards left");
+    }
+    const count = (player: typeof page) => player.getByTestId("deck-count-read_omens_element");
+    const draw = async (player: typeof page) =>
+      (await resultOf(player, () => player.getByRole("button", { name: "Read the omens", exact: true }).click(), "/actions/read_omens")).result.roll;
+    const shown = (player: typeof page) => player.getByRole("region", { name: "Cards drawn from Omen deck" }).getByRole("listitem");
+
+    // Alternating draws come from one deck: each sheet shows its own cards and the shared count.
+    const first = await draw(seer!);
+    await expect(shown(seer!)).toHaveText(first.breakdown.cards.drawn.map((card: { label: string }) => new RegExp(`^${card.label} `)));
+    await expect(count(seer!)).toHaveText("Omen deck: 10 of 12 cards left");
+    const second = await draw(scout!);
+    await expect(count(scout!)).toHaveText("Omen deck: 8 of 12 cards left");
+    const ids = (roll: { breakdown: { cards: { drawn: { id: string }[] } } }) => roll.breakdown.cards.drawn.map(card => card.id);
+    expect(new Set([...ids(first), ...ids(second)]).size).toBe(4);
+    // The other sheet learns the count when it is loaded again, as documented.
+    await expect(count(seer!)).toHaveText("Omen deck: 10 of 12 cards left");
+    await seer!.reload();
+    await expect(count(seer!)).toHaveText("Omen deck: 8 of 12 cards left");
+
+    // Both draw at the same moment: still no card twice.
+    const [third, fourth] = await Promise.all([draw(seer!), draw(scout!)]);
+    expect(new Set([...ids(first), ...ids(second), ...ids(third), ...ids(fourth)]).size).toBe(8);
+    expect([third.breakdown.cards.remaining, fourth.breakdown.cards.remaining].sort()).toEqual([4, 6]);
+
+    // The GM reads both campaign-audience draws on the session board's sheet and may shuffle the shared deck.
+    await page.goto(`/campaigns/${campaignId}`);
+    await page.getByRole("tab", { name: "Session", exact: true }).click();
+    await page.getByRole("button", { name: "Open Seer", exact: true }).click();
+    await page.getByRole("button", { name: "Gather the omens", exact: true }).click();
+    await expect(page.getByText("Omen deck shuffled.")).toBeVisible();
+    await scout!.reload();
+    await expect(count(scout!)).toHaveText("Omen deck: 12 of 12 cards left");
+  } finally {
+    await Promise.all(contexts.map(context => context.close()));
+    if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await cleanup(page.request, systemId, characterIds, campaignId);
   }
 });

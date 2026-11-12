@@ -1,6 +1,6 @@
 import { bridgeContestDocument } from "../../../src/systems/implementation/package/fixtures/opposed.js";
 import { expect, test } from "../fixtures/browserTest";
-import { PLAY_VIEWPORTS, atEachViewport, expectAccessible, expectCreatorUsable, expectWithinViewport, pressFromKeyboard } from "../fixtures/guiChecks";
+import { atEachViewport, expectAccessible, expectCreatorUsable, expectReadableInDarkAndLargeText, expectWithinViewport, PLAY_VIEWPORTS, pressFromKeyboard } from "../fixtures/guiChecks";
 import { cleanup, json, key, resultOf, signIn } from "../fixtures/configurablePush.js";
 
 test("creator, players and GM play the Bridge Contest", async ({ page, browser }) => {
@@ -79,6 +79,7 @@ test("creator, players and GM play the Bridge Contest", async ({ page, browser }
       await expectWithinViewport(attack.getByRole("button", { name: "Bridge attack", exact: true }));
     });
     await expectAccessible(striker!, "target picker on the sheet");
+    await expectReadableInDarkAndLargeText(striker!, "target picker on the sheet");
     await striker!.setViewportSize(PLAY_VIEWPORTS[0]);
     const hit = (await resultOf(striker!, () => pressFromKeyboard(attack.getByRole("button", { name: "Bridge attack", exact: true })), "/actions/attack")).result.roll;
     expect(hit.targetCharacterId).toBe(characterIds[1]);
@@ -98,6 +99,11 @@ test("creator, players and GM play the Bridge Contest", async ({ page, browser }
     const reply = (await resultOf(defender!, () => counter.getByRole("button", { name: "Counter the challenge", exact: true }).click(), "/actions/counter")).result.roll;
     expect(reply.total).toBe(reply.dice[0].value - hit.total);
     expect(reply.bindings).toEqual([{ scope: "opposed", definitionId: "total", value: hit.total }]);
+
+    // One response per player: the answered roll is no longer offered and the action stays off.
+    await counter.getByRole("button", { name: "Load roll options" }).click();
+    await expect(counter.getByLabel("Recorded roll").getByRole("option", { name: hit.output, exact: true })).toHaveCount(0);
+    await expect(counter.getByRole("button", { name: "Counter the challenge", exact: true })).toBeDisabled();
 
     await page.goto(`/campaigns/${campaignId}`);
     await page.getByRole("tab", { name: "Session", exact: true }).click();

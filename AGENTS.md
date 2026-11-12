@@ -90,3 +90,7 @@ on 2026-11-10 with all decisions C1–C13: the rules contract is replaced in pla
 (no systems are published), rolls never change characters, opposed rolls need no
 privacy layer and cards are simple draw/shuffle decks. Linter/formatter tooling is
 not part of it. Stages R0–R8 are implemented (R8: card decks, 2026-11-12). See the plan's implementation record before changing the rules engine.
+
+A [GUI test plan for the rules coverage features](docs/superpowers/plans/2026-11-12-rules-coverage-gui-testing.md)
+is proposed and not yet approved. Do not start its work before the owner
+approves it and its decisions D1–D4.

@@ -241,7 +241,7 @@ class Parser {
     if (!this.at("lparen")) { this.fail("expected '(' after " + which); return undefined; }
     this.take();
     const t = this.take();
-    if (!t || t.kind !== "dice") { this.fail(which + " expects a static dice literal"); return undefined; }
+    if (!t || t.kind !== "dice" || t.count !== 1 || t.keep) { this.fail(which + " expects a single die such as d20"); return undefined; }
     if (!this.at("rparen")) { this.fail("missing closing paren"); return undefined; }
     this.take();
     return {

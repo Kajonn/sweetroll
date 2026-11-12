@@ -35,7 +35,7 @@ values are sets of selected IDs and can be read with `has`.
 | `round(number, mode?)` | Rounded number; mode is `nearest`, `down`, or `up` |
 | `d20`, `2d6` | Static dice result |
 | `4d6kh3`, `4d6kl1` | Keep highest/lowest dice result |
-| `adv(d20)`, `dis(d20)` | Roll two dice and keep the higher/lower one |
+| `adv(d20)`, `dis(d20)` | Roll two dice and keep the higher/lower one. The argument is one die; other counts and keep suffixes are rejected |
 | `dice(count, sides)` | Roll and sum a pool with expression-valued count and sides |
 | `dice(count, "die_id")` | Roll and sum a custom die defined in the system package |
 | `countSymbol(pool, "symbol")` | Sum the named symbol’s multiplicities across faces in the pool |

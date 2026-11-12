@@ -89,4 +89,8 @@ describe("parser", () => {
     if (!r.ok) return;
     expect(r.ast).toEqual({ kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 20 } }, modifiers: [], reducer: { kind: mode, amount: { kind: "numberLiteral", value: 1 } } });
   });
+
+  it.each(["adv(3d6)", "dis(2d20)", "adv(4d6kh3)"])("rejects %s instead of rolling different dice", (source) => {
+    expect(parse(source)).toMatchObject({ ok: false, diagnostics: [{ message: expect.stringContaining("expects a single die") }] });
+  });
 });

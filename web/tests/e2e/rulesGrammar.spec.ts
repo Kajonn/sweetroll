@@ -37,7 +37,11 @@ test("creator, player and GM use conditional rules from the same published versi
       response.request().method() === "PUT" &&
       response.request().postDataJSON()?.document?.expressions?.some((entry: { source: string }) => entry.source === formula),
     );
+    // A formula the grammar rejects is reported beside the editor, with the reason.
+    await page.getByTestId("expression-editor-source").fill("adv(3d6)");
+    await expect(page.getByTestId("expression-editor-live-diagnostic").first()).toContainText("expects a single die such as d20");
     await page.getByTestId("expression-editor-source").fill(formula);
+    await expect(page.getByTestId("expression-editor-live-no-issues")).toBeVisible();
     expect((await saved).status()).toBe(200);
     await page.getByTestId("roll-action-try-check").click();
     await expect(page.getByTestId("roll-action-try-total-check")).toHaveText("1");

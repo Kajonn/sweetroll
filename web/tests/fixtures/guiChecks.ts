@@ -94,3 +94,24 @@ export async function expectCreatorUsable(page: Page, state: string): Promise<vo
   }
   await page.setViewportSize(DESKTOP);
 }
+
+/**
+ * One pass in the dark theme and one with text at 200 %: the current state
+ * stays accessible (contrast included) and the page still does not scroll
+ * sideways. Restores the light theme and normal text size.
+ */
+export async function expectReadableInDarkAndLargeText(page: Page, state: string): Promise<void> {
+  await page.emulateMedia({ colorScheme: "dark" });
+  // The app follows the device preference by default; fail if it did not switch.
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expectAccessible(page, `${state}: dark theme`);
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+  try {
+    await expectNoPageOverflow(page);
+    await expectAccessible(page, `${state}: text at 200 %`);
+  } finally {
+    await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+  }
+}

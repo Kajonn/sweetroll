@@ -1,5 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
-import { atEachViewport, expectAccessible, expectWithinViewport, pressFromKeyboard } from "../fixtures/guiChecks";
+import { atEachViewport, expectAccessible, expectReadableInDarkAndLargeText, expectWithinViewport, pressFromKeyboard } from "../fixtures/guiChecks";
 import { expectSheetSaved } from "../fixtures/sheetSaved";
 import { d20Document } from "../../../src/systems/implementation/package/fixtures/d20.js";
 import { uid } from "../offline/test-auth.js";
@@ -64,6 +64,7 @@ test("a player applies damage in one command and raises the maximum; the GM boar
     await page.getByLabel("Maximum Health", { exact: true }).fill("20");
     await page.getByLabel("Current Health", { exact: true }).fill("20");
     await expectAccessible(page, "resource direct input");
+    await expectReadableInDarkAndLargeText(page, "resource direct input");
     await page.getByRole("button", { name: "Save Health", exact: true }).click();
     await expect(page.getByText("20 / 20", { exact: true })).toBeVisible();
     await expectSheetSaved(page);

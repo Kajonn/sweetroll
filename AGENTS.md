@@ -95,4 +95,6 @@ A [GUI test plan for the rules coverage features](docs/superpowers/plans/2026-11
 was decided by the owner on 2026-11-12: all stages run at three widths (D1), the
 twelve visual baselines are added (D2) and the hosted run is not required before
 PR 75 merges (D3). D4 (who performs the human checks) is open and blocks only T3.
-See the plan's implementation record for what is done.
+T1 is implemented except the visual baselines and its CI exit. The
+[2026-11-12 local record](docs/acceptance/rules-coverage-gui-2026-11-12.md) has the
+results and the list of what is left; T2 and T3 are not started.

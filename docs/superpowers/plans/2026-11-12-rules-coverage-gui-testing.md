@@ -229,14 +229,16 @@ Owner answers of 2026-11-12: D1 all stages, D2 yes, D3 no. D4 is not answered ye
   (fourteen tests) and the offline resource test pass. Not verified: CI on the
   pinned Chromium.
 
-Open in T1:
+**T1 item 5 (rest) and item 1 (rest) — 2026-11-12, implemented.**
 
-- Item 5, rest: the sheet-budget diagnostic at publish (R0), a lookup with no
-  row (R3), the 100-dice refusal (R4), a roll with no matching band (R5), no
-  eligible target (R7) and the deck-without-cards warning in a journey (R8; it
-  has a unit test).
-- Item 7: the twelve visual baselines. They must be generated with the pinned
-  Chromium and reviewed by a person; this environment has a different build.
-- Item 1, rest: the 360 px creator step that opens the editor/preview switch.
+- `e2e/rulesEdgeStates.spec.ts`: the sheet budget blocking publish in the
+  creator (R0), a lookup with no row (R3), the 100-dice refusal (R4), a roll
+  with no matching band (R5) and no eligible target (R7).
+- The creator check opens the preview at 360 px and uses the editor/preview
+  switch.
+- Full local run: see the
+  [2026-11-12 record](../../acceptance/rules-coverage-gui-2026-11-12.md), which
+  also lists everything that is left.
 
-T2 and T3 are not started.
+Open in T1: item 7 (visual baselines) and the exit condition (three passing CI
+runs on the pinned Chromium). T2 and T3 are not started.

@@ -95,14 +95,19 @@ export async function expectCreatorUsable(page: Page, state: string): Promise<vo
   await expectNoPageOverflow(page);
   const preview = page.getByTestId("document-editor-preview-view-preview");
   const editor = page.getByTestId("document-editor-preview-view-editor");
+  const toggle = page.getByTestId("document-editor-preview-toggle");
+  const wasOpen = await toggle.getAttribute("aria-pressed") === "true";
+  // Opening the preview on a phone lands on the preview pane and shows the switch.
+  if (!wasOpen) await toggle.click();
+  else await preview.click();
   await expectWithinViewport(preview);
-  await preview.click();
   await expect(preview).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("document-editor-editor-pane")).toBeHidden();
   await expectNoPageOverflow(page);
   await editor.click();
   await expect(editor).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("document-editor-editor-pane")).toBeVisible();
+  if (!wasOpen) await toggle.click();
   await page.setViewportSize(DESKTOP);
 }
 

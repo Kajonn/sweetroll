@@ -11,7 +11,10 @@ test("R0: a sheet over the evaluation budget is refused at publish with a locate
   test.setTimeout(120_000);
   await signIn(page, "code-test-a");
   const document = structuredClone(d20Document);
-  const source = ["1", ...Array.from({ length: 120 }, () => "1")].join(" + ");
+  // 220 nodes at depth 4: inside every per-expression limit, 8,800 for the sheet.
+  const inner = "min(1, 2, 3, 4, 5, 6, 7, 8)";
+  const middle = `max(${Array.from({ length: 8 }, () => inner).join(", ")})`;
+  const source = `max(${middle}, ${middle}, ${middle})`;
   for (let index = 0; index < 40; index += 1) {
     document.entities[0]!.fields.push({ kind: "computed", id: `heavy_${index}`, label: `Heavy ${index}`, valueType: "number", expressionId: `heavy_expr_${index}` });
     document.expressions.push({ id: `heavy_expr_${index}`, context: "computed", resultType: "number", source, fallback: 0 });
@@ -19,11 +22,12 @@ test("R0: a sheet over the evaluation budget is refused at publish with a locate
   const created = await workspace(page.request, document);
   try {
     await page.goto(`/systems/${created.id}`);
-    await page.getByTestId("document-editor-publish").click();
-    await page.getByTestId("publish-dialog-semver").fill("1.0.0");
-    await page.getByTestId("publish-dialog-release-notes").fill("Too heavy");
-    await page.getByTestId("publish-dialog-submit").click();
-    await expect(page.getByText(/evaluation steps; the limit is 8192/)).toBeVisible();
+    // The creator finds the problem before any publish request and names it in the diagnostics.
+    const publishButton = page.getByTestId("document-editor-publish");
+    await expect(publishButton).toBeDisabled();
+    await expect(publishButton).toHaveAttribute("title", /Resolve 1 issue before publishing/);
+    await page.getByTestId("document-editor-diagnostics-toggle").click();
+    await expect(page.getByTestId("diagnostics-drawer")).toContainText(/evaluation steps; the limit is 8192/);
     await expect(page.getByTestId("publish-dialog-success")).toHaveCount(0);
   } finally {
     if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await cleanup(page.request, created.id, []);

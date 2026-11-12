@@ -37,6 +37,7 @@ describe.each([false, true])("public API with combined deployment = %s", (combin
         "/characters/{characterId}/entries", "/characters/{characterId}/entries/{entryId}",
         "/characters/{characterId}/entries/{entryId}/image", "/characters/{characterId}/fields/{fieldId}/set",
         "/characters/{characterId}/portrait", "/characters/{characterId}/resources/{resourceId}/bump",
+        "/characters/{characterId}/resources/{resourceId}/adjust", "/characters/{characterId}/resources/{resourceId}",
         "/openapi.json", "/system-versions/{versionId}/export", "/systems", "/systems/validate", "/systems/{systemId}",
         "/systems/{systemId}/draft", "/systems/{systemId}/preview", "/systems/{systemId}/publish", "/systems/{systemId}/sharing",
         "/systems/{systemId}/templates/{templateId}/image", "/systems/{systemId}/versions", "/templates",

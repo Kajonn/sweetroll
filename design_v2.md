@@ -166,8 +166,8 @@ A system version is a validated declarative package with stable identifiers for 
 | **Category** | **MVP types**                              | **Notes**                                         |
 |--------------|--------------------------------------------|---------------------------------------------------|
 | Scalar       | text, integer, decimal, boolean            | movable; numeric constraints and step supported   |
-| Choice       | single choice, multi-choice                | Static options only; reference-data source        |
-| Resource     | current/max pair                           | Optional min/max and reset action                 |
+| Choice       | single choice, multi-choice                | Manual options or options from dataset rows        |
+| Resource     | current/max pair                           | Bounded current and a manual or computed maximum                 |
 | Computed     | number, text, boolean                      | Read-only result of a math-only expression        |
 | Media        | image attachment reference                 | Reserved image field; character portraits and item art delivered in M1/M2 (Section 7.8) |
 
@@ -182,6 +182,8 @@ A sheet is a **single-column linear scroll** (predictable collapse to one column
 - Resource bars (current/max) with step controls and direct input
 - A flat list of **action buttons** (rolls and simple stat bumps)
 
+**Resource editing (rules coverage R1, 2026-11-10, implemented):** besides the one-step controls, a resource row has an amount field with **Subtract** and **Add** (one `adjustResource` command; the result stops at the resource's minimum and the character's stored maximum, and the amount must be a non-zero multiple of the step) and a **Set** editor for the current value and the character's maximum (one `setResource` command; lowering only the maximum lowers a higher current value with it; values outside the field's bounds or step are rejected). Both are revision-checked idempotent server commands like `bumpResource`, available to the same actors, queued offline with a sequential estimate, and recorded as `character_resource_adjusted` and `character_resource_set`. Browser routes are `POST /characters/{id}/resources/{resourceId}/adjust` and `/set`; `/api/v1` exposes `POST …/adjust` and `PUT /characters/{id}/resources/{resourceId}`. The GM session board keeps its one-tap step controls.
+
 **Removed from MVP:** tabs, multi-column grid layouts, drag-drop element palette, manual binding inspector, reusable fragments, conditional display, viewport authoring beyond preview. Keep only a simple section/order editor with move-up/down controls and keyboard authoring.
 
 The basic builder exposes an explicit “not on this character sheet” list for the sheet's target entity and global actions. The creator selects a target section for one-action placement (initially the first section); when none exists, placement creates the first section. Each placed item receives a generated document-wide element ID. Manual target-ID editing remains an advanced repair path, not the expected creation flow. The creator Sheets tab presents entity and element-binding reference IDs as labeled dropdowns sourced from compatible document definitions; sheet, section, and element identity IDs remain automatically assigned and read-only in the basic builder. Unresolved legacy bindings are shown explicitly without silent replacement.
@@ -190,19 +192,58 @@ The basic builder exposes an explicit “not on this character sheet” list for
 
 > **Security invariant.** System packages contain data and simple expressions only. They cannot execute JavaScript, make network requests, access files, or run server commands.
 
-Expressions are **math plus basic dice** only, parsed into a lightweight typed AST and evaluated by the platform with hard budgets:
+Expressions are declarative math, conditionals, and dice, parsed into a lightweight typed AST and evaluated by the platform with hard budgets:
 
-- Arithmetic, comparison, and boolean composition: `+ - * /`, `== != < <= > >=`, `&& ||`, `min`, `max`, and `round`; division-by-zero fallback
-- Field access: stable identifiers of sibling fields and current action inputs only
+- Arithmetic, comparison, and boolean composition: `+ - * / %`, `== != < <= > >=`, `&& ||`, `min`, `max`, `round`, `floor`, `ceil`, and `abs`
+- Field access: stable identifiers of sibling fields and current action inputs. Resources expose `.current` and `.max`. Double-quoted choice IDs work with equality and multi-choice fields use `has`.
+- Conditionals: `if(condition, a, b)` requires two branches of the same scalar type and evaluates only the selected branch.
 - Dice: standard notation (`2d6`, `d20 + 2`), keep-high/low (`4d6kh3`), advantage-style helpers, field-derived pools, and counted successes at a threshold; server-side deterministic dice
-- **No** chained derived-field dependency graphs
-- **No** lookup/aggregation over collections (`equipped.armor.bonus` is out)
+- Computed fields may depend on other computed fields of the same owner; dependency cycles are rejected at publish
+- Typed dataset lookups and bounded single-slot aggregates read reference data and equipped or carried items.
 - **No** effect engine (set/increment/append) — resource changes are simple built-in "bump" actions
 - **No** `against target.defense` action chains
 
-Grammar v0.1 is fixed by `docs/superpowers/specs/2026-09-04-system-package-contract-design.md`. It excludes rerolls, exploding dice, push mechanics, custom faces, arbitrary property traversal, and executable extension points. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 dice per roll, and 1,000 sides per die.
+[Grammar 1.0](docs/contracts/grammar-v1.0.md) is the current contract for system and extension document/package 2.0. It supports dynamic dice parameters, reroll-once and bounded explosion modifiers, one reducer per pool, and reuse of a previously evaluated named group. All rolls share a saved breakdown graph. It records the original and replacement faces, explosion chains, reductions, and group reuse. Character activity and campaign export preserve those details. Push policies explicitly opt into modified pools and reroll eligible chains from their starting die. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 draws per roll including rerolls and explosions, 1,000 sides per die, and ten explosions per starting die.
 
 **Rolls** are a button press → server evaluates → result shows normalized expression, individual dice, modifiers, total, and audience. Rolls are factual; the platform does **not** auto-apply outcomes to state.
+
+**Custom dice (rules coverage R6, 2026-11-11):** systems can define up to 16 custom dice with up to 20 equally likely faces each. Each face has a numeric value, an optional label and optional symbol counts. `dice(4, "fudge")` sums four custom draws. `countSymbol` counts a named symbol across the final faces in a pool, including previously rolled named pools. The creator manages definitions in the Dice tab. Creator previews, the player sheet, the GM board, activity and exports use the saved face labels and symbols. Configurable push policies apply to standard dice.
+
+**Card decks (rules coverage R8, 2026-11-12, implemented):** a system can
+define up to 4 decks. A deck names one dataset, and that dataset's records (1 to
+200) are its cards. The only stored state of a deck is its remaining order. A
+campaign shares one state per deck between all its characters. A character
+outside a campaign has its own. Two entity action kinds use a deck: `draw`
+takes a fixed number of cards (1 to 10) from the top, and `shuffle` returns all
+cards and reorders them. The order follows from the roll secret and a shuffle
+ID, which is the server-generated ID of the shuffle command, or of the first
+draw from a deck that was never shuffled. Both commands are online-only,
+idempotent, and resolve inside the command transaction after the deck state is
+locked, so concurrent draws never deal the same card. They leave the character
+revision unchanged. A draw is saved like a roll, with the same audiences,
+activity, GM board and export; its result lists each card's label and columns
+and the number of cards left. A draw from a deck with fewer cards than asked
+deals what is left. A draw from an empty deck is refused with a readable
+message until the deck is shuffled. A shuffle is recorded in the character's
+activity. Cards that a later rules version removes are skipped, and new cards
+enter at the next shuffle. `GET /characters/{id}/decks` (browser API and
+`/api/v1`) returns the cards left per deck. The creator edits decks and their
+cards in the Dice tab on top of the dataset editor. There are no hands, discard
+piles, peeking, dealing to other players or returning single cards, formulas
+cannot read drawn cards, and templates and extensions cannot grant deck actions.
+
+**Targeted and opposed rolls (rules coverage R7, 2026-11-11):** a roll action
+can declare a target entity and use its fields through `target.<fieldId>`.
+A response action can read `opposed.total` from a saved roll visible to the
+responder. These actions run on active campaign sheets. The server locks the
+campaign before reading the actor and target sheets and requires the target to
+use the same pinned rules composition. Each account can respond once per source
+roll. Responses and pushes share stored roll lineage, with distinct links for
+the source of a response and the parent of a push. Rolls leave sheet state to
+the players to update. The creator configures both action types, and players
+select targets and recent rolls from the sheet or GM board.
+
+**Roll outcomes (rules coverage R5, 2026-11-11, implemented):** a roll action can list ordered outcome bands and named details, each an `outcome` expression evaluated after the roll with `roll.total`, the action's values and its named groups (`rolled("group")`), never new dice. The first true band names the result (a PbtA miss / weak hit / strong hit, or a d100 critical / success / fumble / failure); details are numbers such as a margin or success level. The command result carries `outcome { id, label }` and `details`; the output template accepts `{outcome}`, `{detail.id}`, `{fields.id}` and `{inputs.id}` (and `{item.id}` for granted actions), checked at publish, and the outcome label is appended when the template omits it, so saved rolls, activity and exports show it through their output text. Pushed rolls are described again. The creator edits bands (ordered) and details per action; the sheet and the GM session board show the outcome. Players still apply effects by hand (owner decision 2026-11-10). Extensions cannot define outcomes yet.
 
 **Dice-pool reliability, slice A (2026-10-23 CI and isolated deployed acceptance):** success counts require direct dice operands; valid zero pools remain legal. Entity and item-granted roll actions reject arithmetic failures with a reviewable HTTP 422 error, without recording a fallback or partial roll. Error receipts preserve retry identity. Computed/validation scalar fallbacks remain unchanged. Custom pool formulas retain their expression editor; previews show their sample bindings and omit modifiers where the AST cannot prove an additive interpretation. See [slice A acceptance](docs/acceptance/dice-pool-reliability-2026-10-22.md) for verification and remaining release gates.
 
@@ -216,6 +257,50 @@ Slice A was merged as PR #21; B was merged as PR #22 (`759323a`). B passed all s
 The [2026-10-27 scoped acceptance](docs/acceptance/configurable-push-rolls-2026-10-27.md) passed nine fresh-system journeys on isolated deployment `90462834-5fbd-4aea-865c-2f9cdc9680b5`, exact application `dfae37f`, including two independent authors, current permission/scope changes, early Activity and durable offline recovery. All five served artifacts matched the source rebuild; CI 135 passed. The report distinguishes PostgreSQL default-policy evidence from the unperformed live internal setting change.
 
 **Pre-release scope decision (2026-10-27):** The owner confirms there has been no release and there are no existing users. Character/campaign version upgrades were removed on that date and reinstated for non-breaking system versions on 2026-11-07 (Section 6.7). Application/database migration and historical-client compatibility are deferred until after the first release tag under Section 17.0. Fresh system authoring/publishing, play, permissions, saved-pool pushes and offline recovery remain in scope. Existing version checks remain defensive constraints; no upgrade workflow is added by this decision.
+
+**Rules coverage (owner request 2026-11-10):** the
+[rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md) records
+the 2026-11-10 review defects and a staged widening of this contract. Because no system is published yet (owner statement
+2026-11-10), R2 replaces the contract in place with document/package 2.0 and grammar 1.0. Later stages cover d20 with tables and equipment, banded outcomes, d100
+roll-under, variable-target and exploding pools, roll-and-keep, custom dice, cards
+and opposed rolls. The owner confirmed all decisions C1–C13 on
+2026-11-10. Stages R3–R8 change the exclusions listed above. Each stage updates
+this section when it is delivered.
+
+**Rules defects, stage R0 (2026-11-10, implemented):** `adv(d20)`/`dis(d20)` roll
+two dice and keep one. A roll expression must produce a number; pass/fail results
+are a later stage (R5). All computed fields and validations of one sheet share a
+separate `sheetEvaluationNodes` limit of 8,192 AST nodes, recorded in the
+package's effective limits; publishing rejects a sheet above it with a
+`limit_exceeded` diagnostic at the entity, so a published system can no longer
+fail every character with `budget_exceeded`. The 256-node ceiling remains per
+expression. The sheet's increase control stops at the character's stored maximum.
+
+**Grammar core, stage R2:** creator previews and the server compile the same
+grammar. Choice sets and resource parts are recorded in roll bindings for saved
+push replay. Changes to an expression remain non-breaking when its context and
+declared result type stay the same.
+
+**Data-driven rules, stage R3.** Fields are scoped to an entity or item template.
+Option IDs are local to their choice field, inputs are local to their action,
+and granted action IDs are local to their template. Sheet and validation
+pickers identify a field by its owner and field ID. A granted roll reads common
+character fields through `fields.` and its own entry through `item.`. A
+template formula reads its own fields through `item.`.
+
+Tables can declare a key column and typed columns. `lookup` finds an exact
+key and `lookupBand` finds the highest numeric key at or below its argument.
+A choice field can populate its options from the IDs and labels of dataset rows.
+Slot aggregates read one slot and charge its maximum capacity against the sheet
+evaluation budget. A template lists its per-unit number fields (`quantityFields`, such as
+weight); sums multiply only those by the entry's quantity, so two carried armors
+weigh double but grant their bonus once. Counts count entries. `maxOf` selects the largest individual value. Compose checks the
+field types of all templates accepted by a referenced slot, including extensions.
+
+A resource's calculated maximum is rounded down to its step within its bounds.
+The sheet permits edits to the current value and clamps it when the maximum
+decreases. Version dry runs evaluate the target version's data and formulas
+before saving the new pin.
 
 ## 6.5 Draft, validation, and publishing
 
@@ -593,7 +678,7 @@ interface SystemRuntime {
 
 `CreateDraft` uses a source union for blank creation, cloning a version, or importing bounded bytes. `AuthoringWorkspace` returns metadata, current draft and revision, version summaries, and one package assessment. Saving a draft therefore returns validation and compatibility information without requiring callers to coordinate separate operations. A semantically invalid but structurally safe draft may be saved; preview and publication require a valid assessment.
 
-`RuntimeRequest` contains an immutable `versionId`, optional current state, and exactly one intent: `observe`, `initialize`, `set`, `bump`, or `action`. `RuntimeResolution` contains the complete validated next state, derived values, validation messages, normalized roll details when relevant, changed definition IDs, and a versioned render projection. Callers never receive AST nodes, apply runtime-generated patches, or order derived calculations themselves.
+`RuntimeRequest` contains an immutable `versionId`, optional current state, and exactly one intent: `observe`, `initialize`, `set`, `bump`, `adjust`, `setResource`, `action`, or `push`. `RuntimeResolution` contains the complete validated next state, derived values, validation messages, normalized roll details when relevant, changed definition IDs, and a versioned render projection. Callers never receive AST nodes, apply runtime-generated patches, or order derived calculations themselves.
 
 ## 11.4 Interface invariants and errors
 
@@ -664,6 +749,7 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current
 | character_image_assets, item_image_assets | portraits and item art (Section 7.8) | storage_key, media_type, checksum              |
 | character_activity_events, campaign_activity_events | character or campaign scope | kind, payload, occurred_at, request_id         |
 | character_rolls     | character; command execution                 | audience, result, push lineage                                      |
+| deck_states         | campaign or standalone character             | deck_id, shuffle_id, remaining card order (Section 6.4)             |
 | character_controllers, character_claim_designations, character_placements | campaign custody (Section 17.8) | character_id, campaign_id, user_id |
 | scenes, display_codes, display_credentials | campaign scenes and paired displays (Section 7.7) | revision, image_revision, fog, tokens; code/secret hashes |
 | campaign_item_templates, campaign_item_proposals (+ revisions, grants, images) | campaign catalog (Section 5.4) | content revision, audience |
@@ -843,6 +929,12 @@ process.
 - Campaign content uploads default to GM only; player notes default to owner only.
 - Do not use private campaign or character content for model training or recommendation features without explicit consent and a separate design review.
 - Provide account, character, system, and campaign export in documented formats.
+- A targeted roll shows the target field values it read to the roll's normal
+  audience. The target picker shows eligible character names, and direct sheet
+  access follows the existing controller and GM permissions.
+- A response can use the recorded roll's audience or a narrower one. The
+  responder must be able to see the source roll under current campaign membership.
+
 - Publish a clear ownership model for system definitions, user uploads, and copies derived from shared systems.
 
 # 15. Non-functional requirements
@@ -1190,6 +1282,7 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 | OD-02 (resolved 2026-09-09) | GM visibility | Do campaign GMs always see full character state? | Yes for attached sheet state, disclosed; no I6 toggle. Owner-only notes and actor-private rolls have separate policies. See Section 17.8. |
 | OD-03 (deferred 2026-09-09) | Collaboration | Can several creators edit one system draft concurrently? | Named collaborators and multi-creator editing are deferred. Retain current creator ownership and revision-safe saves; campaign membership/co-GM roles confer no system-authoring permissions. Not a blocker for the I6 backend-only slice. |
 | OD-04  | Rules ceiling (resolved) | Grammar v0.1 covers d20, 2d6, keep-high/low, advantage helpers, and threshold-counted dynamic d6 pools. | Defer reroll, explode, push, custom faces, lookups, and effects. |
+| OD-09 (resolved 2026-11-10) | Rules coverage | Which parts of the wider rules contract are approved? | All of C1–C13 in the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md): the contract is replaced in place, rolls never change characters, opposed rolls have no privacy layer, cards are simple draw/shuffle decks. Supersedes the OD-04 deferrals stage by stage. |
 | OD-05  | Authentication | Passwordless email, social sign-in, or both?                                      | OIDC social plus email magic link.                                |
 | OD-06  | Business model | Free, subscription, paid storage, or marketplace?                                 | Do not couple MVP data ownership to an unvalidated payment model. |
 | OD-07  | Public content | What moderation/takedown is required before public discovery?                     | Keep discovery out of MVP unless staffing and process exist.      |

@@ -18,7 +18,7 @@ describe("SystemDocumentV1Schema", () => {
       "unknown nested property",
       { ...validDocument(), metadata: { ...validDocument().metadata, extra: true } },
     ],
-    ["bad schema version", { ...validDocument(), schemaVersion: "2.0" }],
+    ["bad schema version", { ...validDocument(), schemaVersion: "99.0" }],
     [
       "malformed definition id",
       {

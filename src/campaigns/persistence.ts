@@ -1,4 +1,4 @@
-import type {RollBreakdown,PushResult} from "../systems/implementation/rules/result.js";
+import type {DieResult,RollBreakdown,PushResult} from "../systems/implementation/rules/result.js";
 import type { Pool, PoolClient } from "pg";
 
 import { notifySceneEvent } from "./scene-events.js";
@@ -86,15 +86,17 @@ export type ActivityEventRecord = {
  * other members never enter the projection.
  */
 export type RollExportRecord = {
+  targetCharacterId?: string;
+  respondsTo?: string;
   rollId: string;
   characterId: string;
   actorId: string;
   actionId: string;
   audience: "owner_only" | "gm_only" | "campaign";
   expression: string;
-  breakdown?: RollBreakdown;
+  breakdown: RollBreakdown;
   push?: PushResult;
-  dice: unknown;
+  dice: DieResult[];
   bindings: unknown;
   total: number;
   output: string;
@@ -296,15 +298,17 @@ type ActivityEventRow = {
 };
 
 type RollExportRow = {
+  target_character_id: string | null;
+  responds_to_roll_id: string | null;
   id: string;
   character_id: string;
   actor_id: string;
   action_id: string;
   audience: string;
   expression: string;
-  breakdown_json: RollBreakdown | null;
+  breakdown_json: RollBreakdown;
   push_result_json: PushResult | null;
-  dice_json: unknown;
+  dice_json: DieResult[];
   bindings_json: unknown;
   total: number;
   rendered_output: string;
@@ -474,13 +478,15 @@ function toRollExportRecord(row: RollExportRow): RollExportRecord {
   }
   return {
     rollId: row.id,
+    ...(row.target_character_id ? { targetCharacterId: row.target_character_id } : {}),
+    ...(row.responds_to_roll_id ? { respondsTo: row.responds_to_roll_id } : {}),
     characterId: row.character_id,
     actorId: row.actor_id,
     actionId: row.action_id,
     audience: row.audience,
     expression: row.expression,
     dice: row.dice_json,
-    ...(row.breakdown_json == null ? {} : {breakdown:row.breakdown_json}),
+    breakdown: row.breakdown_json,
     ...(row.push_result_json == null ? {} : {push:row.push_result_json}),
     bindings: row.bindings_json,
     total: row.total,
@@ -579,7 +585,7 @@ const CONTENT_VISIBILITY_PREDICATE = `(
  * override); `gm_only` admits the roller plus current GMs; `campaign`
  * admits every active member (callers already require active membership).
  */
-const ROLL_VISIBILITY_PREDICATE = `(
+export const ROLL_VISIBILITY_PREDICATE = `(
   r.audience = 'campaign'
   OR (r.audience = 'gm_only' AND ($2::boolean OR COALESCE(r.audience_actor_id,r.actor_id) = $1))
   OR (r.audience = 'owner_only' AND COALESCE(r.audience_actor_id,r.actor_id) = $1)
@@ -1627,7 +1633,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
     ): Promise<RollExportRecord[]> {
       const result = await client.query<RollExportRow>(
         `SELECT r.id, r.character_id, r.actor_id, r.action_id, r.audience,
-                r.expression, r.dice_json, r.bindings_json, r.breakdown_json, r.push_result_json, r.total, r.rendered_output, r.occurred_at
+                r.expression, r.dice_json, r.bindings_json, r.breakdown_json, r.push_result_json, r.target_character_id, r.responds_to_roll_id, r.total, r.rendered_output, r.occurred_at
            FROM character_rolls r
           WHERE r.scope_campaign_id = $3 AND ${ROLL_VISIBILITY_PREDICATE}
           ORDER BY r.id

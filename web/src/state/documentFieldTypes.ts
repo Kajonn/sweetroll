@@ -52,6 +52,7 @@ export type SingleChoiceFieldV1 = {
   required: boolean;
   default: DefinitionId | null;
   options: ChoiceOptionV1[];
+  optionsFrom?: DefinitionId;
 };
 
 export type MultiChoiceFieldV1 = {
@@ -61,6 +62,7 @@ export type MultiChoiceFieldV1 = {
   required: boolean;
   default: DefinitionId[];
   options: ChoiceOptionV1[];
+  optionsFrom?: DefinitionId;
 };
 
 export type ResourceFieldV1 = {
@@ -72,6 +74,7 @@ export type ResourceFieldV1 = {
   max: number;
   step: number;
   resetTo: "min" | "max";
+  maxExpressionId?: DefinitionId;
 };
 
 export type ComputedFieldV1 = {

@@ -1,3 +1,4 @@
+import type { EvaluationBindings } from "../rules/evaluate.js";
 import {derivedEntryError} from "./effective-entry.js";
 import {effectiveTemplateId} from "./entries.js";
 import { compositionOf, qualifiedId, unqualifiedId } from "../rules/compose.js";
@@ -15,6 +16,7 @@ import type {
 } from "../../runtime.js";
 import type { PushContext } from "./push-context.js";
 import { findOwnedAction } from "./action-ownership.js";
+import { describeRoll } from "../rules/outcomes.js";
 import { findGrantedAction } from "./resolve-entries.js";
 import { validateEntryForSlot } from "./entries.js";
 import { createDeterministicRng } from "./deterministic-rng.js";
@@ -23,6 +25,7 @@ export function makePushContext(
   pkg: SystemPackageV1,
   entityId: string,
   action: RollActionV1,
+  outputValues: Record<string, string>,
   entry?: CharacterEntryV1,
 ): PushContext | undefined {
   if (!action.pushPolicy) return undefined;
@@ -38,6 +41,7 @@ export function makePushContext(
     ...(expression.origin === null ? {} : { extensionId: expression.origin }),
     ...(composition === undefined ? {} : { compositionChecksum: composition.compositionChecksum }),
     outputTemplate: action.outputTemplate,
+    ...(Object.keys(outputValues).length === 0 ? {} : { outputValues }),
     policy: structuredClone(action.pushPolicy),
     ...(entry && effectiveTemplateId(entry)
       ? {
@@ -57,7 +61,7 @@ export function validatePushSource(
   state: RuntimeStateV1,
   parent: NormalizedRoll,
   context: PushContext,
-): string | null {
+): string | RollActionV1 {
   if (
     pkg.versionId !== context.versionId ||
     pkg.integrity.checksum !== context.packageChecksum ||
@@ -86,7 +90,7 @@ export function validatePushSource(
       )
     )
       return "source_unavailable";
-    const siblings = Object.values(state.entries ?? {}).filter(
+    const siblings = Object.values(state.entries).filter(
       (e) =>
         e.slotId === owned.entry.slotId && e.entryId !== owned.entry.entryId,
     ).length;
@@ -94,8 +98,8 @@ export function validatePushSource(
       derivedEntryError(pkg,entity,owned.entry,siblings)!==null ||
       !validateEntryForSlot(
         owned.entry,
-        pkg.slots ?? [],
-        pkg.templates ?? [],
+        pkg.slots,
+        pkg.templates,
         siblings,
       ).ok ||
       ("nominal" in owned.action && owned.action.nominal)
@@ -111,7 +115,7 @@ export function validatePushSource(
     !Value.Equal(action.pushPolicy, context.policy)
   )
     return "source_unavailable";
-  return null;
+  return action;
 }
 export function resolveRuntimePush(input: {
   pkg: SystemPackageV1;
@@ -133,7 +137,7 @@ export function resolveRuntimePush(input: {
     },
   });
   const source = validatePushSource(pkg, entity, state, parent, context);
-  if (source) return fail(source);
+  if (typeof source === "string") return fail(source);
   if (!parent.push) return fail("no_policy");
   const options = pushEligibility(context.policy, parent, parent.push.attempt);
   if (!options.canPush) return fail(options.reason!);
@@ -141,11 +145,12 @@ export function resolveRuntimePush(input: {
   const expressionKey = qualifiedId(context.extensionId, context.expressionId);
   const expression = pkg.expressions.find((e) => e.id === expressionKey);
   if (!expression) return fail("invalid_snapshot");
-  const bindings = { fields: {}, inputs: {} } as {
-    fields: Record<string, string | number | boolean | null>;
-    inputs: Record<string, string | number | boolean | null>;
-  };
-  for (const b of parent.bindings) bindings[b.scope][b.definitionId] = b.value;
+  const saved = { fields: {}, inputs: {}, item: {}, aggregates: {}, target: {}, opposed: {} } satisfies Record<string, Record<string, unknown>>;
+  const bindings: EvaluationBindings = { ...saved, datasets: pkg.referenceData };
+  for (const b of parent.bindings) {
+    const scope: EvaluationBindings["fields"] = saved[b.scope];
+    scope[b.definitionId] = b.value;
+  }
   const result = evaluatePush({
     expression,
     policy: context.policy,
@@ -156,16 +161,25 @@ export function resolveRuntimePush(input: {
     limits: pkg.effectiveLimits,
   });
   if (!result.ok) return fail(result.reason);
+  // The pushed roll is described again: its outcome can differ from the parent's.
+  const { outcome: _outcome, details: _details, ...carried } = parent;
+  const { bindings: _read, outputValues: _outputValues, ...described } = describeRoll({
+    action: source,
+    expression: (id) => pkg.expressions.find((candidate) => candidate.id === qualifiedId(context.extensionId, id)),
+    total: result.roll.total,
+    bindings,
+    savedOutputValues: context.outputValues,
+    rolled: result.rolled,
+    limits: pkg.effectiveLimits,
+  });
   return {
     ok: true,
     value: {
       context,
       roll: {
-        ...parent,
+        ...carried,
         ...result.roll,
-        output: context.outputTemplate
-          .split("{total}")
-          .join(String(result.roll.total)),
+        ...described,
         push: {
           ...parent.push,
           parentRollId: parent.push.rollId,

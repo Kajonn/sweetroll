@@ -1,3 +1,4 @@
+import { campaignRollRequirements } from "./roll-context.js";
 import {effectiveEntryDefinition} from "./effective-entry.js";
 import type {
   CharacterProjectionElement,
@@ -28,8 +29,8 @@ export function buildCharacterProjection(input: {
   const { packageValue, entity, state, derivedValues, validations } = input;
   const fields = new Map(entity.fields.map((field) => [field.id, field]));
   const actions = new Map(packageValue.actions.map((action) => [action.id, action]));
-  const slots = new Map((packageValue.slots ?? []).map((slot) => [slot.id, slot]));
-  const templates = new Map((packageValue.templates ?? []).map((template) => [template.id, template]));
+  const slots = new Map(packageValue.slots.map((slot) => [slot.id, slot]));
+  const templates = new Map(packageValue.templates.map((template) => [template.id, template]));
   const validationsFor = (id: string): RuntimeValidation[] =>
     validations.filter((validation) => validation.targetDefinitionId === id);
   const entitySheets = packageValue.sheets.filter((sheet) => sheet.targetEntityId === entity.id);
@@ -85,7 +86,7 @@ function projectElement(
   validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement[] {
   if (element.kind === "heading") return [{ ...element }];
-  if (element.kind === "slot") return projectSlot(element.slotId, element.id, lookups, state, validationsFor);
+  if (element.kind === "slot") return projectSlot(element.slotId, element.id, lookups, state);
   if (element.kind === "action") {
     const action = lookups.actions.get(element.actionId)!;
     return [{
@@ -94,6 +95,14 @@ function projectElement(
       actionId: action.id,
       label: action.label,
       actionKind: action.kind,
+      ...(action.kind === "draw" || action.kind === "shuffle" ? {
+        deck: {
+          deckId: action.deckId,
+          label: lookups.packageValue.decks?.find(deck => deck.id === action.deckId)?.label ?? action.deckId,
+          ...(action.kind === "draw" ? { count: action.count } : {}),
+        },
+      } : {}),
+      ...campaignRollRequirements(action),
       inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
       validations: validationsFor(action.id),
     }];
@@ -112,6 +121,7 @@ function projectElement(
       max: field.max,
       step: field.step,
       resetTo: field.resetTo,
+      ...(field.maxExpressionId === undefined ? {} : { computedMaximum: true }),
       validations: validationsFor(field.id),
     }];
   }
@@ -135,10 +145,9 @@ function projectSlot(
     packageValue: SystemPackageV1;
   },
   state: RuntimeStateV1,
-  validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement[] {
   const slot = lookups.slots.get(slotId);
-  const slotEntries = Object.values(state.entries ?? {})
+  const slotEntries = Object.values(state.entries)
     .filter((entry) => entry.slotId === slotId)
     .sort((left, right) => (left.entryId < right.entryId ? -1 : left.entryId > right.entryId ? 1 : 0));
   const projected: CharacterProjectionSlotEntry[] = slotEntries.map((entry) => {
@@ -166,7 +175,7 @@ function projectSlot(
     const template = effectiveEntryDefinition(lookups.packageValue, entry);
     if (template === undefined) continue;
     for (const action of template.grantedActions) {
-      elements.push(projectGrantedAction(entry.entryId, action, validationsFor));
+      elements.push(projectGrantedAction(entry.entryId, action));
     }
   }
   return elements;
@@ -175,7 +184,6 @@ function projectSlot(
 function projectGrantedAction(
   entryId: string,
   action: GrantedActionV1,
-  validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement {
   return {
     kind: "action",
@@ -184,8 +192,9 @@ function projectGrantedAction(
     entryId,
     label: action.label,
     actionKind: action.kind,
-    inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
-    validations: validationsFor(action.id),
+    ...campaignRollRequirements(action),
+      inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
+    validations: [],
   };
 }
 
@@ -242,5 +251,5 @@ function fieldConstraints(
 function projectEntryDefinition(template:ObjectTemplateV1):NonNullable<CharacterProjectionSlotEntry["definition"]>{
  return {id:template.id,label:template.label,kind:template.kind,
   fields:template.fields.filter((f):f is Exclude<FieldV1,{kind:"computed"}|{kind:"image"}>=>f.kind!=="computed" && f.kind!=="image").map(f=>({id:f.id,label:f.label,kind:f.kind,default:structuredClone(f.default),...(f.kind==="resource"?{min:f.min,max:f.max,step:f.step}:fieldConstraints(f))})),
-  grantedActions:template.grantedActions.map(a=>({id:a.id,label:a.label,kind:a.kind,inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]}))};
+  grantedActions:template.grantedActions.map(a=>({id:a.id,label:a.label,kind:a.kind,...campaignRollRequirements(a),inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]}))};
 }

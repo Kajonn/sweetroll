@@ -1,15 +1,17 @@
+import { children, parse, type ExpressionAstV1, type CustomDie, type RulesDataset, type SlotEnvironment } from "@sweetroll/rules";
 import { DebugOnly } from "../../ui/debugMode.js";
 import { Disclosure } from "../../ui/Disclosure.js";
 import {PushPolicyEditor} from "./PushPolicyEditor.js";
 import type {PushPolicy} from "@sweetroll/rules";
 import {GroupedPoolEditor} from "./GroupedPoolEditor.js";
+import { RollOutcomesEditor, type OutcomeExpressions, type RollOutcomeEntry } from "./RollOutcomesEditor.js";
 import {RollBreakdown} from "../../rolls/RollBreakdown.js";
 import { useMemo, useState } from "react";
 
 import { evaluateRoll } from "../../api/evaluateExpression.js";
 import type { ApiClient } from "../../api/client.js";
 import { t } from "../../i18n/index.js";
-import { additiveRollModifier, type ScalarValue, type ValueType } from "../../ports/evaluateExpression.js";
+import { additiveRollModifier, previewOutput, type ScalarValue, type ValueType, type BindingValue, type FieldBindingType } from "../../ports/evaluateExpression.js";
 import { Button, Checkbox, FormField, NumberInput, Select } from "../../ui/index.js";
 import { ExpressionEditor } from "../expressions/ExpressionEditor.js";
 import styles from "./RollActionEditor.module.css";
@@ -32,6 +34,10 @@ export type RollActionV1 = {
   expressionId: DefinitionId;
   inputs: ActionInputV1[];
   outputTemplate: string;
+  target?: { entityId: string };
+  respondsTo?: true;
+  outcomes?: RollOutcomeEntry[];
+  details?: RollOutcomeEntry[];
 };
 
 export type RollActionEditorProps = {
@@ -41,9 +47,16 @@ export type RollActionEditorProps = {
   onChange: (next: RollActionV1) => void;
   expressionSource: string;
   onExpressionSourceChange: (next: string) => void;
-  fieldTypes: Record<string, ValueType>;
+  fieldTypes: Record<string, FieldBindingType>;
+  itemTypes?: Record<string, FieldBindingType>;
+  targetEntities?: readonly { id: string; label: string; fields: Record<string, FieldBindingType> }[] | undefined;
+  dice?: readonly CustomDie[] | undefined;
+  datasets?: readonly RulesDataset[];
+  slots?: SlotEnvironment;
   fieldLabels?: Record<string, string> | undefined;
   disabled?: boolean | undefined;
+  /** Storage for outcome and detail formulas; the outcomes section is hidden without it. */
+  outcomeExpressions?: OutcomeExpressions | undefined;
   /**
    * Guided (basics-first) mode for the dice tab: hides the grammar surfaces
    * (expression-id input + ExpressionEditor) and shows a dice-kind picker
@@ -116,7 +129,8 @@ function coerceDefault(value: string, valueType: ActionInputV1["valueType"]): Sc
   }
 }
 
-function defaultBinding(valueType: ValueType): ScalarValue {
+function defaultBinding(valueType: FieldBindingType): BindingValue {
+  if (valueType === "choiceSet") return [];
   switch (valueType) {
     case "number":
       return 0;
@@ -127,9 +141,25 @@ function defaultBinding(valueType: ValueType): ScalarValue {
   }
 }
 
+function sampledReferences(source: string) {
+  const fields = new Map<string, { scope: "fields" | "item" | "target" | "opposed"; id: string }>();
+  const parsed = parse(source);
+  if (!parsed.ok) return fields;
+  function walk(node: ExpressionAstV1, parameter = false): void {
+    if (node.kind === "reference" && (
+      node.scope === "target" || node.scope === "opposed" || (parameter && (node.scope === "fields" || node.scope === "item"))
+    )) {
+      const id = node.part ? `${node.id}.${node.part}` : node.id;
+      fields.set(`${node.scope}.${id}`, { scope: node.scope, id });
+    }
+    for (const child of children(node)) walk(child, parameter || node.kind === "pool");
+  }
+  walk(parsed.ast);
+  return fields;
+}
+
 function formatOutput(template: string, total: number | null): string {
-  if (total === null) return template;
-  return template.replace(/\{total\}/g, String(total));
+  return total === null ? template : previewOutput(template, total);
 }
 
 export function RollActionEditor({
@@ -140,14 +170,21 @@ export function RollActionEditor({
   expressionSource,
   onExpressionSourceChange,
   fieldTypes,
+  itemTypes,
+  targetEntities,
+  dice,
+  datasets,
+  slots,
   fieldLabels,
   disabled,
+  outcomeExpressions,
   guided,
   diceKind,
   onDiceKindChange,
 }: RollActionEditorProps) {
   const [tryItResult, setTryItResult] = useState<ReturnType<typeof evaluateRoll> | null>(null);
-  const [tryItBindings, setTryItBindings] = useState<Record<string, ScalarValue> | null>(null);
+  const [sampleOverrides, setSampleOverrides] = useState<Record<string, number>>({});
+  const [tryItBindings, setTryItBindings] = useState<Record<string, BindingValue> | null>(null);
   // Local custom-edit mode: picking "custom" reveals the inline formula
   // editor on the current source without persisting anything. It clears
   // when a canned kind is picked (which persists that kind instead).
@@ -179,13 +216,39 @@ export function RollActionEditor({
     updateInputs([...action.inputs, defaultActionInput(action.inputs)]);
   };
 
+  const targetTypes = targetEntities?.find(entity => entity.id === action.target?.entityId)?.fields;
+  const opposedTypes: Record<string, ValueType> | undefined = action.respondsTo ? { total: "number" } : undefined;
+  const contextualTypes = { target: targetTypes, opposed: opposedTypes };
+  const types = { fields: fieldTypes, item: itemTypes, ...contextualTypes };
+  const references = useMemo(() => sampledReferences(expressionSource), [expressionSource]);
+  const sampleFields = [...references].filter(([, { scope, id }]) => types[scope]?.[id] === "number");
+  const characterSamples = buildTryItBindings([], fieldTypes);
+  const itemSamples = buildTryItBindings([], itemTypes ?? {});
+  const targetSamples = buildTryItBindings([], targetTypes ?? {});
+  const opposedSamples = buildTryItBindings([], opposedTypes ?? {});
+  const samples = { fields: characterSamples, item: itemSamples, target: targetSamples, opposed: opposedSamples };
+  for (const [key, { scope, id }] of sampleFields) samples[scope][id] = sampleOverrides[key] ?? 0;
+  const contextualReferences = [
+    ...Object.keys(targetTypes ?? {}).map(id => `target.${id}`),
+    ...(opposedTypes ? ["opposed.total"] : []),
+  ];
+  const sampleBindingsNow = { ...characterSamples, ...buildTryItBindings(action.inputs, {}) };
+
   const runTryIt = () => {
-    const bindings = buildTryItBindings(action.inputs, fieldTypes);
-    setTryItBindings(bindings);
+    const bindings = sampleBindingsNow;
+    setTryItBindings({
+      ...bindings,
+      ...Object.fromEntries([...references].flatMap(([key, { scope, id }]) =>
+        (scope === "target" || scope === "opposed") && Object.hasOwn(samples[scope], id) ? [[key, samples[scope][id]!]] : [])),
+    });
     setTryItResult(
       evaluateRoll({
         source: expressionSource,
-        env: { fields: fieldTypes, inputs: inputTypes },
+        env: { fields: fieldTypes, inputs: inputTypes, dice, ...(itemTypes && { item: itemTypes }), ...(targetTypes && { target: targetTypes }), ...(opposedTypes && { opposed: opposedTypes }), ...(datasets && { datasets }), ...(slots && { slots }) },
+        fieldBindings: characterSamples,
+        ...(itemTypes && { itemBindings: itemSamples }),
+        ...(targetTypes && { targetBindings: targetSamples }),
+        ...(opposedTypes && { opposedBindings: opposedSamples }),
         resultType: "number",
         fallback: 0,
         bindings,
@@ -195,10 +258,10 @@ export function RollActionEditor({
 
   const modifiers = tryItResult === null ? null : additiveRollModifier(tryItResult.result);
   const simpleSource = /^d(?:4|6|8|10|12|20)(?:\s*\+\s*fields\.[a-z][a-z0-9_]{0,63})?(?:\s*\+\s*inputs\.[a-z][a-z0-9_]{0,63})*$/.test(expressionSource);
-  const sampleBindings = tryItBindings ?? buildTryItBindings(action.inputs, fieldTypes);
+  const sampleBindings = tryItBindings ?? sampleBindingsNow;
 
   const showEmpty = tryItResult === null;
-  const numericFields = Object.entries(fieldTypes).filter(([, valueType]) => valueType === "number");
+  const numericFields = Object.entries(fieldTypes).filter(([id, valueType]) => !id.includes(".") && valueType === "number");
   const currentFieldModifier = selectedFieldModifier(expressionSource);
   const inputTerms = guidedInputTerms(expressionSource);
 
@@ -283,13 +346,39 @@ export function RollActionEditor({
           </div>
         )}
       </div>
+      {targetEntities && !("nominal" in action && action.nominal === true) ? (
+        <div className={styles.row}>
+          <Select
+            label={t("editor.action.roll.targetEntity")}
+            value={action.target?.entityId ?? ""}
+            options={[{ value: "", label: t("editor.action.roll.targetNone") }, ...targetEntities.map(entity => ({ value: entity.id, label: entity.label }))]}
+            onChange={(event) => {
+              const { target: _target, ...rest } = action;
+              onChange(event.target.value ? { ...rest, target: { entityId: event.target.value } } : rest);
+            }}
+            disabled={disabled}
+          />
+          <Checkbox
+            label={t("editor.action.roll.respondsTo")}
+            checked={action.respondsTo === true}
+            onChange={(event) => {
+              const { respondsTo: _respondsTo, ...rest } = action;
+              onChange(event.target.checked ? { ...rest, respondsTo: true } : rest);
+            }}
+            disabled={disabled}
+          />
+        </div>
+      ) : null}
       <PushPolicyEditor source={expressionSource} policy={action.pushPolicy} disabled={disabled || ("nominal" in action && action.nominal===true)} onChange={policy=>{const {pushPolicy:_old,...rest}=action;onChange(policy?{...rest,pushPolicy:policy}:rest);}}/>
-      <GroupedPoolEditor source={expressionSource} onChange={onExpressionSourceChange} disabled={disabled} choices={[
+      <GroupedPoolEditor dice={dice} source={expressionSource} onChange={onExpressionSourceChange} disabled={disabled} choices={[
         ...numericFields.map(([id])=>({value:`fields.${id}`,label:fieldLabels?.[id]??id})),
+        ...Object.entries(itemTypes ?? {}).filter(([, type]) => type === "number").map(([id]) => ({ value: `item.${id}`, label: `item.${id}` })),
         ...action.inputs.filter(input=>input.valueType==="integer"||input.valueType==="decimal").map(input=>({value:`inputs.${input.id}`,label:input.label})),
       ]}/>
       {guided !== true || diceKind === "custom" || customEditing ? (
         <ExpressionEditor
+          roll
+          references={[...Object.keys(fieldTypes).map(id => `fields.${id}`), ...Object.keys(inputTypes).map(id => `inputs.${id}`), ...Object.keys(itemTypes ?? {}).map(id => `item.${id}`), ...contextualReferences]}
           client={client}
           systemId={systemId}
           source={expressionSource}
@@ -310,9 +399,13 @@ export function RollActionEditor({
               data-testid={`roll-action-output-${action.id}`}
               disabled={disabled}
             />
+            <small>{t("editor.action.roll.outputTemplate.help")}</small>
           </FormField>
         </div>
       </div>
+      {outcomeExpressions ? (
+        <RollOutcomesEditor action={action} onChange={onChange} expressions={outcomeExpressions} disabled={disabled} />
+      ) : null}
       <div className={styles.row} data-testid={`roll-action-inputs-${action.id}`}>
         <div className={styles.field}>
           {t("editor.action.roll.inputs.title")}
@@ -451,6 +544,14 @@ export function RollActionEditor({
         </Button>
       </div>
       <p data-testid={`roll-action-try-sample-note-${action.id}`}>{t("editor.action.roll.tryIt.sampleNote")}</p>
+      {sampleFields.map(([key, { scope, id }]) => <NumberInput
+        key={key}
+        label={t("editor.action.roll.tryIt.sampleField", { field: scope === "fields" ? fieldLabels?.[id] ?? id : key })}
+        value={sampleOverrides[key] ?? 0}
+        step={1}
+        disabled={disabled === true}
+        onChange={(value) => setSampleOverrides((current) => ({ ...current, [key]: value ?? 0 }))}
+      />)}
       <ul data-testid={`roll-action-try-bindings-${action.id}`}>
         {Object.entries(sampleBindings).map(([id, value]) => <li key={id}>{action.inputs.find(input => input.id === id)?.label || fieldLabels?.[id] || id}: {String(value)}</li>)}
       </ul>
@@ -573,9 +674,9 @@ export function RollActionEditor({
 
 function buildTryItBindings(
   inputs: ReadonlyArray<ActionInputV1>,
-  fieldTypes: Record<string, ValueType>,
-): Record<string, ScalarValue> {
-  const out: Record<string, ScalarValue> = {};
+  fieldTypes: Record<string, FieldBindingType>,
+): Record<string, BindingValue> {
+  const out: Record<string, BindingValue> = {};
   for (const input of inputs) {
     out[input.id] = input.default;
   }

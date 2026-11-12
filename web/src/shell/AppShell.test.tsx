@@ -259,7 +259,7 @@ describe("AppShell", () => {
       return new Response(JSON.stringify({ state: "authenticated", userId: "user-a" }));
     }));
     const doc = (name: string) => ({
-      schemaVersion: "1.0",
+      schemaVersion: "2.0", templates: [], slots: [],
       metadata: { name, description: "d", language: "en", defaultDice: "d20" },
       entities: [],
       referenceData: [],

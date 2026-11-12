@@ -2,7 +2,7 @@ import { PassThrough } from "node:stream";
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
 import { campaignItemImageHandlers, campaignItemImageRoutes } from "./campaignItemImages.js";
 import {campaignProposalRoutes,campaignProposalHandlers,CampaignProposalDto} from "./campaignProposals.js";
-import {RollBreakdownSchema,PushResultSchema} from "../../systems/implementation/rules/result.js";
+import {DieResultSchema,RollBreakdownSchema,PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {campaignTemplateRoutes,campaignTemplateHandlers,CampaignTemplateDto} from "./campaignTemplates.js";
 import { Type, type TSchema } from "@sinclair/typebox";
@@ -317,9 +317,12 @@ const CampaignExportDto = Type.Object({
       actionId: Type.String(),
       audience: Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]),
       expression: Type.String(),
-      breakdown: Type.Optional(RollBreakdownSchema),
+      breakdown: RollBreakdownSchema,
+      breakdownText: Type.String(),
+      targetCharacterId: Type.Optional(Type.String({ format: UUID_FORMAT })),
+      respondsTo: Type.Optional(Type.String({ format: UUID_FORMAT })),
       push:Type.Optional(PushResultSchema),
-      dice: Type.Unknown(),
+      dice: Type.Array(DieResultSchema),
       bindings: Type.Unknown(),
       total: Type.Number(),
       output: Type.String(),

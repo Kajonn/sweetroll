@@ -1,7 +1,7 @@
 import { d20Document } from "./d20.js";
 export function derivedTemplateDocument() {
   const d = structuredClone(d20Document);
-  d.schemaVersion = "1.2";
+
   d.slots = [
     { id: "inventory", label: "Inventory", accepts: ["item"], maxEntries: 4 },
   ];
@@ -111,14 +111,14 @@ export function derivedTemplateDocument() {
       id: "sword_hit_expr",
       context: "roll",
       resultType: "number",
-      source: "d20 + fields.modifier + fields.damage_bonus",
+      source: "d20 + fields.modifier + item.damage_bonus",
       fallback: 0,
     },
     {
       id: "sword_damage_expr",
       context: "roll",
       resultType: "number",
-      source: "d8 + fields.damage_bonus",
+      source: "d8 + item.damage_bonus",
       fallback: 0,
     },
     {

@@ -58,6 +58,13 @@ function entryLabel(entry: CharacterSnapshot["entries"][number], snapshot: Chara
   const label = (id: string) => definitionLabel(snapshot, id, debug);
   if (entry.intent.kind === "setField") return `${label(entry.intent.fieldId)} → ${String(entry.intent.value)}`;
   if (entry.intent.kind === "bumpResource") return `${label(entry.intent.resourceId)} ${entry.intent.direction}`;
+  if (entry.intent.kind === "adjustResource") {
+    return `${label(entry.intent.resourceId)} ${entry.intent.delta > 0 ? "+" : "−"}${Math.abs(entry.intent.delta)}`;
+  }
+  if (entry.intent.kind === "setResource") {
+    const current = entry.intent.current ?? "…";
+    return `${label(entry.intent.resourceId)} → ${current} / ${entry.intent.max ?? "…"}`;
+  }
   if (entry.intent.kind === "addEntry") {
     const template = entry.intent.entry.source?.kind === "campaign"
       ? debug ? t("character.review.campaignTemplate", { revision: entry.intent.entry.source.contentRevision }) : t("character.review.campaignItem")
@@ -375,7 +382,7 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
           const server =
             entry.intent.kind === "setField"
               ? serverValue(snapshot, entry.intent.fieldId)
-              : entry.intent.kind === "bumpResource"
+              : entry.intent.kind === "bumpResource" || entry.intent.kind === "adjustResource" || entry.intent.kind === "setResource"
                 ? serverValue(snapshot, entry.intent.resourceId)
                 : "—";
           const correctable = entry.intent.kind === "setField" || entry.intent.kind === "bumpResource";

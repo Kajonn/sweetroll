@@ -36,7 +36,8 @@ export function validPushResponse(
     return false;
   const grouped = new Set<string>();
   for (const group of roll.breakdown!.groups) {
-    if (group.count !== group.diceIds.length) return false;
+    let roots = 0;
+    const groupDice = new Set<string>();
     for (const id of group.diceIds) {
       const die = dice.get(id);
       if (
@@ -46,14 +47,20 @@ export function validPushResponse(
         die.sides !== group.sides
       )
         return false;
+      if (die.rerolledFrom && die.explodedFrom) return false;
+      const parent = die.rerolledFrom ?? die.explodedFrom;
+      if (parent === undefined) roots++;
+      else if (!groupDice.has(parent)) return false;
+      groupDice.add(id);
       grouped.add(id);
     }
+    if (roots !== group.count) return false;
   }
   return (
     grouped.size === dice.size &&
     push.faceOutcomes.every((outcome) => {
       const matching = roll.dice.filter(
-        (d) => d.groupId === outcome.groupId && d.value === outcome.face,
+        (d) => d.kept && d.groupId === outcome.groupId && d.value === outcome.face,
       );
       return (
         outcome.combinedCount === matching.length &&

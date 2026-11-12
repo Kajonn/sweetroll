@@ -11,7 +11,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
   const confirmed = makeView({
     characterId: "char-1",
     revision: 7,
-    state: { schemaVersion: "1.0", values: { name: "ServerName", health: 4 } },
+    state: { schemaVersion: "1.0", entries: {}, values: { name: "ServerName", health: 4 } },
   });
   return {
     phase: "conflict",
@@ -57,7 +57,7 @@ describe("ConflictReview", () => {
     const confirmed = makeView({
       characterId: "char-1",
       revision: 7,
-      state: { schemaVersion: "1.0", values: { health: 4 } },
+      state: { schemaVersion: "1.0", entries: {}, values: { health: 4 } },
     });
     const snap = snapshot({
       confirmed,
@@ -104,7 +104,7 @@ describe("ConflictReview", () => {
       confirmed: makeView({
         characterId: "char-1",
         revision: 9,
-        state: { schemaVersion: "1.0", values: { name: "ServerAgain" } },
+        state: { schemaVersion: "1.0", entries: {}, values: { name: "ServerAgain" } },
       }),
     });
     rerender(<ConflictReview snapshot={again} onResolve={vi.fn()} onClose={vi.fn()} />);
@@ -274,7 +274,7 @@ describe("ConflictReview", () => {
     const confirmed = makeView({
       characterId: "char-1",
       revision: 7,
-      state: { schemaVersion: "1.0", values: { level: 1 } },
+      state: { schemaVersion: "1.0", entries: {}, values: { level: 1 } },
       projection: {
         projectionVersion: "1.0",
         systemId: "22222222-2222-4000-8000-000000000000",

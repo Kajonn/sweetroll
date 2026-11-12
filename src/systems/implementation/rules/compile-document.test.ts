@@ -4,6 +4,8 @@ import { validDocument } from "../package/schema/test-values.js";
 import type { SystemDocumentV1 } from "../package/schema/index.js";
 import { documentFromPackage } from "../authoring/assess.js";
 import { compileDocument } from "./compile-document.js";
+import { resolveObservedValues } from "../runtime/resolve.js";
+import { initializeState } from "../runtime/state.js";
 
 const opts = { systemId: "a0000000-0000-5000-8000-000000000001", versionId: "a0000000-0000-5000-8000-000000000002", semanticVersion: "1.0.0" };
 
@@ -13,7 +15,7 @@ describe("compileDocument", () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.value.expressions).toHaveLength(3);
-    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 6, 7]);
+    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 7, 7]);
     expect(r.value.integrity.checksum).toMatch(/^sha256:[0-9a-f]{64}$/);
     for (let i = 0; i < r.value.expressions.length; i++) {
       expect(r.value.expressions[i]!.ast).toEqual(d20Package.expressions[i]!.ast);
@@ -24,7 +26,7 @@ describe("compileDocument", () => {
     const r = compileDocument(pbta2d6Document, opts);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 6, 7]);
+    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 7, 7]);
     for (let i = 0; i < r.value.expressions.length; i++) {
       expect(r.value.expressions[i]!.ast).toEqual(pbta2d6Package.expressions[i]!.ast);
     }
@@ -34,7 +36,7 @@ describe("compileDocument", () => {
     const r = compileDocument(d6SuccessPoolDocument, opts);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 7, 7]);
+    expect(r.value.expressions.map((e) => e.cost)).toEqual([3, 8, 7]);
     for (let i = 0; i < r.value.expressions.length; i++) {
       expect(r.value.expressions[i]!.ast).toEqual(d6SuccessPoolPackage.expressions[i]!.ast);
     }
@@ -299,7 +301,7 @@ describe("compileDocument", () => {
     const document = templateDocument();
     document.sheets[0]!.sections[0]!.elements.push({ kind: "slot", id: "inventory_element", slotId: "inventory" });
     document.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source =
-      "d20 + fields.modifier + fields.bonus";
+      "d20 + fields.modifier + item.bonus";
     document.templates![0]!.grantedActions.push({
       kind: "roll", id: "longsword_damage", label: "Longsword Damage",
       expressionId: "longsword_damage_expr", inputs: [], outputTemplate: "Damage: {total}",
@@ -434,14 +436,14 @@ describe("compileDocument", () => {
         id: "power_expr",
         context: "computed",
         resultType: "number",
-        source: "fields.might + 1",
+        source: "item.might + 1",
         fallback: 0,
       },
       {
         id: "might_expr",
         context: "computed",
         resultType: "number",
-        source: "fields.power + 1",
+        source: "item.power + 1",
         fallback: 0,
       },
     );
@@ -469,20 +471,20 @@ describe("compileDocument", () => {
     expect(roundTripped.templates).toEqual(document.templates);
     expect(roundTripped.slots).toEqual(document.slots);
     expect(roundTripped.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source)
-      .toBe("d20 + fields.bonus + inputs.edge");
+      .toBe("d20 + item.bonus + inputs.edge");
   });
 
-  it("omits optional templates and slots when the source document omits them", () => {
+  it("preserves empty template and slot collections", () => {
     const document = validDocument();
     document.expressions = document.expressions.filter((expression) => expression.id !== "title_expr");
     const result = compileDocument(document, opts);
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.templates).toBeUndefined();
-    expect(result.value.slots).toBeUndefined();
-    expect(documentFromPackage(result.value).templates).toBeUndefined();
-    expect(documentFromPackage(result.value).slots).toBeUndefined();
+    expect(result.value.templates).toEqual([]);
+    expect(result.value.slots).toEqual([]);
+    expect(documentFromPackage(result.value).templates).toEqual([]);
+    expect(documentFromPackage(result.value).slots).toEqual([]);
   });
 });
 
@@ -523,7 +525,7 @@ function templateDocument(): SystemDocumentV1 {
     id: "longsword_attack_expr",
     context: "roll",
     resultType: "number",
-    source: "d20 + fields.bonus + inputs.edge",
+    source: "d20 + item.bonus + inputs.edge",
     fallback: 0,
   });
   return document;
@@ -568,5 +570,45 @@ describe("success-count authoring assessment", () => {
     expect(result.ok).toBe(false);
     const diagnostics = result.ok ? [] : result.diagnostics;
     expect(diagnostics).toContainEqual(expect.objectContaining({ code: "invalid_expression", path: "pool_roll_expr" }));
+  });
+});
+
+describe("sheet evaluation budget", () => {
+  // 128 leaves in a balanced tree: 255 nodes, inside the per-expression limits.
+  const balanced = (leaves: number): string =>
+    leaves === 1 ? "1" : `(${balanced(leaves / 2)}+${balanced(leaves / 2)})`;
+  const withComputedFields = (count: number): SystemDocumentV1 => {
+    const document = structuredClone(d20Document);
+    for (let index = 0; index < count; index++) {
+      document.expressions.push({
+        id: `heavy_expr_${index}`, context: "computed", resultType: "number", source: balanced(128), fallback: 0,
+      });
+      document.entities[0]!.fields.push({
+        kind: "computed", id: `heavy_${index}`, label: `Heavy ${index}`, valueType: "number", expressionId: `heavy_expr_${index}`,
+      });
+    }
+    return document;
+  };
+
+  it("accepts a sheet whose total cost is above one expression's limit and the runtime observes it", () => {
+    const compiled = compileDocument(withComputedFields(31), opts);
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+    const entity = compiled.value.entities[0]!;
+    const state = initializeState(entity);
+    expect(state.ok).toBe(true);
+    if (!state.ok) return;
+    const observed = resolveObservedValues(compiled.value, entity, state.value);
+    expect(observed.ok).toBe(true);
+    if (!observed.ok) return;
+    expect(observed.value.derivedValues.heavy_30).toBe(128);
+  });
+
+  it("rejects a sheet that the runtime could never observe", () => {
+    const result = compileDocument(withComputedFields(33), opts);
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [expect.objectContaining({ code: "limit_exceeded", path: "/entities/0/fields" })],
+    });
   });
 });

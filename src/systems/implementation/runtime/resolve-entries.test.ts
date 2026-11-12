@@ -93,7 +93,7 @@ function entryDocument(): SystemDocumentV1 {
       id: "longsword_attack_expr",
       context: "roll",
       resultType: "number",
-      source: "d20 + fields.weapon_bonus + inputs.edge",
+      source: "d20 + item.weapon_bonus + inputs.edge",
       fallback: 0,
     },
     {
@@ -107,14 +107,9 @@ function entryDocument(): SystemDocumentV1 {
   return document;
 }
 
-// The Task 2 global duplicate-id rule forbids a template field that shares an
-// entity field id, so the brief's literal `d20 + fields.strength_mod +
-// fields.bonus` case (character strength_mod + entry bonus) cannot pass the
-// strict decode path. These two tests drive runtime.resolve with a compiled
-// package that collides on purpose, loaded raw (no structural validation), to
-// pin the entry-first merge order at the resolution layer.
 function collisionDocument(): SystemDocumentV1 {
   const document = entryDocument();
+  document.sheets[0]!.sections[0]!.elements.push({ kind: "slot", id: "inventory_element", slotId: "inventory" });
   document.templates![0]!.fields.push({
     kind: "integer",
     id: "strength_mod",
@@ -126,7 +121,7 @@ function collisionDocument(): SystemDocumentV1 {
     step: 1,
   });
   document.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source =
-    "d20 + fields.strength_mod + fields.weapon_bonus";
+    "d20 + fields.strength_mod + item.strength_mod + item.weapon_bonus";
   return document;
 }
 
@@ -140,11 +135,9 @@ function compileEntryPackage(document: SystemDocumentV1): SystemPackageV1 {
   return result.value;
 }
 
-function createRuntime(packageValue: SystemPackageV1, strict = true): SystemRuntime {
+function createRuntime(packageValue: SystemPackageV1): SystemRuntime {
   return createSystemRuntime({
-    loadPackage: strict
-      ? createFixturePublishedPackageLoader([packageValue])
-      : async (versionId) => (versionId === packageValue.versionId ? packageValue : null),
+    loadPackage: createFixturePublishedPackageLoader([packageValue]),
     authoritativeRollSecret: "0123456789abcdef0123456789abcdef",
   });
 }
@@ -165,7 +158,7 @@ describe("granted-action resolution", () => {
     const document = entryDocument();
     document.sheets[0]!.sections[0]!.elements.push({ kind: "slot", id: "inventory_element", slotId: "inventory" });
     document.expressions.find((expression) => expression.id === "longsword_attack_expr")!.source =
-      "d20 + fields.strength_mod + fields.weapon_bonus";
+      "d20 + fields.strength_mod + item.weapon_bonus";
     document.templates![0]!.grantedActions.push({
       kind: "roll", id: "longsword_damage", label: "Longsword Damage",
       expressionId: "longsword_damage_expr", inputs: [], outputTemplate: "Damage: {total}",
@@ -229,7 +222,7 @@ describe("granted-action resolution", () => {
     if (!result.ok) return;
     expect(result.value.roll).toMatchObject({ actionId: "longsword_attack" });
     expect(result.value.roll?.bindings).toEqual(expect.arrayContaining([
-      { scope: "fields", definitionId: "weapon_bonus", value: 1 },
+      { scope: "item", definitionId: "weapon_bonus", value: 1 },
       { scope: "inputs", definitionId: "edge", value: 0 },
     ]));
     expect(result.value.roll?.output).toMatch(/^Longsword: /);
@@ -239,9 +232,9 @@ describe("granted-action resolution", () => {
     expect(result.value.changedDefinitionIds).toEqual([]);
   });
 
-  it("lets the character stat show through when the entry omits it", async () => {
+  it("reads the character stat and the item default from distinct scopes", async () => {
     const packageValue = compileEntryPackage(collisionDocument());
-    const runtime = createRuntime(packageValue, false);
+    const runtime = createRuntime(packageValue);
     const base = await initializedState(runtime, packageValue);
     const state = {
       ...structuredClone(base),
@@ -272,13 +265,14 @@ describe("granted-action resolution", () => {
     if (!result.ok) return;
     expect(result.value.roll?.bindings).toEqual(expect.arrayContaining([
       { scope: "fields", definitionId: "strength_mod", value: 2 },
-      { scope: "fields", definitionId: "weapon_bonus", value: 1 },
+      { scope: "item", definitionId: "strength_mod", value: 0 },
+      { scope: "item", definitionId: "weapon_bonus", value: 1 },
     ]));
   });
 
-  it("lets an entry value shadow the same-named character field", async () => {
+  it("keeps the character stat and same-named item value distinct", async () => {
     const packageValue = compileEntryPackage(collisionDocument());
-    const runtime = createRuntime(packageValue, false);
+    const runtime = createRuntime(packageValue);
     const base = await initializedState(runtime, packageValue);
     const state = {
       ...structuredClone(base),
@@ -308,8 +302,9 @@ describe("granted-action resolution", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.roll?.bindings).toEqual(expect.arrayContaining([
-      { scope: "fields", definitionId: "strength_mod", value: 5 },
-      { scope: "fields", definitionId: "weapon_bonus", value: 1 },
+      { scope: "fields", definitionId: "strength_mod", value: 2 },
+      { scope: "item", definitionId: "strength_mod", value: 5 },
+      { scope: "item", definitionId: "weapon_bonus", value: 1 },
     ]));
   });
 
@@ -451,6 +446,9 @@ describe("granted-action resolution", () => {
 describe("slot projection", () => {
   it("projects slot elements with entries and synthetic granted actions", async () => {
     const document = entryDocument();
+    document.entities[0]!.fields.push({ kind: "boolean", id: "longsword_attack", label: "Training", required: false, default: false });
+    document.expressions.push({ id: "training_expr", context: "validation", resultType: "boolean", source: "fields.longsword_attack", fallback: false });
+    document.validations.push({ id: "check_training", targetId: "longsword_attack", targetEntityId: "character", expressionId: "training_expr", severity: "warning", message: "Training required." });
     (document.sheets[0]!.sections[0]!.elements as unknown[]).push({
       kind: "slot",
       id: "inv_element",
@@ -487,6 +485,7 @@ describe("slot projection", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.value.projection.projectionVersion).toBe("1.0");
+    expect(result.value.projection.validations).toContainEqual(expect.objectContaining({ validationId: "check_training" }));
     const elements = result.value.projection.sheets[0]!.sections[0]!.elements;
     const slotIndex = elements.findIndex((element) => element.kind === "slot");
     expect(slotIndex).toBeGreaterThanOrEqual(0);
@@ -554,7 +553,7 @@ describe("derived campaign copies", () => {
   it("projects and executes a pinned derived copy without catalog lookup or metadata bindings", async () => {
     const document = entryDocument();
     document.sheets[0]!.sections[0]!.elements.push({kind:"slot",id:"inventory_element",slotId:"inventory"});
-    document.expressions.find(e=>e.id === "longsword_attack_expr")!.source = "d20 + fields.strength_mod + fields.weapon_bonus";
+    document.expressions.find(e=>e.id === "longsword_attack_expr")!.source = "d20 + fields.strength_mod + item.weapon_bonus";
     const pkg=compileEntryPackage(document), runtime=createRuntime(pkg);
     const state=await initializedState(runtime,pkg);
     state.entries![SWORD_ENTRY_ID]={entryId:SWORD_ENTRY_ID,slotId:"inventory",templateId:null,
@@ -568,7 +567,7 @@ describe("derived campaign copies", () => {
     expect(elements.find(e=>e.kind==="slot")).toMatchObject({entries:[{label:"Captain's sword",values:{weapon_bonus:4}}]});
     const result=await runtime.resolve({versionId:pkg.versionId,entityId:"character",state,intent:{kind:"action",entryId:SWORD_ENTRY_ID,actionId:"longsword_attack",inputs:{},executionId:TORCH_ENTRY_ID}});
     expect(result.ok).toBe(true);
-    if(result.ok) expect(result.value.roll?.bindings).toEqual(expect.arrayContaining([{scope:"fields",definitionId:"strength_mod",value:2},{scope:"fields",definitionId:"weapon_bonus",value:4}]));
+    if(result.ok) expect(result.value.roll?.bindings).toEqual(expect.arrayContaining([{scope:"fields",definitionId:"strength_mod",value:2},{scope:"item",definitionId:"weapon_bonus",value:4}]));
     (state.entries![SWORD_ENTRY_ID]!.snapshot as any).base.packageChecksum="forged";
     expect(await runtime.resolve({versionId:pkg.versionId,entityId:"character",state,intent:{kind:"observe"}})).toMatchObject({ok:false,error:{code:"invalid_state"}});
   });

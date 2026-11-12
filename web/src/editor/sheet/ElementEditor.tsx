@@ -16,7 +16,7 @@ import type {
 export type ElementEditorProps = {
   element: SheetElementV1;
   onChange: (next: SheetElementV1) => void;
-  definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string}>;
+  definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string; ownerId?: string}>;
 };
 
 export function ElementEditor({ element, onChange, definitions = [] }: ElementEditorProps) {

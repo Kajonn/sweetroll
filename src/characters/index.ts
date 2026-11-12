@@ -1,6 +1,7 @@
 import { createCharacterImages, type CharacterImages } from "./images.js";
 import { createCharacterEntryImages, type CharacterEntryImages } from "./entry-images.js";
 import {canPlaceTemplate} from "../campaigns/templatePolicy.js";
+import { campaignRollRequirements } from "../systems/implementation/runtime/roll-context.js";
 import { materializeDefaults, slotsForEntity, templateApplicable, validDefaults } from "../systems/implementation/runtime/effective-entry.js";
 import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
 import {pushEligibility} from "../systems/implementation/rules/push.js";
@@ -34,7 +35,9 @@ import {
   createPostgresPublishedPackageLoader,
 } from "../systems/implementation/runtime/package-loader.js";
 import type {
+  CampaignRollContext,
   CharacterProjectionV1,
+  RuntimeResolution,
   DefinitionId,
   NominalActionResult,
   NormalizedRoll,
@@ -49,6 +52,10 @@ import type {
 import {
   createCharacterPersistenceRepository,
   type ApplyCommandOutcome,
+  type ApplyCommandInput,
+  type DeferredDeckAction,
+  type CampaignRollSelection,
+  type CampaignRollOptions,
   type AttachedAuthorization,
   type CampaignMembershipSnapshot,
   type CharacterPageCursor,
@@ -74,6 +81,8 @@ const DUPLICATE_COMMAND_KIND = "character_duplicate";
 const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
   setField: "character_set_field",
   bumpResource: "character_bump_resource",
+  adjustResource: "character_adjust_resource",
+  setResource: "character_set_resource",
   executeAction: "character_execute_action",
   pushRoll: "character_push_roll",
   addEntry: "character_add_entry",
@@ -280,7 +289,7 @@ export type CharacterResourceBumpCommand = {
   idempotencyKey: string;
 };
 
-export type CharacterActionCommand = {
+export type CharacterActionCommand = CampaignRollSelection & {
   kind: "executeAction";
   characterId: CharacterId;
   actionId: DefinitionId;
@@ -310,8 +319,31 @@ export type CharacterActionCommand = {
 export type CharacterPushCommand={kind:"pushRoll";characterId:CharacterId;parentRollId:string;expectedRevision:number;idempotencyKey:string};
 export type PushOptions={canPush:boolean;reason:string|null;eligibleDiceIds:string[];revision:number;nextAttempt:number;maxAttempts:number};
 
+/** Design 6.3: apply an amount (damage, healing, spending) in one atomic command. */
+export type CharacterResourceAdjustCommand = {
+  kind: "adjustResource";
+  characterId: CharacterId;
+  resourceId: DefinitionId;
+  delta: number;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+/** Design 6.3: direct input of a resource's current value and/or maximum. */
+export type CharacterResourceSetCommand = {
+  kind: "setResource";
+  characterId: CharacterId;
+  resourceId: DefinitionId;
+  current?: number;
+  max?: number;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
 export type CharacterCommand =
   | CharacterPushCommand
+  | CharacterResourceAdjustCommand
+  | CharacterResourceSetCommand
   | CharacterFieldSetCommand
   | CharacterResourceBumpCommand
   | CharacterActionCommand
@@ -379,6 +411,8 @@ export type EntryTemplateSummary = {
     id: DefinitionId;
     label: string;
     actionKind: "roll" | "resourceBump";
+    target?: { entityId: DefinitionId };
+    respondsTo?: true;
     inputs: Array<{
       id: DefinitionId;
       label: string;
@@ -418,6 +452,8 @@ export type CharacterRecoverCommand = {
   expectedRevision: number;
   idempotencyKey: string;
 };
+
+export type CharacterDeck = { deckId: DefinitionId; label: string; total: number; remaining: number };
 
 export type CharacterManagementCommand =
   | CharacterRenameCommand
@@ -515,6 +551,7 @@ export type CharacterExportV1 = {
 type CharacterAccess = { standaloneOnly?: boolean };
 
 export interface Characters extends CharacterImages, CharacterEntryImages {
+  rollOptions(ctx: RequestContext, request: { characterId: string; actionId: string; entryId?: string }): Promise<CharacterResult<CampaignRollOptions>>;
   readRoll(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<NormalizedRoll>>;
   pushOptions(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<PushOptions>>;
   create(ctx: RequestContext, input: CreateCharacter): Promise<CharacterResult<CharacterView>>;
@@ -539,6 +576,12 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
     ctx: RequestContext,
     input: { characterId: CharacterId },
   ): Promise<CharacterResult<EntryTemplateSummary[]>>;
+  /**
+   * Design 6.4 (C13): card counts of the decks this sheet's system defines.
+   * An attached sheet reads the campaign's shared decks, a standalone sheet
+   * its own. Authorized like `open`.
+   */
+  listDecks(ctx: RequestContext, input: { characterId: CharacterId }): Promise<CharacterResult<CharacterDeck[]>>;
   manage(
     ctx: RequestContext,
     input: CharacterManagementCommand,
@@ -1018,7 +1061,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       return { ok: false, error };
     }
     if (outcome.kind === "precondition_failed") {
-      await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(outcome.error, resultScope), expiresAt: replayExpiresAt });
+      if (!outcome.retryable) await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(outcome.error, resultScope), expiresAt: replayExpiresAt });
       return {ok:false,error:outcome.error};
     }
     if (outcome.kind === "archived") {
@@ -1133,11 +1176,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const packaged = await loadEntryPackage(resolveSource, executionId, replayExpiresAt, resultScope);
     if (!packaged.ok) return packaged;
     const packageValue=packaged.value;
-    const slots: SlotDefinitionV1[] = packaged.value.slots ?? [];
+    const slots: SlotDefinitionV1[] = packaged.value.slots;
     const allowedSlots = standaloneOnly ? slotsForEntity(packageValue, resolveSource.entityDefinitionId) : slots;
-    const templates: ObjectTemplateV1[] = packaged.value.templates ?? [];
+    const templates: ObjectTemplateV1[] = packaged.value.templates;
     // RuntimeStateV1.entries is optional: legacy rows decode without it.
-    const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries ?? {};
+    const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries;
 
     let nextEntries: Record<string, CharacterEntryV1>;
     let selectedSource: Extract<EntrySource, {kind:"campaign"}> | undefined;
@@ -2053,6 +2096,31 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
 
+    async rollOptions(ctx, request) {
+      try {
+        const snapshot = await loadAttachedSnapshot(ctx, request.characterId);
+        if (!snapshot || snapshot.auth.record.lifecycle !== "active" || snapshot.auth.campaign?.status !== "active") {
+          return { ok: false, error: errors.not_found() };
+        }
+        const source = snapshot.auth.record;
+        const observed = await input.runtime.resolve({
+          versionId: source.systemVersionId, extensions: source.extensions, entityId: source.entityDefinitionId,
+          state: source.state, intent: { kind: "observe" },
+        });
+        if (!observed.ok) return { ok: false, error: mapRuntimeError(observed.error) };
+        const action = findProjectedAction(observed.value.projection, request.actionId, request.entryId);
+        if (action?.kind !== "action" || (!action.target && !action.respondsTo)) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const options = await repo.loadCampaignRollOptions({
+          source, member: toMembershipRecord(snapshot.auth.membership!), includeRolls: action.respondsTo === true,
+          ...(action.target ? { targetEntityId: action.target.entityId } : {}),
+        });
+        return options ? { ok: true, value: options } : { ok: false, error: errors.not_found() };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
     async readRoll(ctx,rollInput){
       try{
         const owned=await repo.openOwnedCharacter(rollInput.characterId,ctx.actorId);
@@ -2110,12 +2178,18 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? { fieldId: command.fieldId, value: command.value }
             : command.kind === "bumpResource"
               ? { resourceId: command.resourceId, direction: command.direction }
+            : command.kind === "adjustResource"
+              ? { resourceId: command.resourceId, delta: command.delta }
+            : command.kind === "setResource"
+              ? resourceSetPayload(command)
               : command.kind === "pushRoll"
                 ? {parentRollId:command.parentRollId}
               : command.kind === "executeAction"
                 ? {
                     actionId: command.actionId,
                     inputs: command.inputs,
+                    ...(command.targetCharacterId === undefined ? {} : { targetCharacterId: command.targetCharacterId }),
+                    ...(command.respondsTo === undefined ? {} : { respondsTo: command.respondsTo }),
                     ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
                   }
                 : command.kind === "addEntry"
@@ -2246,8 +2320,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         // (resolved to the effective audience inside the transaction).
         if (attachedCampaignId === null && command.kind === "executeAction") {
           const requested = command.audience ?? null;
-          if (requested !== null && requested !== "owner_only") {
-            const error = errors.bad_request("Standalone actions accept only the owner_only audience.");
+          const needsCampaign = command.targetCharacterId !== undefined || command.respondsTo !== undefined;
+          if (needsCampaign || (requested !== null && requested !== "owner_only")) {
+            const error = errors.bad_request(needsCampaign
+              ? "Targeted and opposed rolls require a campaign character."
+              : "Standalone actions accept only the owner_only audience.");
             await repo.finalizeExecutionError({
               executionId,
               resultJson: serializeCommandError(error),
@@ -2288,6 +2365,10 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
             : command.kind === "bumpResource"
               ? ({ kind: "bump", resourceId: command.resourceId, direction: command.direction } as const)
+            : command.kind === "adjustResource"
+              ? ({ kind: "adjust", resourceId: command.resourceId, delta: command.delta } as const)
+            : command.kind === "setResource"
+              ? ({ kind: "setResource", ...resourceSetPayload(command) } as const)
               : ({
                   kind: "action",
                   actionId: command.actionId,
@@ -2296,83 +2377,159 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                   ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
                 } as const);
 
-        const resolved = await input.runtime.resolve({
+        const selection = command.kind === "executeAction" && (command.targetCharacterId !== undefined || command.respondsTo !== undefined)
+          ? {
+              ...(command.targetCharacterId === undefined ? {} : { targetCharacterId: command.targetCharacterId }),
+              ...(command.respondsTo === undefined ? {} : { respondsTo: command.respondsTo }),
+            }
+          : null;
+        const contextual = selection !== null;
+        const makeCommit = (resolved: RuntimeResolution): ApplyCommandInput => {
+          const activityKind =
+            command.kind === "setField"
+              ? "character_field_set"
+              : command.kind === "bumpResource"
+                ? "character_resource_bumped"
+              : command.kind === "adjustResource"
+                ? "character_resource_adjusted"
+              : command.kind === "setResource"
+                ? "character_resource_set"
+                : command.kind==="pushRoll"?"character_roll_pushed":"character_action_executed";
+          const changedDefinitionIds = contextual ? [] : resolved.changedDefinitionIds;
+          const roll = resolved.roll;
+          if(roll&&resolved.pushContext&&!roll.push){
+            const policy=resolved.pushContext.policy;
+            roll.push={version:"1.0",rollId:executionId,rootRollId:executionId,parentRollId:null,attempt:0,maxAttempts:policy.maxAttempts,rerolledDiceIds:[],faceOutcomes:policy.groups.flatMap(g=>g.reportedFaces.map(face=>({groupId:g.groupId,face,combinedCount:roll.dice.filter(d=>d.kept&&d.groupId===g.groupId&&d.value===face).length,rerolledCount:0})))};
+          }
+          const nominal = resolved.nominal;
+
+          return {
+            executionId,
+            characterId: command.characterId,
+            actorId: ctx.actorId,
+            expectedRevision: command.expectedRevision,
+            nextState: resolved.state,
+            stateChanged: changedDefinitionIds.length > 0,
+            roll,
+            ...(resolved.pushContext?{pushContext:resolved.pushContext,pushResolutionRevision:resolveSource.revision}:{}),
+            activity: {
+              kind: activityKind,
+              payloadJson: { ...payload, changedDefinitionIds },
+              requestId: ctx.requestId,
+            },
+            resultExpiresAt: replayExpiresAt,
+            ...(attachedCampaignId === null ? {} : { campaign: { campaignId: attachedCampaignId } }),
+            ...(command.kind === "executeAction" ? { rollAudience: { requested: command.audience ?? null } } : {}),
+            buildResult: ({ record, controllers, scope, rollAudience }) => {
+              const view = toView(
+                record,
+                {
+                  derivedValues: resolved.derivedValues,
+                  validations: resolved.validations,
+                  projection: resolved.projection,
+                  packageChecksum: resolved.packageChecksum,
+                  changedDefinitionIds,
+                },
+                {
+                  baseRevision: command.expectedRevision,
+                  commandExecutionId: executionId,
+                  replayExpiresAt: replayExpiresAt.toISOString(),
+                  replayed: false,
+                },
+              );
+              // I6 Task 8: compose the authorized audience onto the normalized
+              // runtime output. The Runtime stamp (`owner_only`) is never
+              // authoritative for attached rolls; the transaction-fixed
+              // effective audience is. The Runtime itself never queries
+              // membership.
+              const composedRoll =
+                roll === null ? null : { ...roll, audience: rollAudience ?? ("owner_only" as const) };
+              return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll, nominal } };
+            },
+          };
+        };
+        const rulesScope = {
           versionId: resolveSource.systemVersionId,
           extensions: resolveSource.extensions,
           entityId: resolveSource.entityDefinitionId,
-          state: resolveSource.state,
-          intent,
-        });
-        if (!resolved.ok) {
-          const error = mapRuntimeError(resolved.error);
-          if (isFinalizableRuntimeError(resolved.error.code)) {
+        };
+
+        let outcome: ApplyCommandOutcome;
+        // Design 6.4 (C13): a draw or shuffle resolves under the deck's lock.
+        const deckPrepared = !selection && intent.kind === "action" && intent.entryId === undefined
+          ? await input.runtime.prepareResolve(rulesScope)
+          : null;
+        const deckId = deckPrepared?.ok ? deckPrepared.value.deckIdFor(intent.kind === "action" ? intent.actionId : "") : null;
+        if (deckPrepared?.ok && deckId !== null && intent.kind === "action") {
+          const resolveDeck: DeferredDeckAction["resolve"] = (deck) => {
+            const resolved = deckPrepared.value({ state: resolveSource.state, intent: { ...intent, deck } });
+            return resolved.ok
+              ? { ok: true, value: { ...makeCommit(resolved.value), ...(resolved.value.deck ? { deckState: resolved.value.deck } : {}) } }
+              : { ok: false, error: mapRuntimeError(resolved.error), retryable: !isFinalizableRuntimeError(resolved.error.code) };
+          };
+          outcome = await repo.applyCommandTx({
+            executionId,
+            characterId: command.characterId,
+            actorId: ctx.actorId,
+            expectedRevision: command.expectedRevision,
+            deck: { deckId },
+            source: resolveSource,
+            resolve: resolveDeck,
+            ...(attachedCampaignId && resultScope
+              ? { campaign: { campaignId: attachedCampaignId }, membershipGeneration: resultScope.membershipGeneration }
+              : {}),
+          });
+        } else if (selection && attachedCampaignId && resultScope && intent.kind === "action") {
+          // Package loading can use the pool. Complete it before holding a
+          // campaign transaction so contention cannot exhaust connections.
+          const prepared = await input.runtime.prepareResolve(rulesScope);
+          if (!prepared.ok) return { ok: false, error: mapRuntimeError(prepared.error) };
+          const observed = prepared.value({ state: resolveSource.state, intent: { kind: "observe" } });
+          if (!observed.ok) return { ok: false, error: mapRuntimeError(observed.error) };
+          const action = findProjectedAction(observed.value.projection, intent.actionId, intent.entryId);
+          if (!action || Boolean(action.target) !== Boolean(selection.targetCharacterId)
+            || Boolean(action.respondsTo) !== Boolean(selection.respondsTo)) {
+            const error = mapRuntimeError({ code: "bad_request", definitionId: intent.actionId, message: "Roll context does not match the action." });
             await repo.finalizeExecutionError({
-              executionId,
-              resultJson: serializeCommandError(error, resultScope),
-              expiresAt: replayExpiresAt,
+              executionId, resultJson: serializeCommandError(error, resultScope), expiresAt: replayExpiresAt,
             });
+            return { ok: false, error };
           }
-          return { ok: false, error };
+          outcome = await repo.applyCommandTx({
+            executionId,
+            characterId: command.characterId,
+            actorId: ctx.actorId,
+            expectedRevision: command.expectedRevision,
+            campaign: { campaignId: attachedCampaignId },
+            selection: { ...selection, ...(action.target ? { targetEntityId: action.target.entityId } : {}) },
+            source: resolveSource,
+            membershipGeneration: resultScope.membershipGeneration,
+            resolve: (campaignRoll: CampaignRollContext) => {
+              const resolved = prepared.value({ state: resolveSource.state, intent: { ...intent, campaignRoll } });
+              return resolved.ok
+                ? { ok: true as const, value: makeCommit(resolved.value) }
+                : {
+                    ok: false as const,
+                    error: mapRuntimeError(resolved.error),
+                    retryable: !isFinalizableRuntimeError(resolved.error.code),
+                  };
+            },
+          });
+        } else {
+          const resolved = deckPrepared?.ok
+            ? deckPrepared.value({ state: resolveSource.state, intent })
+            : await input.runtime.resolve({ ...rulesScope, state: resolveSource.state, intent });
+          if (!resolved.ok) {
+            const error = mapRuntimeError(resolved.error);
+            if (isFinalizableRuntimeError(resolved.error.code)) {
+              await repo.finalizeExecutionError({
+                executionId, resultJson: serializeCommandError(error, resultScope), expiresAt: replayExpiresAt,
+              });
+            }
+            return { ok: false, error };
+          }
+          outcome = await repo.applyCommandTx(makeCommit(resolved.value));
         }
-
-        const activityKind =
-          command.kind === "setField"
-            ? "character_field_set"
-            : command.kind === "bumpResource"
-              ? "character_resource_bumped"
-              : command.kind==="pushRoll"?"character_roll_pushed":"character_action_executed";
-        const changedDefinitionIds = resolved.value.changedDefinitionIds;
-        const roll = resolved.value.roll;
-        if(roll&&resolved.value.pushContext&&!roll.push){
-          const policy=resolved.value.pushContext.policy;
-          roll.push={version:"1.0",rollId:executionId,rootRollId:executionId,parentRollId:null,attempt:0,maxAttempts:policy.maxAttempts,rerolledDiceIds:[],faceOutcomes:policy.groups.flatMap(g=>g.reportedFaces.map(face=>({groupId:g.groupId,face,combinedCount:roll.dice.filter(d=>d.groupId===g.groupId&&d.value===face).length,rerolledCount:0})))};
-        }
-        const nominal = resolved.value.nominal;
-
-        const outcome = await repo.applyCommandTx({
-          executionId,
-          characterId: command.characterId,
-          actorId: ctx.actorId,
-          expectedRevision: command.expectedRevision,
-          nextState: resolved.value.state,
-          stateChanged: changedDefinitionIds.length > 0,
-          roll,
-          ...(resolved.value.pushContext?{pushContext:resolved.value.pushContext,pushResolutionRevision:resolveSource.revision}:{}),
-          activity: {
-            kind: activityKind,
-            payloadJson: { ...payload, changedDefinitionIds },
-            requestId: ctx.requestId,
-          },
-          resultExpiresAt: replayExpiresAt,
-          ...(attachedCampaignId === null ? {} : { campaign: { campaignId: attachedCampaignId } }),
-          ...(command.kind === "executeAction" ? { rollAudience: { requested: command.audience ?? null } } : {}),
-          buildResult: ({ record, controllers, scope, rollAudience }) => {
-            const view = toView(
-              record,
-              {
-                derivedValues: resolved.value.derivedValues,
-                validations: resolved.value.validations,
-                projection: resolved.value.projection,
-                packageChecksum: resolved.value.packageChecksum,
-                changedDefinitionIds,
-              },
-              {
-                baseRevision: command.expectedRevision,
-                commandExecutionId: executionId,
-                replayExpiresAt: replayExpiresAt.toISOString(),
-                replayed: false,
-              },
-            );
-            // I6 Task 8: compose the authorized audience onto the normalized
-            // runtime output. The Runtime stamp (`owner_only`) is never
-            // authoritative for attached rolls; the transaction-fixed
-            // effective audience is. The Runtime itself never queries
-            // membership.
-            const composedRoll =
-              roll === null ? null : { ...roll, audience: rollAudience ?? ("owner_only" as const) };
-            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll, nominal } };
-          },
-        });
 
         return finishCommandTx({
           ctx,
@@ -2385,6 +2542,43 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           executionId,
           replayExpiresAt,
         });
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+    async listDecks(ctx, request) {
+      try {
+        let record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        if (record === null) {
+          const scope = await repo.loadCharacterScope(request.characterId);
+          if (scope === null || scope.campaignId === null) return { ok: false, error: errors.not_found() };
+          const attached = await loadAttachedSnapshot(ctx, request.characterId);
+          if (attached === null) return { ok: false, error: errors.not_found() };
+          record = attached.auth.record;
+        }
+        const loaded = await loadEffective(record.systemVersionId, record.extensions);
+        if (!loaded.ok) {
+          return loaded.error.code === "invalid_package"
+            ? { ok: false, error: mapRuntimeError({ code: "invalid_package", message: "Published package runtime references are invalid." }) }
+            : { ok: false, error: errors.internal() };
+        }
+        const decks = loaded.value.decks ?? [];
+        const stored = decks.length === 0
+          ? new Map<string, string[]>()
+          : await repo.loadDeckCounts({ campaignId: record.campaignId, characterId: record.characterId });
+        return {
+          ok: true,
+          value: decks.map((deck) => {
+            const cards = new Set(loaded.value.referenceData.find(dataset => dataset.id === deck.datasetId)?.records.map(card => card.id));
+            const remaining = stored.get(deck.id);
+            return {
+              deckId: deck.id,
+              label: deck.label,
+              total: cards.size,
+              remaining: remaining === undefined ? cards.size : remaining.filter(id => cards.has(id)).length,
+            };
+          }),
+        };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -2412,7 +2606,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         }
         const packageValue: SystemPackageV1 = loaded.value;
         // Design 6.8: extension templates are listed by plain ID with their extension.
-        const systemChoices: EntryTemplateSummary[] = (packageValue.templates ?? []).map((template) => {
+        const systemChoices: EntryTemplateSummary[] = packageValue.templates.map((template) => {
           const key = unqualifiedId(template.id);
           return {
             id: key.id,
@@ -2427,6 +2621,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               id: action.id,
               label: action.label,
               actionKind: action.kind,
+              ...campaignRollRequirements(action),
               inputs: action.kind === "roll" ? action.inputs.map((actionInput) => ({ ...actionInput })) : [],
             })),
           };
@@ -2441,12 +2636,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               if(template.content.base){
                 const entity=packageValue.entities.find(e=>e.id===record!.entityDefinitionId);
                 const baseRef=template.content.base;
-                base=(packageValue.templates ?? []).find(t=>t.id===baseRef.templateId);
+                base=packageValue.templates.find(t=>t.id===baseRef.templateId);
                 if(!base || !entity || !validDefaults(base,template.content.defaultValues ?? {}) || baseRef.versionId!==record.systemVersionId || baseRef.packageChecksum!==packageValue.integrity.checksum || !templateApplicable(packageValue,entity,base)) continue;
               }
               campaignChoices.push({id:template.templateId,label:template.content.name,kind:template.kind,
                 fields:base?.fields.map(f=>structuredClone(f)) ?? [],
-                grantedActions:base?.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]})) ?? [],
+                grantedActions:base?.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,...campaignRollRequirements(a),inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]})) ?? [],
                 source:{kind:"campaign",campaignId:template.campaignId,templateId:template.templateId,templateRevision:template.revision,contentRevision:template.contentRevision},...(template.kind === "item" ? {defaultQuantity:template.content.defaultQuantity ?? 1}: {})});
             }
             cursor=page.nextCursor;
@@ -2939,6 +3134,20 @@ function redactRollIdForReader(
 // inputs), email, external identity, session, or idempotency keys. Only structural identifiers
 // needed to interpret "what happened" are retained; the underlying write-side payload (in
 // persistence.ts) may include more, but the read-side projection here minimizes it.
+function findProjectedAction(projection: CharacterProjectionV1, actionId: string, entryId: string | undefined) {
+  return projection.sheets.flatMap(sheet => sheet.sections).flatMap(section => section.elements)
+    .find((element): element is Extract<typeof element, { kind: "action" }> =>
+      element.kind === "action" && element.actionId === actionId && element.entryId === entryId);
+}
+
+function resourceSetPayload(command: CharacterResourceSetCommand): { resourceId: string; current?: number; max?: number } {
+  return {
+    resourceId: command.resourceId,
+    ...(command.current === undefined ? {} : { current: command.current }),
+    ...(command.max === undefined ? {} : { max: command.max }),
+  };
+}
+
 function minimizeActivityPayload(kind: string, payload: unknown): unknown {
   const record = payload as Record<string, unknown> | null | undefined;
   if (record === null || record === undefined || typeof record !== "object") return {};
@@ -2951,6 +3160,19 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
       return {
         resourceId: record.resourceId,
         direction: record.direction,
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
+    case "character_resource_adjusted":
+      return {
+        resourceId: record.resourceId,
+        delta: record.delta,
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
+    case "character_resource_set":
+      return {
+        resourceId: record.resourceId,
+        ...(record.current === undefined ? {} : { current: record.current }),
+        ...(record.max === undefined ? {} : { max: record.max }),
         changedDefinitionIds: record.changedDefinitionIds ?? [],
       };
     case "character_action_executed":

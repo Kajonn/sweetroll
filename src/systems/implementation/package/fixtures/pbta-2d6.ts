@@ -5,7 +5,7 @@ import type { SystemExportV1 } from "../schema/export.js";
 import type { SystemPackageV1, UnsignedSystemPackageV1 } from "../schema/package.js";
 
 export const pbta2d6Document: SystemDocumentV1 = {
-  schemaVersion: "1.0",
+  schemaVersion: "2.0", templates: [], slots: [],
   metadata: {
     name: "2d6 PbtA-style",
     description: "Powered by the Apocalypse style 2d6 system",
@@ -152,13 +152,14 @@ export const pbta2d6Document: SystemDocumentV1 = {
       expressionId: "stat_valid_expr",
       severity: "error",
       message: "Move stat must be between -1 and 3",
+      targetEntityId: "character",
       targetId: "move_stat",
     },
   ],
 };
 
 const unsignedPackage: UnsignedSystemPackageV1 = {
-  schemaVersion: "1.0",
+  schemaVersion: "2.0", templates: [], slots: [],
   systemId: "b0000000-0000-5000-8000-000000000001",
   versionId: "b0000000-0000-5000-8000-000000000002",
   semanticVersion: "1.0.0",
@@ -255,7 +256,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
   expressions: [
     {
       id: "penalty_expr",
-      context: "computed",
+      context: "computed", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
@@ -272,19 +273,19 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "move_expr",
-      context: "roll",
+      context: "roll", languageVersion: "1.0",
       resultType: "number",
       inferredType: "number",
       fallback: 0,
       dependencies: ["move_stat", "forward"],
-      cost: 6,
+      cost: 7,
       ast: {
         kind: "binary",
         operator: "+",
         left: {
           kind: "binary",
           operator: "+",
-          left: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: 6 },
+          left: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides: { kind: "numberLiteral", value: 6 } }, modifiers: [] },
           right: { kind: "reference", scope: "fields", id: "move_stat" },
         },
         right: { kind: "reference", scope: "inputs", id: "forward" },
@@ -292,7 +293,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     },
     {
       id: "stat_valid_expr",
-      context: "validation",
+      context: "validation", languageVersion: "1.0",
       resultType: "boolean",
       inferredType: "boolean",
       fallback: false,
@@ -347,6 +348,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
       expressionId: "stat_valid_expr",
       severity: "error",
       message: "Move stat must be between -1 and 3",
+      targetEntityId: "character",
       targetId: "move_stat",
     },
   ],
@@ -354,6 +356,7 @@ const unsignedPackage: UnsignedSystemPackageV1 = {
     expressionBytes: PACKAGE_LIMITS.expressionBytes,
     expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
     expressionAstDepth: PACKAGE_LIMITS.expressionAstDepth,
+    sheetEvaluationNodes: PACKAGE_LIMITS.sheetEvaluationNodes,
     dicePerRoll: PACKAGE_LIMITS.dicePerRoll,
     sidesPerDie: PACKAGE_LIMITS.sidesPerDie,
   },

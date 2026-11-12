@@ -1,6 +1,8 @@
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import type {CharacterSession} from "../characters/session.js";
 import {useCharacterSession} from "../characters/useCharacterSession.js";
+import { hasRollSelection, RollContextFields } from "../rolls/RollContextFields.js";
+import type { CampaignRollSelection } from "../characters/types.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 // SessionBoard: GM session tab body. Read-only latest content (limit 10)
 // + recent activity (limit 20) + character directory with inline resource
@@ -25,7 +27,7 @@ import { randomUUID } from "../utils/uuid";
 
 export type SessionBoardProps = {
   campaignsApi: Pick<CampaignsApi, "listContent" | "listActivity" | "listCampaignCharacters">;
-  charactersApi: Pick<CharactersApi, "open" | "bumpCharacterResource" | "executeCharacterAction"> & Partial<PushApi>;
+  charactersApi: Pick<CharactersApi, "open" | "bumpCharacterResource" | "executeCharacterAction"> & Partial<PushApi> & Pick<CharactersApi, "rollOptions">;
   createSession?:((characterId:string)=>CharacterSession)|undefined;
   campaignId: string;
   actorId: string;
@@ -174,6 +176,7 @@ function SessionRollRow(props: {
   onRolled: () => Promise<void>;
   onRollResult?:(roll:CommandResultResponse["result"]["roll"])=>void;
 }) {
+  const [selection, setSelection] = useState<CampaignRollSelection>({});
   const [audience, setAudience] = useState<RollAudience>("campaign");
   const [lastRoll,setLastRoll]=useState<CommandResultResponse["result"]["roll"]>(null);
   const [resultText, setResultText] = useState<string | null>(null);
@@ -189,7 +192,7 @@ function SessionRollRow(props: {
 
   // Actions with required inputs never execute from the board: the board
   // must not fabricate inputs, so it links to the sheet instead.
-  if (props.element.inputs.some((input) => input.required)) {
+  if ((props.element.entryId !== undefined && (props.element.target || props.element.respondsTo)) || props.element.inputs.some((input) => input.required)) {
     return (
       <div>
         <span>{props.element.label}</span>{" "}
@@ -201,7 +204,7 @@ function SessionRollRow(props: {
   }
 
   const execute = async (): Promise<void> => {
-    if (props.commandPending || props.refreshPending || props.refreshFailed) return;
+    if (props.commandPending || props.refreshPending || props.refreshFailed || !hasRollSelection(props.element, selection)) return;
     props.onCommandStart();
     if (mountedRef.current) {
       setFailed(false);
@@ -214,6 +217,7 @@ function SessionRollRow(props: {
         props.element.actionId,
         {
           audience,
+          ...selection,
           expectedRevision: props.revision,
           idempotencyKey: randomUUID(),
         },
@@ -223,12 +227,23 @@ function SessionRollRow(props: {
       // uncertain-outcome text (malformed_response discipline).
       const raw = (response.result as { roll?: unknown }).roll ?? response.result;
       if (mountedRef.current) {
-        if (typeof raw === "string" || typeof raw === "number") {
+        if (props.element.actionKind === "shuffle") {
+          setLastRoll(null);
+          setResultText(t("campaign.detail.session.deck.shuffled", { deck: props.element.deck?.label ?? props.element.label }));
+        } else if (props.element.actionKind === "draw" && response.result.roll) {
+          setResultText(response.result.roll.output);
+          setLastRoll(response.result.roll);
+          props.onRollResult?.(response.result.roll);
+        } else if (typeof raw === "string" || typeof raw === "number") {
           setResultText(String(raw));
         } else if (raw !== null && typeof raw === "object" &&
           typeof (raw as { total?: unknown }).total === "number") {
-          setResultText(String((raw as { total: number }).total));
+          // Design 6.4: an outcome label, when the action defines bands, reads with the total.
+          const outcome = (raw as { outcome?: { label?: unknown } }).outcome?.label;
+          const total = String((raw as { total: number }).total);
+          setResultText(typeof outcome === "string" && outcome.length > 0 ? `${total} — ${outcome}` : total);
           setLastRoll(response.result.roll);
+          if (props.element.respondsTo) setSelection({});
           props.onRollResult?.(response.result.roll);
         } else {
           setUncertain(true);
@@ -275,12 +290,14 @@ function SessionRollRow(props: {
         disabled={controlsDisabled}
         onChange={(event) => setAudience(event.target.value as RollAudience)}
       />{" "}
+      <RollContextFields requirements={props.element} selection={selection} onChange={setSelection} disabled={controlsDisabled}
+        characterId={props.characterId} actionId={props.element.actionId} loadOptions={props.charactersApi.rollOptions} />
       <Button
         variant="secondary"
-        disabled={controlsDisabled}
+        disabled={controlsDisabled || !hasRollSelection(props.element, selection)}
         onClick={() => void execute()}
       >
-        {t("campaign.detail.session.roll.execute", { label: props.element.label })}
+        {props.element.deck ? props.element.label : t("campaign.detail.session.roll.execute", { label: props.element.label })}
       </Button>
       {lastRoll===null||lastRoll.push?null:<RollBreakdown roll={lastRoll}/>}
       {resultText !== null ? <p role="status">{resultText}</p> : null}

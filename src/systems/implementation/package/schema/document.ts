@@ -3,6 +3,7 @@ import { Type, type Static } from "@sinclair/typebox";
 
 import {PushPolicySchema} from "./push-policy.js";
 
+import { CustomDieSchema } from "./dice.js";
 import { PACKAGE_LIMITS } from "../limits.js";
 import { DefinitionIdSchema, ValueTypeSchema } from "./common.js";
 
@@ -92,6 +93,7 @@ export const SingleChoiceFieldV1Schema = Type.Object(
     required: Type.Boolean(),
     default: Type.Union([DefinitionIdSchema, Type.Null()]),
     options: Type.Array(ChoiceOptionV1Schema),
+    optionsFrom: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );
@@ -105,6 +107,7 @@ export const MultiChoiceFieldV1Schema = Type.Object(
     required: Type.Boolean(),
     default: Type.Array(DefinitionIdSchema),
     options: Type.Array(ChoiceOptionV1Schema),
+    optionsFrom: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );
@@ -128,6 +131,7 @@ export const ResourceFieldV1Schema = Type.Object(
     min: Type.Number(),
     max: Type.Number(),
     step: Type.Number(),
+    maxExpressionId: Type.Optional(DefinitionIdSchema),
     resetTo: Type.Union([Type.Literal("min"), Type.Literal("max")]),
   },
   { additionalProperties: false },
@@ -198,6 +202,8 @@ export const ReferenceDataV1Schema = Type.Object(
   {
     id: DefinitionIdSchema,
     label: LabelSchema,
+    keyColumn: Type.Optional(DefinitionIdSchema),
+    columns: Type.Optional(Type.Record(DefinitionIdSchema, ValueTypeSchema, { additionalProperties: false, maxProperties: PACKAGE_LIMITS.referenceRecordValues })),
     records: Type.Array(ReferenceRecordV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceRecordsPerSet,
     }),
@@ -301,6 +307,8 @@ export const SourceExpressionV1Schema = Type.Object(
       Type.Literal("computed"),
       Type.Literal("roll"),
       Type.Literal("validation"),
+      // Evaluated after a roll: an outcome band's condition or a detail value.
+      Type.Literal("outcome"),
     ]),
     resultType: ValueTypeSchema,
     source: Type.String({ maxLength: PACKAGE_LIMITS.expressionBytes }),
@@ -327,8 +335,22 @@ export const ActionInputV1Schema = Type.Object(
 );
 export type ActionInputV1 = Static<typeof ActionInputV1Schema>;
 
+// Design 6.4 (rules coverage R5). An outcome band names the result of a roll;
+// the first band whose condition is true applies. A detail is a named number
+// shown with the result, such as a margin. Both are `outcome` expressions that
+// may read `roll.total`, the roller's fields and inputs, and rolled("group").
+export const RollOutcomeV1Schema = Type.Object(
+  { id: DefinitionIdSchema, label: LabelSchema, expressionId: DefinitionIdSchema },
+  { additionalProperties: false },
+);
+export type RollOutcomeV1 = Static<typeof RollOutcomeV1Schema>;
+
 export const RollActionV1Schema = Type.Object(
   {
+    target: Type.Optional(Type.Object({ entityId: DefinitionIdSchema }, { additionalProperties: false })),
+    respondsTo: Type.Optional(Type.Literal(true)),
+    outcomes: Type.Optional(Type.Array(RollOutcomeV1Schema, { maxItems: 16 })),
+    details: Type.Optional(Type.Array(RollOutcomeV1Schema, { maxItems: 8 })),
     pushPolicy: Type.Optional(PushPolicySchema),
     kind: Type.Literal("roll"),
     id: DefinitionIdSchema,
@@ -371,7 +393,44 @@ export const ResourceBumpActionV1Schema = Type.Object(
 );
 export type ResourceBumpActionV1 = Static<typeof ResourceBumpActionV1Schema>;
 
-export const ActionV1Schema = Type.Union([RollActionV1Schema, ResourceBumpActionV1Schema]);
+// Design 6.4 (rules coverage R8). A deck is a dataset whose records are cards.
+// Its only stored state is the remaining order, shared by a campaign or owned
+// by a standalone character.
+export const DeckV1Schema = Type.Object(
+  { id: DefinitionIdSchema, label: LabelSchema, datasetId: DefinitionIdSchema },
+  { additionalProperties: false },
+);
+export type DeckV1 = Static<typeof DeckV1Schema>;
+
+export const DrawActionV1Schema = Type.Object(
+  {
+    kind: Type.Literal("draw"),
+    id: DefinitionIdSchema,
+    label: LabelSchema,
+    deckId: DefinitionIdSchema,
+    count: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.cardsPerDraw }),
+  },
+  { additionalProperties: false },
+);
+export type DrawActionV1 = Static<typeof DrawActionV1Schema>;
+
+export const ShuffleActionV1Schema = Type.Object(
+  {
+    kind: Type.Literal("shuffle"),
+    id: DefinitionIdSchema,
+    label: LabelSchema,
+    deckId: DefinitionIdSchema,
+  },
+  { additionalProperties: false },
+);
+export type ShuffleActionV1 = Static<typeof ShuffleActionV1Schema>;
+
+export const ActionV1Schema = Type.Union([
+  RollActionV1Schema,
+  ResourceBumpActionV1Schema,
+  DrawActionV1Schema,
+  ShuffleActionV1Schema,
+]);
 export type ActionV1 = Static<typeof ActionV1Schema>;
 
 // Dynamic sheet objects (templates, slots). Defined here — next to the field
@@ -424,6 +483,9 @@ export const ObjectTemplateV1Schema = Type.Object(
     image: Type.Optional(ImageDescriptorSchema),
     label: LabelSchema,
     kind: TemplateKindSchema,
+    // Numeric fields whose value is per unit: sums over a slot multiply them by
+    // the entry's quantity (weight, cost). Other fields count once per entry.
+    quantityFields: Type.Optional(Type.Array(DefinitionIdSchema, { maxItems: 64, uniqueItems: true })),
     description: Type.Optional(Type.String({ maxLength: LONG_TEXT_MAX_LENGTH })),
     fields: Type.Array(FieldV1Schema, { maxItems: 64 }),
     grantedActions: Type.Array(GrantedActionV1Schema, { maxItems: 16 }),
@@ -450,6 +512,7 @@ export const ValidationV1Schema = Type.Object(
     severity: Type.Union([Type.Literal("error"), Type.Literal("warning")]),
     message: Type.String({ maxLength: LONG_TEXT_MAX_LENGTH }),
     targetId: DefinitionIdSchema,
+    targetEntityId: Type.Optional(DefinitionIdSchema),
   },
   { additionalProperties: false },
 );
@@ -475,9 +538,11 @@ export type SystemMetadataV1 = Static<typeof SystemMetadataV1Schema>;
 
 export const SystemDocumentV1Schema = Type.Object(
   {
-    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1"), Type.Literal("1.2")]),
+    schemaVersion: Type.Literal("2.0"),
     metadata: SystemMetadataV1Schema,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
+    dice: Type.Optional(Type.Array(CustomDieSchema, { maxItems: PACKAGE_LIMITS.customDice })),
+    decks: Type.Optional(Type.Array(DeckV1Schema, { maxItems: PACKAGE_LIMITS.decks })),
     referenceData: Type.Array(ReferenceDataV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceDataSets,
     }),
@@ -489,8 +554,8 @@ export const SystemDocumentV1Schema = Type.Object(
     validations: Type.Array(ValidationV1Schema, {
       maxItems: PACKAGE_LIMITS.validations,
     }),
-    templates: Type.Optional(Type.Array(ObjectTemplateV1Schema, { maxItems: 128 })),
-    slots: Type.Optional(Type.Array(SlotDefinitionV1Schema, { maxItems: 64 })),
+    templates: Type.Array(ObjectTemplateV1Schema, { maxItems: 128 }),
+    slots: Type.Array(SlotDefinitionV1Schema, { maxItems: 64 }),
   },
   { additionalProperties: false },
 );

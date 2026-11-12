@@ -84,3 +84,15 @@ scopes including `campaigns:read`/`campaigns:write`, browser-policy character
 access, rolls and pushes, and the full campaign, media, scene and display-pairing
 surface under `/api/v1`. See the plan's implementation record before changing v1.
 The hosted B6 journey depends on real provider sign-in and remains open.
+
+The owner approved the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md)
+on 2026-11-10 with all decisions C1–C13: the rules contract is replaced in place
+(no systems are published), rolls never change characters, opposed rolls need no
+privacy layer and cards are simple draw/shuffle decks. Linter/formatter tooling is
+not part of it. Stages R0–R8 are implemented (R8: card decks, 2026-11-12). See the plan's implementation record before changing the rules engine.
+
+A [GUI test plan for the rules coverage features](docs/superpowers/plans/2026-11-12-rules-coverage-gui-testing.md)
+was decided by the owner on 2026-11-12: all stages run at three widths (D1), the
+twelve visual baselines are added (D2) and the hosted run is not required before
+PR 75 merges (D3). D4 (who performs the human checks) is open and blocks only T3.
+See the plan's implementation record for what is done.

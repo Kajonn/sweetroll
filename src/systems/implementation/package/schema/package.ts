@@ -1,8 +1,10 @@
 import { Type, type Static } from "@sinclair/typebox";
 
+import { CustomDieSchema } from "./dice.js";
 import { PACKAGE_LIMITS } from "../limits.js";
 import {
   ActionV1Schema,
+  DeckV1Schema,
   EntityDefinitionV1Schema,
   ReferenceDataV1Schema,
   SheetV1Schema,
@@ -28,6 +30,10 @@ export const EffectivePackageLimitsV1Schema = Type.Object(
       minimum: 1,
       maximum: PACKAGE_LIMITS.expressionAstDepth,
     }),
+    sheetEvaluationNodes: Type.Integer({
+      minimum: 1,
+      maximum: PACKAGE_LIMITS.sheetEvaluationNodes,
+    }),
     dicePerRoll: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.dicePerRoll }),
     sidesPerDie: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.sidesPerDie }),
   },
@@ -37,12 +43,14 @@ export type EffectivePackageLimitsV1 = Static<typeof EffectivePackageLimitsV1Sch
 
 export const SystemPackageV1Schema = Type.Object(
   {
-    schemaVersion: Type.Union([Type.Literal("1.0"), Type.Literal("1.1"), Type.Literal("1.2")]),
+    schemaVersion: Type.Literal("2.0"),
     systemId: Type.String({ pattern: UUID_PATTERN }),
     versionId: Type.String({ pattern: UUID_PATTERN }),
     semanticVersion: Type.String({ pattern: SEMANTIC_VERSION_PATTERN }),
     ...SystemMetadataV1Schema.properties,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
+    dice: Type.Optional(Type.Array(CustomDieSchema, { maxItems: PACKAGE_LIMITS.customDice })),
+    decks: Type.Optional(Type.Array(DeckV1Schema, { maxItems: PACKAGE_LIMITS.decks })),
     referenceData: Type.Array(ReferenceDataV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceDataSets,
     }),
@@ -52,8 +60,8 @@ export const SystemPackageV1Schema = Type.Object(
     }),
     actions: Type.Array(ActionV1Schema, { maxItems: PACKAGE_LIMITS.actions }),
     validations: Type.Array(ValidationV1Schema, { maxItems: PACKAGE_LIMITS.validations }),
-    templates: Type.Optional(Type.Array(ObjectTemplateV1Schema, { maxItems: 128 })),
-    slots: Type.Optional(Type.Array(SlotDefinitionV1Schema, { maxItems: 64 })),
+    templates: Type.Array(ObjectTemplateV1Schema, { maxItems: 128 }),
+    slots: Type.Array(SlotDefinitionV1Schema, { maxItems: 64 }),
     effectiveLimits: EffectivePackageLimitsV1Schema,
     integrity: Type.Object(
       {

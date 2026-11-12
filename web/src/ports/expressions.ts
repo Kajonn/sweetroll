@@ -1,5 +1,6 @@
 import {
   tokenize,
+  parse,
   type RulesDiagnostic,
   type Token as RulesToken,
   type TokenizeResult as RulesTokenizeResult,
@@ -14,7 +15,7 @@ export type TokenizeExpressionResult =
 
 /**
  * Live syntax check for the expression editors. Delegates to the real
- * grammar tokenizer (`@sweetroll/rules`, the same grammar v0.1 the server
+ * grammar tokenizer (`@sweetroll/rules`, the same grammar 1.0 the server
  * enforces) so client diagnostics can never disagree with the server about
  * supported syntax such as dice notation. Never hand-roll a second
  * tokenizer here.
@@ -24,3 +25,5 @@ export function tokenizeExpression(source: string): TokenizeExpressionResult {
   if (result.ok) return { ok: true, tokens: result.tokens };
   return { ok: false, diagnostics: result.diagnostics };
 }
+
+export { parse as parseExpression };

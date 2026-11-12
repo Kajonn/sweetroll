@@ -13,7 +13,6 @@ const opts = {
   resultType: "number",
   context: "roll",
   fallback: 0,
-  languageVersion: "0.2",
 } as const;
 
 describe("grammar 0.2 named groups", () => {
@@ -45,14 +44,14 @@ describe("grammar 0.2 named groups", () => {
       {
         id: "attribute",
         count: 2,
-        operation: "successCount",
+        operation: "countAtLeast",
         threshold: 6,
         total: 1,
       },
       {
         id: "skill",
         count: 1,
-        operation: "successCount",
+        operation: "countAtLeast",
         threshold: 5,
         total: 1,
       },
@@ -99,10 +98,7 @@ describe("grammar 0.2 named groups", () => {
       value: 2,
     });
   });
-  it("rejects old grammar, duplicate IDs and non-deterministic counts", () => {
-    expect(
-      compileExpression(source, { ...opts, languageVersion: "0.1" }).ok,
-    ).toBe(false);
+  it("rejects duplicate IDs and non-deterministic counts", () => {
     expect(
       compileExpression('group("x", "X", d6) + group("x", "Again", d6)', opts)
         .ok,
@@ -128,10 +124,9 @@ describe("grammar 0.2 named groups", () => {
       "arithmetic_failure",
     );
   });
-  it("preserves plain dice result shape and deterministic draw order", () => {
+  it("records a graph for unnamed pools and preserves deterministic draw order", () => {
     const compiled = compileExpression("2d6kh1 + d4", {
       ...opts,
-      languageVersion: "0.1",
     });
     expect(compiled.ok).toBe(true);
     if (!compiled.ok) return;
@@ -143,9 +138,10 @@ describe("grammar 0.2 named groups", () => {
       () => rng[calls++]!,
     );
     expect(calls).toBe(3);
-    expect(result.ok && result.roll).toEqual({
+    expect(result.ok && result.roll).toMatchObject({
       total: 8,
       expression: "2d6kh1 + d4",
+      breakdown: { groups: [{ id: "@root.0" }, { id: "@root.1" }] },
       dice: [
         { sides: 6, value: 6, kept: true },
         { sides: 6, value: 1, kept: false },

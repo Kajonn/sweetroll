@@ -8,6 +8,25 @@ import {
 } from "../editor/actions/GroupedPoolEditor.js";
 
 describe("group results and guided source", () => {
+  it("shows custom faces and their symbols as readable text", () => {
+    const result = evaluateExpression({
+      source: 'countSymbol(dice(1, "signal"), "hit")',
+      env: { fields: {}, inputs: {}, dice: [
+        { id: "signal", label: "Signal", faces: [{ value: 0, label: "Bright", symbols: { hit: 2 } }] },
+      ] },
+      resultType: "number", fallback: 0, bindings: {}, rng: () => 0.5,
+    });
+    if (!result.ok || !result.roll) throw Error("Custom dice did not roll");
+    render(<RollBreakdown roll={result.roll} />);
+    expect(screen.getByRole("list", { name: "Signal faces" })).toHaveTextContent("Bright (0), hit × 2");
+  });
+
+  it("round-trips custom dice and a symbol reducer in the guided pool editor", () => {
+    const source = 'countSymbol(group("signal", "Signal", dice(3, "signal_die")), "hit")';
+    const groups = readGuidedGroups(source);
+    expect(groups).not.toBeNull();
+    if (groups) expect(writeGuidedGroups(groups)).toBe(source);
+  });
   it("explains mixed results and empty groups using text rather than a dice-sum modifier", () => {
     const result = evaluateExpression({
       source:

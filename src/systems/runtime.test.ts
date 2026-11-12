@@ -21,6 +21,7 @@ import {
 import { createSystemRuntime } from "./runtime.js";
 import type {
   RuntimeErrorCode,
+  RuntimeIntent,
   RuntimeResolution,
   RuntimeResult,
   SystemRuntime,
@@ -42,6 +43,7 @@ describe("SystemRuntime contract", () => {
       | "invalid_state"
       | "unsupported_field_value"
       | "push_unavailable"
+      | "deck_empty"
       | "action_evaluation_failed"
       | "budget_exceeded"
       | "internal"
@@ -343,6 +345,81 @@ describe("SystemRuntime contract", () => {
     expect(result.value.changedDefinitionIds).toEqual([resourceId]);
   });
 
+  describe("resource amounts and direct input (design 6.3)", () => {
+    const change = async (intent: RuntimeIntent, values?: Record<string, unknown>) => {
+      const runtime = createRuntime(d20Package);
+      const initialized = await runtime.resolve({
+        versionId: d20Package.versionId,
+        entityId: "character",
+        intent: { kind: "initialize", ...(values === undefined ? {} : { values }) },
+      });
+      if (!initialized.ok) throw new Error(initialized.error.message);
+      return runtime.resolve({
+        versionId: d20Package.versionId, entityId: "character", state: initialized.value.state, intent,
+      });
+    };
+
+    it("applies an amount in one command", async () => {
+      const result = await change({ kind: "adjust", resourceId: "health", delta: -7 });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.state.values.health).toEqual({ current: 3, max: 10 });
+      expect(result.value.changedDefinitionIds).toEqual(["health"]);
+    });
+
+    it.each([
+      [-17, 0],
+      [5, 10],
+    ])("stops an amount of %d at the resource's bounds", async (delta, current) => {
+      const result = await change({ kind: "adjust", resourceId: "health", delta }, { health: { current: 8, max: 10 } });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.state.values.health).toEqual({ current, max: 10 });
+    });
+
+    it.each([0, 0.5, Number.NaN, "3"])("rejects the amount %s", async (delta) => {
+      const result = await change({ kind: "adjust", resourceId: "health", delta });
+      expect(result).toMatchObject({ ok: false, error: { code: "bad_request", definitionId: "health" } });
+    });
+
+    it("raises the maximum without changing the current value", async () => {
+      const result = await change({ kind: "setResource", resourceId: "health", max: 14 });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.state.values.health).toEqual({ current: 10, max: 14 });
+    });
+
+    it("lowers the current value with a lowered maximum", async () => {
+      const result = await change({ kind: "setResource", resourceId: "health", max: 6 });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.state.values.health).toEqual({ current: 6, max: 6 });
+    });
+
+    it("sets current and maximum together and reports no change for equal values", async () => {
+      const both = await change({ kind: "setResource", resourceId: "health", current: 2, max: 12 });
+      expect(both.ok && both.value.state.values.health).toEqual({ current: 2, max: 12 });
+      const same = await change({ kind: "setResource", resourceId: "health", current: 10 });
+      expect(same.ok && same.value.changedDefinitionIds).toEqual([]);
+    });
+
+    it.each([
+      [{ current: 11 }],
+      [{ current: -1 }],
+      [{ max: 1000 }],
+      [{ current: 1.5 }],
+      [{}],
+    ])("rejects %j", async (values) => {
+      const result = await change({ kind: "setResource", resourceId: "health", ...values });
+      expect(result).toMatchObject({ ok: false, error: { code: "bad_request", definitionId: "health" } });
+    });
+
+    it("rejects a field that is not a resource", async () => {
+      const result = await change({ kind: "adjust", resourceId: "ability", delta: 1 });
+      expect(result).toMatchObject({ ok: false, error: { code: "bad_request", definitionId: "ability" } });
+    });
+  });
+
   it("rejects resource bumps beyond current bounds instead of clamping", async () => {
     const runtime = createRuntime(pbta2d6Package);
     const initialized = await initialize(runtime, pbta2d6Package);
@@ -400,21 +477,21 @@ describe("SystemRuntime contract", () => {
     });
     expect(result).toMatchObject({ ok: false, error: {
       code: "action_evaluation_failed", definitionId: "test_pool",
-      actionDiagnostics: [{ code: "arithmetic_failure", actionId: "test_pool", expressionId: "pool_roll_expr", message: expect.stringContaining("non-negative integer") }],
+      actionDiagnostics: [{ code: "arithmetic_failure", actionId: "test_pool", expressionId: "pool_roll_expr", message: expect.stringContaining("dice count must be an integer") }],
     } });
     expect(state).toEqual(initialized.state);
   });
 
-  it.each(["partial division", "legacy scalar operand"])("rejects %s without returning fallback or partial dice", async (mode) => {
+  it.each(["partial division", "invalid die size"])("rejects %s without returning fallback or partial dice", async (mode) => {
     const pkg = structuredClone(d6SuccessPoolPackage);
     const expression = pkg.expressions.find((e) => e.id === "pool_roll_expr")!;
-    expression.ast = mode === "legacy scalar operand"
-      ? { kind: "successCount", dice: { kind: "numberLiteral", value: 5 }, threshold: 6 }
-      : { kind: "binary", operator: "+", left: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: 6 }, right: { kind: "binary", operator: "/", left: { kind: "numberLiteral", value: 1 }, right: { kind: "numberLiteral", value: 0 } } };
+    expression.ast = mode === "invalid die size"
+      ? { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: { kind: "numberLiteral", value: 0 } }, modifiers: [] }
+      : { kind: "binary", operator: "+", left: { kind: "pool", source: { kind: "dice", count: { kind: "numberLiteral", value: 1 }, sides: { kind: "numberLiteral", value: 6 } }, modifiers: [] }, right: { kind: "binary", operator: "/", left: { kind: "numberLiteral", value: 1 }, right: { kind: "numberLiteral", value: 0 } } };
     const runtime = createRuntime(signSystemPackage(pkg));
     const initialized = await initialize(runtime, pkg);
     const result = await runtime.resolve({ versionId: pkg.versionId, entityId: "character", state: initialized.state,
-      intent: { kind: "action", actionId: "test_pool", inputs: {}, executionId: "legacy-failure" },
+      intent: { kind: "action", actionId: "test_pool", inputs: {}, executionId: "pool-failure" },
     });
     expect(result).toMatchObject({ ok: false, error: { code: "action_evaluation_failed", actionDiagnostics: [{ actionId: "test_pool", expressionId: "pool_roll_expr", code: "arithmetic_failure" }] } });
     expect(result).not.toHaveProperty("value");
@@ -445,7 +522,7 @@ describe("SystemRuntime contract", () => {
 
     expect(a.ok && b.ok).toBe(true);
     if (!a.ok || !b.ok) return;
-    expect(a.value.roll).toEqual({
+    expect(a.value.roll).toMatchObject({
       actionId: "test_pool",
       expression: "countSuccesses(dice(fields.attribute + fields.skill + inputs.bonus_dice, 6), 6)",
       dice: [4, 4, 3, 5, 3, 4, 6, 3].map((value) => ({ sides: 6, value, kept: true })),
@@ -761,7 +838,7 @@ describe("SystemRuntime contract", () => {
     const { integrity: _integrity, ...unsigned } = compiled;
     const packageValue = signSystemPackage({
       ...unsigned,
-      effectiveLimits: { ...compiled.effectiveLimits, expressionAstNodes: 1 },
+      effectiveLimits: { ...compiled.effectiveLimits, sheetEvaluationNodes: 1 },
     });
 
     const result = await createRuntime(packageValue).resolve({

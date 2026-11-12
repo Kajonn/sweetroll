@@ -1,6 +1,6 @@
 import {createProposalRepository} from "./proposalPersistence.js";
 import {proposalView} from "./proposals.js";
-import type {RollBreakdown, PushResult} from "../systems/implementation/rules/result.js";
+import { formatRollBreakdown, type DieResult, type RollBreakdown, type PushResult } from "../systems/implementation/rules/result.js";
 import {createTemplateRepository} from "./templatePersistence.js";
 import { randomUUID } from "node:crypto";
 
@@ -206,15 +206,18 @@ export type CampaignExportSnapshot = {
    * rolls carry their full details.
    */
   rolls: {
+    targetCharacterId?: string;
+    respondsTo?: string;
     rollId: string;
     characterId: string;
     actorId: string;
     actionId: string;
     audience: "owner_only" | "gm_only" | "campaign";
     expression: string;
-    breakdown?: RollBreakdown;
+    breakdown: RollBreakdown;
+    breakdownText: string;
     push?: PushResult;
-    dice: unknown;
+    dice: DieResult[];
     bindings: unknown;
     total: number;
     output: string;
@@ -1825,6 +1828,8 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             occurredAt: event.occurredAt.toISOString(),
           })),
           rolls: snapshot.rolls.map((roll) => ({
+            ...(roll.targetCharacterId === undefined ? {} : { targetCharacterId: roll.targetCharacterId }),
+            ...(roll.respondsTo === undefined ? {} : { respondsTo: roll.respondsTo }),
             rollId: roll.rollId,
             characterId: roll.characterId,
             actorId: roll.actorId,
@@ -1832,7 +1837,8 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
             audience: roll.audience,
             expression: roll.expression,
             dice: roll.dice,
-            ...(roll.breakdown === undefined ? {} : {breakdown:roll.breakdown}),
+            breakdown: roll.breakdown,
+            breakdownText: formatRollBreakdown(roll.breakdown, roll.dice),
             ...(roll.push === undefined ? {} : {push:roll.push}),
             bindings: roll.bindings,
             total: roll.total,

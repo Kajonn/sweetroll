@@ -166,7 +166,14 @@ test("I5 exit: sign in on phone, select system, create+play two characters, find
   // returns), the library prompt carries no cached names, the recent rail is
   // gone, no stored value retains either name, and a reload stays clean.
   page.on("dialog", dialog => void dialog.accept());
+  const signedOut = page.waitForResponse(response =>
+    response.url().endsWith("/api/signout") && response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Sign out" }).click();
+  // The shell hides private data immediately. Wait for the online session
+  // revocation before navigating away from that shell.
+  expect((await signedOut).ok()).toBe(true);
+  await expect(page.getByText("Signed out.", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("dev-signin")).toBeVisible({ timeout: 30_000 });
   await page.goto("/characters");
   await expect(page.getByTestId("dev-signin")).toBeVisible({ timeout: 30_000 });

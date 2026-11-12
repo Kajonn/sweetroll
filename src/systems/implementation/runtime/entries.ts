@@ -98,13 +98,6 @@ export function validateEntryForSlot(
   return { ok: true };
 }
 
-export function buildEntryScope(
-  characterFields: Record<string, unknown>,
-  entryValues: Record<string, unknown>,
-): Record<string, unknown> {
-  return { ...characterFields, ...entryValues };
-}
-
 export function validEntryValue(field: FieldV1, value: unknown): boolean {
   switch (field.kind) {
     case "text": {

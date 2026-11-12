@@ -1,3 +1,4 @@
+import type { ReferenceDataV1 } from "../referenceData/ReferenceDataEditor.js";
 import { t } from "../../i18n/index.js";
 import type {
   ChoiceOptionV1,
@@ -25,6 +26,7 @@ function newOptionId(existing: ChoiceOptionV1[]): string {
 export type ChoiceFieldEditorProps = {
   field: FieldV1;
   onChange: (next: FieldV1) => void;
+  datasets?: readonly ReferenceDataV1[] | undefined;
   referencedBy?: number | undefined;
   disabled?: boolean | undefined;
 };
@@ -32,6 +34,7 @@ export type ChoiceFieldEditorProps = {
 export function ChoiceFieldEditor({
   field,
   onChange,
+  datasets,
   referencedBy,
   disabled,
 }: ChoiceFieldEditorProps) {
@@ -42,6 +45,15 @@ export function ChoiceFieldEditor({
       </p>
     );
   }
+  const datasetId = field.optionsFrom;
+  const fromDataset = datasetId !== undefined;
+  const selectedDataset = datasets?.find(dataset => dataset.id === datasetId);
+  const options = fromDataset ? selectedDataset?.records ?? [] : field.options;
+  const chooseDataset = (id: string) => {
+    const { optionsFrom: _old, ...next } = field;
+    const defaultValue = field.kind === "singleChoice" ? null : [];
+    onChange({ ...next, default: defaultValue, ...(id === "" ? {} : { optionsFrom: id }) } as ChoiceField);
+  };
   const update = (patch: Partial<ChoiceField>) => {
     onChange({ ...field, ...patch } as ChoiceField);
   };
@@ -98,15 +110,25 @@ export function ChoiceFieldEditor({
           {t("editor.fields.required")}
         </label>
       </div>
+      {fromDataset || (datasets?.length ?? 0) > 0 ? <label>
+        {t("editor.fields.options.dataset")}
+        <select value={datasetId ?? ""} onChange={event => chooseDataset(event.target.value)} disabled={disabled}>
+          <option value="">{t("editor.fields.options.static")}</option>
+          {fromDataset && selectedDataset === undefined && (
+            <option value={datasetId} disabled>{t("editor.fields.options.missingDataset", { id: datasetId })}</option>
+          )}
+          {datasets?.map(dataset => <option key={dataset.id} value={dataset.id}>{dataset.label} ({dataset.id})</option>)}
+        </select>
+      </label> : null}
       <div className={styles.row}>
         <fieldset className={styles.options} disabled={disabled}>
           <legend>{t("editor.fields.options")}</legend>
-          {field.options.length === 0 && (
+          {options.length === 0 && (
             <p className={styles.placeholder} data-testid={`choice-field-options-empty-${field.id}`}>
               {t("editor.fields.options.placeholder")}
             </p>
           )}
-          {field.options.map((opt, i) => (
+          {options.map((opt, i) => (
             <div key={`${opt.id}-${i}`} className={styles.optionsRow} data-testid={`choice-field-option-${i}-${field.id}`}>
               {field.kind === "singleChoice" ? (
                 <input
@@ -143,14 +165,14 @@ export function ChoiceFieldEditor({
                 onChange={(e) => updateOption(i, { label: e.target.value })}
                 aria-label={t("editor.fields.options.optionLabel")}
                 data-testid={`choice-field-option-label-${i}-${field.id}`}
-                disabled={disabled}
+                disabled={disabled || fromDataset}
               />
               <button
                 type="button"
                 onClick={() => removeOption(i)}
                 aria-label={t("editor.fields.options.removeOptionAria", { label: opt.label })}
                 data-testid={`choice-field-option-remove-${i}-${field.id}`}
-                disabled={disabled}
+                disabled={disabled || fromDataset}
               >
                 {t("editor.fields.options.removeOption")}
               </button>
@@ -161,7 +183,7 @@ export function ChoiceFieldEditor({
             className={styles.addOption}
             onClick={addOption}
             data-testid={`choice-field-add-option-${field.id}`}
-            disabled={disabled}
+            disabled={disabled || fromDataset}
           >
             {t("editor.fields.options.addOption")}
           </button>

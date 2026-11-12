@@ -183,6 +183,7 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
 function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:PushApi;session:CharacterSession;snapshot:ReturnType<CharacterSession["getSnapshot"]> }) {
   const knownKinds = new Set([
     "character_created", "character_duplicated", "character_field_set", "character_resource_bumped",
+    "character_resource_adjusted", "character_resource_set",
     "character_action_executed", "character_renamed", "character_archived", "character_recovered",
     "character_exported", "character_campaign_created", "character_adopted",
     "character_controllers_assigned", "character_claimed", "character_ownership_transferred",

@@ -1,4 +1,5 @@
 import { ApiError } from "../api/client.js";
+import type { CampaignRollSelection } from "./types.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt, WriteGuard } from "./store.js";
 import { validPushResponse } from "./push-response.js";
@@ -96,6 +97,11 @@ export type CharacterSnapshot = {
   pendingOnlineAttempts: OnlineAttempt[];
 };
 
+/** Key of a resource's pending maximum in `snapshot.tentative`. */
+export function resourceMaxKey(resourceId: string): string {
+  return `${resourceId}.max`;
+}
+
 export type CharacterSession = {
   open(): Promise<void>;
   /** Apply a catalog access denial only to the generation it was fetched against. */
@@ -104,7 +110,11 @@ export type CharacterSession = {
   subscribe(listener: (snapshot: CharacterSnapshot) => void): () => void;
   setField(fieldId: string, value: unknown): Promise<void>;
   bumpResource(resourceId: string, direction: "up" | "down"): Promise<void>;
-  executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  /** Apply an amount (negative subtracts); the server stops at the resource's bounds. */
+  adjustResource(resourceId: string, delta: number): Promise<void>;
+  /** Direct input of the current value and/or the character's maximum. */
+  setResource(resourceId: string, values: { current?: number; max?: number }): Promise<void>;
+  executeAction(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void>;
   pushRoll(parentRollId:string):Promise<void>;
   refresh():Promise<void>;
   forgetRoll(rootRollId:string):Promise<void>;
@@ -112,7 +122,7 @@ export type CharacterSession = {
    * Task 7: template-granted roll routed through the executeAction intent
    * with its owning entry. Online-only, like entity actions.
    */
-  executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void>;
   /**
    * Task 7: durable entry intents. Offline-capable like field sets and
    * resource bumps: they queue durably and replay verbatim, so offline
@@ -307,13 +317,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     };
   }
 
-  function resourceBounds(resourceId: string): { current: number; min: number; max: number; step: number } | null {
+  function resourceBounds(resourceId: string): { current: number; min: number; max: number; step: number; valueMax: number } | null {
     if (!confirmed) return null;
     for (const sheet of confirmed.projection.sheets) {
       for (const section of sheet.sections) {
         for (const element of section.elements) {
           if (element.kind === "resource" && element.resourceId === resourceId) {
-            return { current: element.value.current, min: element.min, max: element.max, step: element.step };
+            return { current: element.value.current, min: element.min, max: element.max, step: element.step, valueMax: element.value.max };
           }
         }
       }
@@ -340,6 +350,24 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           : bounds.current;
         const stepped = entry.intent.direction === "up" ? previous + bounds.step : previous - bounds.step;
         values[entry.intent.resourceId] = Math.max(bounds.min, Math.min(bounds.max, stepped));
+      }
+      else if (entry.intent.kind === "adjustResource" || entry.intent.kind === "setResource") {
+        // Same sequential estimate as bumps. The pending maximum is kept
+        // under `<resourceId>.max`; a definition ID never contains a dot.
+        const bounds = resourceBounds(entry.intent.resourceId);
+        if (bounds === null) continue;
+        const maxKey = resourceMaxKey(entry.intent.resourceId);
+        const previousMax = typeof values[maxKey] === "number" ? (values[maxKey] as number) : bounds.valueMax;
+        const previous = typeof values[entry.intent.resourceId] === "number"
+          ? (values[entry.intent.resourceId] as number)
+          : bounds.current;
+        if (entry.intent.kind === "adjustResource") {
+          values[entry.intent.resourceId] = Math.max(bounds.min, Math.min(previousMax, previous + entry.intent.delta));
+        } else {
+          const max = entry.intent.max ?? previousMax;
+          if (entry.intent.max !== undefined) values[maxKey] = max;
+          values[entry.intent.resourceId] = entry.intent.current ?? Math.min(previous, max);
+        }
       }
       // executeAction intentions contribute no estimate: applying a roll
       // outcome would be rule evaluation, and only the server confirms it.
@@ -461,6 +489,27 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         firstAttemptAt,
       };
     }
+    if (entry.intent.kind === "adjustResource") {
+      return {
+        method,
+        path: `/characters/${characterId}/resources/${entry.intent.resourceId}/adjust`,
+        body: { delta: entry.intent.delta, expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
+    if (entry.intent.kind === "setResource") {
+      return {
+        method,
+        path: `/characters/${characterId}/resources/${entry.intent.resourceId}/set`,
+        body: {
+          ...(entry.intent.current === undefined ? {} : { current: entry.intent.current }),
+          ...(entry.intent.max === undefined ? {} : { max: entry.intent.max }),
+          expectedRevision,
+          idempotencyKey: key,
+        },
+        firstAttemptAt,
+      };
+    }
     if (entry.intent.kind === "addEntry") {
       return {
         method,
@@ -492,6 +541,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       path: `/characters/${characterId}/actions/${entry.intent.actionId}`,
       body: {
         inputs: entry.intent.inputs ?? {},
+        ...entry.intent.campaignRoll,
         ...(entry.intent.entryId === undefined ? {} : { entryId: entry.intent.entryId }),
         expectedRevision,
         idempotencyKey: key,
@@ -1927,7 +1977,22 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "bumpResource", resourceId, direction }));
     },
-    async executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void> {
+    async adjustResource(resourceId: string, delta: number): Promise<void> {
+      assertMutationAllowed({ offlineIntent: true });
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      await persistEntry(newEntry({ kind: "adjustResource", resourceId, delta }));
+    },
+    async setResource(resourceId: string, values: { current?: number; max?: number }): Promise<void> {
+      assertMutationAllowed({ offlineIntent: true });
+      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      await persistEntry(newEntry({
+        kind: "setResource",
+        resourceId,
+        ...(values.current === undefined ? {} : { current: values.current }),
+        ...(values.max === undefined ? {} : { max: values.max }),
+      }));
+    },
+    async executeAction(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void> {
       assertMutationAllowed();
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
@@ -1941,10 +2006,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           kind: "executeAction",
           actionId,
           ...(inputs !== undefined ? { inputs } : {}),
+          ...(campaignRoll === undefined ? {} : { campaignRoll }),
         }),
       );
     },
-    async executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>): Promise<void> {
+    async executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void> {
       assertMutationAllowed();
       if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
@@ -1959,6 +2025,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           actionId,
           entryId,
           ...(inputs !== undefined ? { inputs } : {}),
+          ...(campaignRoll === undefined ? {} : { campaignRoll }),
         }),
       );
     },

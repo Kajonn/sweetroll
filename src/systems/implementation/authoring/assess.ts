@@ -22,7 +22,7 @@ export type AssessedDocument =
 
 export function blankSystemDocument(name: string): SystemDocumentV1 {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0", templates: [], slots: [],
     metadata: { name, description: "", language: "en", defaultDice: "d20" },
     entities: [],
     referenceData: [],
@@ -86,6 +86,8 @@ export function documentFromPackage(pkg: SystemPackageV1): SystemDocumentV1 {
       ...(pkg.presentation === undefined ? {} : { presentation: structuredClone(pkg.presentation) }),
     },
     entities: structuredClone(pkg.entities),
+    ...(pkg.dice === undefined ? {} : { dice: structuredClone(pkg.dice) }),
+    ...(pkg.decks === undefined ? {} : { decks: structuredClone(pkg.decks) }),
     referenceData: structuredClone(pkg.referenceData),
     sheets: structuredClone(pkg.sheets),
     expressions: pkg.expressions.map((expression) => ({
@@ -97,7 +99,7 @@ export function documentFromPackage(pkg: SystemPackageV1): SystemDocumentV1 {
     })),
     actions: structuredClone(pkg.actions),
     validations: structuredClone(pkg.validations),
-    ...(pkg.templates !== undefined ? { templates: structuredClone(pkg.templates) } : {}),
-    ...(pkg.slots !== undefined ? { slots: structuredClone(pkg.slots) } : {}),
+    templates: structuredClone(pkg.templates),
+    slots: structuredClone(pkg.slots),
   };
 }

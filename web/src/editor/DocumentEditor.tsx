@@ -2,7 +2,7 @@ import { DebugOnly } from "../ui/debugMode.js";
 import { ItemArtwork } from "../ui/ItemArtwork.js";
 import { createImageEditorApi } from "../ui/imageEditorApi.js";
 import { useQueryClient } from "@tanstack/react-query";
-import { compileExpression, type ExpressionAstV1 } from "@sweetroll/rules";
+import { compileExpression, entityFieldTypes, fieldWithDatasetOptions, slotEnvironment, type SlotEnvironment, type FieldBindingType, type ExpressionAstV1 } from "@sweetroll/rules";
 import { Check } from "lucide-react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 
@@ -28,7 +28,10 @@ import { VersionHistory } from "../publish/VersionHistory.js";
 import { ReferenceDataEditor, type ReferenceDataV1 } from "./referenceData/ReferenceDataEditor.js";
 import { SheetEditor, type UnplacedDefinition } from "./sheet/SheetEditor.js";
 import type { SheetEditorV1 } from "./sheet/sheetTypes.js";
-import { readSlots } from "./sheet/slotTypes.js";
+import { collectUsedIds, nextScopedId, readSlots } from "./sheet/slotTypes.js";
+import type { OutcomeExpressions } from "./actions/RollOutcomesEditor.js";
+import { CustomDiceEditor } from "./actions/CustomDiceEditor.js";
+import { DeckActionEditor, DeckEditor, type DeckActionV1 } from "./actions/DeckEditor.js";
 import { TemplatesTab } from "./TemplatesTab.js";
 import { useDraftSync } from "../state/draftSync.js";
 import {
@@ -671,10 +674,22 @@ function EntitiesTab({
     source: string;
     fallback?: unknown;
   }>;
+  const createNumericExpression = (initial: number): string => {
+    const used = collectUsedIds(document);
+    let index = 1;
+    while (used.has(`computed_expr_${index}`)) index++;
+    const id = `computed_expr_${index}`;
+    dispatch({ type: "addExpression", expression: { id, context: "computed", resultType: "number", source: String(initial), fallback: initial } });
+    return id;
+  };
   return (
     <section data-testid="attributes-tab" data-path="/attributes">
       <EntityList
         entities={entityList}
+        datasets={document.referenceData}
+        slotsFor={id => previewSlots(document, id)}
+        createNumericExpression={createNumericExpression}
+        maximumExpressions={expressions.filter(expression => document.expressions.some(entry => entry.id === expression.id && entry.context === "computed" && entry.resultType === "number")).map(expression => ({ id: expression.id, source: expression.source }))}
         selectedEntityId={selectedEntityId}
         onSelectEntity={onSelectEntity}
         onChange={(next) => {
@@ -809,7 +824,7 @@ export function availableDefinitionsForSheet(document: SystemDocumentV1, sheet: 
   const definitions: UnplacedDefinition[] = [];
   const entity = document.entities.find((candidate) => candidate.id === sheet.targetEntityId);
   for (const field of (entity?.fields ?? []) as unknown as Array<EntityFieldV1 & {kind: string; label: string}>) {
-    definitions.push({kind: field.kind === "resource" ? "resource" : "field", id: field.id, label: field.label});
+    definitions.push({kind: field.kind === "resource" ? "resource" : "field", id: field.id, label: field.label, ownerId: entity!.id});
   }
   for (const action of document.actions) definitions.push({kind: "action", id: action.id, label: action.label});
   for (const slot of readSlots(document)) definitions.push({kind: "slot", id: slot.id, label: slot.label});
@@ -868,6 +883,28 @@ function nextSheetId(existing: ReadonlyArray<string>): string {
  * edit and rapid successive edits cannot clobber each other. Unknown ids
  * are ignored: no stray entries.
  */
+/** Stores outcome and detail formulas as `outcome` expressions of the document. */
+export function outcomeExpressionStore(
+  document: SystemDocumentV1,
+  dispatch: React.Dispatch<DocumentAction>,
+): OutcomeExpressions {
+  return {
+    sourceFor: (expressionId) => (document.expressions ?? []).find((entry) => entry.id === expressionId)?.source ?? "",
+    add: (kind, source) => {
+      const id = nextScopedId(collectUsedIds(document), kind === "outcomes" ? "outcome_expr" : "detail_expr");
+      dispatch({
+        type: "addExpression",
+        expression: kind === "outcomes"
+          ? { id, context: "outcome", resultType: "boolean", source, fallback: false }
+          : { id, context: "outcome", resultType: "number", source, fallback: 0 },
+      });
+      return id;
+    },
+    setSource: (expressionId, source) => dispatch({ type: "setExpressionSource", expressionId, source }),
+    remove: (expressionId) => dispatch({ type: "removeExpression", expressionId }),
+  };
+}
+
 export function persistExpressionSource(
   document: SystemDocumentV1,
   dispatch: React.Dispatch<DocumentAction>,
@@ -921,7 +958,7 @@ function DiceTab({
   document: SystemDocumentV1;
   dispatch: React.Dispatch<DocumentAction>;
 }) {
-  const actions = (document.actions as unknown as Array<RollActionV1 | ResourceBumpActionV1>) ?? [];
+  const actions = (document.actions as unknown as Array<RollActionV1 | ResourceBumpActionV1 | DeckActionV1>) ?? [];
   const expressions = (document.expressions as unknown as Array<{
     id: string;
     source: string;
@@ -929,7 +966,16 @@ function DiceTab({
     fallback: unknown;
     context: string;
   }>) ?? [];
+  const decks = document.decks ?? [];
 
+  const addDeckAction = (kind: DeckActionV1["kind"]) => {
+    const base = { id: nextActionId(actions.map((a) => a.id)), label: t(`editor.actions.kind.${kind}`), deckId: decks[0]?.id ?? "" };
+    const next: DeckActionV1 = kind === "draw" ? { kind, ...base, count: 1 } : { kind, ...base };
+    dispatch({
+      type: "setActions",
+      actions: [...actions, next as unknown as SystemDocumentV1["actions"][number]],
+    });
+  };
   const addRoll = () => {
     const expressionId = nextExpressionId(expressions.map((e) => e.id));
     dispatch({
@@ -970,7 +1016,7 @@ function DiceTab({
       actions: [...actions, next as unknown as SystemDocumentV1["actions"][number]],
     });
   };
-  const replaceAction = (idx: number, action: RollActionV1 | ResourceBumpActionV1) => {
+  const replaceAction = (idx: number, action: RollActionV1 | ResourceBumpActionV1 | DeckActionV1) => {
     const next = actions.map((a, i) => (i === idx ? action : a));
     dispatch({
       type: "setActions",
@@ -992,6 +1038,17 @@ function DiceTab({
 
   return (
     <section data-testid="dice-tab" data-path="/dice">
+    <CustomDiceEditor
+      dice={document.dice ?? []}
+      usedIds={collectUsedIds(document)}
+      onChange={(dice) => dispatch({ type: "setDice", dice })}
+    />
+    <DeckEditor
+      decks={decks}
+      datasets={document.referenceData}
+      usedIds={collectUsedIds(document)}
+      onChange={(next) => dispatch({ type: "setDecks", ...next })}
+    />
     <section data-testid="actions-tab" data-path="/actions">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.actions.addTitle")}</h2>
@@ -1001,6 +1058,16 @@ function DiceTab({
         <Button variant="secondary" onClick={addResourceBump} data-testid="actions-add-resource-bump">
           {t("editor.actions.addResourceBump")}
         </Button>
+        {decks.length === 0 ? null : (
+          <>
+            <Button variant="secondary" onClick={() => addDeckAction("draw")} data-testid="actions-add-draw">
+              {t("editor.actions.addDraw")}
+            </Button>
+            <Button variant="secondary" onClick={() => addDeckAction("shuffle")} data-testid="actions-add-shuffle">
+              {t("editor.actions.addShuffle")}
+            </Button>
+          </>
+        )}
       </header>
       {actions.length === 0 ? (
         <div data-testid="actions-tab-empty">
@@ -1020,7 +1087,12 @@ function DiceTab({
                   onExpressionSourceChange={(next) => {
                     persistExpressionSource(document, dispatch, action.expressionId, next);
                   }}
+                  outcomeExpressions={outcomeExpressionStore(document, dispatch)}
                   fieldTypes={buildFieldTypeMap(document, action.id)}
+                  targetEntities={document.entities.map(entity => ({ id: entity.id, label: entity.label, fields: entityFieldTypes(entity.fields) }))}
+                  dice={document.dice}
+                  datasets={document.referenceData}
+                  slots={previewSlots(document, actionOwner(document, action.id)?.id)}
                   fieldLabels={Object.fromEntries(document.entities.flatMap(entity => entity.fields.map(field => [field.id, typeof field.label === "string" ? field.label : field.id])))}
                   guided
                   diceKind={diceKindFor(expressionSourceFor(action.expressionId))}
@@ -1031,6 +1103,8 @@ function DiceTab({
                       }
                     : undefined}
                 />
+              ) : action.kind === "draw" || action.kind === "shuffle" ? (
+                <DeckActionEditor action={action} decks={decks} onChange={(next) => replaceAction(idx, next)} />
               ) : (
                 <ResourceBumpEditor
                   action={action}
@@ -1079,36 +1153,23 @@ function nextActionId(existing: ReadonlyArray<string>): string {
   return `action_${Date.now()}`;
 }
 
+function actionOwner(document: SystemDocumentV1, actionId: string | undefined) {
+  const owningSheet = actionId === undefined ? undefined : (document.sheets as unknown as SheetEditorV1[]).find(sheet =>
+    sheet.sections.some(section => section.elements.some(element => element.kind === "action" && element.actionId === actionId)),
+  );
+  return owningSheet === undefined ? document.entities.find(entity => entity.kind !== "npc") ?? document.entities[0]
+    : document.entities.find(entity => entity.id === owningSheet.targetEntityId);
+}
+
+function previewSlots(document: SystemDocumentV1, entityId: string | undefined): SlotEnvironment {
+  return entityId === undefined ? {} : slotEnvironment(document as unknown as Parameters<typeof slotEnvironment>[0], entityId);
+}
+
 function buildFieldTypeMap(
   document: SystemDocumentV1,
   actionId?: string,
-): Record<string, "number" | "text" | "boolean"> {
-  const out: Record<string, "number" | "text" | "boolean"> = {};
-  const typedSheets = document.sheets as unknown as SheetEditorV1[];
-  const owningSheet = actionId === undefined
-    ? undefined
-    : typedSheets.find((sheet) =>
-        sheet.sections.some((section) =>
-          section.elements.some((element) => element.kind === "action" && element.actionId === actionId),
-        ),
-      );
-  const fallbackEntity = document.entities.find((entity) => entity.kind !== "npc") ?? document.entities[0];
-  const entities = document.entities.filter((entity) =>
-    owningSheet === undefined ? entity.id === fallbackEntity?.id : entity.id === owningSheet.targetEntityId,
-  );
-  for (const entity of entities) {
-    for (const field of entity.fields as unknown as EntityFieldV1[]) {
-      const kind = (field as { kind?: string }).kind;
-      if (kind === "integer" || kind === "decimal" || kind === "resource") {
-        out[field.id] = "number";
-      } else if (kind === "boolean") {
-        out[field.id] = "boolean";
-      } else if (kind === "text" || kind === "singleChoice" || kind === "multiChoice") {
-        out[field.id] = "text";
-      }
-    }
-  }
-  return out;
+): Record<string, FieldBindingType> {
+  return entityFieldTypes(actionOwner(document, actionId)?.fields ?? []);
 }
 
 function collectResourceFields(document: SystemDocumentV1): Array<{
@@ -1184,7 +1245,10 @@ function ValidationsTab({
   };
 
   const expressionOptions = expressions.map((e) => ({ id: e.id, label: e.id }));
-  const targetOptions = document.entities.map((e) => ({ id: e.id, label: e.label }));
+  const targetOptions = document.entities.flatMap(entity => [
+    { id: entity.id, label: entity.label },
+    ...entity.fields.map(field => ({ id: field.id, entityId: entity.id, label: typeof field.label === "string" ? field.label : field.id })),
+  ]);
 
   return (
     <section data-testid="validations-tab" data-path="/validations">
@@ -1443,7 +1507,7 @@ export function buildPreviewPackage(document: SystemDocumentV1): import("../prev
   const entities = document.entities.map((entity) => ({
     id: entity.id,
     label: entity.label,
-    fields: entity.fields as unknown as Array<{ kind: string; id: string; label?: string }>,
+    fields: entity.fields.map(field => fieldWithDatasetOptions(field as Parameters<typeof fieldWithDatasetOptions>[0], document.referenceData)),
   })) as unknown as import("../preview/sampleData.js").SystemPackageV1["entities"];
   const sheets = (document.sheets as unknown as Array<{
     id: string;
@@ -1471,6 +1535,9 @@ export function buildPreviewPackage(document: SystemDocumentV1): import("../prev
     presentation: document.metadata.presentation,
     entities,
     expressions: compilePreviewExpressions(document),
+    dice: document.dice,
+    datasets: document.referenceData,
+    slotsByEntity: Object.fromEntries(document.entities.map(entity => [entity.id, previewSlots(document, entity.id)])),
     sheets: sheets as unknown as never,
     actions: actions as unknown as never,
   } as unknown as import("../preview/sampleData.js").SystemPackageV1;
@@ -1511,9 +1578,18 @@ function compilePreviewExpressions(
       entry.resultType === resultType &&
       entry.fallback === fallback;
     if (shapeOk) {
+      const fieldOwner = document.entities.find(entity => entity.fields.some(field =>
+        field.expressionId === entry.id || field.maxExpressionId === entry.id));
+      const action = document.actions.find(action => action.expressionId === entry.id);
+      const owner = fieldOwner ?? (action === undefined ? undefined : actionOwner(document, action.id));
       const result = compileExpression(entry.source as string, {
-        env: { fields, inputs: inputsByExpression.get(entry.id) ?? {} },
-        languageVersion: document.schemaVersion !== "1.0" ? "0.2" : "0.1",
+        env: {
+          fields: owner === undefined ? fields : entityFieldTypes(owner.fields),
+          inputs: inputsByExpression.get(entry.id) ?? {},
+          dice: document.dice,
+          datasets: document.referenceData, slots: previewSlots(document, owner?.id),
+        },
+
         resultType,
         context,
         fallback,
@@ -1521,7 +1597,7 @@ function compilePreviewExpressions(
       if (result.ok) {
         out.push({
           id: entry.id,
-          context: result.value.context,
+          context,
           resultType: result.value.resultType,
           fallback: result.value.fallback,
           ast: result.value.ast,
@@ -1582,21 +1658,10 @@ function fallbackLiteralAst(fallback: ScalarValue, resultType: ValueType): Expre
 }
 
 function previewExpressionEnvs(document: SystemDocumentV1): {
-  fields: Record<string, ValueType>;
+  fields: Record<string, FieldBindingType>;
   inputsByExpression: Map<string, Record<string, ValueType>>;
 } {
-  const fields: Record<string, ValueType> = {};
-  for (const entity of document.entities) {
-    for (const field of entity.fields as unknown as Array<{
-      id: string;
-      kind?: string;
-      valueType?: unknown;
-    }>) {
-      if (fields[field.id] !== undefined) continue;
-      const valueType = previewFieldValueType(field.kind, field.valueType);
-      if (valueType !== undefined) fields[field.id] = valueType;
-    }
-  }
+  const fields = entityFieldTypes(document.entities.flatMap(entity => entity.fields));
   const inputsByExpression = new Map<string, Record<string, ValueType>>();
   for (const action of document.actions as unknown as Array<{
     kind?: string;
@@ -1618,25 +1683,6 @@ function previewExpressionEnvs(document: SystemDocumentV1): {
     inputsByExpression.set(action.expressionId, inputs);
   }
   return { fields, inputsByExpression };
-}
-
-function previewFieldValueType(kind: unknown, valueType: unknown): ValueType | undefined {
-  switch (kind) {
-    case "text":
-    case "singleChoice":
-    case "multiChoice":
-      return "text";
-    case "integer":
-    case "decimal":
-    case "resource":
-      return "number";
-    case "boolean":
-      return "boolean";
-    case "computed":
-      return isPreviewResultType(valueType) ? valueType : undefined;
-    default:
-      return undefined;
-  }
 }
 
 function isPreviewContext(value: unknown): value is "computed" | "roll" | "validation" {

@@ -17,7 +17,7 @@ const sheet = (overrides = {}) => ({
   returnOwnerId: null, name: "Bram", systemVersionId: "v1", entityDefinitionId: "hero",
   revision: 7, lifecycle: "active", archivedAt: null,
   createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z",
-  state: { schemaVersion: "1.0", values: {} }, derivedValues: {},
+  state: { schemaVersion: "1.0", entries: {}, values: {} }, derivedValues: {},
   validations: [],
   projection: {
     projectionVersion: "1.0", systemId: "s", versionId: "v1", packageChecksum: "p",
@@ -247,6 +247,27 @@ describe("SessionBoard", () => {
     fireEvent.click(await screen.findByRole("button", { name: /bram/i }));
     fireEvent.click(await screen.findByRole("button", { name: /roll strike/i }));
     expect(await screen.findByRole("status", { name: "" })).toHaveTextContent("13");
+    expect(screen.queryByText(/roll may have applied/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the outcome label with the total on the session board", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [
+        { characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero", systemVersionId: "v1", revision: 7, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+      ], nextCursor: null, requestId: "r2" }),
+    };
+    const charactersApi = {
+      open: vi.fn().mockResolvedValue({ character: sheet(), requestId: "r3" }),
+      executeCharacterAction: vi.fn().mockResolvedValue({ result: { roll: { total: 13, outcome: { id: "hit", label: "Hit" }, output: "Hit (13)", dice: [] } }, requestId: "r4" }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={charactersApi as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+      { wrapper: wrapper() });
+    fireEvent.click(await screen.findByRole("button", { name: /bram/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /roll strike/i }));
+    expect(await screen.findByRole("status", { name: "" })).toHaveTextContent("13 — Hit");
     expect(screen.queryByText(/roll may have applied/i)).not.toBeInTheDocument();
   });
 

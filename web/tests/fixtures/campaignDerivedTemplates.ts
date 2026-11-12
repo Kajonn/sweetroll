@@ -220,7 +220,7 @@ export async function campaignDerivedJourney(
       ).result;
       if (action === "Hit" || action === "Damage")
         expect(result.roll.bindings).toContainEqual({
-          scope: "fields",
+          scope: "item",
           definitionId: "damage_bonus",
           value: 6,
         });

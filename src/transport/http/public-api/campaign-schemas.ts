@@ -1,3 +1,4 @@
+import { DieResultSchema, PushResultSchema, RollBreakdownSchema } from "../../../systems/implementation/rules/result.js";
 import { Type } from "@sinclair/typebox";
 
 import { ImageDescriptorSchema } from "../../../platform/image-attachment.js";
@@ -252,7 +253,14 @@ export const campaignSchemas = {
     members: Type.Array(looseObject),
     content: Type.Array(looseObject),
     activity: Type.Array(looseObject),
-    rolls: Type.Array(looseObject),
+    rolls: Type.Array(object({
+      targetCharacterId: Type.Optional(uuid), respondsTo: Type.Optional(uuid),
+      rollId: uuid, characterId: uuid, actorId: uuid, actionId: s.definitionId,
+      audience: Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]),
+      expression: text, breakdown: RollBreakdownSchema, breakdownText: text,
+      dice: Type.Array(DieResultSchema), bindings: Type.Unknown(), total: Type.Number(), output: text,
+      push: Type.Optional(PushResultSchema), occurredAt: dateTime,
+    })),
     templates: Type.Optional(Type.Array(looseObject)),
     proposals: Type.Optional(Type.Array(looseObject)),
   }),

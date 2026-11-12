@@ -236,6 +236,29 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
     ));
 
     route({
+      method: "POST", path: "/characters/:characterId/resources/:resourceId/adjust", id: "adjustCharacterResource",
+      description: "Add an amount to a character resource, or subtract a negative one. The result stops at the resource's minimum and the character's maximum.",
+      scope: "characters:write", input: { params: s.resourceId, body: s.adjustResource }, output: "CharacterMutation",
+      example: { delta: -17, expectedRevision: 3, idempotencyKey: "damage-1" },
+    }, async (ctx, { params, body }) => map(
+      await characters.apply(ctx, { kind: "adjustResource", ...params, ...body }),
+      ({ character }) => characterMutation(character),
+    ));
+
+    route({
+      method: "PUT", path: "/characters/:characterId/resources/:resourceId", id: "setCharacterResource",
+      description: "Set a character resource's current value, editable maximum, or both. A computed maximum follows the published formula. Lowering a maximum clamps the current value.",
+      scope: "characters:write", input: { params: s.resourceId, body: s.setResource }, output: "CharacterMutation",
+      example: { max: 24, expectedRevision: 4, idempotencyKey: "level-up-hp" },
+    }, async (ctx, { params, body }) => {
+      const { current, max, ...command } = body;
+      return map(await characters.apply(ctx, {
+        kind: "setResource", ...params, ...command,
+        ...(current === undefined ? {} : { current }), ...(max === undefined ? {} : { max }),
+      }), ({ character }) => characterMutation(character));
+    });
+
+    route({
       method: "POST", path: "/characters/:characterId/entries", id: "addCharacterEntry",
       description: "Add an entry to a slot from the pinned version's catalog, or add a personal data-only entry with a null template ID.",
       scope: "characters:write", input: { params: s.characterId, body: s.addEntry }, output: "CharacterMutation",

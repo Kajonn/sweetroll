@@ -1,5 +1,7 @@
+import { sheetActionOwners, validationOwner } from "../rules/owners.js";
+import { fieldWithDatasetOptions, validateDataset } from "./reference-data.js";
 import {validatePushPolicies} from "../rules/push-policy.js";
-import { validateDiceGroups } from "../rules/groups.js";
+import { children, namedGroups, validateDiceGroups } from "../rules/groups.js";
 import { Buffer } from "node:buffer";
 
 import { PACKAGE_LIMITS } from "./limits.js";
@@ -12,15 +14,16 @@ import type {
 
 type StructuralValue = SystemDocumentV1 | SystemPackageV1;
 
-export function validateDocumentStructure(value: SystemDocumentV1): PackageDiagnostic[] {
-  return validateStructure(value, "");
+export function validateDocumentStructure(value: SystemDocumentV1, extension = false): PackageDiagnostic[] {
+  return validateStructure(value, "", extension);
 }
 
 export function validatePackageStructure(
   value: SystemPackageV1,
   prefix = "",
+  extension = false,
 ): PackageDiagnostic[] {
-  return validateStructure(value, prefix);
+  return validateStructure(value, prefix, extension);
 }
 
 export function preflightPackageAstLimits(
@@ -59,27 +62,34 @@ export function preflightExportAstLimits(value: unknown): PackageDiagnostic[] {
   }
 }
 
-function validateStructure(value: StructuralValue, prefix: string): PackageDiagnostic[] {
-  const budgetDiagnostics = validateBudgets(value, prefix);
+function validateStructure(value: StructuralValue, prefix: string, extension: boolean): PackageDiagnostic[] {
+  const budgetDiagnostics = validateBudgets(value, prefix, extension);
   if (budgetDiagnostics.length > 0) return budgetDiagnostics;
 
   const diagnostics: PackageDiagnostic[] = validatePushPolicies(value);
   const definitionIds = new Set<string>();
   const entityIds = new Set<string>();
-  const fieldIds = new Set<string>();
   const resourceIds = new Set<string>();
   const expressionIds = new Set<string>();
   const actionIds = new Set<string>();
 
-  const collectId = (id: string, path: string): void => {
-    if (definitionIds.has(id)) {
+  const collectId = (id: string, path: string, ids = definitionIds): void => {
+    if (ids.has(id)) {
       diagnostics.push({
         code: "duplicate_definition_id",
         path: prefix + path,
         message: "Definition ID must be unique.",
       });
     } else {
-      definitionIds.add(id);
+      ids.add(id);
+    }
+  };
+  type OutcomeLists = { outcomes?: { id: string }[]; details?: { id: string }[] };
+  // Outcome and detail IDs are scoped to their action, like action inputs.
+  const collectOutcomeIds = (action: OutcomeLists, actionPath: string): void => {
+    for (const list of ["outcomes", "details"] as const) {
+      const ids = new Set<string>();
+      (action[list] ?? []).forEach((entry, index) => collectId(entry.id, `${actionPath}/${list}/${index}/id`, ids));
     }
   };
 
@@ -87,24 +97,34 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
     const entityPath = `/entities/${entityIndex}`;
     collectId(entity.id, `${entityPath}/id`);
     entityIds.add(entity.id);
+    const fieldIds = new Set<string>();
     entity.fields.forEach((field, fieldIndex) => {
       const fieldPath = `${entityPath}/fields/${fieldIndex}`;
-      collectId(field.id, `${fieldPath}/id`);
-      fieldIds.add(field.id);
+      collectId(field.id, `${fieldPath}/id`, fieldIds);
       if (field.kind === "resource") resourceIds.add(field.id);
       if (field.kind === "singleChoice" || field.kind === "multiChoice") {
+        const optionIds = new Set<string>();
         field.options.forEach((option, optionIndex) => {
-          collectId(option.id, `${fieldPath}/options/${optionIndex}/id`);
+          collectId(option.id, `${fieldPath}/options/${optionIndex}/id`, optionIds);
         });
       }
     });
   });
 
+  value.dice?.forEach((die, index) => collectId(die.id, `/dice/${index}/id`));
+  const deckIds = new Set<string>();
+  value.decks?.forEach((deck, index) => {
+    collectId(deck.id, `/decks/${index}/id`);
+    deckIds.add(deck.id);
+  });
+
   value.referenceData.forEach((dataSet, dataSetIndex) => {
     const dataSetPath = `/referenceData/${dataSetIndex}`;
     collectId(dataSet.id, `${dataSetPath}/id`);
+    if ("effectiveLimits" in value) diagnostics.push(...validateDataset(dataSet, prefix + dataSetPath));
+    const recordIds = new Set<string>();
     dataSet.records.forEach((record, recordIndex) => {
-      collectId(record.id, `${dataSetPath}/records/${recordIndex}/id`);
+      collectId(record.id, `${dataSetPath}/records/${recordIndex}/id`, recordIds);
     });
   });
 
@@ -130,9 +150,11 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
     collectId(action.id, `${actionPath}/id`);
     actionIds.add(action.id);
     if (action.kind === "roll") {
+      const inputIds = new Set<string>();
       action.inputs.forEach((input, inputIndex) => {
-        collectId(input.id, `${actionPath}/inputs/${inputIndex}/id`);
+        collectId(input.id, `${actionPath}/inputs/${inputIndex}/id`, inputIds);
       });
+      collectOutcomeIds(action, actionPath);
     }
   });
 
@@ -140,31 +162,34 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
     collectId(validation.id, `/validations/${validationIndex}/id`);
   });
 
-  // Dynamic sheet objects: templates/slots are Type.Optional, so legacy
-  // documents without the arrays validate exactly as before.
-  const templates = value.templates ?? [];
-  const slots = value.slots ?? [];
+  const templates = value.templates;
+  const slots = value.slots;
   const slotIds = new Set<string>();
 
   templates.forEach((template, templateIndex) => {
     const templatePath = `/templates/${templateIndex}`;
     collectId(template.id, `${templatePath}/id`);
+    const fieldIds = new Set<string>();
+    const grantedIds = new Set<string>();
     template.fields.forEach((field, fieldIndex) => {
       const fieldPath = `${templatePath}/fields/${fieldIndex}`;
-      collectId(field.id, `${fieldPath}/id`);
+      collectId(field.id, `${fieldPath}/id`, fieldIds);
       if (field.kind === "singleChoice" || field.kind === "multiChoice") {
+        const optionIds = new Set<string>();
         field.options.forEach((option, optionIndex) => {
-          collectId(option.id, `${fieldPath}/options/${optionIndex}/id`);
+          collectId(option.id, `${fieldPath}/options/${optionIndex}/id`, optionIds);
         });
       }
     });
     (template.grantedActions ?? []).forEach((action, actionIndex) => {
       const actionPath = `${templatePath}/grantedActions/${actionIndex}`;
-      collectId(action.id, `${actionPath}/id`);
+      collectId(action.id, `${actionPath}/id`, grantedIds);
       if (action.kind === "roll") {
+        const inputIds = new Set<string>();
         action.inputs.forEach((input, inputIndex) => {
-          collectId(input.id, `${actionPath}/inputs/${inputIndex}/id`);
+          collectId(input.id, `${actionPath}/inputs/${inputIndex}/id`, inputIds);
         });
+        collectOutcomeIds(action, actionPath);
       }
     });
   });
@@ -183,9 +208,38 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
       });
     }
   };
+  const missingOutcomeExpressions = (
+    action: { outcomes?: { expressionId: string }[]; details?: { expressionId: string }[] },
+    actionPath: string,
+  ): void => {
+    for (const list of ["outcomes", "details"] as const) {
+      (action[list] ?? []).forEach((entry, index) =>
+        missing(expressionIds.has(entry.expressionId), `${actionPath}/${list}/${index}/expressionId`));
+    }
+  };
+
+  const validateFieldData = (field: SystemDocumentV1["entities"][number]["fields"][number], path: string, template: boolean) => {
+    if (field.kind === "resource" && field.maxExpressionId !== undefined) {
+      missing(!template && expressionIds.has(field.maxExpressionId), `${path}/maxExpressionId`);
+    }
+    if (extension || (field.kind !== "singleChoice" && field.kind !== "multiChoice") || field.optionsFrom === undefined) return;
+    const dataset = value.referenceData.find(table => table.id === field.optionsFrom);
+    missing(dataset !== undefined, `${path}/optionsFrom`);
+    if (dataset === undefined) return;
+    const options = new Set(dataset.records.map(record => record.id));
+    const defaults = Array.isArray(field.default) ? field.default : field.default === null ? [] : [field.default];
+    if ("effectiveLimits" in value) missing(defaults.every(id => options.has(id)), `${path}/default`);
+    const materialized = fieldWithDatasetOptions(field, value.referenceData);
+    if ("effectiveLimits" in value && "options" in materialized
+      && (materialized.options.length !== field.options.length || materialized.options.some((option, i) =>
+        option.id !== field.options[i]?.id || option.label !== field.options[i]?.label))) {
+      diagnostics.push({ code: "invalid_schema", path: prefix + `${path}/options`, message: "Published options must match the referenced dataset." });
+    }
+  };
 
   value.entities.forEach((entity, entityIndex) => {
     entity.fields.forEach((field, fieldIndex) => {
+      validateFieldData(field, `/entities/${entityIndex}/fields/${fieldIndex}`, false);
       if (field.kind === "computed") {
         missing(
           expressionIds.has(field.expressionId),
@@ -198,13 +252,15 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
   value.sheets.forEach((sheet, sheetIndex) => {
     const sheetPath = `/sheets/${sheetIndex}`;
     missing(entityIds.has(sheet.targetEntityId), `${sheetPath}/targetEntityId`);
+    const fields = value.entities.find(entity => entity.id === sheet.targetEntityId)?.fields
+      ?? value.entities.flatMap(entity => entity.fields);
     sheet.sections.forEach((section, sectionIndex) => {
       section.elements.forEach((element, elementIndex) => {
         const elementPath = `${sheetPath}/sections/${sectionIndex}/elements/${elementIndex}`;
         if (element.kind === "field") {
-          missing(fieldIds.has(element.fieldId), `${elementPath}/fieldId`);
+          missing(fields.some(field => field.id === element.fieldId), `${elementPath}/fieldId`);
         } else if (element.kind === "resource") {
-          missing(resourceIds.has(element.resourceId), `${elementPath}/resourceId`);
+          missing(fields.some(field => field.kind === "resource" && field.id === element.resourceId), `${elementPath}/resourceId`);
         } else if (element.kind === "action") {
           missing(actionIds.has(element.actionId), `${elementPath}/actionId`);
         } else {
@@ -223,20 +279,37 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
     });
   });
 
+  // A deck's cards are the records of one dataset (design 6.4, C13).
+  value.decks?.forEach((deck, index) => {
+    const dataset = value.referenceData.find(candidate => candidate.id === deck.datasetId);
+    missing(dataset !== undefined, `/decks/${index}/datasetId`);
+    if (dataset !== undefined && (dataset.records.length < 1 || dataset.records.length > PACKAGE_LIMITS.cardsPerDeck)) {
+      diagnostics.push({
+        code: "limit_exceeded",
+        path: `${prefix}/decks/${index}/datasetId`,
+        message: `A deck needs between 1 and ${PACKAGE_LIMITS.cardsPerDeck} cards.`,
+      });
+    }
+  });
+
   value.actions.forEach((action, actionIndex) => {
     if (action.kind === "roll") {
       missing(expressionIds.has(action.expressionId), `/actions/${actionIndex}/expressionId`);
+      missingOutcomeExpressions(action, `/actions/${actionIndex}`);
+    } else if (action.kind === "draw" || action.kind === "shuffle") {
+      missing(deckIds.has(action.deckId), `/actions/${actionIndex}/deckId`);
     } else {
       missing(resourceIds.has(action.resourceId), `/actions/${actionIndex}/resourceId`);
     }
   });
 
+  const actionOwners = sheetActionOwners(value);
   value.validations.forEach((validation, validationIndex) => {
     missing(
       expressionIds.has(validation.expressionId),
       `/validations/${validationIndex}/expressionId`,
     );
-    missing(definitionIds.has(validation.targetId), `/validations/${validationIndex}/targetId`);
+    missing(validationOwner(value, validation, actionOwners) !== undefined, `/validations/${validationIndex}/targetId`);
   });
 
   templates.forEach((template, templateIndex) => {
@@ -245,7 +318,18 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
     for (const field of template.fields) {
       if (field.kind === "resource") templateResourceIds.add(field.id);
     }
+    (template.quantityFields ?? []).forEach((fieldId, index) => {
+      const field = template.fields.find((candidate) => candidate.id === fieldId);
+      if (field?.kind !== "integer" && field?.kind !== "decimal") {
+        diagnostics.push({
+          code: "missing_reference",
+          path: `${prefix}${templatePath}/quantityFields/${index}`,
+          message: "A per-quantity field must be a number field of this template.",
+        });
+      }
+    });
     template.fields.forEach((field, fieldIndex) => {
+      validateFieldData(field, `${templatePath}/fields/${fieldIndex}`, true);
       if (field.kind === "computed") {
         missing(
           expressionIds.has(field.expressionId),
@@ -257,6 +341,7 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
       const actionPath = `${templatePath}/grantedActions/${actionIndex}`;
       if (action.kind === "roll") {
         missing(expressionIds.has(action.expressionId), `${actionPath}/expressionId`);
+        missingOutcomeExpressions(action, actionPath);
       } else {
         missing(templateResourceIds.has(action.resourceId), `${actionPath}/resourceId`);
       }
@@ -266,10 +351,10 @@ function validateStructure(value: StructuralValue, prefix: string): PackageDiagn
   return diagnostics;
 }
 
-function validateBudgets(value: StructuralValue, prefix: string): PackageDiagnostic[] {
+function validateBudgets(value: StructuralValue, prefix: string, extension: boolean): PackageDiagnostic[] {
   const diagnostics: PackageDiagnostic[] = [];
-  const templates = value.templates ?? [];
-  const slots = value.slots ?? [];
+  const templates = value.templates;
+  const slots = value.slots;
 
   if (templates.length > PACKAGE_LIMITS.templates) {
     diagnostics.push({
@@ -349,7 +434,7 @@ function validateBudgets(value: StructuralValue, prefix: string): PackageDiagnos
   }
 
   if ("effectiveLimits" in value) {
-    validatePackageBudgets(value, prefix, diagnostics);
+    validatePackageBudgets(value, prefix, diagnostics, extension);
   } else {
     value.expressions.forEach((expression, expressionIndex) => {
       if (Buffer.byteLength(expression.source, "utf8") > PACKAGE_LIMITS.expressionBytes) {
@@ -368,11 +453,13 @@ function validatePackageBudgets(
   value: SystemPackageV1,
   prefix: string,
   diagnostics: PackageDiagnostic[],
+  extension: boolean,
 ): void {
   const ceilings = {
     expressionBytes: PACKAGE_LIMITS.expressionBytes,
     expressionAstNodes: PACKAGE_LIMITS.expressionAstNodes,
     expressionAstDepth: PACKAGE_LIMITS.expressionAstDepth,
+    sheetEvaluationNodes: PACKAGE_LIMITS.sheetEvaluationNodes,
     dicePerRoll: PACKAGE_LIMITS.dicePerRoll,
     sidesPerDie: PACKAGE_LIMITS.sidesPerDie,
   } as const;
@@ -386,11 +473,24 @@ function validatePackageBudgets(
     }
   }
 
+  // An outcome expression may read the named groups of the roll it describes.
+  const asts = new Map(value.expressions.map((expression) => [expression.id, expression.ast]));
+  const rolledBy = new Map<string, string[]>();
+  const describedActions = [...value.actions, ...value.templates.flatMap((template) => template.grantedActions)];
+  for (const action of describedActions) {
+    if (action.kind !== "roll") continue;
+    const roll = asts.get(action.expressionId);
+    const groups = roll === undefined ? [] : namedGroups(roll);
+    for (const entry of [...(action.outcomes ?? []), ...(action.details ?? [])]) rolledBy.set(entry.expressionId, groups);
+  }
+
+  const customDice = extension ? undefined : new Set(value.dice?.map(die => die.id));
   value.expressions.forEach((expression, expressionIndex) => {
-    diagnostics.push(...validateDiceGroups(expression.ast, expression.languageVersion).map(d => ({...d, path: `${prefix}/expressions/${expressionIndex}/ast`})));
-    if (expression.languageVersion !== undefined && value.schemaVersion === "1.0") diagnostics.push({code: "invalid_schema",path: `${prefix}/schemaVersion`,message: "Grammar 0.2 requires package version 1.1."});
-    const { depth, nodes } = measureAst(expression.ast);
     const path = `${prefix}/expressions/${expressionIndex}/ast`;
+    diagnostics.push(...validateDiceGroups(expression.ast, rolledBy.get(expression.id), customDice).map(diagnostic => ({
+      ...diagnostic, path,
+    })));
+    const { depth, nodes } = measureAst(expression.ast);
     if (nodes > PACKAGE_LIMITS.expressionAstNodes) {
       diagnostics.push({
         code: "limit_exceeded",
@@ -417,34 +517,7 @@ function measureAst(root: ExpressionAstV1): { depth: number; nodes: number } {
     nodes += 1;
     depth = Math.max(depth, current.depth);
     const childDepth = current.depth + 1;
-    switch (current.node.kind) {
-      case "unary":
-        pending.push({ node: current.node.operand, depth: childDepth });
-        break;
-      case "binary":
-        pending.push(
-          { node: current.node.right, depth: childDepth },
-          { node: current.node.left, depth: childDepth },
-        );
-        break;
-      case "call":
-        for (const argument of current.node.arguments) {
-          pending.push({ node: argument, depth: childDepth });
-        }
-        break;
-      case "dice":
-        pending.push({ node: current.node.count, depth: childDepth });
-        break;
-      case "keep":
-      case "successCount":
-        pending.push({ node: current.node.dice, depth: childDepth });
-        break;
-      case "numberLiteral":
-      case "stringLiteral":
-      case "booleanLiteral":
-      case "reference":
-        break;
-    }
+    for (const node of children(current.node)) pending.push({ node, depth: childDepth });
   }
   return { depth, nodes };
 }
@@ -461,31 +534,7 @@ function preflightAst(root: Record<string, unknown>): "depth" | "invalid" | "nod
     if (!isObject(current.node) || !isLocallyValidAstNode(current.node)) return "invalid";
 
     const childDepth = current.depth + 1;
-    switch (current.node.kind) {
-      case "unary":
-        pending.push({ node: current.node.operand, depth: childDepth });
-        break;
-      case "binary":
-        pending.push(
-          { node: current.node.left, depth: childDepth },
-          { node: current.node.right, depth: childDepth },
-        );
-        break;
-      case "call":
-        if (Array.isArray(current.node.arguments)) {
-          for (const argument of current.node.arguments) {
-            pending.push({ node: argument, depth: childDepth });
-          }
-        }
-        break;
-      case "dice":
-        pending.push({ node: current.node.count, depth: childDepth });
-        break;
-      case "keep":
-      case "successCount":
-        pending.push({ node: current.node.dice, depth: childDepth });
-        break;
-    }
+    for (const node of children(current.node as ExpressionAstV1)) pending.push({ node, depth: childDepth });
   }
   return null;
 }
@@ -499,8 +548,9 @@ function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
     case "booleanLiteral":
       return hasOnlyKeys(node, ["kind", "value"]) && typeof node.value === "boolean";
     case "reference":
-      return hasOnlyKeys(node, ["kind", "scope", "id"])
-        && (node.scope === "fields" || node.scope === "inputs")
+      return hasOnlyKeys(node, ["kind", "scope", "id"], ["part"])
+        && (node.scope === "fields" || node.scope === "inputs" || node.scope === "item" || node.scope === "roll" || node.scope === "target" || node.scope === "opposed")
+        && (node.part === undefined || ((node.scope === "fields" || node.scope === "item" || node.scope === "target") && (node.part === "current" || node.part === "max")))
         && typeof node.id === "string"
         && /^[a-z][a-z0-9_]{0,63}$/.test(node.id);
     case "unary":
@@ -510,33 +560,43 @@ function isLocallyValidAstNode(node: Record<string, unknown>): boolean {
     case "binary":
       return hasOnlyKeys(node, ["kind", "operator", "left", "right"])
         && typeof node.operator === "string"
-        && ["+", "-", "*", "/", "==", "!=", "<", "<=", ">", ">=", "&&", "||"]
+        && ["+", "-", "*", "/", "%", "==", "!=", "<", "<=", ">", ">=", "&&", "||"]
           .includes(node.operator)
         && isObject(node.left)
         && isObject(node.right);
     case "call":
       return hasOnlyKeys(node, ["kind", "function", "arguments"], ["roundMode"])
-        && (node.function === "min" || node.function === "max" || node.function === "round")
+        && typeof node.function === "string"
+        && ["min", "max", "round", "floor", "ceil", "abs", "if", "has", "lookup", "lookupBand", "sum", "count", "sumWhere", "countWhere", "maxOf"].includes(node.function)
         && Array.isArray(node.arguments)
-        && node.arguments.length <= 2
+        && node.arguments.length <= 8
         && node.arguments.every(isObject)
         && (!Object.hasOwn(node, "roundMode")
           || node.roundMode === "nearest"
           || node.roundMode === "down"
           || node.roundMode === "up");
-    case "dice":
-      return hasOnlyKeys(node, ["kind", "count", "sides"], ["group"])
-        && isObject(node.count)
-        && isIntegerBetween(node.sides, 1, PACKAGE_LIMITS.sidesPerDie);
-    case "keep":
-      return hasOnlyKeys(node, ["kind", "mode", "count", "dice"])
-        && (node.mode === "highest" || node.mode === "lowest")
-        && isIntegerBetween(node.count, 1, PACKAGE_LIMITS.dicePerRoll)
-        && isObject(node.dice);
-    case "successCount":
-      return hasOnlyKeys(node, ["kind", "dice", "threshold"])
-        && isObject(node.dice)
-        && Number.isInteger(node.threshold);
+    case "pool": {
+      if (!hasOnlyKeys(node, ["kind", "source", "modifiers"], ["group", "reducer"]) ||
+          !isObject(node.source) || !Array.isArray(node.modifiers) || node.modifiers.length > 2) return false;
+      const source = node.source;
+      if (source.kind === "dice") {
+        if (!hasOnlyKeys(source, ["kind", "count", "sides"]) || !isObject(source.count) || !isObject(source.sides)) return false;
+      } else if (source.kind === "custom") {
+        if (!hasOnlyKeys(source, ["kind", "count", "dieId"]) || !isObject(source.count) || typeof source.dieId !== "string") return false;
+      } else if (source.kind !== "rolled" || !hasOnlyKeys(source, ["kind", "groupId"]) || typeof source.groupId !== "string") return false;
+      if (!node.modifiers.every((modifier) => isObject(modifier) && (
+        modifier.kind === "explode" && hasOnlyKeys(modifier, ["kind"], ["face"]) && (modifier.face === undefined || isObject(modifier.face)) ||
+        modifier.kind === "rerollOnce" && hasOnlyKeys(modifier, ["kind", "face"]) && isObject(modifier.face)
+      ))) return false;
+      if (node.reducer === undefined) return true;
+      if (!isObject(node.reducer)) return false;
+      if (node.reducer.kind === "countSymbol") {
+        return hasOnlyKeys(node.reducer, ["kind", "symbol"]) && typeof node.reducer.symbol === "string";
+      }
+      return hasOnlyKeys(node.reducer, ["kind", "amount"]) && typeof node.reducer.kind === "string" &&
+        ["keepHighest", "keepLowest", "countAtLeast", "countAtMost", "countEqual"].includes(node.reducer.kind) &&
+        isObject(node.reducer.amount);
+    }
     default:
       return false;
   }
@@ -556,9 +616,7 @@ function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-function isIntegerBetween(value: unknown, minimum: number, maximum: number): value is number {
-  return Number.isInteger(value) && (value as number) >= minimum && (value as number) <= maximum;
-}
+
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

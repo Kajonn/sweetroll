@@ -118,7 +118,7 @@
 
 .noIssues {
   font-size: 13px;
-  color: var(--status-success);
+  color: var(--status-success-fg);
 }
 
 .dependencyList {

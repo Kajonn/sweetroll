@@ -15,7 +15,7 @@ function seqRng(seq: number[]): () => number { let i = 0; return () => seq[i++]!
 
 describe("evaluate", () => {
   it("evaluates arithmetic against bindings", () => {
-    const r = evaluate(compile("10 + fields.modifier"), { fields: { modifier: 7 }, inputs: {} });
+    const r = evaluate(compile("10 + fields.modifier", { ...rollOpts, context: "computed" }), { fields: { modifier: 7 }, inputs: {} });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.result).toBe(17);
@@ -29,7 +29,7 @@ describe("evaluate", () => {
     if (!r.ok) return;
     expect(r.roll).not.toBeNull();
     if (!r.roll) return;
-    expect(r.roll.dice).toEqual([{ sides: 20, value: 1, kept: true }]);
+    expect(r.roll.dice).toMatchObject([{ sides: 20, value: 1, kept: true }]);
     expect(r.roll.total).toBe(1);
   });
 
@@ -157,5 +157,17 @@ describe("evaluate", () => {
         message: "dice count 4 exceeds the 3-die-per-roll limit",
       }],
     });
+  });
+
+  it.each([
+    ["adv(d20)", 16],
+    ["dis(d20)", 2],
+  ])("%s keeps one of two dice instead of summing them", (source, total) => {
+    const r = evaluate(compile(source), { fields: {}, inputs: {} }, seqRng([0.8, 0.1]));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.roll?.dice.map((die) => die.value)).toEqual([16, 2]);
+    expect(r.roll?.dice.filter((die) => die.kept)).toHaveLength(1);
+    expect(r.result).toBe(total);
   });
 });

@@ -27,8 +27,7 @@ import {
 // documents and packages reuse the system structural checks (unique IDs,
 // expression/resource references, budgets, push policies) by presenting their
 // templates and expressions as a system with no entities, sheets, slots,
-// entity actions or validations. Extension expressions always use grammar 0.2
-// with push policies, which the system checks gate on package version 1.2.
+// entity actions or validations. Extensions use the same grammar as systems.
 
 const ajv = new Ajv({ allErrors: true, strict: true });
 const validateDocument = ajv.compile<ExtensionDocumentV1>(ExtensionDocumentV1Schema);
@@ -36,7 +35,7 @@ const validatePackage = ajv.compile<ExtensionPackageV1>(ExtensionPackageV1Schema
 
 export function validateExtensionDocumentStructure(value: ExtensionDocumentV1): PackageDiagnostic[] {
   const asSystem: SystemDocumentV1 = {
-    schemaVersion: "1.2",
+    schemaVersion: "2.0",
     metadata: { ...value.metadata, defaultDice: "" },
     entities: [],
     referenceData: [],
@@ -45,13 +44,14 @@ export function validateExtensionDocumentStructure(value: ExtensionDocumentV1): 
     actions: [],
     validations: [],
     templates: value.templates,
+    slots: [],
   };
-  return sortDiagnostics([...validateDocumentStructure(asSystem), ...validationExpressions(value.expressions)]);
+  return sortDiagnostics([...validateDocumentStructure(asSystem, true), ...validationExpressions(value.expressions), ...extensionOutcomes(value.templates)]);
 }
 
 export function validateExtensionPackageStructure(value: ExtensionPackageV1): PackageDiagnostic[] {
   const asSystem = {
-    schemaVersion: "1.2",
+    schemaVersion: "2.0",
     systemId: value.baseSystemId,
     versionId: value.versionId,
     semanticVersion: value.semanticVersion,
@@ -66,10 +66,11 @@ export function validateExtensionPackageStructure(value: ExtensionPackageV1): Pa
     actions: [],
     validations: [],
     templates: value.templates,
+    slots: [],
     effectiveLimits: value.effectiveLimits,
     integrity: value.integrity,
   } satisfies SystemPackageV1;
-  return sortDiagnostics([...validatePackageStructure(asSystem), ...validationExpressions(value.expressions)]);
+  return sortDiagnostics([...validatePackageStructure(asSystem, "", true), ...validationExpressions(value.expressions)]);
 }
 
 export function decodeExtensionDocument(input: unknown): DecodeResult<ExtensionDocumentV1> {
@@ -103,13 +104,27 @@ export function decodeExtensionPackage(input: unknown): DecodeResult<ExtensionPa
 }
 
 function validationExpressions(expressions: readonly { context: string }[]): PackageDiagnostic[] {
-  return expressions.flatMap((expression, index) => expression.context === "validation"
+  // Outcome bands on extension actions are not supported yet (rules coverage R5).
+  return expressions.flatMap((expression, index) => expression.context === "validation" || expression.context === "outcome"
     ? [{
       code: "invalid_schema",
       path: `/expressions/${index}/context`,
-      message: "Extensions cannot contain validation expressions.",
+      message: expression.context === "validation"
+        ? "Extensions cannot contain validation expressions."
+        : "Extensions cannot contain outcome expressions yet.",
     }]
     : []);
+}
+
+function extensionOutcomes(templates: ExtensionDocumentV1["templates"]): PackageDiagnostic[] {
+  return templates.flatMap((template, templateIndex) => template.grantedActions.flatMap((action, actionIndex) =>
+    action.kind === "roll" && ((action.outcomes?.length ?? 0) > 0 || (action.details?.length ?? 0) > 0)
+      ? [{
+        code: "invalid_schema",
+        path: `/templates/${templateIndex}/grantedActions/${actionIndex}/outcomes`,
+        message: "Actions in extensions cannot define outcomes or details yet.",
+      }]
+      : []));
 }
 
 function validateWith<T>(

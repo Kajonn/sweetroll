@@ -14,7 +14,7 @@ export function effectiveEntryDefinition(
 ): ObjectTemplateV1 | undefined {
   if (entry.templateId !== null) {
     const key = templateKey(entry);
-    return (pkg.templates ?? []).find((t) => t.id === key);
+    return pkg.templates.find((t) => t.id === key);
   }
   const snapshot = entry.snapshot;
   if (
@@ -26,7 +26,7 @@ export function effectiveEntryDefinition(
     snapshot.base.packageChecksum !== pkg.integrity.checksum
   )
     return undefined;
-  const template = (pkg.templates ?? []).find(
+  const template = pkg.templates.find(
     (t) => t.id === snapshot.base.templateId,
   );
   if (
@@ -78,7 +78,7 @@ export function slotsForEntity(pkg: SystemPackageV1, entityId: string) {
         ),
       ),
   );
-  return (pkg.slots ?? []).filter((slot) => sheetSlots.has(slot.id));
+  return pkg.slots.filter((slot) => sheetSlots.has(slot.id));
 }
 
 /** All inherited actions must be applicable; never omit an unsupported action. */
@@ -94,19 +94,13 @@ export function templateApplicable(
     )
   )
     return false;
-  const fields = new Set(
-    [
-      ...entity.fields,
-      ...template.fields.filter(
-        (f) => f.kind !== "computed" && f.kind !== "image",
-      ),
-    ].map((f) => f.id),
-  );
+  const fields = new Set(entity.fields.map(field => field.id));
+  const item = new Set(template.fields.filter(field => field.kind !== "image").map(field => field.id));
   function refs(node: unknown): boolean {
     if (!node || typeof node !== "object") return true;
     const n = node as Record<string, unknown>;
-    if (n.scope === "fields" && typeof n.id === "string" && !fields.has(n.id))
-      return false;
+    if (typeof n.id === "string" && ((n.scope === "fields" && !fields.has(n.id))
+      || (n.scope === "item" && !item.has(n.id)))) return false;
     return Object.values(n).every((v) =>
       Array.isArray(v) ? v.every(refs) : refs(v),
     );
@@ -156,8 +150,8 @@ export function derivedEntryError(
     return "Derived entry is missing a typed value.";
   const valid = validateEntryForSlot(
     entry,
-    pkg.slots ?? [],
-    pkg.templates ?? [],
+    pkg.slots,
+    pkg.templates,
     siblings,
   );
   return valid.ok ? null : valid.message;

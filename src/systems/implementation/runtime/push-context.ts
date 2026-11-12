@@ -19,6 +19,12 @@ export const PushContextSchema = Type.Object(
     })),
     compositionChecksum: Type.Optional(Type.String({ maxLength: 80 })),
     outputTemplate: Type.String({ maxLength: 2000 }),
+    // A 2,000-character template can contain at most 250 scoped placeholders.
+    outputValues: Type.Optional(Type.Record(
+      Type.String({ pattern: "^(fields|inputs|item)\\.[a-z][a-z0-9_]{0,63}(\\.(current|max))?$" }),
+      Type.String(),
+      { additionalProperties: false, maxProperties: 250 },
+    )),
     policy: PushPolicySchema,
     entry: Type.Optional(
       Type.Object(

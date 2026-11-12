@@ -3,7 +3,9 @@
   "mediaType": "application/vnd.sweetroll.system+json;version=1",
   "exportedAt": "2026-09-04T12:00:00Z",
   "package": {
-    "schemaVersion": "1.0",
+    "schemaVersion": "2.0",
+    "templates": [],
+    "slots": [],
     "systemId": "a0000000-0000-5000-8000-000000000001",
     "versionId": "a0000000-0000-5000-8000-000000000002",
     "semanticVersion": "1.0.0",
@@ -167,6 +169,7 @@
       {
         "id": "defense_expr",
         "context": "computed",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 10,
@@ -191,6 +194,7 @@
       {
         "id": "check_expr",
         "context": "roll",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
@@ -198,7 +202,7 @@
           "modifier",
           "bonus"
         ],
-        "cost": 6,
+        "cost": 7,
         "ast": {
           "kind": "binary",
           "operator": "+",
@@ -206,12 +210,19 @@
             "kind": "binary",
             "operator": "+",
             "left": {
-              "kind": "dice",
-              "count": {
-                "kind": "numberLiteral",
-                "value": 1
+              "kind": "pool",
+              "source": {
+                "kind": "dice",
+                "count": {
+                  "kind": "numberLiteral",
+                  "value": 1
+                },
+                "sides": {
+                  "kind": "numberLiteral",
+                  "value": 20
+                }
               },
-              "sides": 20
+              "modifiers": []
             },
             "right": {
               "kind": "reference",
@@ -229,6 +240,7 @@
       {
         "id": "ability_valid_expr",
         "context": "validation",
+        "languageVersion": "1.0",
         "resultType": "boolean",
         "inferredType": "boolean",
         "fallback": false,
@@ -312,6 +324,7 @@
         "expressionId": "ability_valid_expr",
         "severity": "error",
         "message": "Ability score must be between 3 and 18",
+        "targetEntityId": "character",
         "targetId": "ability"
       }
     ],
@@ -319,11 +332,12 @@
       "expressionBytes": 1024,
       "expressionAstNodes": 256,
       "expressionAstDepth": 32,
+      "sheetEvaluationNodes": 8192,
       "dicePerRoll": 100,
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:b383db1493dc405f506595d546628b8e22b2457cfa0a240871e14e09832a4102"
+      "checksum": "sha256:5178fbd42729b28f711bc54866394108602c9aa148cf125992dd5d24fb2d83a4"
     }
   }
 }

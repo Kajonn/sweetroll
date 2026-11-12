@@ -2341,6 +2341,248 @@
         }
       }
     },
+    "/characters/{characterId}/resources/{resourceId}/adjust": {
+      "post": {
+        "operationId": "adjustCharacterResource",
+        "description": "Add an amount to a character resource, or subtract a negative one. The result stops at the resource's minimum and the character's maximum.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:write"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "x-max-body-bytes": 131072,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "delta",
+                  "expectedRevision",
+                  "idempotencyKey"
+                ],
+                "properties": {
+                  "delta": {
+                    "minimum": -1000000000,
+                    "maximum": 1000000000,
+                    "type": "number"
+                  },
+                  "expectedRevision": {
+                    "minimum": 1,
+                    "maximum": 2147483647,
+                    "type": "integer"
+                  },
+                  "idempotencyKey": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "\\S",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "delta": -17,
+                "expectedRevision": 3,
+                "idempotencyKey": "damage-1"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/characters/{characterId}/resources/{resourceId}": {
+      "put": {
+        "operationId": "setCharacterResource",
+        "description": "Set a character resource's current value, editable maximum, or both. A computed maximum follows the published formula. Lowering a maximum clamps the current value.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:write"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "x-max-body-bytes": 131072,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "expectedRevision",
+                  "idempotencyKey"
+                ],
+                "properties": {
+                  "current": {
+                    "minimum": -1000000000,
+                    "maximum": 1000000000,
+                    "type": "number"
+                  },
+                  "max": {
+                    "minimum": -1000000000,
+                    "maximum": 1000000000,
+                    "type": "number"
+                  },
+                  "expectedRevision": {
+                    "minimum": 1,
+                    "maximum": 2147483647,
+                    "type": "integer"
+                  },
+                  "idempotencyKey": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "\\S",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "max": 24,
+                "expectedRevision": 4,
+                "idempotencyKey": "level-up-hp"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
     "/characters/{characterId}/entries": {
       "post": {
         "operationId": "addCharacterEntry",
@@ -4228,6 +4470,164 @@
         }
       }
     },
+    "/characters/{characterId}/decks": {
+      "get": {
+        "operationId": "listCharacterDecks",
+        "description": "List the card decks of the character's system with the cards left. A campaign character reads the campaign's shared decks.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterDecks"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/characters/{characterId}/actions/{actionId}/roll-options": {
+      "get": {
+        "operationId": "listCharacterRollOptions",
+        "description": "List eligible targets and recent visible rolls for a campaign action on a character the caller controls.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "actionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          },
+          {
+            "name": "entryId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RollOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
     "/characters/{characterId}/actions/{actionId}": {
       "post": {
         "operationId": "executeCharacterAction",
@@ -4273,6 +4673,14 @@
                   "idempotencyKey"
                 ],
                 "properties": {
+                  "targetCharacterId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "respondsTo": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
                   "inputs": {
                     "maxProperties": 64,
                     "type": "object",
@@ -14064,6 +14472,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -14121,6 +14533,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -14174,6 +14590,10 @@
                           },
                           "step": {
                             "type": "number"
+                          },
+                          "maxExpressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           },
                           "resetTo": {
                             "anyOf": [
@@ -14570,6 +14990,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -14627,6 +15051,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -14680,6 +15108,10 @@
                           },
                           "step": {
                             "type": "number"
+                          },
+                          "maxExpressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           },
                           "resetTo": {
                             "anyOf": [
@@ -15660,9 +16092,18 @@
                   "bindings",
                   "total",
                   "output",
-                  "audience"
+                  "audience",
+                  "breakdown"
                 ],
                 "properties": {
+                  "targetCharacterId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "respondsTo": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
                   "rollId": {
                     "description": "Saved roll ID of a push-tracked roll, for reads and pushes. Null for rolls without a push policy, and when the reader may not correlate the roll; those appear in the activity feed.",
                     "anyOf": [
@@ -15699,8 +16140,24 @@
                           "type": "integer"
                         },
                         "value": {
-                          "minimum": 1,
-                          "type": "integer"
+                          "type": "number"
+                        },
+                        "faceLabel": {
+                          "minLength": 1,
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "symbols": {
+                          "maxProperties": 16,
+                          "additionalProperties": false,
+                          "type": "object",
+                          "patternProperties": {
+                            "^[a-z][a-z0-9_]{0,63}$": {
+                              "minimum": 1,
+                              "maximum": 100,
+                              "type": "integer"
+                            }
+                          }
                         },
                         "kept": {
                           "type": "boolean"
@@ -15717,6 +16174,16 @@
                         },
                         "success": {
                           "type": "boolean"
+                        },
+                        "rerolledFrom": {
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "type": "string"
+                        },
+                        "explodedFrom": {
+                          "minLength": 1,
+                          "maxLength": 256,
+                          "type": "string"
                         }
                       }
                     }
@@ -15741,26 +16208,55 @@
                             {
                               "const": "inputs",
                               "type": "string"
+                            },
+                            {
+                              "const": "item",
+                              "type": "string"
+                            },
+                            {
+                              "const": "aggregates",
+                              "type": "string"
+                            },
+                            {
+                              "const": "target",
+                              "type": "string"
+                            },
+                            {
+                              "const": "opposed",
+                              "type": "string"
                             }
                           ]
                         },
                         "definitionId": {
-                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "minLength": 1,
+                          "maxLength": 205,
                           "type": "string"
                         },
                         "value": {
                           "anyOf": [
                             {
-                              "type": "string"
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
                             },
                             {
-                              "type": "number"
-                            },
-                            {
-                              "type": "boolean"
-                            },
-                            {
-                              "type": "null"
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
                             }
                           ]
                         }
@@ -15769,6 +16265,48 @@
                   },
                   "total": {
                     "type": "number"
+                  },
+                  "outcome": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "label"
+                    ],
+                    "properties": {
+                      "id": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "details": {
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "label",
+                        "value"
+                      ],
+                      "properties": {
+                        "id": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "type": "number"
+                        }
+                      }
+                    }
                   },
                   "output": {
                     "type": "string"
@@ -15808,6 +16346,78 @@
                         "maxLength": 256,
                         "type": "string"
                       },
+                      "cards": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "deckId",
+                          "deckLabel",
+                          "remaining",
+                          "drawn"
+                        ],
+                        "properties": {
+                          "deckId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "deckLabel": {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "remaining": {
+                            "minimum": 0,
+                            "maximum": 200,
+                            "type": "integer"
+                          },
+                          "drawn": {
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "label",
+                                "values"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "values": {
+                                  "additionalProperties": false,
+                                  "maxProperties": 64,
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[a-z][a-z0-9_]{0,63}$": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
                       "groups": {
                         "maxItems": 256,
                         "type": "array",
@@ -15844,6 +16454,14 @@
                               "maximum": 1000,
                               "type": "integer"
                             },
+                            "dieId": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
+                            "symbol": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
                             "operation": {
                               "anyOf": [
                                 {
@@ -15851,7 +16469,19 @@
                                   "type": "string"
                                 },
                                 {
-                                  "const": "successCount",
+                                  "const": "countAtLeast",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "countAtMost",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "countEqual",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "countSymbol",
                                   "type": "string"
                                 },
                                 {
@@ -15866,6 +16496,28 @@
                             },
                             "threshold": {
                               "type": "integer"
+                            },
+                            "keepCount": {
+                              "minimum": 0,
+                              "maximum": 100,
+                              "type": "integer"
+                            },
+                            "modifiers": {
+                              "maxItems": 2,
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "const": "explode",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "rerollOnce",
+                                    "type": "string"
+                                  }
+                                ]
+                              }
                             },
                             "diceIds": {
                               "maxItems": 100,
@@ -15906,7 +16558,7 @@
                               "type": "string"
                             },
                             "operandIds": {
-                              "maxItems": 2,
+                              "maxItems": 8,
                               "type": "array",
                               "items": {
                                 "minLength": 1,
@@ -15917,16 +16569,28 @@
                             "value": {
                               "anyOf": [
                                 {
-                                  "type": "string"
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
                                 },
                                 {
-                                  "type": "number"
-                                },
-                                {
-                                  "type": "boolean"
-                                },
-                                {
-                                  "type": "null"
+                                  "uniqueItems": true,
+                                  "type": "array",
+                                  "items": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  }
                                 }
                               ]
                             },
@@ -15934,6 +16598,14 @@
                               "minLength": 1,
                               "maxLength": 256,
                               "type": "string"
+                            },
+                            "symbol": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
+                            "reused": {
+                              "const": true,
+                              "type": "boolean"
                             }
                           }
                         }
@@ -16083,9 +16755,18 @@
           "bindings",
           "total",
           "output",
-          "audience"
+          "audience",
+          "breakdown"
         ],
         "properties": {
+          "targetCharacterId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "respondsTo": {
+            "format": "uuid",
+            "type": "string"
+          },
           "rollId": {
             "description": "Saved roll ID of a push-tracked roll, for reads and pushes. Null for rolls without a push policy, and when the reader may not correlate the roll; those appear in the activity feed.",
             "anyOf": [
@@ -16122,8 +16803,24 @@
                   "type": "integer"
                 },
                 "value": {
-                  "minimum": 1,
-                  "type": "integer"
+                  "type": "number"
+                },
+                "faceLabel": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "symbols": {
+                  "maxProperties": 16,
+                  "additionalProperties": false,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_]{0,63}$": {
+                      "minimum": 1,
+                      "maximum": 100,
+                      "type": "integer"
+                    }
+                  }
                 },
                 "kept": {
                   "type": "boolean"
@@ -16140,6 +16837,16 @@
                 },
                 "success": {
                   "type": "boolean"
+                },
+                "rerolledFrom": {
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                "explodedFrom": {
+                  "minLength": 1,
+                  "maxLength": 256,
+                  "type": "string"
                 }
               }
             }
@@ -16164,26 +16871,55 @@
                     {
                       "const": "inputs",
                       "type": "string"
+                    },
+                    {
+                      "const": "item",
+                      "type": "string"
+                    },
+                    {
+                      "const": "aggregates",
+                      "type": "string"
+                    },
+                    {
+                      "const": "target",
+                      "type": "string"
+                    },
+                    {
+                      "const": "opposed",
+                      "type": "string"
                     }
                   ]
                 },
                 "definitionId": {
-                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "minLength": 1,
+                  "maxLength": 205,
                   "type": "string"
                 },
                 "value": {
                   "anyOf": [
                     {
-                      "type": "string"
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     {
-                      "type": "number"
-                    },
-                    {
-                      "type": "boolean"
-                    },
-                    {
-                      "type": "null"
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      }
                     }
                   ]
                 }
@@ -16192,6 +16928,48 @@
           },
           "total": {
             "type": "number"
+          },
+          "outcome": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "label"
+            ],
+            "properties": {
+              "id": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            }
+          },
+          "details": {
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "value"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "value": {
+                  "type": "number"
+                }
+              }
+            }
           },
           "output": {
             "type": "string"
@@ -16231,6 +17009,78 @@
                 "maxLength": 256,
                 "type": "string"
               },
+              "cards": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "deckId",
+                  "deckLabel",
+                  "remaining",
+                  "drawn"
+                ],
+                "properties": {
+                  "deckId": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  },
+                  "deckLabel": {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  "remaining": {
+                    "minimum": 0,
+                    "maximum": 200,
+                    "type": "integer"
+                  },
+                  "drawn": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "label",
+                        "values"
+                      ],
+                      "properties": {
+                        "id": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "values": {
+                          "additionalProperties": false,
+                          "maxProperties": 64,
+                          "type": "object",
+                          "patternProperties": {
+                            "^[a-z][a-z0-9_]{0,63}$": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
               "groups": {
                 "maxItems": 256,
                 "type": "array",
@@ -16267,6 +17117,14 @@
                       "maximum": 1000,
                       "type": "integer"
                     },
+                    "dieId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "symbol": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
                     "operation": {
                       "anyOf": [
                         {
@@ -16274,7 +17132,19 @@
                           "type": "string"
                         },
                         {
-                          "const": "successCount",
+                          "const": "countAtLeast",
+                          "type": "string"
+                        },
+                        {
+                          "const": "countAtMost",
+                          "type": "string"
+                        },
+                        {
+                          "const": "countEqual",
+                          "type": "string"
+                        },
+                        {
+                          "const": "countSymbol",
                           "type": "string"
                         },
                         {
@@ -16289,6 +17159,28 @@
                     },
                     "threshold": {
                       "type": "integer"
+                    },
+                    "keepCount": {
+                      "minimum": 0,
+                      "maximum": 100,
+                      "type": "integer"
+                    },
+                    "modifiers": {
+                      "maxItems": 2,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "const": "explode",
+                            "type": "string"
+                          },
+                          {
+                            "const": "rerollOnce",
+                            "type": "string"
+                          }
+                        ]
+                      }
                     },
                     "diceIds": {
                       "maxItems": 100,
@@ -16329,7 +17221,7 @@
                       "type": "string"
                     },
                     "operandIds": {
-                      "maxItems": 2,
+                      "maxItems": 8,
                       "type": "array",
                       "items": {
                         "minLength": 1,
@@ -16340,16 +17232,28 @@
                     "value": {
                       "anyOf": [
                         {
-                          "type": "string"
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         },
                         {
-                          "type": "number"
-                        },
-                        {
-                          "type": "boolean"
-                        },
-                        {
-                          "type": "null"
+                          "uniqueItems": true,
+                          "type": "array",
+                          "items": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
                         }
                       ]
                     },
@@ -16357,6 +17261,14 @@
                       "minLength": 1,
                       "maxLength": 256,
                       "type": "string"
+                    },
+                    "symbol": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "reused": {
+                      "const": true,
+                      "type": "boolean"
                     }
                   }
                 }
@@ -16454,6 +17366,95 @@
                       "type": "integer"
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      },
+      "RollOptions": {
+        "type": "object",
+        "required": [
+          "targets",
+          "rolls"
+        ],
+        "properties": {
+          "targets": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "characterId",
+                "name"
+              ],
+              "properties": {
+                "characterId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "rolls": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "rollId",
+                "output"
+              ],
+              "properties": {
+                "rollId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "output": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CharacterDecks": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decks"
+        ],
+        "properties": {
+          "decks": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "deckId",
+                "label",
+                "total",
+                "remaining"
+              ],
+              "properties": {
+                "deckId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "total": {
+                  "minimum": 1,
+                  "maximum": 200,
+                  "type": "integer"
+                },
+                "remaining": {
+                  "minimum": 0,
+                  "maximum": 200,
+                  "type": "integer"
                 }
               }
             }
@@ -16848,6 +17849,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -16905,6 +17910,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -16958,6 +17967,10 @@
                           },
                           "step": {
                             "type": "number"
+                          },
+                          "maxExpressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           },
                           "resetTo": {
                             "anyOf": [
@@ -17078,6 +18091,23 @@
                             "type": "string"
                           }
                         ]
+                      },
+                      "target": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "entityId"
+                        ],
+                        "properties": {
+                          "entityId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "respondsTo": {
+                        "const": true,
+                        "type": "boolean"
                       },
                       "inputs": {
                         "type": "array",
@@ -17205,9 +18235,18 @@
                     "bindings",
                     "total",
                     "output",
-                    "audience"
+                    "audience",
+                    "breakdown"
                   ],
                   "properties": {
+                    "targetCharacterId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "respondsTo": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
                     "rollId": {
                       "description": "Saved roll ID of a push-tracked roll, for reads and pushes. Null for rolls without a push policy, and when the reader may not correlate the roll; those appear in the activity feed.",
                       "anyOf": [
@@ -17244,8 +18283,24 @@
                             "type": "integer"
                           },
                           "value": {
-                            "minimum": 1,
-                            "type": "integer"
+                            "type": "number"
+                          },
+                          "faceLabel": {
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "symbols": {
+                            "maxProperties": 16,
+                            "additionalProperties": false,
+                            "type": "object",
+                            "patternProperties": {
+                              "^[a-z][a-z0-9_]{0,63}$": {
+                                "minimum": 1,
+                                "maximum": 100,
+                                "type": "integer"
+                              }
+                            }
                           },
                           "kept": {
                             "type": "boolean"
@@ -17262,6 +18317,16 @@
                           },
                           "success": {
                             "type": "boolean"
+                          },
+                          "rerolledFrom": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "explodedFrom": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
                           }
                         }
                       }
@@ -17286,26 +18351,55 @@
                               {
                                 "const": "inputs",
                                 "type": "string"
+                              },
+                              {
+                                "const": "item",
+                                "type": "string"
+                              },
+                              {
+                                "const": "aggregates",
+                                "type": "string"
+                              },
+                              {
+                                "const": "target",
+                                "type": "string"
+                              },
+                              {
+                                "const": "opposed",
+                                "type": "string"
                               }
                             ]
                           },
                           "definitionId": {
-                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "minLength": 1,
+                            "maxLength": 205,
                             "type": "string"
                           },
                           "value": {
                             "anyOf": [
                               {
-                                "type": "string"
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
                               },
                               {
-                                "type": "number"
-                              },
-                              {
-                                "type": "boolean"
-                              },
-                              {
-                                "type": "null"
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
                               }
                             ]
                           }
@@ -17314,6 +18408,48 @@
                     },
                     "total": {
                       "type": "number"
+                    },
+                    "outcome": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "label"
+                      ],
+                      "properties": {
+                        "id": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "details": {
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "label",
+                          "value"
+                        ],
+                        "properties": {
+                          "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "number"
+                          }
+                        }
+                      }
                     },
                     "output": {
                       "type": "string"
@@ -17353,6 +18489,78 @@
                           "maxLength": 256,
                           "type": "string"
                         },
+                        "cards": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "deckId",
+                            "deckLabel",
+                            "remaining",
+                            "drawn"
+                          ],
+                          "properties": {
+                            "deckId": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
+                            "deckLabel": {
+                              "maxLength": 120,
+                              "type": "string"
+                            },
+                            "remaining": {
+                              "minimum": 0,
+                              "maximum": 200,
+                              "type": "integer"
+                            },
+                            "drawn": {
+                              "minItems": 1,
+                              "maxItems": 10,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "values"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "maxLength": 120,
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "additionalProperties": false,
+                                    "maxProperties": 64,
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^[a-z][a-z0-9_]{0,63}$": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
                         "groups": {
                           "maxItems": 256,
                           "type": "array",
@@ -17389,6 +18597,14 @@
                                 "maximum": 1000,
                                 "type": "integer"
                               },
+                              "dieId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "symbol": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
                               "operation": {
                                 "anyOf": [
                                   {
@@ -17396,7 +18612,19 @@
                                     "type": "string"
                                   },
                                   {
-                                    "const": "successCount",
+                                    "const": "countAtLeast",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countAtMost",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countEqual",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countSymbol",
                                     "type": "string"
                                   },
                                   {
@@ -17411,6 +18639,28 @@
                               },
                               "threshold": {
                                 "type": "integer"
+                              },
+                              "keepCount": {
+                                "minimum": 0,
+                                "maximum": 100,
+                                "type": "integer"
+                              },
+                              "modifiers": {
+                                "maxItems": 2,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "const": "explode",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "rerollOnce",
+                                      "type": "string"
+                                    }
+                                  ]
+                                }
                               },
                               "diceIds": {
                                 "maxItems": 100,
@@ -17451,7 +18701,7 @@
                                 "type": "string"
                               },
                               "operandIds": {
-                                "maxItems": 2,
+                                "maxItems": 8,
                                 "type": "array",
                                 "items": {
                                   "minLength": 1,
@@ -17462,16 +18712,28 @@
                               "value": {
                                 "anyOf": [
                                   {
-                                    "type": "string"
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
                                   },
                                   {
-                                    "type": "number"
-                                  },
-                                  {
-                                    "type": "boolean"
-                                  },
-                                  {
-                                    "type": "null"
+                                    "uniqueItems": true,
+                                    "type": "array",
+                                    "items": {
+                                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                      "type": "string"
+                                    }
                                   }
                                 ]
                               },
@@ -17479,6 +18741,14 @@
                                 "minLength": 1,
                                 "maxLength": 256,
                                 "type": "string"
+                              },
+                              "symbol": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "reused": {
+                                "const": true,
+                                "type": "boolean"
                               }
                             }
                           }
@@ -17685,7 +18955,8 @@
             "type": "object",
             "required": [
               "schemaVersion",
-              "values"
+              "values",
+              "entries"
             ],
             "properties": {
               "schemaVersion": {
@@ -18547,9 +19818,527 @@
           "rolls": {
             "type": "array",
             "items": {
-              "additionalProperties": true,
+              "additionalProperties": false,
               "type": "object",
-              "properties": {}
+              "required": [
+                "rollId",
+                "characterId",
+                "actorId",
+                "actionId",
+                "audience",
+                "expression",
+                "breakdown",
+                "breakdownText",
+                "dice",
+                "bindings",
+                "total",
+                "output",
+                "occurredAt"
+              ],
+              "properties": {
+                "targetCharacterId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "respondsTo": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "rollId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "characterId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "actorId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "actionId": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "audience": {
+                  "anyOf": [
+                    {
+                      "const": "owner_only",
+                      "type": "string"
+                    },
+                    {
+                      "const": "gm_only",
+                      "type": "string"
+                    },
+                    {
+                      "const": "campaign",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "expression": {
+                  "type": "string"
+                },
+                "breakdown": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "version",
+                    "rootId",
+                    "groups",
+                    "terms"
+                  ],
+                  "properties": {
+                    "version": {
+                      "const": "1.0",
+                      "type": "string"
+                    },
+                    "rootId": {
+                      "minLength": 1,
+                      "maxLength": 256,
+                      "type": "string"
+                    },
+                    "cards": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "deckId",
+                        "deckLabel",
+                        "remaining",
+                        "drawn"
+                      ],
+                      "properties": {
+                        "deckId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "deckLabel": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "remaining": {
+                          "minimum": 0,
+                          "maximum": 200,
+                          "type": "integer"
+                        },
+                        "drawn": {
+                          "minItems": 1,
+                          "maxItems": 10,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "values"
+                            ],
+                            "properties": {
+                              "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 120,
+                                "type": "string"
+                              },
+                              "values": {
+                                "additionalProperties": false,
+                                "maxProperties": 64,
+                                "type": "object",
+                                "patternProperties": {
+                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "groups": {
+                      "maxItems": 256,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "label",
+                          "count",
+                          "sides",
+                          "operation",
+                          "diceIds",
+                          "total"
+                        ],
+                        "properties": {
+                          "id": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "label": {
+                            "minLength": 1,
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "count": {
+                            "minimum": 0,
+                            "maximum": 100,
+                            "type": "integer"
+                          },
+                          "sides": {
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "type": "integer"
+                          },
+                          "dieId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "symbol": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "operation": {
+                            "anyOf": [
+                              {
+                                "const": "sum",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countAtLeast",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countAtMost",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countEqual",
+                                "type": "string"
+                              },
+                              {
+                                "const": "countSymbol",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keepHighest",
+                                "type": "string"
+                              },
+                              {
+                                "const": "keepLowest",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "threshold": {
+                            "type": "integer"
+                          },
+                          "keepCount": {
+                            "minimum": 0,
+                            "maximum": 100,
+                            "type": "integer"
+                          },
+                          "modifiers": {
+                            "maxItems": 2,
+                            "uniqueItems": true,
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "const": "explode",
+                                  "type": "string"
+                                },
+                                {
+                                  "const": "rerollOnce",
+                                  "type": "string"
+                                }
+                              ]
+                            }
+                          },
+                          "diceIds": {
+                            "maxItems": 100,
+                            "type": "array",
+                            "items": {
+                              "minLength": 1,
+                              "maxLength": 256,
+                              "type": "string"
+                            }
+                          },
+                          "total": {
+                            "type": "number"
+                          }
+                        }
+                      }
+                    },
+                    "terms": {
+                      "maxItems": 256,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "operation",
+                          "operandIds",
+                          "value"
+                        ],
+                        "properties": {
+                          "id": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "operation": {
+                            "minLength": 1,
+                            "maxLength": 32,
+                            "type": "string"
+                          },
+                          "operandIds": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "minLength": 1,
+                              "maxLength": 256,
+                              "type": "string"
+                            }
+                          },
+                          "value": {
+                            "anyOf": [
+                              {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "number"
+                                  },
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              {
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            ]
+                          },
+                          "groupId": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "symbol": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "reused": {
+                            "const": true,
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "breakdownText": {
+                  "type": "string"
+                },
+                "dice": {
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "sides",
+                      "value",
+                      "kept"
+                    ],
+                    "properties": {
+                      "sides": {
+                        "minimum": 1,
+                        "maximum": 1000,
+                        "type": "integer"
+                      },
+                      "value": {
+                        "type": "number"
+                      },
+                      "faceLabel": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      },
+                      "kept": {
+                        "type": "boolean"
+                      },
+                      "id": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      },
+                      "groupId": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      },
+                      "success": {
+                        "type": "boolean"
+                      },
+                      "rerolledFrom": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      },
+                      "explodedFrom": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "bindings": {},
+                "total": {
+                  "type": "number"
+                },
+                "output": {
+                  "type": "string"
+                },
+                "push": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "version",
+                    "rollId",
+                    "rootRollId",
+                    "parentRollId",
+                    "attempt",
+                    "maxAttempts",
+                    "rerolledDiceIds",
+                    "faceOutcomes"
+                  ],
+                  "properties": {
+                    "version": {
+                      "const": "1.0",
+                      "type": "string"
+                    },
+                    "rollId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "rootRollId": {
+                      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                      "type": "string"
+                    },
+                    "parentRollId": {
+                      "anyOf": [
+                        {
+                          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "attempt": {
+                      "minimum": 0,
+                      "maximum": 10,
+                      "type": "integer"
+                    },
+                    "maxAttempts": {
+                      "minimum": 1,
+                      "maximum": 10,
+                      "type": "integer"
+                    },
+                    "rerolledDiceIds": {
+                      "maxItems": 100,
+                      "uniqueItems": true,
+                      "type": "array",
+                      "items": {
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "type": "string"
+                      }
+                    },
+                    "faceOutcomes": {
+                      "maxItems": 32000,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "groupId",
+                          "face",
+                          "combinedCount",
+                          "rerolledCount"
+                        ],
+                        "properties": {
+                          "groupId": {
+                            "minLength": 1,
+                            "maxLength": 256,
+                            "type": "string"
+                          },
+                          "face": {
+                            "minimum": 1,
+                            "maximum": 1000,
+                            "type": "integer"
+                          },
+                          "combinedCount": {
+                            "minimum": 0,
+                            "maximum": 100,
+                            "type": "integer"
+                          },
+                          "rerolledCount": {
+                            "minimum": 0,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "occurredAt": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              }
             }
           },
           "templates": {
@@ -19779,6 +21568,15 @@
                     }
                   ]
                 },
+                "quantityFields": {
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  }
+                },
                 "description": {
                   "maxLength": 2000,
                   "type": "string"
@@ -20003,6 +21801,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -20060,6 +21862,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -20113,6 +21919,10 @@
                           },
                           "step": {
                             "type": "number"
+                          },
+                          "maxExpressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           },
                           "resetTo": {
                             "anyOf": [
@@ -20220,6 +22030,77 @@
                           "outputTemplate"
                         ],
                         "properties": {
+                          "target": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "entityId"
+                            ],
+                            "properties": {
+                              "entityId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "respondsTo": {
+                            "const": true,
+                            "type": "boolean"
+                          },
+                          "outcomes": {
+                            "maxItems": 16,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "label",
+                                "expressionId"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "expressionId": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "details": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "label",
+                                "expressionId"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "expressionId": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
                           "pushPolicy": {
                             "additionalProperties": false,
                             "type": "object",
@@ -20283,6 +22164,23 @@
                                         "minimum": 1,
                                         "maximum": 1000,
                                         "type": "integer"
+                                      }
+                                    },
+                                    "modifiers": {
+                                      "maxItems": 2,
+                                      "uniqueItems": true,
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "rerollOnce",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "explode",
+                                            "type": "string"
+                                          }
+                                        ]
                                       }
                                     }
                                   }
@@ -22014,24 +23912,14 @@
           "sheets",
           "expressions",
           "actions",
-          "validations"
+          "validations",
+          "templates",
+          "slots"
         ],
         "properties": {
           "schemaVersion": {
-            "anyOf": [
-              {
-                "const": "1.0",
-                "type": "string"
-              },
-              {
-                "const": "1.1",
-                "type": "string"
-              },
-              {
-                "const": "1.2",
-                "type": "string"
-              }
-            ]
+            "const": "2.0",
+            "type": "string"
           },
           "metadata": {
             "additionalProperties": false,
@@ -22350,6 +24238,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -22407,6 +24299,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -22460,6 +24356,10 @@
                           },
                           "step": {
                             "type": "number"
+                          },
+                          "maxExpressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           },
                           "resetTo": {
                             "anyOf": [
@@ -22553,6 +24453,91 @@
               }
             }
           },
+          "dice": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "faces"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "faces": {
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "decks": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "datasetId"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "datasetId": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                }
+              }
+            }
+          },
           "referenceData": {
             "maxItems": 64,
             "type": "array",
@@ -22572,6 +24557,33 @@
                 "label": {
                   "maxLength": 120,
                   "type": "string"
+                },
+                "keyColumn": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "columns": {
+                  "additionalProperties": false,
+                  "maxProperties": 64,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_]{0,63}$": {
+                      "anyOf": [
+                        {
+                          "const": "number",
+                          "type": "string"
+                        },
+                        {
+                          "const": "text",
+                          "type": "string"
+                        },
+                        {
+                          "const": "boolean",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
                 },
                 "records": {
                   "maxItems": 1000,
@@ -22841,6 +24853,10 @@
                     {
                       "const": "validation",
                       "type": "string"
+                    },
+                    {
+                      "const": "outcome",
+                      "type": "string"
                     }
                   ]
                 },
@@ -22901,6 +24917,77 @@
                     "outputTemplate"
                   ],
                   "properties": {
+                    "target": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "entityId"
+                      ],
+                      "properties": {
+                        "entityId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "respondsTo": {
+                      "const": true,
+                      "type": "boolean"
+                    },
+                    "outcomes": {
+                      "maxItems": 16,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "label",
+                          "expressionId"
+                        ],
+                        "properties": {
+                          "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "label": {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "expressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "details": {
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "label",
+                          "expressionId"
+                        ],
+                        "properties": {
+                          "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "label": {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "expressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
                     "pushPolicy": {
                       "additionalProperties": false,
                       "type": "object",
@@ -22964,6 +25051,23 @@
                                   "minimum": 1,
                                   "maximum": 1000,
                                   "type": "integer"
+                                }
+                              },
+                              "modifiers": {
+                                "maxItems": 2,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "const": "rerollOnce",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "explode",
+                                      "type": "string"
+                                    }
+                                  ]
                                 }
                               }
                             }
@@ -23119,6 +25223,68 @@
                       ]
                     }
                   }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "deckId",
+                    "count"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "draw",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "deckId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "count": {
+                      "minimum": 1,
+                      "maximum": 10,
+                      "type": "integer"
+                    }
+                  }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "deckId"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "shuffle",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "deckId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    }
+                  }
                 }
               ]
             }
@@ -23162,6 +25328,10 @@
                   "type": "string"
                 },
                 "targetId": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "targetEntityId": {
                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                   "type": "string"
                 }
@@ -23268,6 +25438,15 @@
                       "type": "string"
                     }
                   ]
+                },
+                "quantityFields": {
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  }
                 },
                 "description": {
                   "maxLength": 2000,
@@ -23493,6 +25672,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -23550,6 +25733,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -23603,6 +25790,10 @@
                           },
                           "step": {
                             "type": "number"
+                          },
+                          "maxExpressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           },
                           "resetTo": {
                             "anyOf": [
@@ -23710,6 +25901,77 @@
                           "outputTemplate"
                         ],
                         "properties": {
+                          "target": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "entityId"
+                            ],
+                            "properties": {
+                              "entityId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "respondsTo": {
+                            "const": true,
+                            "type": "boolean"
+                          },
+                          "outcomes": {
+                            "maxItems": 16,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "label",
+                                "expressionId"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "expressionId": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "details": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "label",
+                                "expressionId"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "expressionId": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
                           "pushPolicy": {
                             "additionalProperties": false,
                             "type": "object",
@@ -23773,6 +26035,23 @@
                                         "minimum": 1,
                                         "maximum": 1000,
                                         "type": "integer"
+                                      }
+                                    },
+                                    "modifiers": {
+                                      "maxItems": 2,
+                                      "uniqueItems": true,
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "rerollOnce",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "explode",
+                                            "type": "string"
+                                          }
+                                        ]
                                       }
                                     }
                                   }
@@ -24014,25 +26293,15 @@
           "expressions",
           "actions",
           "validations",
+          "templates",
+          "slots",
           "effectiveLimits",
           "integrity"
         ],
         "properties": {
           "schemaVersion": {
-            "anyOf": [
-              {
-                "const": "1.0",
-                "type": "string"
-              },
-              {
-                "const": "1.1",
-                "type": "string"
-              },
-              {
-                "const": "1.2",
-                "type": "string"
-              }
-            ]
+            "const": "2.0",
+            "type": "string"
           },
           "systemId": {
             "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -24351,6 +26620,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -24408,6 +26681,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -24461,6 +26738,10 @@
                           },
                           "step": {
                             "type": "number"
+                          },
+                          "maxExpressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           },
                           "resetTo": {
                             "anyOf": [
@@ -24554,6 +26835,91 @@
               }
             }
           },
+          "dice": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "faces"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "minLength": 1,
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "faces": {
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "value"
+                    ],
+                    "properties": {
+                      "value": {
+                        "type": "number"
+                      },
+                      "label": {
+                        "minLength": 1,
+                        "maxLength": 120,
+                        "type": "string"
+                      },
+                      "symbols": {
+                        "maxProperties": 16,
+                        "additionalProperties": false,
+                        "type": "object",
+                        "patternProperties": {
+                          "^[a-z][a-z0-9_]{0,63}$": {
+                            "minimum": 1,
+                            "maximum": 100,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "decks": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "datasetId"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "datasetId": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                }
+              }
+            }
+          },
           "referenceData": {
             "maxItems": 64,
             "type": "array",
@@ -24573,6 +26939,33 @@
                 "label": {
                   "maxLength": 120,
                   "type": "string"
+                },
+                "keyColumn": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "columns": {
+                  "additionalProperties": false,
+                  "maxProperties": 64,
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_]{0,63}$": {
+                      "anyOf": [
+                        {
+                          "const": "number",
+                          "type": "string"
+                        },
+                        {
+                          "const": "text",
+                          "type": "string"
+                        },
+                        {
+                          "const": "boolean",
+                          "type": "string"
+                        }
+                      ]
+                    }
+                  }
                 },
                 "records": {
                   "maxItems": 1000,
@@ -24819,6 +27212,7 @@
               "type": "object",
               "required": [
                 "id",
+                "languageVersion",
                 "context",
                 "resultType",
                 "inferredType",
@@ -24833,7 +27227,7 @@
                   "type": "string"
                 },
                 "languageVersion": {
-                  "const": "0.2",
+                  "const": "1.0",
                   "type": "string"
                 },
                 "context": {
@@ -24848,6 +27242,10 @@
                     },
                     {
                       "const": "validation",
+                      "type": "string"
+                    },
+                    {
+                      "const": "outcome",
                       "type": "string"
                     }
                   ]
@@ -24936,6 +27334,77 @@
                     "outputTemplate"
                   ],
                   "properties": {
+                    "target": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "entityId"
+                      ],
+                      "properties": {
+                        "entityId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "respondsTo": {
+                      "const": true,
+                      "type": "boolean"
+                    },
+                    "outcomes": {
+                      "maxItems": 16,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "label",
+                          "expressionId"
+                        ],
+                        "properties": {
+                          "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "label": {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "expressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "details": {
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "label",
+                          "expressionId"
+                        ],
+                        "properties": {
+                          "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "label": {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "expressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
                     "pushPolicy": {
                       "additionalProperties": false,
                       "type": "object",
@@ -24999,6 +27468,23 @@
                                   "minimum": 1,
                                   "maximum": 1000,
                                   "type": "integer"
+                                }
+                              },
+                              "modifiers": {
+                                "maxItems": 2,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "anyOf": [
+                                    {
+                                      "const": "rerollOnce",
+                                      "type": "string"
+                                    },
+                                    {
+                                      "const": "explode",
+                                      "type": "string"
+                                    }
+                                  ]
                                 }
                               }
                             }
@@ -25154,6 +27640,68 @@
                       ]
                     }
                   }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "deckId",
+                    "count"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "draw",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "deckId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "count": {
+                      "minimum": 1,
+                      "maximum": 10,
+                      "type": "integer"
+                    }
+                  }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "deckId"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "shuffle",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "deckId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    }
+                  }
                 }
               ]
             }
@@ -25197,6 +27745,10 @@
                   "type": "string"
                 },
                 "targetId": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "targetEntityId": {
                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                   "type": "string"
                 }
@@ -25303,6 +27855,15 @@
                       "type": "string"
                     }
                   ]
+                },
+                "quantityFields": {
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "type": "array",
+                  "items": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  }
                 },
                 "description": {
                   "maxLength": 2000,
@@ -25528,6 +28089,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -25585,6 +28150,10 @@
                                 }
                               }
                             }
+                          },
+                          "optionsFrom": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           }
                         }
                       },
@@ -25638,6 +28207,10 @@
                           },
                           "step": {
                             "type": "number"
+                          },
+                          "maxExpressionId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
                           },
                           "resetTo": {
                             "anyOf": [
@@ -25745,6 +28318,77 @@
                           "outputTemplate"
                         ],
                         "properties": {
+                          "target": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "entityId"
+                            ],
+                            "properties": {
+                              "entityId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "respondsTo": {
+                            "const": true,
+                            "type": "boolean"
+                          },
+                          "outcomes": {
+                            "maxItems": 16,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "label",
+                                "expressionId"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "expressionId": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "details": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "label",
+                                "expressionId"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "expressionId": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
                           "pushPolicy": {
                             "additionalProperties": false,
                             "type": "object",
@@ -25808,6 +28452,23 @@
                                         "minimum": 1,
                                         "maximum": 1000,
                                         "type": "integer"
+                                      }
+                                    },
+                                    "modifiers": {
+                                      "maxItems": 2,
+                                      "uniqueItems": true,
+                                      "type": "array",
+                                      "items": {
+                                        "anyOf": [
+                                          {
+                                            "const": "rerollOnce",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "explode",
+                                            "type": "string"
+                                          }
+                                        ]
                                       }
                                     }
                                   }
@@ -26036,6 +28697,7 @@
               "expressionBytes",
               "expressionAstNodes",
               "expressionAstDepth",
+              "sheetEvaluationNodes",
               "dicePerRoll",
               "sidesPerDie"
             ],
@@ -26053,6 +28715,11 @@
               "expressionAstDepth": {
                 "minimum": 1,
                 "maximum": 32,
+                "type": "integer"
+              },
+              "sheetEvaluationNodes": {
+                "minimum": 1,
+                "maximum": 8192,
                 "type": "integer"
               },
               "dicePerRoll": {
@@ -26157,12 +28824,40 @@
                   {
                     "const": "inputs",
                     "type": "string"
+                  },
+                  {
+                    "const": "item",
+                    "type": "string"
+                  },
+                  {
+                    "const": "roll",
+                    "type": "string"
+                  },
+                  {
+                    "const": "target",
+                    "type": "string"
+                  },
+                  {
+                    "const": "opposed",
+                    "type": "string"
                   }
                 ]
               },
               "id": {
                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                 "type": "string"
+              },
+              "part": {
+                "anyOf": [
+                  {
+                    "const": "current",
+                    "type": "string"
+                  },
+                  {
+                    "const": "max",
+                    "type": "string"
+                  }
+                ]
               }
             }
           },
@@ -26226,6 +28921,10 @@
                   },
                   {
                     "const": "/",
+                    "type": "string"
+                  },
+                  {
+                    "const": "%",
                     "type": "string"
                   },
                   {
@@ -26296,11 +28995,59 @@
                   {
                     "const": "round",
                     "type": "string"
+                  },
+                  {
+                    "const": "floor",
+                    "type": "string"
+                  },
+                  {
+                    "const": "ceil",
+                    "type": "string"
+                  },
+                  {
+                    "const": "abs",
+                    "type": "string"
+                  },
+                  {
+                    "const": "if",
+                    "type": "string"
+                  },
+                  {
+                    "const": "has",
+                    "type": "string"
+                  },
+                  {
+                    "const": "lookup",
+                    "type": "string"
+                  },
+                  {
+                    "const": "lookupBand",
+                    "type": "string"
+                  },
+                  {
+                    "const": "sum",
+                    "type": "string"
+                  },
+                  {
+                    "const": "count",
+                    "type": "string"
+                  },
+                  {
+                    "const": "sumWhere",
+                    "type": "string"
+                  },
+                  {
+                    "const": "countWhere",
+                    "type": "string"
+                  },
+                  {
+                    "const": "maxOf",
+                    "type": "string"
                   }
                 ]
               },
               "arguments": {
-                "maxItems": 2,
+                "maxItems": 8,
                 "type": "array",
                 "items": {
                   "$ref": "#/components/schemas/ExpressionAst"
@@ -26329,13 +29076,78 @@
             "type": "object",
             "required": [
               "kind",
-              "count",
-              "sides"
+              "source",
+              "modifiers"
             ],
             "properties": {
               "kind": {
-                "const": "dice",
+                "const": "pool",
                 "type": "string"
+              },
+              "source": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "count",
+                      "sides"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "dice",
+                        "type": "string"
+                      },
+                      "count": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      },
+                      "sides": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      }
+                    }
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "count",
+                      "dieId"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "custom",
+                        "type": "string"
+                      },
+                      "count": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      },
+                      "dieId": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "groupId"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "rolled",
+                        "type": "string"
+                      },
+                      "groupId": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      }
+                    }
+                  }
+                ]
               },
               "group": {
                 "additionalProperties": false,
@@ -26356,70 +29168,105 @@
                   }
                 }
               },
-              "count": {
-                "$ref": "#/components/schemas/ExpressionAst"
+              "modifiers": {
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "kind"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "explode",
+                          "type": "string"
+                        },
+                        "face": {
+                          "$ref": "#/components/schemas/ExpressionAst"
+                        }
+                      }
+                    },
+                    {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "kind",
+                        "face"
+                      ],
+                      "properties": {
+                        "kind": {
+                          "const": "rerollOnce",
+                          "type": "string"
+                        },
+                        "face": {
+                          "$ref": "#/components/schemas/ExpressionAst"
+                        }
+                      }
+                    }
+                  ]
+                }
               },
-              "sides": {
-                "minimum": 1,
-                "maximum": 1000,
-                "type": "integer"
-              }
-            }
-          },
-          {
-            "additionalProperties": false,
-            "type": "object",
-            "required": [
-              "kind",
-              "mode",
-              "count",
-              "dice"
-            ],
-            "properties": {
-              "kind": {
-                "const": "keep",
-                "type": "string"
-              },
-              "mode": {
+              "reducer": {
                 "anyOf": [
                   {
-                    "const": "highest",
-                    "type": "string"
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "amount"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "const": "keepHighest",
+                            "type": "string"
+                          },
+                          {
+                            "const": "keepLowest",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countAtLeast",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countAtMost",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countEqual",
+                            "type": "string"
+                          }
+                        ]
+                      },
+                      "amount": {
+                        "$ref": "#/components/schemas/ExpressionAst"
+                      }
+                    }
                   },
                   {
-                    "const": "lowest",
-                    "type": "string"
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "kind",
+                      "symbol"
+                    ],
+                    "properties": {
+                      "kind": {
+                        "const": "countSymbol",
+                        "type": "string"
+                      },
+                      "symbol": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      }
+                    }
                   }
                 ]
-              },
-              "count": {
-                "minimum": 1,
-                "maximum": 100,
-                "type": "integer"
-              },
-              "dice": {
-                "$ref": "#/components/schemas/ExpressionAst"
-              }
-            }
-          },
-          {
-            "additionalProperties": false,
-            "type": "object",
-            "required": [
-              "kind",
-              "dice",
-              "threshold"
-            ],
-            "properties": {
-              "kind": {
-                "const": "successCount",
-                "type": "string"
-              },
-              "dice": {
-                "$ref": "#/components/schemas/ExpressionAst"
-              },
-              "threshold": {
-                "type": "integer"
               }
             }
           }

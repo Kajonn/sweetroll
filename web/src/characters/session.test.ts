@@ -2568,6 +2568,44 @@ describe("ordered resource estimates", () => {
     await store.close();
   });
 
+  it("estimates amounts and direct input in order, stopping at the pending maximum", async () => {
+    const { session, store } = await offlineHarnessWith([
+      { resourceId: "health", label: "Health", current: 6, min: 0, max: 10, step: 1 },
+    ]);
+    await session.adjustResource("health", -17);
+    expect(session.getSnapshot().tentative).toEqual({ health: 0 });
+    await session.setResource("health", { max: 4 });
+    await session.adjustResource("health", 9);
+    // Damage stops at the minimum; healing stops at the pending maximum of 4.
+    expect(session.getSnapshot().tentative).toEqual({ health: 4, "health.max": 4 });
+    await session.setResource("health", { current: 2 });
+    expect(session.getSnapshot().tentative).toEqual({ health: 2, "health.max": 4 });
+    session.dispose();
+    await store.close();
+  });
+
+  it("sends queued amounts and direct input to their own routes", async () => {
+    const harness = await makeHarness();
+    await seedConfirmed(harness.store, "char-1", resourceView("char-1", 1, [
+      { resourceId: "health", label: "Health", current: 6, min: 0, max: 10, step: 1 },
+    ]));
+    harness.api.scriptOpenView(viewFor("char-1", 1));
+    harness.api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+    harness.api.scriptSend(async () => successEnvelope(viewFor("char-1", 3)));
+    await harness.session.open();
+    await harness.session.adjustResource("health", -3);
+    await harness.session.whenIdle();
+    await harness.session.setResource("health", { max: 8 });
+    await harness.session.whenIdle();
+    expect(harness.api.sent.map((request) => [request.path, request.body])).toEqual([
+      ["/characters/char-1/resources/health/adjust", expect.objectContaining({ delta: -3, expectedRevision: 1 })],
+      ["/characters/char-1/resources/health/set", expect.objectContaining({ max: 8, expectedRevision: 2 })],
+    ]);
+    expect(harness.api.sent[1]?.body).not.toHaveProperty("current");
+    harness.session.dispose();
+    await harness.store.close();
+  });
+
   it("mixes field sets with resource estimates and derives no value from action intentions", async () => {
     const harness = await offlineHarnessWith([
       { resourceId: "health", label: "Health", current: 1, min: 0, max: 10, step: 2 },

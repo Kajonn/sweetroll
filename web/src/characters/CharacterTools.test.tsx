@@ -72,7 +72,7 @@ function makeApi(overrides: Partial<CharactersApi> = {}): CharactersApi {
       systemVersionId: "11111111-1111-4000-8000-000000000000",
       packageChecksum: "abc",
       revision: 3,
-      state: { schemaVersion: "1.0", values: {} },
+      state: { schemaVersion: "1.0", entries: {}, values: {} },
     })),
     ...overrides,
   } as unknown as CharactersApi;
@@ -142,7 +142,7 @@ describe("CharacterTools", () => {
       systemVersionId: "11111111-1111-4000-8000-000000000000",
       packageChecksum: "abc",
       revision: 3,
-      state: { schemaVersion: "1.0", values: { name: "Aria" } },
+      state: { schemaVersion: "1.0", entries: {}, values: { name: "Aria" } },
     } as unknown as CharacterExport;
     const api = makeApi({ export: vi.fn(async () => document) });
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {});
@@ -490,7 +490,7 @@ describe("CharacterTools", () => {
       systemVersionId: "11111111-1111-4000-8000-000000000000",
       packageChecksum: "abc",
       revision: 3,
-      state: { schemaVersion: "1.0", values: { name: "Aria" } },
+      state: { schemaVersion: "1.0", entries: {}, values: { name: "Aria" } },
     } as unknown as CharacterExport;
     const api = makeApi({ export: vi.fn(async () => serverDocument) });
     let capturedParts: BlobPart[] | null = null;

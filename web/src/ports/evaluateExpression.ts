@@ -1,5 +1,6 @@
 import {
   compileExpression,
+  containsDice,
   evaluate,
   renderExpression,
   type CompiledExpressionV1,
@@ -11,22 +12,28 @@ import {
   type DieResult as SharedDieResult,
   type ScalarValue,
   type ValueType,
+  type BindingValue,
+  type FieldBindingType,
+  type ExpressionCompileEnv,
 } from "@sweetroll/rules";
 
-export type { ScalarValue, ValueType };
+export type { ScalarValue, ValueType, BindingValue, FieldBindingType };
 
-export type ExpressionEnv = {
-  fields: Record<string, ValueType>;
-  inputs: Record<string, ValueType>;
-};
+export type ExpressionEnv = ExpressionCompileEnv;
 
 export type EvaluateExpressionInput = {
   source: string;
   env: ExpressionEnv;
   resultType: ValueType;
   fallback: ScalarValue;
-  bindings: Record<string, ScalarValue>;
+  bindings: Record<string, BindingValue>;
+  fieldBindings?: Record<string, BindingValue>;
+  itemBindings?: Record<string, BindingValue>;
+  targetBindings?: Record<string, BindingValue>;
+  opposedBindings?: Record<string, BindingValue>;
   rng?: Rng;
+  /** Where the expression is used. Computed fields and validations may be text or boolean; rolls must be numbers. */
+  context?: "computed" | "roll" | "validation";
 };
 
 export type EvaluateDiagnostic = { code: string; path: string; message: string };
@@ -37,10 +44,10 @@ export type DieResult = SharedDieResult;
 type EvaluateExpressionBindings = EvaluationBindings;
 
 function pickBindings(
-  all: Record<string, ScalarValue>,
-  scope: Record<string, ValueType>,
-): Record<string, ScalarValue> {
-  const picked: Record<string, ScalarValue> = {};
+  all: Record<string, BindingValue>,
+  scope: Record<string, FieldBindingType>,
+): Record<string, BindingValue> {
+  const picked: Record<string, BindingValue> = {};
   for (const id of Object.keys(all)) {
     if (Object.prototype.hasOwnProperty.call(scope, id)) picked[id] = all[id]!;
   }
@@ -62,8 +69,8 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
   const compiled = compileExpression(input.source, {
     env: input.env,
     resultType: input.resultType,
-    context: "roll",
-    languageVersion: "0.2",
+    context: input.context ?? "roll",
+
     fallback: input.fallback,
   });
   if (!compiled.ok) {
@@ -71,8 +78,14 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
   }
   const body = compiled.value;
   const scopedBindings: EvaluateExpressionBindings = {
-    fields: pickBindings(input.bindings, input.env.fields),
+    fields: pickBindings(input.fieldBindings ?? input.bindings, input.env.fields),
     inputs: pickBindings(input.bindings, input.env.inputs),
+    ...(input.env.item === undefined ? {} : { item: pickBindings(input.itemBindings ?? {}, input.env.item) }),
+    ...(input.env.target === undefined ? {} : { target: pickBindings(input.targetBindings ?? {}, input.env.target) }),
+    ...(input.env.opposed === undefined ? {} : { opposed: pickBindings(input.opposedBindings ?? {}, input.env.opposed) }),
+    ...(input.env.dice === undefined ? {} : { dice: input.env.dice }),
+    ...(input.env.datasets === undefined ? {} : { datasets: input.env.datasets }),
+    ...(input.env.slots === undefined ? {} : { slotEntries: () => [] }),
   };
   const evaluated: EvalResult = evaluate(
     { id: "try_it", ...body } as CompiledExpressionV1,
@@ -98,27 +111,29 @@ export function evaluateExpression(input: EvaluateExpressionInput): EvaluateExpr
 /** A flat dice sum only explains additive rolls; count/scale/negation need their own breakdown. */
 export function additiveRollModifier(result: EvaluateExpressionResult): number | null {
   if (!result.ok || result.roll === null || result.diagnostics.length > 0) return null;
-  function diceFree(ast: ExpressionAstV1): boolean {
-    switch (ast.kind) {
-      case "dice": case "keep": case "successCount": return false;
-      case "binary": return diceFree(ast.left) && diceFree(ast.right);
-      case "unary": return diceFree(ast.operand);
-      case "call": return ast.arguments.every(diceFree);
-      default: return true;
-    }
-  }
   function additive(ast: ExpressionAstV1): boolean {
-    if (diceFree(ast)) return true;
+    if (!containsDice(ast)) return true;
     switch (ast.kind) {
-      case "dice": return diceFree(ast.count);
-      case "keep": return ast.dice.kind === "dice" && diceFree(ast.dice.count);
+      case "pool":
+        return ast.source.kind !== "rolled" && (!ast.reducer || ast.reducer.kind === "keepHighest" || ast.reducer.kind === "keepLowest");
       case "binary": return ast.operator === "+"
         ? additive(ast.left) && additive(ast.right)
-        : ast.operator === "-" && additive(ast.left) && diceFree(ast.right);
+        : ast.operator === "-" && additive(ast.left) && !containsDice(ast.right);
       default: return false;
     }
   }
   return additive(result.ast)
     ? result.roll.total - result.roll.dice.reduce((sum, die) => die.kept ? sum + die.value : sum, 0)
     : null;
+}
+
+/**
+ * Output text for creator previews. The total is real; outcome, detail and
+ * value placeholders are shown as an ellipsis because previews roll sample
+ * dice without evaluating a sheet's outcomes.
+ */
+export function previewOutput(template: string, total: number): string {
+  return template
+    .replace(/\{total\}/g, String(total))
+    .replace(/\{[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*\}/g, "…");
 }

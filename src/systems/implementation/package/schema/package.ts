@@ -4,6 +4,7 @@ import { CustomDieSchema } from "./dice.js";
 import { PACKAGE_LIMITS } from "../limits.js";
 import {
   ActionV1Schema,
+  DeckV1Schema,
   EntityDefinitionV1Schema,
   ReferenceDataV1Schema,
   SheetV1Schema,
@@ -49,6 +50,7 @@ export const SystemPackageV1Schema = Type.Object(
     ...SystemMetadataV1Schema.properties,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
     dice: Type.Optional(Type.Array(CustomDieSchema, { maxItems: PACKAGE_LIMITS.customDice })),
+    decks: Type.Optional(Type.Array(DeckV1Schema, { maxItems: PACKAGE_LIMITS.decks })),
     referenceData: Type.Array(ReferenceDataV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceDataSets,
     }),

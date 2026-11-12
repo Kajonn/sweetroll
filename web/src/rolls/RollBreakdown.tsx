@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Disclosure } from "../ui/Disclosure.js";
-import { formatDieFace, type RollBreakdown as Breakdown, type DieResult, type PushResult } from "@sweetroll/rules";
+import { formatCard, formatDieFace, type RollBreakdown as Breakdown, type DieResult, type PushResult } from "@sweetroll/rules";
 import { t } from "../i18n/index.js";
 
 /** One shared view for authoritative results, history, GM and non-factual previews. */
@@ -19,6 +19,18 @@ export function RollBreakdown({
 }) {
   const b = roll.breakdown;
   if (b === undefined || b.version !== "1.0") return null;
+  if (b.cards) {
+    // Design 6.4: a draw shows each card's label and columns instead of dice.
+    return (
+      <section aria-label={t("roll.cards.title", { deck: b.cards.deckLabel })} data-testid="roll-cards" style={{ overflowWrap: "anywhere", minWidth: 0 }}>
+        <ol>
+          {b.cards.drawn.map(card => <li key={card.id} data-testid={`roll-card-${card.id}`}>{formatCard(card)}</li>)}
+        </ol>
+        <p>{t("roll.cards.remaining", { deck: b.cards.deckLabel, count: String(b.cards.remaining) })}</p>
+        {children}
+      </section>
+    );
+  }
   const contextual = new Map(roll.bindings?.filter(binding => binding.scope === "target" || binding.scope === "opposed")
     .map(binding => [`${binding.scope}.${binding.definitionId}`, binding.value]));
   const terms = new Map(b.terms.map((term) => [term.id, term]));

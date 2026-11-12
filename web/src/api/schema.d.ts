@@ -612,6 +612,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/characters/{characterId}/decks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_decks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/characters/{characterId}/actions/{actionId}/roll-options": {
         parameters: {
             query?: never;
@@ -7927,7 +7943,12 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump";
+                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            deck?: {
+                                                deckId: string;
+                                                label: string;
+                                                count?: number;
+                                            };
                                             target?: {
                                                 entityId: string;
                                             };
@@ -8854,7 +8875,12 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump";
+                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            deck?: {
+                                                deckId: string;
+                                                label: string;
+                                                count?: number;
+                                            };
                                             target?: {
                                                 entityId: string;
                                             };
@@ -9348,7 +9374,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -9500,6 +9531,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -10017,7 +10060,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -10169,6 +10217,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -10686,7 +10746,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -10838,6 +10903,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -11355,7 +11432,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -11507,6 +11589,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -12025,7 +12119,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -12177,6 +12276,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -12242,6 +12353,242 @@ export interface operations {
                                 output: string;
                             } | null;
                         };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId_decks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        decks: {
+                            deckId: string;
+                            label: string;
+                            total: number;
+                            remaining: number;
+                        }[];
                         requestId: string;
                     };
                 };
@@ -12740,6 +13087,18 @@ export interface operations {
                                 /** @constant */
                                 version: "1.0";
                                 rootId: string;
+                                cards?: {
+                                    deckId: string;
+                                    deckLabel: string;
+                                    remaining: number;
+                                    drawn: {
+                                        id: string;
+                                        label: string;
+                                        values: {
+                                            [key: string]: string | number | boolean | null;
+                                        };
+                                    }[];
+                                };
                                 groups: {
                                     id: string;
                                     label: string;
@@ -13489,7 +13848,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -13641,6 +14005,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -14174,7 +14550,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -14326,6 +14707,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -14869,7 +15262,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -15021,6 +15419,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -15537,7 +15947,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -15689,6 +16104,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -16209,7 +16636,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -16361,6 +16793,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -17173,7 +17617,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -17325,6 +17774,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -18375,7 +18836,12 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump";
+                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
                                                 target?: {
                                                     entityId: string;
                                                 };
@@ -18527,6 +18993,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -19040,7 +19518,12 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump";
+                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            deck?: {
+                                                deckId: string;
+                                                label: string;
+                                                count?: number;
+                                            };
                                             target?: {
                                                 entityId: string;
                                             };
@@ -19426,6 +19909,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;
@@ -27491,7 +27986,12 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump";
+                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            deck?: {
+                                                deckId: string;
+                                                label: string;
+                                                count?: number;
+                                            };
                                             target?: {
                                                 entityId: string;
                                             };
@@ -28063,7 +28563,12 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump";
+                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            deck?: {
+                                                deckId: string;
+                                                label: string;
+                                                count?: number;
+                                            };
                                             target?: {
                                                 entityId: string;
                                             };
@@ -28539,7 +29044,12 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump";
+                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            deck?: {
+                                                deckId: string;
+                                                label: string;
+                                                count?: number;
+                                            };
                                             target?: {
                                                 entityId: string;
                                             };
@@ -29017,7 +29527,12 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump";
+                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            deck?: {
+                                                deckId: string;
+                                                label: string;
+                                                count?: number;
+                                            };
                                             target?: {
                                                 entityId: string;
                                             };
@@ -30700,6 +31215,18 @@ export interface operations {
                                     /** @constant */
                                     version: "1.0";
                                     rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
                                     groups: {
                                         id: string;
                                         label: string;

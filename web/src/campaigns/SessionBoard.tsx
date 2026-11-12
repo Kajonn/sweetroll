@@ -227,7 +227,14 @@ function SessionRollRow(props: {
       // uncertain-outcome text (malformed_response discipline).
       const raw = (response.result as { roll?: unknown }).roll ?? response.result;
       if (mountedRef.current) {
-        if (typeof raw === "string" || typeof raw === "number") {
+        if (props.element.actionKind === "shuffle") {
+          setLastRoll(null);
+          setResultText(t("campaign.detail.session.deck.shuffled", { deck: props.element.deck?.label ?? props.element.label }));
+        } else if (props.element.actionKind === "draw" && response.result.roll) {
+          setResultText(response.result.roll.output);
+          setLastRoll(response.result.roll);
+          props.onRollResult?.(response.result.roll);
+        } else if (typeof raw === "string" || typeof raw === "number") {
           setResultText(String(raw));
         } else if (raw !== null && typeof raw === "object" &&
           typeof (raw as { total?: unknown }).total === "number") {
@@ -290,7 +297,7 @@ function SessionRollRow(props: {
         disabled={controlsDisabled || !hasRollSelection(props.element, selection)}
         onClick={() => void execute()}
       >
-        {t("campaign.detail.session.roll.execute", { label: props.element.label })}
+        {props.element.deck ? props.element.label : t("campaign.detail.session.roll.execute", { label: props.element.label })}
       </Button>
       {lastRoll===null||lastRoll.push?null:<RollBreakdown roll={lastRoll}/>}
       {resultText !== null ? <p role="status">{resultText}</p> : null}

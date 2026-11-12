@@ -4470,6 +4470,76 @@
         }
       }
     },
+    "/characters/{characterId}/decks": {
+      "get": {
+        "operationId": "listCharacterDecks",
+        "description": "List the card decks of the character's system with the cards left. A campaign character reads the campaign's shared decks.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterDecks"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
     "/characters/{characterId}/actions/{actionId}/roll-options": {
       "get": {
         "operationId": "listCharacterRollOptions",
@@ -16276,6 +16346,78 @@
                         "maxLength": 256,
                         "type": "string"
                       },
+                      "cards": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "deckId",
+                          "deckLabel",
+                          "remaining",
+                          "drawn"
+                        ],
+                        "properties": {
+                          "deckId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "deckLabel": {
+                            "maxLength": 120,
+                            "type": "string"
+                          },
+                          "remaining": {
+                            "minimum": 0,
+                            "maximum": 200,
+                            "type": "integer"
+                          },
+                          "drawn": {
+                            "minItems": 1,
+                            "maxItems": 10,
+                            "type": "array",
+                            "items": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "id",
+                                "label",
+                                "values"
+                              ],
+                              "properties": {
+                                "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "values": {
+                                  "additionalProperties": false,
+                                  "maxProperties": 64,
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[a-z][a-z0-9_]{0,63}$": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "boolean"
+                                        },
+                                        {
+                                          "type": "null"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
                       "groups": {
                         "maxItems": 256,
                         "type": "array",
@@ -16867,6 +17009,78 @@
                 "maxLength": 256,
                 "type": "string"
               },
+              "cards": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "deckId",
+                  "deckLabel",
+                  "remaining",
+                  "drawn"
+                ],
+                "properties": {
+                  "deckId": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  },
+                  "deckLabel": {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  "remaining": {
+                    "minimum": 0,
+                    "maximum": 200,
+                    "type": "integer"
+                  },
+                  "drawn": {
+                    "minItems": 1,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "label",
+                        "values"
+                      ],
+                      "properties": {
+                        "id": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "values": {
+                          "additionalProperties": false,
+                          "maxProperties": 64,
+                          "type": "object",
+                          "patternProperties": {
+                            "^[a-z][a-z0-9_]{0,63}$": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
               "groups": {
                 "maxItems": 256,
                 "type": "array",
@@ -17201,6 +17415,46 @@
                 },
                 "output": {
                   "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "CharacterDecks": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "decks"
+        ],
+        "properties": {
+          "decks": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "deckId",
+                "label",
+                "total",
+                "remaining"
+              ],
+              "properties": {
+                "deckId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "total": {
+                  "minimum": 1,
+                  "maximum": 200,
+                  "type": "integer"
+                },
+                "remaining": {
+                  "minimum": 0,
+                  "maximum": 200,
+                  "type": "integer"
                 }
               }
             }
@@ -18234,6 +18488,78 @@
                           "minLength": 1,
                           "maxLength": 256,
                           "type": "string"
+                        },
+                        "cards": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "deckId",
+                            "deckLabel",
+                            "remaining",
+                            "drawn"
+                          ],
+                          "properties": {
+                            "deckId": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
+                            "deckLabel": {
+                              "maxLength": 120,
+                              "type": "string"
+                            },
+                            "remaining": {
+                              "minimum": 0,
+                              "maximum": 200,
+                              "type": "integer"
+                            },
+                            "drawn": {
+                              "minItems": 1,
+                              "maxItems": 10,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "id",
+                                  "label",
+                                  "values"
+                                ],
+                                "properties": {
+                                  "id": {
+                                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                    "type": "string"
+                                  },
+                                  "label": {
+                                    "maxLength": 120,
+                                    "type": "string"
+                                  },
+                                  "values": {
+                                    "additionalProperties": false,
+                                    "maxProperties": 64,
+                                    "type": "object",
+                                    "patternProperties": {
+                                      "^[a-z][a-z0-9_]{0,63}$": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string"
+                                          },
+                                          {
+                                            "type": "number"
+                                          },
+                                          {
+                                            "type": "boolean"
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
                         },
                         "groups": {
                           "maxItems": 256,
@@ -19571,6 +19897,78 @@
                       "minLength": 1,
                       "maxLength": 256,
                       "type": "string"
+                    },
+                    "cards": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "deckId",
+                        "deckLabel",
+                        "remaining",
+                        "drawn"
+                      ],
+                      "properties": {
+                        "deckId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "deckLabel": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "remaining": {
+                          "minimum": 0,
+                          "maximum": 200,
+                          "type": "integer"
+                        },
+                        "drawn": {
+                          "minItems": 1,
+                          "maxItems": 10,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "values"
+                            ],
+                            "properties": {
+                              "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 120,
+                                "type": "string"
+                              },
+                              "values": {
+                                "additionalProperties": false,
+                                "maxProperties": 64,
+                                "type": "object",
+                                "patternProperties": {
+                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string"
+                                      },
+                                      {
+                                        "type": "number"
+                                      },
+                                      {
+                                        "type": "boolean"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
                     },
                     "groups": {
                       "maxItems": 256,
@@ -24113,6 +24511,33 @@
               }
             }
           },
+          "decks": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "datasetId"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "datasetId": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                }
+              }
+            }
+          },
           "referenceData": {
             "maxItems": 64,
             "type": "array",
@@ -24796,6 +25221,68 @@
                           }
                         }
                       ]
+                    }
+                  }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "deckId",
+                    "count"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "draw",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "deckId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "count": {
+                      "minimum": 1,
+                      "maximum": 10,
+                      "type": "integer"
+                    }
+                  }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "deckId"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "shuffle",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "deckId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
                     }
                   }
                 }
@@ -26406,6 +26893,33 @@
               }
             }
           },
+          "decks": {
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "id",
+                "label",
+                "datasetId"
+              ],
+              "properties": {
+                "id": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
+                "label": {
+                  "maxLength": 120,
+                  "type": "string"
+                },
+                "datasetId": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                }
+              }
+            }
+          },
           "referenceData": {
             "maxItems": 64,
             "type": "array",
@@ -27124,6 +27638,68 @@
                           }
                         }
                       ]
+                    }
+                  }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "deckId",
+                    "count"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "draw",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "deckId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "count": {
+                      "minimum": 1,
+                      "maximum": 10,
+                      "type": "integer"
+                    }
+                  }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "deckId"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "shuffle",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "deckId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
                     }
                   }
                 }

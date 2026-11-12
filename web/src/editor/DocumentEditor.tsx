@@ -31,6 +31,7 @@ import type { SheetEditorV1 } from "./sheet/sheetTypes.js";
 import { collectUsedIds, nextScopedId, readSlots } from "./sheet/slotTypes.js";
 import type { OutcomeExpressions } from "./actions/RollOutcomesEditor.js";
 import { CustomDiceEditor } from "./actions/CustomDiceEditor.js";
+import { DeckActionEditor, DeckEditor, type DeckActionV1 } from "./actions/DeckEditor.js";
 import { TemplatesTab } from "./TemplatesTab.js";
 import { useDraftSync } from "../state/draftSync.js";
 import {
@@ -957,7 +958,7 @@ function DiceTab({
   document: SystemDocumentV1;
   dispatch: React.Dispatch<DocumentAction>;
 }) {
-  const actions = (document.actions as unknown as Array<RollActionV1 | ResourceBumpActionV1>) ?? [];
+  const actions = (document.actions as unknown as Array<RollActionV1 | ResourceBumpActionV1 | DeckActionV1>) ?? [];
   const expressions = (document.expressions as unknown as Array<{
     id: string;
     source: string;
@@ -965,7 +966,16 @@ function DiceTab({
     fallback: unknown;
     context: string;
   }>) ?? [];
+  const decks = document.decks ?? [];
 
+  const addDeckAction = (kind: DeckActionV1["kind"]) => {
+    const base = { id: nextActionId(actions.map((a) => a.id)), label: t(`editor.actions.kind.${kind}`), deckId: decks[0]?.id ?? "" };
+    const next: DeckActionV1 = kind === "draw" ? { kind, ...base, count: 1 } : { kind, ...base };
+    dispatch({
+      type: "setActions",
+      actions: [...actions, next as unknown as SystemDocumentV1["actions"][number]],
+    });
+  };
   const addRoll = () => {
     const expressionId = nextExpressionId(expressions.map((e) => e.id));
     dispatch({
@@ -1006,7 +1016,7 @@ function DiceTab({
       actions: [...actions, next as unknown as SystemDocumentV1["actions"][number]],
     });
   };
-  const replaceAction = (idx: number, action: RollActionV1 | ResourceBumpActionV1) => {
+  const replaceAction = (idx: number, action: RollActionV1 | ResourceBumpActionV1 | DeckActionV1) => {
     const next = actions.map((a, i) => (i === idx ? action : a));
     dispatch({
       type: "setActions",
@@ -1033,6 +1043,12 @@ function DiceTab({
       usedIds={collectUsedIds(document)}
       onChange={(dice) => dispatch({ type: "setDice", dice })}
     />
+    <DeckEditor
+      decks={decks}
+      datasets={document.referenceData}
+      usedIds={collectUsedIds(document)}
+      onChange={(next) => dispatch({ type: "setDecks", ...next })}
+    />
     <section data-testid="actions-tab" data-path="/actions">
       <header className={styles.tabHeader}>
         <h2 className={styles.tabTitle}>{t("editor.actions.addTitle")}</h2>
@@ -1042,6 +1058,16 @@ function DiceTab({
         <Button variant="secondary" onClick={addResourceBump} data-testid="actions-add-resource-bump">
           {t("editor.actions.addResourceBump")}
         </Button>
+        {decks.length === 0 ? null : (
+          <>
+            <Button variant="secondary" onClick={() => addDeckAction("draw")} data-testid="actions-add-draw">
+              {t("editor.actions.addDraw")}
+            </Button>
+            <Button variant="secondary" onClick={() => addDeckAction("shuffle")} data-testid="actions-add-shuffle">
+              {t("editor.actions.addShuffle")}
+            </Button>
+          </>
+        )}
       </header>
       {actions.length === 0 ? (
         <div data-testid="actions-tab-empty">
@@ -1077,6 +1103,8 @@ function DiceTab({
                       }
                     : undefined}
                 />
+              ) : action.kind === "draw" || action.kind === "shuffle" ? (
+                <DeckActionEditor action={action} decks={decks} onChange={(next) => replaceAction(idx, next)} />
               ) : (
                 <ResourceBumpEditor
                   action={action}

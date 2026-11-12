@@ -478,6 +478,22 @@ CREATE TABLE character_audit_records (
   occurred_at  timestamptz NOT NULL DEFAULT now()
 );
 
+-- Card decks (design Section 6.4): the remaining order of one deck, shared by a
+-- campaign or owned by a standalone character.
+CREATE TABLE deck_states (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id    uuid REFERENCES campaigns(id) ON DELETE CASCADE,
+  character_id   uuid REFERENCES characters(id) ON DELETE CASCADE,
+  deck_id        text NOT NULL,
+  shuffle_id     uuid NOT NULL,
+  remaining_json jsonb NOT NULL,
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT deck_states_one_owner CHECK ((campaign_id IS NULL) <> (character_id IS NULL)),
+  CONSTRAINT deck_states_remaining_array CHECK (jsonb_typeof(remaining_json) = 'array')
+);
+CREATE UNIQUE INDEX deck_states_campaign_deck ON deck_states(campaign_id, deck_id) WHERE campaign_id IS NOT NULL;
+CREATE UNIQUE INDEX deck_states_character_deck ON deck_states(character_id, deck_id) WHERE character_id IS NOT NULL;
+
 -- Campaign character placement
 CREATE TABLE character_placements (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),

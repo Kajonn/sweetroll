@@ -52,6 +52,7 @@ export function withSlots(document: SystemDocumentV1, slots: SlotDefinitionV1[])
 /** Collect every definition id in the document so allocations stay global. */
 export function collectUsedIds(document: SystemDocumentV1): Set<string> {
   const used = new Set(document.dice?.map(die => die.id));
+  for (const deck of document.decks ?? []) used.add(deck.id);
   for (const entity of document.entities) {
     used.add(entity.id);
     for (const field of entity.fields) used.add(field.id);

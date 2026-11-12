@@ -5,7 +5,7 @@ import { EntrySourceSchema } from "../../../systems/implementation/package/schem
 import { FieldV1Schema, TemplateKindSchema } from "../../../systems/implementation/package/schema/document.js";
 import { BindingValueSchema, DieResultSchema, PushResultSchema, RollBreakdownSchema } from "../../../systems/implementation/rules/result.js";
 import { map, wire, type Route } from "./router.js";
-import { RollOptionsQuery, RollOptionsSchema } from "../roll-options.js";
+import { CharacterDecksSchema, RollOptionsQuery, RollOptionsSchema } from "../roll-options.js";
 import * as s from "./schemas.js";
 
 const audience = Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]);
@@ -45,6 +45,7 @@ export const characterSchemas = {
   CharacterCommandResult: commandResult,
   Roll: roll,
   RollOptions: RollOptionsSchema,
+  CharacterDecks: s.object({ decks: CharacterDecksSchema }),
   PushOptions: s.object({
     canPush: Type.Boolean(),
     reason: Type.Union([s.text, Type.Null()]),
@@ -160,6 +161,12 @@ export function registerCharacterRoutes(route: Route, { characters }: { characte
     description: "List the system and campaign templates the caller may place on this character, with granted actions.",
     scope: "characters:read", input: { params: s.characterId }, output: "EntryTemplates",
   }, async (ctx, { params }) => map(await characters.listEntryTemplates(ctx, params), (templates) => ({ templates: wire(templates) })));
+
+  route({
+    method: "GET", path: "/characters/:characterId/decks", id: "listCharacterDecks",
+    description: "List the card decks of the character's system with the cards left. A campaign character reads the campaign's shared decks.",
+    scope: "characters:read", input: { params: s.characterId }, output: "CharacterDecks",
+  }, async (ctx, { params }) => map(await characters.listDecks(ctx, params), (decks) => ({ decks: wire(decks) })));
 
   route({
     method: "GET", path: "/characters/:characterId/actions/:actionId/roll-options", id: "listCharacterRollOptions",

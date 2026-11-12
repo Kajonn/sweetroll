@@ -87,6 +87,7 @@ export function documentFromPackage(pkg: SystemPackageV1): SystemDocumentV1 {
     },
     entities: structuredClone(pkg.entities),
     ...(pkg.dice === undefined ? {} : { dice: structuredClone(pkg.dice) }),
+    ...(pkg.decks === undefined ? {} : { decks: structuredClone(pkg.decks) }),
     referenceData: structuredClone(pkg.referenceData),
     sheets: structuredClone(pkg.sheets),
     expressions: pkg.expressions.map((expression) => ({

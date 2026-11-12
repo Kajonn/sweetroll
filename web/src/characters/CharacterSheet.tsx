@@ -1,11 +1,11 @@
 import { hasRollSelection, RollContextFields } from "../rolls/RollContextFields.js";
-import type { CampaignRollSelection } from "./types.js";
+import type { CampaignRollSelection, CharacterDeck } from "./types.js";
 import { ItemArtwork } from "../ui/ItemArtwork.js";
 import type { CharactersApi } from "./api.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
@@ -35,6 +35,8 @@ export type CharacterSheetCallbacks = {
 
 export type CharacterSheetProps = { snapshot: CharacterSnapshot;pushApi?:PushApi|undefined;onPushRoll?:((id:string)=>Promise<void>)|undefined;onRefreshRoll?:(()=>Promise<void>)|undefined;onDeniedRoll?:((id:string)=>Promise<void>)|undefined } & CharacterSheetCallbacks & {
   loadRollOptions?: CharactersApi["rollOptions"];
+  /** Design 6.4: reads the cards left in the sheet's decks; counts are hidden when absent. */
+  loadDecks?: CharactersApi["decks"];
   /** Offline availability once determined; omitted while unknown. */
   offlineAvailable?: boolean | undefined;
   /** Template catalog for slot pickers and granted-action buttons; omitted while unknown. */
@@ -177,8 +179,11 @@ function describeCommandError(error: unknown): string {
   return t("character.command.failed", { message });
 }
 
-function ActionControl({ element, disabled, disabledReason, onExecuteAction, characterId, loadRollOptions }: {
+function ActionControl({ element, disabled, disabledReason, onExecuteAction, characterId, loadRollOptions, deck, onDeckChanged }: {
   element: Extract<Element, { kind: "action" }>;
+  /** Card counts of the deck a draw or shuffle action uses, once known. */
+  deck?: CharacterDeck | undefined;
+  onDeckChanged?: (() => void) | undefined;
   disabled: boolean;
   disabledReason: string | null;
   onExecuteAction: NonNullable<CharacterSheetCallbacks["onExecuteAction"]>;
@@ -187,7 +192,8 @@ function ActionControl({ element, disabled, disabledReason, onExecuteAction, cha
 }) {
   const [selection, setSelection] = useState<CampaignRollSelection>({});
   const contextual = Boolean(element.target || element.respondsTo);
-  const blocked = disabled || (contextual && (!characterId || !hasRollSelection(element, selection)));
+  const deckEmpty = element.actionKind === "draw" && deck?.remaining === 0;
+  const blocked = disabled || deckEmpty || (contextual && (!characterId || !hasRollSelection(element, selection)));
   const [inputs, setInputs] = useState<Record<string, unknown>>(() => Object.fromEntries(element.inputs.map(input => [input.id, input.default])));
   const [commandError, setCommandError] = useState<string | null>(null);
   return <form className={styles.action} onSubmit={(event) => {
@@ -205,9 +211,15 @@ function ActionControl({ element, disabled, disabledReason, onExecuteAction, cha
       return;
     }
     if (result !== undefined && result !== null && typeof (result as Promise<void>).then === "function") {
-      (result as Promise<void>).then(undefined, (error: unknown) => setCommandError(describeCommandError(error)));
+      (result as Promise<void>).then(undefined, (error: unknown) => setCommandError(describeCommandError(error)))
+        .then(() => { if (element.deck) onDeckChanged?.(); });
+    } else if (element.deck) {
+      onDeckChanged?.();
     }
   }}>
+    {element.deck && deck ? <p role="status" data-testid={`deck-count-${element.id}`}>
+      {t(deckEmpty ? "character.deck.empty" : "character.deck.remaining", { deck: deck.label, remaining: String(deck.remaining), total: String(deck.total) })}
+    </p> : null}
     {element.inputs.map(input => <label key={input.id}>{input.label}<input type={input.valueType === "integer" || input.valueType === "decimal" ? "number" : input.valueType === "boolean" ? "checkbox" : "text"} required={input.required} value={input.valueType === "boolean" ? undefined : String(inputs[input.id] ?? "")} checked={input.valueType === "boolean" ? inputs[input.id] === true : undefined} onChange={(event) => setInputs(current => ({ ...current, [input.id]: input.valueType === "boolean" ? event.target.checked : input.valueType === "integer" || input.valueType === "decimal" ? Number(event.target.value) : event.target.value }))} disabled={disabled} aria-describedby={disabledReason === null ? undefined : "character-action-unavailable"} /></label>)}
     <RollContextFields requirements={element} selection={selection} onChange={setSelection} disabled={disabled}
       characterId={characterId} actionId={element.actionId} loadOptions={loadRollOptions} />
@@ -256,11 +268,29 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
   </section>;
 }
 
-export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource, onSetResource, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, loadRollOptions, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdjustResource, onSetResource, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, loadRollOptions, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
   const characterIdForImages = snapshot.confirmed?.characterId;
   const imageFactory = useMemo(() => entryImages && characterIdForImages ? (id: string) => entryImages(characterIdForImages, id) : undefined, [entryImages, characterIdForImages]);
   const character = snapshot.confirmed;
   const [commandError, setCommandError] = useState<string | null>(null);
+  // Design 6.4: deck counts are read from the server on load and after each
+  // draw or shuffle. Other players' draws show up on the next read.
+  const [decks, setDecks] = useState<CharacterDeck[]>([]);
+  const [deckRead, setDeckRead] = useState(0);
+  const refreshDecks = useCallback(() => setDeckRead(count => count + 1), []);
+  const deckCharacterId = character?.projection.sheets.some(sheet => sheet.sections.some(section =>
+    section.elements.some(element => element.kind === "action" && element.deck !== undefined))) ? character.characterId : undefined;
+  const lastDrawRemaining = snapshot.lastRoll?.breakdown?.cards?.remaining;
+  const connected = snapshot.connected;
+  useEffect(() => {
+    if (deckCharacterId === undefined || loadDecks === undefined || !connected) return;
+    let current = true;
+    loadDecks(deckCharacterId).then(
+      (response) => { if (current) setDecks(response.decks); },
+      () => { if (current) setDecks([]); },
+    );
+    return () => { current = false; };
+  }, [deckCharacterId, loadDecks, connected, deckRead, lastDrawRemaining, character?.campaignId]);
   // A purged snapshot carries no private content: the session nulls
   // confirmed/tentative/entries on purge, so report availability only.
   if (character === null) {
@@ -372,6 +402,7 @@ export function CharacterSheet({ snapshot, onSetField, onBump, onAdjustResource,
       case "action": {
         if (element.entryId !== undefined) return null;
         return <ActionControl key={`${character.characterId}:${character.placementGeneration}:${element.id}`} element={element}
+          deck={decks.find(deck => deck.deckId === element.deck?.deckId)} onDeckChanged={refreshDecks}
           characterId={character.campaignId ? character.characterId : undefined} loadRollOptions={loadRollOptions} disabled={!actionsAvailable} disabledReason={actionUnavailableReason} onExecuteAction={executeAction} />;
       }
     }

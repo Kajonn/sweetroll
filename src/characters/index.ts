@@ -35,6 +35,7 @@ import {
   createPostgresPublishedPackageLoader,
 } from "../systems/implementation/runtime/package-loader.js";
 import type {
+  CampaignRollContext,
   CharacterProjectionV1,
   RuntimeResolution,
   DefinitionId,
@@ -52,6 +53,7 @@ import {
   createCharacterPersistenceRepository,
   type ApplyCommandOutcome,
   type ApplyCommandInput,
+  type DeferredDeckAction,
   type CampaignRollSelection,
   type CampaignRollOptions,
   type AttachedAuthorization,
@@ -451,6 +453,8 @@ export type CharacterRecoverCommand = {
   idempotencyKey: string;
 };
 
+export type CharacterDeck = { deckId: DefinitionId; label: string; total: number; remaining: number };
+
 export type CharacterManagementCommand =
   | CharacterRenameCommand
   | CharacterTransferCommand
@@ -572,6 +576,12 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
     ctx: RequestContext,
     input: { characterId: CharacterId },
   ): Promise<CharacterResult<EntryTemplateSummary[]>>;
+  /**
+   * Design 6.4 (C13): card counts of the decks this sheet's system defines.
+   * An attached sheet reads the campaign's shared decks, a standalone sheet
+   * its own. Authorized like `open`.
+   */
+  listDecks(ctx: RequestContext, input: { characterId: CharacterId }): Promise<CharacterResult<CharacterDeck[]>>;
   manage(
     ctx: RequestContext,
     input: CharacterManagementCommand,
@@ -2445,7 +2455,31 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         };
 
         let outcome: ApplyCommandOutcome;
-        if (selection && attachedCampaignId && resultScope && intent.kind === "action") {
+        // Design 6.4 (C13): a draw or shuffle resolves under the deck's lock.
+        const deckPrepared = !selection && intent.kind === "action" && intent.entryId === undefined
+          ? await input.runtime.prepareResolve(rulesScope)
+          : null;
+        const deckId = deckPrepared?.ok ? deckPrepared.value.deckIdFor(intent.kind === "action" ? intent.actionId : "") : null;
+        if (deckPrepared?.ok && deckId !== null && intent.kind === "action") {
+          const resolveDeck: DeferredDeckAction["resolve"] = (deck) => {
+            const resolved = deckPrepared.value({ state: resolveSource.state, intent: { ...intent, deck } });
+            return resolved.ok
+              ? { ok: true, value: { ...makeCommit(resolved.value), ...(resolved.value.deck ? { deckState: resolved.value.deck } : {}) } }
+              : { ok: false, error: mapRuntimeError(resolved.error), retryable: !isFinalizableRuntimeError(resolved.error.code) };
+          };
+          outcome = await repo.applyCommandTx({
+            executionId,
+            characterId: command.characterId,
+            actorId: ctx.actorId,
+            expectedRevision: command.expectedRevision,
+            deck: { deckId },
+            source: resolveSource,
+            resolve: resolveDeck,
+            ...(attachedCampaignId && resultScope
+              ? { campaign: { campaignId: attachedCampaignId }, membershipGeneration: resultScope.membershipGeneration }
+              : {}),
+          });
+        } else if (selection && attachedCampaignId && resultScope && intent.kind === "action") {
           // Package loading can use the pool. Complete it before holding a
           // campaign transaction so contention cannot exhaust connections.
           const prepared = await input.runtime.prepareResolve(rulesScope);
@@ -2470,19 +2504,21 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             selection: { ...selection, ...(action.target ? { targetEntityId: action.target.entityId } : {}) },
             source: resolveSource,
             membershipGeneration: resultScope.membershipGeneration,
-            resolve: (campaignRoll) => {
+            resolve: (campaignRoll: CampaignRollContext) => {
               const resolved = prepared.value({ state: resolveSource.state, intent: { ...intent, campaignRoll } });
               return resolved.ok
-                ? { ok: true, value: makeCommit(resolved.value) }
+                ? { ok: true as const, value: makeCommit(resolved.value) }
                 : {
-                    ok: false,
+                    ok: false as const,
                     error: mapRuntimeError(resolved.error),
                     retryable: !isFinalizableRuntimeError(resolved.error.code),
                   };
             },
           });
         } else {
-          const resolved = await input.runtime.resolve({ ...rulesScope, state: resolveSource.state, intent });
+          const resolved = deckPrepared?.ok
+            ? deckPrepared.value({ state: resolveSource.state, intent })
+            : await input.runtime.resolve({ ...rulesScope, state: resolveSource.state, intent });
           if (!resolved.ok) {
             const error = mapRuntimeError(resolved.error);
             if (isFinalizableRuntimeError(resolved.error.code)) {
@@ -2506,6 +2542,43 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           executionId,
           replayExpiresAt,
         });
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+    async listDecks(ctx, request) {
+      try {
+        let record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        if (record === null) {
+          const scope = await repo.loadCharacterScope(request.characterId);
+          if (scope === null || scope.campaignId === null) return { ok: false, error: errors.not_found() };
+          const attached = await loadAttachedSnapshot(ctx, request.characterId);
+          if (attached === null) return { ok: false, error: errors.not_found() };
+          record = attached.auth.record;
+        }
+        const loaded = await loadEffective(record.systemVersionId, record.extensions);
+        if (!loaded.ok) {
+          return loaded.error.code === "invalid_package"
+            ? { ok: false, error: mapRuntimeError({ code: "invalid_package", message: "Published package runtime references are invalid." }) }
+            : { ok: false, error: errors.internal() };
+        }
+        const decks = loaded.value.decks ?? [];
+        const stored = decks.length === 0
+          ? new Map<string, string[]>()
+          : await repo.loadDeckCounts({ campaignId: record.campaignId, characterId: record.characterId });
+        return {
+          ok: true,
+          value: decks.map((deck) => {
+            const cards = new Set(loaded.value.referenceData.find(dataset => dataset.id === deck.datasetId)?.records.map(card => card.id));
+            const remaining = stored.get(deck.id);
+            return {
+              deckId: deck.id,
+              label: deck.label,
+              total: cards.size,
+              remaining: remaining === undefined ? cards.size : remaining.filter(id => cards.has(id)).length,
+            };
+          }),
+        };
       } catch {
         return { ok: false, error: errors.internal() };
       }

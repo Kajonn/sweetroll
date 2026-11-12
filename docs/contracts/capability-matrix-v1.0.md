@@ -27,10 +27,12 @@ The Winter Compass and Signal Forge fixtures exercise labeled four-die Fudge
 rolls and net symbols from one saved pool. The dynamic pool fixtures exercise
 explosions, and Hearthbound exercises named move outcomes.
 
+The Bridge Contest fixture exercises targeted attacks and opposed responses.
+The Ember Road fixture exercises a shared campaign deck and a standalone deck
+with draw and shuffle actions.
+
 ## Deferred
 
 | Capability | Status |
 |------------|--------|
-| Opposed tests | Deferred |
-| Card decks | Deferred |
 | Automated roll consequences | Deferred |

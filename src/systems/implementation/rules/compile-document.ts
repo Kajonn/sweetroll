@@ -340,6 +340,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     ...(document.metadata.presentation === undefined ? {} : { presentation: document.metadata.presentation }),
     entities: document.entities.map(entity => ({ ...entity, fields: entity.fields.map(field => fieldWithDatasetOptions(field, document.referenceData)) })),
     ...(document.dice === undefined ? {} : { dice: document.dice }),
+    ...(document.decks === undefined ? {} : { decks: document.decks }),
     referenceData: document.referenceData,
     sheets: document.sheets,
     expressions: compiled.map((b, i) => ({ id: document.expressions[i]!.id, ...b })),

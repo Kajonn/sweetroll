@@ -27,7 +27,8 @@ export {validatePushPolicies} from "./push-policy.js";
 export type {PushPolicy} from "../package/schema/push-policy.js";
 
 export type {PushResult} from "./result.js";
-export {SavedPushRollSchema, formatDieFace} from "./result.js";
+export {SavedPushRollSchema, formatCard, formatDieFace} from "./result.js";
+export type { DrawnCards } from "./result.js";
 
 export { entityFieldTypes, type FieldBindingType } from "./typecheck.js";
 

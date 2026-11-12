@@ -316,6 +316,7 @@ function CharacterDetailLoaded({
         snapshot={snapshot}
         pushApi={api}
         loadRollOptions={api.rollOptions}
+        loadDecks={api.decks}
         onPushRoll={session.pushRoll}
         onRefreshRoll={session.refresh}
         onDeniedRoll={session.forgetRoll}

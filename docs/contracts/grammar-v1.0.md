@@ -64,6 +64,7 @@ Arithmetic and ordering require numbers. Equality operands have the same scalar 
 | All computed fields and validations of one sheet | 8,192 nodes, checked when the system is published |
 | Dice | 100 draws per roll, 1,000 sides per standard die |
 | Custom dice | 16 definitions, 1–20 faces per die, 16 symbol IDs per face with counts 1–100 |
+| Card decks | 4 decks, 1–200 cards per deck, 1–10 cards per draw |
 | Entities | 32 |
 | Total fields | 512 |
 | Reference datasets | 64 |
@@ -198,8 +199,31 @@ roll and outcome expressions. The command supplies `respondsTo` with the ID
 of a saved campaign roll. For example, `d20 - opposed.total` compares a new
 roll with the stored total. Both scopes record the values actually read.
 
+## Card decks
+
+Decks are data and actions, not grammar. The system document and compiled
+package may include a top-level `decks` array. Each deck has an `id`, a
+`label` and a `datasetId`. The records of that dataset are the cards: the
+record label names the card and its values are shown with a draw.
+
+```json
+{
+  "decks": [{ "id": "omen_deck", "label": "Omen deck", "datasetId": "omens" }],
+  "actions": [
+    { "kind": "draw", "id": "read_omens", "label": "Read the omens", "deckId": "omen_deck", "count": 2 },
+    { "kind": "shuffle", "id": "gather_omens", "label": "Gather the omens", "deckId": "omen_deck" }
+  ]
+}
+```
+
+A draw is saved as a roll without dice. Its total is the number of cards
+drawn and its breakdown has a `cards` object with `deckId`, `deckLabel`,
+`remaining` and the `drawn` cards (`id`, `label`, `values`) in order. A
+campaign shares each deck. A character outside a campaign has its own.
+Expressions cannot read drawn cards or the deck.
+
 ## Exclusions
 
-Arbitrary property traversal, effects, loops, assignment, and
-user-defined functions are outside this grammar. See the
+Arbitrary property traversal, effects, loops, assignment,
+user-defined functions, card hands and discard piles are outside this grammar. See the
 [rules coverage plan](../superpowers/plans/2026-11-10-rules-coverage.md).

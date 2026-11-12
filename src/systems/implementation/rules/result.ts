@@ -22,10 +22,42 @@ export const DieResultSchema = Type.Object(
   { additionalProperties: false },
 );
 export type DieResult = Static<typeof DieResultSchema>;
+/** Design 6.4 (C13): the cards one draw took from a deck, in the order drawn. */
+export const DrawnCardsSchema = Type.Object(
+  {
+    deckId: DefinitionIdSchema,
+    deckLabel: Type.String({ maxLength: 120 }),
+    /** Cards left in the deck after this draw. */
+    remaining: Type.Integer({ minimum: 0, maximum: PACKAGE_LIMITS.cardsPerDeck }),
+    drawn: Type.Array(
+      Type.Object(
+        {
+          id: DefinitionIdSchema,
+          label: Type.String({ maxLength: 120 }),
+          values: Type.Record(DefinitionIdSchema, ScalarValueSchema, {
+            additionalProperties: false,
+            maxProperties: PACKAGE_LIMITS.referenceRecordValues,
+          }),
+        },
+        { additionalProperties: false },
+      ),
+      { minItems: 1, maxItems: PACKAGE_LIMITS.cardsPerDraw },
+    ),
+  },
+  { additionalProperties: false },
+);
+export type DrawnCards = Static<typeof DrawnCardsSchema>;
+
+export function formatCard(card: DrawnCards["drawn"][number]): string {
+  const values = Object.entries(card.values).map(([id, value]) => `${id}: ${String(value)}`);
+  return values.length === 0 ? card.label : `${card.label} (${values.join(", ")})`;
+}
+
 export const RollBreakdownSchema = Type.Object(
   {
     version: Type.Literal("1.0"),
     rootId: Identity,
+    cards: Type.Optional(DrawnCardsSchema),
     groups: Type.Array(
       Type.Object(
         {
@@ -111,6 +143,10 @@ export function formatRollBreakdown(breakdown: RollBreakdown, dice: readonly Die
   const groups = new Map(breakdown.groups.map((group) => [group.id, group.label]));
   for (const term of breakdown.terms) {
     if (term.reused && term.groupId) lines.push(`Reused ${groups.get(term.groupId)} (${term.operation}${term.symbol ? ` ${term.symbol}` : ""}): ${String(term.value)}`);
+  }
+  if (breakdown.cards) {
+    const { deckLabel, drawn, remaining } = breakdown.cards;
+    return [...drawn.map((card, index) => `${deckLabel} ${index + 1}: ${formatCard(card)}`), `Cards left: ${remaining}`].join("\n");
   }
   const root = breakdown.terms.find((term) => term.id === breakdown.rootId);
   if (root) lines.push(`Total: ${String(root.value)}`);

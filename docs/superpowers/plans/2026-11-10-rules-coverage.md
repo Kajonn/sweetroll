@@ -410,4 +410,34 @@ stage (E5) lands, compositions with extensions keep their current restrictions.
 - Bridge Contest exercises targeted and opposed rolls through the PostgreSQL
   API scenario and creator → players → GM browser journey.
 
-R8 is next.
+**R8 — 2026-11-12, implemented.**
+
+- Documents and packages take up to 4 `decks` (`{ id, label, datasetId }`) and
+  the entity action kinds `draw { deckId, count }` and `shuffle { deckId }`.
+  Publishing checks the dataset reference, 1–200 cards and 1–10 cards per draw
+  (`package/structural.ts`, `runtime/decks.ts`).
+- `deck_states` in the schema baseline holds one remaining order per deck and
+  campaign, or per deck and standalone character. The order is a Fisher–Yates
+  shuffle over the HMAC stream keyed by the roll secret, the deck ID and the
+  shuffle ID (the execution ID of the shuffle, or of the first draw).
+- Draw and shuffle resolve inside the command transaction after the deck row
+  is read under the campaign or character lock. They do not change the
+  character revision. An empty deck returns HTTP 422 with a readable message.
+- A draw is a saved roll whose breakdown carries `cards` (deck, cards left,
+  each drawn card's label and columns). Activity, the GM board and the campaign
+  export read it through the existing roll paths. A shuffle is a character
+  activity event without a roll.
+- `GET /characters/{id}/decks` in the browser API and `/api/v1` returns the
+  cards left. The sheet shows the count beside draw and shuffle buttons and
+  disables drawing from an empty deck. The Dice tab has a deck editor over the
+  dataset editor and editors for both action kinds.
+- Ember Road is the M9 card fixture: unit tests (`runtime/decks.test.ts`),
+  the PostgreSQL scenario `scenarios/card-decks.test.ts` with concurrent draws
+  on a shared campaign deck and a standalone deck, and the creator → player →
+  GM browser journey `cardDecks.spec.ts`.
+- Not done in R8: deck actions granted by templates or extensions, a campaign
+  activity entry for a shuffle, and live updates of the card count when another
+  player draws (the count is read again on load and after each own draw or
+  shuffle; the draw result is always current).
+
+All stages R0–R8 are implemented.

@@ -24,11 +24,14 @@ export type SourceExpressionV1 = { id: string; context: string; resultType: stri
 export type ActionV1 = { id: string; label: string; kind: string } & Record<string, unknown>;
 export type ValidationV1 = { id: string; expressionId: string; severity: string; message: string; targetId: string; targetEntityId?: string };
 
+export type DeckV1 = { id: string; label: string; datasetId: string };
+
 export type SystemDocumentV1 = {
   schemaVersion: "2.0";
   metadata: SystemMetadataV1;
   entities: EntityDefinitionV1[];
   dice?: import("@sweetroll/rules").CustomDie[];
+  decks?: DeckV1[];
   referenceData: ReferenceDataV1[];
   sheets: SheetV1[];
   expressions: SourceExpressionV1[];
@@ -47,6 +50,7 @@ export type DocumentAction =
   | { type: "setEntities"; entities: EntityDefinitionV1[] }
   | { type: "setSheets"; sheets: SheetV1[] }
   | { type: "setDice"; dice: NonNullable<SystemDocumentV1["dice"]> }
+  | { type: "setDecks"; decks: DeckV1[]; referenceData: ReferenceDataV1[] }
   | { type: "setReferenceData"; referenceData: ReferenceDataV1[] }
   | { type: "setActions"; actions: ActionV1[] }
   | { type: "setValidations"; validations: ValidationV1[] }
@@ -122,6 +126,8 @@ export function documentReducer(state: SystemDocumentV1, action: DocumentAction)
       return { ...state, sheets: action.sheets };
     case "setDice":
       return { ...state, dice: action.dice };
+    case "setDecks":
+      return { ...state, decks: action.decks, referenceData: action.referenceData };
     case "setReferenceData":
       return { ...state, referenceData: action.referenceData };
     case "setActions":

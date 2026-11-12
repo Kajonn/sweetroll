@@ -43,6 +43,7 @@ describe("SystemRuntime contract", () => {
       | "invalid_state"
       | "unsupported_field_value"
       | "push_unavailable"
+      | "deck_empty"
       | "action_evaluation_failed"
       | "budget_exceeded"
       | "internal"

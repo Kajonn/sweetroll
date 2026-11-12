@@ -95,6 +95,13 @@ function projectElement(
       actionId: action.id,
       label: action.label,
       actionKind: action.kind,
+      ...(action.kind === "draw" || action.kind === "shuffle" ? {
+        deck: {
+          deckId: action.deckId,
+          label: lookups.packageValue.decks?.find(deck => deck.id === action.deckId)?.label ?? action.deckId,
+          ...(action.kind === "draw" ? { count: action.count } : {}),
+        },
+      } : {}),
       ...campaignRollRequirements(action),
       inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
       validations: validationsFor(action.id),

@@ -393,7 +393,44 @@ export const ResourceBumpActionV1Schema = Type.Object(
 );
 export type ResourceBumpActionV1 = Static<typeof ResourceBumpActionV1Schema>;
 
-export const ActionV1Schema = Type.Union([RollActionV1Schema, ResourceBumpActionV1Schema]);
+// Design 6.4 (rules coverage R8). A deck is a dataset whose records are cards.
+// Its only stored state is the remaining order, shared by a campaign or owned
+// by a standalone character.
+export const DeckV1Schema = Type.Object(
+  { id: DefinitionIdSchema, label: LabelSchema, datasetId: DefinitionIdSchema },
+  { additionalProperties: false },
+);
+export type DeckV1 = Static<typeof DeckV1Schema>;
+
+export const DrawActionV1Schema = Type.Object(
+  {
+    kind: Type.Literal("draw"),
+    id: DefinitionIdSchema,
+    label: LabelSchema,
+    deckId: DefinitionIdSchema,
+    count: Type.Integer({ minimum: 1, maximum: PACKAGE_LIMITS.cardsPerDraw }),
+  },
+  { additionalProperties: false },
+);
+export type DrawActionV1 = Static<typeof DrawActionV1Schema>;
+
+export const ShuffleActionV1Schema = Type.Object(
+  {
+    kind: Type.Literal("shuffle"),
+    id: DefinitionIdSchema,
+    label: LabelSchema,
+    deckId: DefinitionIdSchema,
+  },
+  { additionalProperties: false },
+);
+export type ShuffleActionV1 = Static<typeof ShuffleActionV1Schema>;
+
+export const ActionV1Schema = Type.Union([
+  RollActionV1Schema,
+  ResourceBumpActionV1Schema,
+  DrawActionV1Schema,
+  ShuffleActionV1Schema,
+]);
 export type ActionV1 = Static<typeof ActionV1Schema>;
 
 // Dynamic sheet objects (templates, slots). Defined here — next to the field
@@ -505,6 +542,7 @@ export const SystemDocumentV1Schema = Type.Object(
     metadata: SystemMetadataV1Schema,
     entities: Type.Array(EntityDefinitionV1Schema, { maxItems: PACKAGE_LIMITS.entities }),
     dice: Type.Optional(Type.Array(CustomDieSchema, { maxItems: PACKAGE_LIMITS.customDice })),
+    decks: Type.Optional(Type.Array(DeckV1Schema, { maxItems: PACKAGE_LIMITS.decks })),
     referenceData: Type.Array(ReferenceDataV1Schema, {
       maxItems: PACKAGE_LIMITS.referenceDataSets,
     }),

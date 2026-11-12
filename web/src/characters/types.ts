@@ -24,6 +24,8 @@ export type EntryInput = {
 };
 
 export type RollOptionsResponse = operations["get_character_roll_options"]["responses"][200]["content"]["application/json"];
+export type CharacterDecksResponse = operations["get_characters_characterId_decks"]["responses"][200]["content"]["application/json"];
+export type CharacterDeck = CharacterDecksResponse["decks"][number];
 export type CampaignRollSelection = { targetCharacterId?: string; respondsTo?: string };
 
 export type EditIntent =

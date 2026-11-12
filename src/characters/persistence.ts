@@ -1,6 +1,6 @@
 import { ROLL_VISIBILITY_PREDICATE } from "../campaigns/persistence.js";
 import { canReadRoll, type MembershipRecord } from "../campaigns/policy.js";
-import type { CampaignRollContext } from "../systems/runtime.js";
+import type { CampaignRollContext, DeckContext, DeckState } from "../systems/runtime.js";
 import {preparePushCommit,insertPushRoll,narrowerAudience} from "./push.js";
 import type {PushContext, ExtensionRef} from "../systems/runtime.js";
 import type { Pool, PoolClient } from "pg";
@@ -161,7 +161,24 @@ export type DeferredCampaignRoll = CommandTransaction & {
     | { ok: false; error: import("./index.js").CharacterError; retryable: boolean };
 };
 
+/**
+ * Design 6.4 (C13): a draw or shuffle resolves inside the transaction, after
+ * the deck state is read under the campaign or character lock, so concurrent
+ * draws never deal the same card.
+ */
+export type DeferredDeckAction = CommandTransaction & {
+  campaign?: { campaignId: string };
+  deck: { deckId: string };
+  source: CharacterRecord;
+  membershipGeneration?: number;
+  resolve: (context: DeckContext) =>
+    | { ok: true; value: ApplyCommandInput }
+    | { ok: false; error: import("./index.js").CharacterError; retryable: boolean };
+};
+
 export type ApplyCommandInput = CommandTransaction & {
+  /** New remaining order of a deck, stored with the command. */
+  deckState?: DeckState;
   /** Revision of the source state validated by Systems, checked under the character lock. */
   pushResolutionRevision?: number;
   pushContext?: PushContext;
@@ -388,7 +405,9 @@ export interface CharacterPersistenceRepository {
   loadCampaignRollOptions(input: {
     source: CharacterRecord; member: MembershipRecord; targetEntityId?: string; includeRolls: boolean;
   }): Promise<CampaignRollOptions | null>;
-  applyCommandTx(input: ApplyCommandInput | DeferredCampaignRoll): Promise<ApplyCommandOutcome>;
+  applyCommandTx(input: ApplyCommandInput | DeferredCampaignRoll | DeferredDeckAction): Promise<ApplyCommandOutcome>;
+  /** Remaining cards per deck for a campaign or, when `campaignId` is null, a standalone character. */
+  loadDeckCounts(owner: { campaignId: string | null; characterId: string }): Promise<Map<string, string[]>>;
 
   applyManagementCommandTx(input: ApplyManagementCommandInput): Promise<ApplyManagementCommandOutcome>;
 
@@ -536,6 +555,48 @@ async function loadCampaignRollContext(
   return { ok: true, context, audience };
 }
 
+type DeckOwner = { campaignId: string } | { characterId: string };
+
+async function loadDeckContext(client: PoolClient, owner: DeckOwner, deckId: string): Promise<DeckContext> {
+  const { rows: [row] } = await client.query<{ shuffle_id: string; remaining_json: string[] }>(
+    `SELECT shuffle_id, remaining_json FROM deck_states
+      WHERE deck_id = $1 AND ${"campaignId" in owner ? "campaign_id" : "character_id"} = $2 FOR UPDATE`,
+    [deckId, "campaignId" in owner ? owner.campaignId : owner.characterId],
+  );
+  return { state: row ? { shuffleId: row.shuffle_id, remaining: row.remaining_json } : null };
+}
+
+async function storeDeckState(client: PoolClient, owner: DeckOwner, deck: DeckState | undefined): Promise<void> {
+  if (deck === undefined) return;
+  const campaign = "campaignId" in owner;
+  await client.query(
+    `INSERT INTO deck_states (${campaign ? "campaign_id" : "character_id"}, deck_id, shuffle_id, remaining_json)
+     VALUES ($1, $2, $3, $4::jsonb)
+     ON CONFLICT (${campaign ? "campaign_id" : "character_id"}, deck_id) WHERE ${campaign ? "campaign_id" : "character_id"} IS NOT NULL
+     DO UPDATE SET shuffle_id = EXCLUDED.shuffle_id, remaining_json = EXCLUDED.remaining_json, updated_at = now()`,
+    [campaign ? owner.campaignId : owner.characterId, deck.deckId, deck.shuffleId, JSON.stringify(deck.remaining)],
+  );
+}
+
+/** A deferred deck action resolves only against the snapshot the rules were prepared for. */
+async function resolveDeckTransaction(
+  client: PoolClient,
+  transaction: DeferredDeckAction,
+  record: CharacterRecord,
+  owner: DeckOwner,
+): Promise<{ ok: true; value: ApplyCommandInput } | { ok: false; outcome: ApplyCommandOutcome }> {
+  if (transaction.source.revision !== record.revision) {
+    return { ok: false, outcome: { kind: "conflict", latestRevision: record.revision } };
+  }
+  if (transaction.source.placementGeneration !== record.placementGeneration || !sameComposition(transaction.source, record)) {
+    return { ok: false, outcome: { kind: "not_found" } };
+  }
+  const resolved = transaction.resolve(await loadDeckContext(client, owner, transaction.deck.deckId));
+  return resolved.ok
+    ? resolved
+    : { ok: false, outcome: { kind: "precondition_failed", error: resolved.error, retryable: resolved.retryable } };
+}
+
 /**
  * I6 Task 5 attached-sheet command path. The caller holds an open
  * transaction with the execution row already locked; this locks the campaign
@@ -547,7 +608,7 @@ async function loadCampaignRollContext(
  */
 async function applyCommandCampaignTx(
   client: PoolClient,
-  transaction: ApplyCommandInput | DeferredCampaignRoll,
+  transaction: ApplyCommandInput | DeferredCampaignRoll | DeferredDeckAction,
   campaignId: string,
 ): Promise<ApplyCommandOutcome> {
   const campaign = await lockCampaignForWrite(client, campaignId);
@@ -615,6 +676,17 @@ async function applyCommandCampaignTx(
       return { kind: "precondition_failed", error: resolved.error, retryable: resolved.retryable };
     }
     input = resolved.value;
+  } else if ("deck" in transaction) {
+    if (transaction.membershipGeneration !== membership.generation) {
+      await client.query("ROLLBACK");
+      return { kind: "not_found" };
+    }
+    const resolved = await resolveDeckTransaction(client, transaction, toCharacterRecord(charRow), { campaignId });
+    if (!resolved.ok) {
+      await client.query("ROLLBACK");
+      return resolved.outcome;
+    }
+    input = resolved.value;
   } else {
     input = transaction;
   }
@@ -675,6 +747,7 @@ async function applyCommandCampaignTx(
     );
     rollId = requireRow(insertedRoll.rows[0], "applyCommandCampaignTx.roll").id;
   }
+  await storeDeckState(client, { campaignId }, input.deckState);
 
   await client.query(
     `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, roll_id, request_id, scope_campaign_id)
@@ -1208,13 +1281,21 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       return options ?? null;
     },
 
-    async applyCommandTx(input) {
+    async loadDeckCounts(owner) {
+      const { rows } = await pool.query<{ deck_id: string; remaining_json: string[] }>(
+        `SELECT deck_id, remaining_json FROM deck_states WHERE ${owner.campaignId === null ? "character_id" : "campaign_id"} = $1`,
+        [owner.campaignId ?? owner.characterId],
+      );
+      return new Map(rows.map(row => [row.deck_id, row.remaining_json]));
+    },
+
+    async applyCommandTx(transaction) {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         const execResult = await client.query<{ status: string; result_json: unknown }>(
           `SELECT status, result_json FROM character_command_executions WHERE execution_id = $1 FOR UPDATE`,
-          [input.executionId],
+          [transaction.executionId],
         );
         const execRow = execResult.rows[0];
         if (execRow === undefined) throw new Error("applyCommandTx: execution row missing");
@@ -1223,28 +1304,23 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           return { kind: "already_completed", resultJson: execRow.result_json };
         }
 
-        if (input.campaign !== undefined) {
-          return await applyCommandCampaignTx(client, input, input.campaign.campaignId);
+        if (transaction.campaign !== undefined) {
+          return await applyCommandCampaignTx(client, transaction, transaction.campaign.campaignId);
         }
 
         // I6 Task 8: standalone commits accept only `owner_only`/omitted and
         // retain existing behavior. The module validates before claim; this
         // second layer holds even if that check ever widens.
         // Deliberately `not_found` (not `bad_request`): persistence outcomes carry no validation variant, so this unreachable fail-closed denial collapses exactly like a foreign id.
-        if ("selection" in input) throw new Error("Campaign roll context requires a campaign transaction.");
-        const standaloneRequested = input.rollAudience?.requested ?? null;
-        if (standaloneRequested !== null && standaloneRequested !== "owner_only") {
-          await client.query("ROLLBACK");
-          return { kind: "not_found" };
-        }
+        if ("selection" in transaction) throw new Error("Campaign roll context requires a campaign transaction.");
 
         const charResult = await client.query<CharacterRow>(
           `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
              FROM characters WHERE id = $1 FOR UPDATE`,
-          [input.characterId],
+          [transaction.characterId],
         );
         const charRow = charResult.rows[0];
-        if (charRow === undefined || charRow.owner_id !== input.actorId || charRow.campaign_id !== null) {
+        if (charRow === undefined || charRow.owner_id !== transaction.actorId || charRow.campaign_id !== null) {
           await client.query("ROLLBACK");
           return { kind: "not_found" };
         }
@@ -1252,10 +1328,26 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           await client.query("ROLLBACK");
           return { kind: "archived" };
         }
-        if (charRow.revision !== input.expectedRevision) {
+        if (charRow.revision !== transaction.expectedRevision) {
           const latestRevision = charRow.revision;
           await client.query("ROLLBACK");
           return { kind: "conflict", latestRevision };
+        }
+        let input: ApplyCommandInput;
+        if ("deck" in transaction) {
+          const resolved = await resolveDeckTransaction(client, transaction, toCharacterRecord(charRow), { characterId: charRow.id });
+          if (!resolved.ok) {
+            await client.query("ROLLBACK");
+            return resolved.outcome;
+          }
+          input = resolved.value;
+        } else {
+          input = transaction;
+        }
+        const standaloneRequested = input.rollAudience?.requested ?? null;
+        if (standaloneRequested !== null && standaloneRequested !== "owner_only") {
+          await client.query("ROLLBACK");
+          return { kind: "not_found" };
         }
 
         if(input.precondition){const error=await input.precondition(client);if(error){await client.query("ROLLBACK");return {kind:"precondition_failed",error};}}
@@ -1299,6 +1391,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           );
           rollId = requireRow(insertedRoll.rows[0], "applyCommandTx.roll").id;
         }
+        await storeDeckState(client, { characterId: charRow.id }, input.deckState);
 
         await client.query(
           `INSERT INTO character_activity_events (character_id, character_revision, kind, payload_json, roll_id, request_id)
@@ -1333,7 +1426,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       } catch (error) {
         await client.query("ROLLBACK");
         const constraint=error as {code?:string;constraint?:string};
-        if(constraint.code==="23505"&&["character_rolls_one_push_child","character_rolls_push_attempt"].includes(constraint.constraint??""))return {kind:"precondition_failed",error:{code:"conflict",message:"This roll already has a push. Review its child before continuing.",pushReason:"parent_consumed",latestRevision:input.expectedRevision}};
+        if(constraint.code==="23505"&&["character_rolls_one_push_child","character_rolls_push_attempt"].includes(constraint.constraint??""))return {kind:"precondition_failed",error:{code:"conflict",message:"This roll already has a push. Review its child before continuing.",pushReason:"parent_consumed",latestRevision:transaction.expectedRevision}};
         throw error;
       } finally {
         client.release();

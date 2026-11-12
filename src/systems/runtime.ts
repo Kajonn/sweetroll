@@ -14,6 +14,7 @@ import { buildCharacterProjection } from "./implementation/runtime/projection.js
 import { decodeActionInputs, resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
 import { resolveObservedValues } from "./implementation/runtime/resolve.js";
 import { describeRoll, mergeBindings, type RollDetail, type RollOutcome } from "./implementation/rules/outcomes.js";
+import { resolveDeckAction } from "./implementation/runtime/decks.js";
 import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
 import { decodeRuntimeState, initializeState } from "./implementation/runtime/state.js";
 import { actionEvaluationFailure } from "./implementation/runtime/action-evaluation.js";
@@ -56,6 +57,11 @@ export type CampaignRollContext = {
   opposed?: { rollId: string; total: number };
 };
 
+/** Design 6.4 (C13): the remaining order of one deck, as stored for a campaign or a standalone character. */
+export type DeckState = { deckId: DefinitionId; shuffleId: string; remaining: DefinitionId[]; total: number };
+/** The stored deck state read under the caller's lock; `state` is null before the deck is first used. */
+export type DeckContext = { state: Pick<DeckState, "shuffleId" | "remaining"> | null };
+
 export type RuntimeIntent =
   | {kind:"push";parent:NormalizedRoll;context:PushContext;executionId:string;optionsOnly?:boolean}
   | { kind: "initialize"; values?: Record<DefinitionId, unknown> }
@@ -78,6 +84,8 @@ export type RuntimeIntent =
        */
       entryId?: string;
       campaignRoll?: CampaignRollContext;
+      /** Required for draw and shuffle actions. */
+      deck?: DeckContext;
     };
 
 export type RuntimeRequest = {
@@ -209,7 +217,9 @@ export type CharacterProjectionElement =
       id: DefinitionId;
       actionId: DefinitionId;
       label: string;
-      actionKind: "roll" | "resourceBump";
+      actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+      /** Design 6.4 (C13): the deck a draw or shuffle action uses, and how many cards a draw takes. */
+      deck?: { deckId: DefinitionId; label: string; count?: number };
       target?: { entityId: DefinitionId };
       respondsTo?: true;
       inputs: CharacterProjectionActionInput[];
@@ -285,6 +295,8 @@ export type RuntimeResolution = {
   changedDefinitionIds: DefinitionId[];
   roll: NormalizedRoll | null;
   nominal: NominalActionResult | null;
+  /** New deck state to store when the command drew from or shuffled a deck. */
+  deck?: DeckState;
   projection: CharacterProjectionV1;
 };
 
@@ -295,6 +307,7 @@ export type RuntimeErrorCode =
   | "invalid_state"
   | "unsupported_field_value"
   | "push_unavailable"
+  | "deck_empty"
   | "action_evaluation_failed"
   | "budget_exceeded"
   | "internal";
@@ -332,8 +345,12 @@ export type VersionDescription = {
   templates?: Array<Pick<ObjectTemplateV1, "id" | "label" | "kind" | "description" | "fields"> & { extensionId?: string }>;
 };
 
+export type PreparedResolution = ((command: Pick<RuntimeRequest, "state" | "intent">) => RuntimeResult<RuntimeResolution>) & {
+  /** The deck an entity action draws from or shuffles; null for every other action. */
+  deckIdFor(actionId: DefinitionId): DefinitionId | null;
+};
 type PrepareResolution = (scope: Pick<RuntimeRequest, "versionId" | "extensions" | "entityId">) =>
-  Promise<RuntimeResult<(command: Pick<RuntimeRequest, "state" | "intent">) => RuntimeResult<RuntimeResolution>>>;
+  Promise<RuntimeResult<PreparedResolution>>;
 
 export interface SystemRuntime {
   /** Load the immutable composition before a transaction takes row locks. */
@@ -428,7 +445,15 @@ export function createSystemRuntime(input: {
 
       return {
         ok: true,
-        value: (request) => resolveCharacter(packageValue, entity, request),
+        value: Object.assign(
+          (request: Pick<RuntimeRequest, "state" | "intent">) => resolveCharacter(packageValue, entity, request),
+          {
+            deckIdFor(actionId: DefinitionId) {
+              const action = findOwnedAction(packageValue, entity.id, actionId);
+              return action?.kind === "draw" || action?.kind === "shuffle" ? action.deckId : null;
+            },
+          },
+        ),
       };
     },
     async resolve(request) {
@@ -456,6 +481,7 @@ export function createSystemRuntime(input: {
     } | null = null;
     let roll: NormalizedRoll | null = null;
     let nominal: NominalActionResult | null = null;
+    let deck: DeckState | undefined;
     let pushContext: PushContext | undefined;
     if (request.intent.kind === "initialize") {
       if (request.state !== undefined) {
@@ -554,6 +580,21 @@ export function createSystemRuntime(input: {
           if (!decoded.ok) return badRequest("Resource action exceeds its bounds.", resource.id);
           stateResult = decoded;
           changedDefinitionIds = changed ? [resource.id] : [];
+        } else if (action.kind === "draw" || action.kind === "shuffle") {
+          if (request.intent.campaignRoll) return badRequest("A deck action cannot use a campaign roll context.", action.id);
+          if (Object.keys(request.intent.inputs).length > 0) {
+            return badRequest("Deck actions do not accept inputs.", Object.keys(request.intent.inputs)[0]!);
+          }
+          const resolved = resolveDeckAction({
+            packageValue,
+            action,
+            context: request.intent.deck,
+            executionId: request.intent.executionId,
+            secret: input.authoritativeRollSecret,
+          });
+          if (!resolved.ok) return resolved;
+          deck = resolved.value.deck;
+          roll = resolved.value.roll;
         } else {
           const actionInputs = decodeActionInputs(action.inputs, request.intent.inputs);
           if (!actionInputs.ok) return actionInputs;
@@ -649,6 +690,7 @@ export function createSystemRuntime(input: {
         changedDefinitionIds,
         roll,
         nominal,
+        ...(deck === undefined ? {} : { deck }),
         ...(pushContext?{pushContext}:{}),
         projection,
       },

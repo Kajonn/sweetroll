@@ -139,6 +139,7 @@ function characterExport(): CharacterExportV1 {
 
 function makeCharacters(overrides: Partial<Characters> = {}): Characters {
   const base: Characters = {
+    listDecks: async () => ({ ok: true, value: [] }),
     openEntryImage: async () => ({ ok: true, value: { revision: 0, image: null } }),
     setEntryImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
     removeEntryImage: async () => ({ ok: true, value: { revision: 1, image: null } }),

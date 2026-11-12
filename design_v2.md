@@ -209,6 +209,29 @@ Expressions are declarative math, conditionals, and dice, parsed into a lightwei
 
 **Custom dice (rules coverage R6, 2026-11-11):** systems can define up to 16 custom dice with up to 20 equally likely faces each. Each face has a numeric value, an optional label and optional symbol counts. `dice(4, "fudge")` sums four custom draws. `countSymbol` counts a named symbol across the final faces in a pool, including previously rolled named pools. The creator manages definitions in the Dice tab. Creator previews, the player sheet, the GM board, activity and exports use the saved face labels and symbols. Configurable push policies apply to standard dice.
 
+**Card decks (rules coverage R8, 2026-11-12, implemented):** a system can
+define up to 4 decks. A deck names one dataset, and that dataset's records (1 to
+200) are its cards. The only stored state of a deck is its remaining order. A
+campaign shares one state per deck between all its characters. A character
+outside a campaign has its own. Two entity action kinds use a deck: `draw`
+takes a fixed number of cards (1 to 10) from the top, and `shuffle` returns all
+cards and reorders them. The order follows from the roll secret and a shuffle
+ID, which is the server-generated ID of the shuffle command, or of the first
+draw from a deck that was never shuffled. Both commands are online-only,
+idempotent, and resolve inside the command transaction after the deck state is
+locked, so concurrent draws never deal the same card. They leave the character
+revision unchanged. A draw is saved like a roll, with the same audiences,
+activity, GM board and export; its result lists each card's label and columns
+and the number of cards left. A draw from a deck with fewer cards than asked
+deals what is left. A draw from an empty deck is refused with a readable
+message until the deck is shuffled. A shuffle is recorded in the character's
+activity. Cards that a later rules version removes are skipped, and new cards
+enter at the next shuffle. `GET /characters/{id}/decks` (browser API and
+`/api/v1`) returns the cards left per deck. The creator edits decks and their
+cards in the Dice tab on top of the dataset editor. There are no hands, discard
+piles, peeking, dealing to other players or returning single cards, formulas
+cannot read drawn cards, and templates and extensions cannot grant deck actions.
+
 **Targeted and opposed rolls (rules coverage R7, 2026-11-11):** a roll action
 can declare a target entity and use its fields through `target.<fieldId>`.
 A response action can read `opposed.total` from a saved roll visible to the
@@ -726,6 +749,7 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current
 | character_image_assets, item_image_assets | portraits and item art (Section 7.8) | storage_key, media_type, checksum              |
 | character_activity_events, campaign_activity_events | character or campaign scope | kind, payload, occurred_at, request_id         |
 | character_rolls     | character; command execution                 | audience, result, push lineage                                      |
+| deck_states         | campaign or standalone character             | deck_id, shuffle_id, remaining card order (Section 6.4)             |
 | character_controllers, character_claim_designations, character_placements | campaign custody (Section 17.8) | character_id, campaign_id, user_id |
 | scenes, display_codes, display_credentials | campaign scenes and paired displays (Section 7.7) | revision, image_revision, fog, tokens; code/secret hashes |
 | campaign_item_templates, campaign_item_proposals (+ revisions, grants, images) | campaign catalog (Section 5.4) | content revision, audience |

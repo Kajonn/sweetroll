@@ -1,6 +1,9 @@
 export const PACKAGE_LIMITS = {
   actions: 256,
+  cardsPerDeck: 200,
+  cardsPerDraw: 10,
   customDice: 16,
+  decks: 4,
   dicePerRoll: 100,
   facesPerCustomDie: 20,
   symbolCountPerFace: 100,

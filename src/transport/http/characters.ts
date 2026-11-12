@@ -6,7 +6,7 @@ import { characterEntryImageHandlers, characterEntryImageRoutes } from "./charac
 import {DieResultSchema, RollBreakdownSchema, PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
-import { RollOptionsQuery, RollOptionsSchema } from "./roll-options.js";
+import { CharacterDecksSchema, RollOptionsQuery, RollOptionsSchema } from "./roll-options.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
@@ -176,7 +176,12 @@ const ProjectionElementDto = Type.Union([
     id: Type.String(),
     actionId: Type.String(),
     label: Type.String(),
-    actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
+    actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump"), Type.Literal("draw"), Type.Literal("shuffle")]),
+    deck: Type.Optional(Type.Object({
+      deckId: Type.String(),
+      label: Type.String(),
+      count: Type.Optional(Type.Integer({ minimum: 1, maximum: 10 })),
+    })),
     target: Type.Optional(Type.Object({ entityId: Type.String() })),
     respondsTo: Type.Optional(Type.Literal(true)),
     inputs: Type.Array(ProjectionActionInputDto),
@@ -778,6 +783,15 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
       },
     },
   },
+  {
+    method: "get",
+    path: "/characters/:characterId/decks",
+    operationId: "get_characters_characterId_decks",
+    schema: {
+      params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) }),
+      response: { "200": Type.Object({ decks: CharacterDecksSchema, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
   {method:"get",path:"/characters/:characterId/actions/:actionId/roll-options",operationId:"get_character_roll_options",schema:{
     params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }), actionId: Type.String() }),
     querystring: RollOptionsQuery,
@@ -1242,6 +1256,13 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      get_characters_characterId_decks: async (request, reply) => {
+        const result = await characters.listDecks(ctxOf(request), request.params as { characterId: string });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "no-store");
+        return { decks: result.value, requestId: request.id };
       },
 
       get_character_roll_options: async (request, reply) => {

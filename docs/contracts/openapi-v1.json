@@ -16560,8 +16560,36 @@
                                                       {
                                                         "const": "resourceBump",
                                                         "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "draw",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "shuffle",
+                                                        "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "deck": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "deckId",
+                                                      "label"
+                                                    ],
+                                                    "properties": {
+                                                      "deckId": {
+                                                        "type": "string"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      },
+                                                      "count": {
+                                                        "minimum": 1,
+                                                        "maximum": 10,
+                                                        "type": "integer"
+                                                      }
+                                                    }
                                                   },
                                                   "target": {
                                                     "type": "object",
@@ -21312,8 +21340,36 @@
                                                       {
                                                         "const": "resourceBump",
                                                         "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "draw",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "shuffle",
+                                                        "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "deck": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "deckId",
+                                                      "label"
+                                                    ],
+                                                    "properties": {
+                                                      "deckId": {
+                                                        "type": "string"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      },
+                                                      "count": {
+                                                        "minimum": 1,
+                                                        "maximum": 10,
+                                                        "type": "integer"
+                                                      }
+                                                    }
                                                   },
                                                   "target": {
                                                     "type": "object",
@@ -23737,8 +23793,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -24561,6 +24645,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -27117,8 +27273,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -27941,6 +28125,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -30508,8 +30764,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -31332,6 +31616,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -33890,8 +34246,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -34714,6 +35098,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -37274,8 +37730,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -38099,6 +38583,78 @@
                                       "maxLength": 256,
                                       "type": "string"
                                     },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
                                     "groups": {
                                       "maxItems": 256,
                                       "type": "array",
@@ -38528,6 +39084,965 @@
                               "type": "null"
                             }
                           ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "const": "unauthorized",
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "pushReason": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "diagnostics": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "validationId",
+                              "severity",
+                              "message",
+                              "targetDefinitionId"
+                            ],
+                            "properties": {
+                              "validationId": {
+                                "type": "string"
+                              },
+                              "severity": {
+                                "anyOf": [
+                                  {
+                                    "const": "error",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "warning",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "message": {
+                                "type": "string"
+                              },
+                              "targetDefinitionId": {
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "actionDiagnostics": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "code",
+                              "actionId",
+                              "expressionId",
+                              "message"
+                            ],
+                            "properties": {
+                              "code": {
+                                "const": "arithmetic_failure",
+                                "type": "string"
+                              },
+                              "actionId": {
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "type": "string"
+                              },
+                              "message": {
+                                "maxLength": 256,
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "changedDefinitionIds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "activityCursor": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "cacheDisposition": {
+                          "anyOf": [
+                            {
+                              "const": "retain",
+                              "type": "string"
+                            },
+                            {
+                              "const": "replace",
+                              "type": "string"
+                            },
+                            {
+                              "const": "purge",
+                              "type": "string"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/characters/{characterId}/decks": {
+      "get": {
+        "operationId": "get_characters_characterId_decks",
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "decks",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "decks": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "deckId",
+                          "label",
+                          "total",
+                          "remaining"
+                        ],
+                        "properties": {
+                          "deckId": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "total": {
+                            "minimum": 1,
+                            "maximum": 200,
+                            "type": "integer"
+                          },
+                          "remaining": {
+                            "minimum": 0,
+                            "maximum": 200,
+                            "type": "integer"
+                          }
                         }
                       }
                     },
@@ -40584,6 +42099,78 @@
                               "minLength": 1,
                               "maxLength": 256,
                               "type": "string"
+                            },
+                            "cards": {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "deckId",
+                                "deckLabel",
+                                "remaining",
+                                "drawn"
+                              ],
+                              "properties": {
+                                "deckId": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "deckLabel": {
+                                  "maxLength": 120,
+                                  "type": "string"
+                                },
+                                "remaining": {
+                                  "minimum": 0,
+                                  "maximum": 200,
+                                  "type": "integer"
+                                },
+                                "drawn": {
+                                  "minItems": 1,
+                                  "maxItems": 10,
+                                  "type": "array",
+                                  "items": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "id",
+                                      "label",
+                                      "values"
+                                    ],
+                                    "properties": {
+                                      "id": {
+                                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                        "type": "string"
+                                      },
+                                      "label": {
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "values": {
+                                        "additionalProperties": false,
+                                        "maxProperties": 64,
+                                        "type": "object",
+                                        "patternProperties": {
+                                          "^[a-z][a-z0-9_]{0,63}$": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "number"
+                                              },
+                                              {
+                                                "type": "boolean"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
                             },
                             "groups": {
                               "maxItems": 256,
@@ -44094,8 +45681,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -44918,6 +46533,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -47529,8 +49216,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -48353,6 +50068,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -51015,8 +52802,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -51839,6 +53654,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -54393,8 +56280,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -55217,6 +57132,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -57779,8 +59766,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -58603,6 +60618,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -62453,8 +64540,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -63277,6 +65392,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -68015,8 +70202,36 @@
                                                           {
                                                             "const": "resourceBump",
                                                             "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "draw",
+                                                            "type": "string"
+                                                          },
+                                                          {
+                                                            "const": "shuffle",
+                                                            "type": "string"
                                                           }
                                                         ]
+                                                      },
+                                                      "deck": {
+                                                        "type": "object",
+                                                        "required": [
+                                                          "deckId",
+                                                          "label"
+                                                        ],
+                                                        "properties": {
+                                                          "deckId": {
+                                                            "type": "string"
+                                                          },
+                                                          "label": {
+                                                            "type": "string"
+                                                          },
+                                                          "count": {
+                                                            "minimum": 1,
+                                                            "maximum": 10,
+                                                            "type": "integer"
+                                                          }
+                                                        }
                                                       },
                                                       "target": {
                                                         "type": "object",
@@ -68839,6 +71054,78 @@
                                       "minLength": 1,
                                       "maxLength": 256,
                                       "type": "string"
+                                    },
+                                    "cards": {
+                                      "additionalProperties": false,
+                                      "type": "object",
+                                      "required": [
+                                        "deckId",
+                                        "deckLabel",
+                                        "remaining",
+                                        "drawn"
+                                      ],
+                                      "properties": {
+                                        "deckId": {
+                                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                          "type": "string"
+                                        },
+                                        "deckLabel": {
+                                          "maxLength": 120,
+                                          "type": "string"
+                                        },
+                                        "remaining": {
+                                          "minimum": 0,
+                                          "maximum": 200,
+                                          "type": "integer"
+                                        },
+                                        "drawn": {
+                                          "minItems": 1,
+                                          "maxItems": 10,
+                                          "type": "array",
+                                          "items": {
+                                            "additionalProperties": false,
+                                            "type": "object",
+                                            "required": [
+                                              "id",
+                                              "label",
+                                              "values"
+                                            ],
+                                            "properties": {
+                                              "id": {
+                                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                                "type": "string"
+                                              },
+                                              "label": {
+                                                "maxLength": 120,
+                                                "type": "string"
+                                              },
+                                              "values": {
+                                                "additionalProperties": false,
+                                                "maxProperties": 64,
+                                                "type": "object",
+                                                "patternProperties": {
+                                                  "^[a-z][a-z0-9_]{0,63}$": {
+                                                    "anyOf": [
+                                                      {
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "type": "number"
+                                                      },
+                                                      {
+                                                        "type": "boolean"
+                                                      },
+                                                      {
+                                                        "type": "null"
+                                                      }
+                                                    ]
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
                                     },
                                     "groups": {
                                       "maxItems": 256,
@@ -71372,8 +73659,36 @@
                                                       {
                                                         "const": "resourceBump",
                                                         "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "draw",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "shuffle",
+                                                        "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "deck": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "deckId",
+                                                      "label"
+                                                    ],
+                                                    "properties": {
+                                                      "deckId": {
+                                                        "type": "string"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      },
+                                                      "count": {
+                                                        "minimum": 1,
+                                                        "maximum": 10,
+                                                        "type": "integer"
+                                                      }
+                                                    }
                                                   },
                                                   "target": {
                                                     "type": "object",
@@ -73155,6 +75470,78 @@
                                     "minLength": 1,
                                     "maxLength": 256,
                                     "type": "string"
+                                  },
+                                  "cards": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "deckId",
+                                      "deckLabel",
+                                      "remaining",
+                                      "drawn"
+                                    ],
+                                    "properties": {
+                                      "deckId": {
+                                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                        "type": "string"
+                                      },
+                                      "deckLabel": {
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "remaining": {
+                                        "minimum": 0,
+                                        "maximum": 200,
+                                        "type": "integer"
+                                      },
+                                      "drawn": {
+                                        "minItems": 1,
+                                        "maxItems": 10,
+                                        "type": "array",
+                                        "items": {
+                                          "additionalProperties": false,
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "label",
+                                            "values"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "label": {
+                                              "maxLength": 120,
+                                              "type": "string"
+                                            },
+                                            "values": {
+                                              "additionalProperties": false,
+                                              "maxProperties": 64,
+                                              "type": "object",
+                                              "patternProperties": {
+                                                "^[a-z][a-z0-9_]{0,63}$": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "boolean"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
                                   },
                                   "groups": {
                                     "maxItems": 256,
@@ -98412,8 +100799,36 @@
                                                       {
                                                         "const": "resourceBump",
                                                         "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "draw",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "shuffle",
+                                                        "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "deck": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "deckId",
+                                                      "label"
+                                                    ],
+                                                    "properties": {
+                                                      "deckId": {
+                                                        "type": "string"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      },
+                                                      "count": {
+                                                        "minimum": 1,
+                                                        "maximum": 10,
+                                                        "type": "integer"
+                                                      }
+                                                    }
                                                   },
                                                   "target": {
                                                     "type": "object",
@@ -100898,8 +103313,36 @@
                                                       {
                                                         "const": "resourceBump",
                                                         "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "draw",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "shuffle",
+                                                        "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "deck": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "deckId",
+                                                      "label"
+                                                    ],
+                                                    "properties": {
+                                                      "deckId": {
+                                                        "type": "string"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      },
+                                                      "count": {
+                                                        "minimum": 1,
+                                                        "maximum": 10,
+                                                        "type": "integer"
+                                                      }
+                                                    }
                                                   },
                                                   "target": {
                                                     "type": "object",
@@ -103105,8 +105548,36 @@
                                                       {
                                                         "const": "resourceBump",
                                                         "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "draw",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "shuffle",
+                                                        "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "deck": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "deckId",
+                                                      "label"
+                                                    ],
+                                                    "properties": {
+                                                      "deckId": {
+                                                        "type": "string"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      },
+                                                      "count": {
+                                                        "minimum": 1,
+                                                        "maximum": 10,
+                                                        "type": "integer"
+                                                      }
+                                                    }
                                                   },
                                                   "target": {
                                                     "type": "object",
@@ -105317,8 +107788,36 @@
                                                       {
                                                         "const": "resourceBump",
                                                         "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "draw",
+                                                        "type": "string"
+                                                      },
+                                                      {
+                                                        "const": "shuffle",
+                                                        "type": "string"
                                                       }
                                                     ]
+                                                  },
+                                                  "deck": {
+                                                    "type": "object",
+                                                    "required": [
+                                                      "deckId",
+                                                      "label"
+                                                    ],
+                                                    "properties": {
+                                                      "deckId": {
+                                                        "type": "string"
+                                                      },
+                                                      "label": {
+                                                        "type": "string"
+                                                      },
+                                                      "count": {
+                                                        "minimum": 1,
+                                                        "maximum": 10,
+                                                        "type": "integer"
+                                                      }
+                                                    }
                                                   },
                                                   "target": {
                                                     "type": "object",
@@ -111108,6 +113607,78 @@
                                     "minLength": 1,
                                     "maxLength": 256,
                                     "type": "string"
+                                  },
+                                  "cards": {
+                                    "additionalProperties": false,
+                                    "type": "object",
+                                    "required": [
+                                      "deckId",
+                                      "deckLabel",
+                                      "remaining",
+                                      "drawn"
+                                    ],
+                                    "properties": {
+                                      "deckId": {
+                                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                        "type": "string"
+                                      },
+                                      "deckLabel": {
+                                        "maxLength": 120,
+                                        "type": "string"
+                                      },
+                                      "remaining": {
+                                        "minimum": 0,
+                                        "maximum": 200,
+                                        "type": "integer"
+                                      },
+                                      "drawn": {
+                                        "minItems": 1,
+                                        "maxItems": 10,
+                                        "type": "array",
+                                        "items": {
+                                          "additionalProperties": false,
+                                          "type": "object",
+                                          "required": [
+                                            "id",
+                                            "label",
+                                            "values"
+                                          ],
+                                          "properties": {
+                                            "id": {
+                                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                              "type": "string"
+                                            },
+                                            "label": {
+                                              "maxLength": 120,
+                                              "type": "string"
+                                            },
+                                            "values": {
+                                              "additionalProperties": false,
+                                              "maxProperties": 64,
+                                              "type": "object",
+                                              "patternProperties": {
+                                                "^[a-z][a-z0-9_]{0,63}$": {
+                                                  "anyOf": [
+                                                    {
+                                                      "type": "string"
+                                                    },
+                                                    {
+                                                      "type": "number"
+                                                    },
+                                                    {
+                                                      "type": "boolean"
+                                                    },
+                                                    {
+                                                      "type": "null"
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
                                   },
                                   "groups": {
                                     "maxItems": 256,

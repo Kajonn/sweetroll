@@ -112,6 +112,11 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
   });
 
   value.dice?.forEach((die, index) => collectId(die.id, `/dice/${index}/id`));
+  const deckIds = new Set<string>();
+  value.decks?.forEach((deck, index) => {
+    collectId(deck.id, `/decks/${index}/id`);
+    deckIds.add(deck.id);
+  });
 
   value.referenceData.forEach((dataSet, dataSetIndex) => {
     const dataSetPath = `/referenceData/${dataSetIndex}`;
@@ -274,10 +279,25 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
     });
   });
 
+  // A deck's cards are the records of one dataset (design 6.4, C13).
+  value.decks?.forEach((deck, index) => {
+    const dataset = value.referenceData.find(candidate => candidate.id === deck.datasetId);
+    missing(dataset !== undefined, `/decks/${index}/datasetId`);
+    if (dataset !== undefined && (dataset.records.length < 1 || dataset.records.length > PACKAGE_LIMITS.cardsPerDeck)) {
+      diagnostics.push({
+        code: "limit_exceeded",
+        path: `${prefix}/decks/${index}/datasetId`,
+        message: `A deck needs between 1 and ${PACKAGE_LIMITS.cardsPerDeck} cards.`,
+      });
+    }
+  });
+
   value.actions.forEach((action, actionIndex) => {
     if (action.kind === "roll") {
       missing(expressionIds.has(action.expressionId), `/actions/${actionIndex}/expressionId`);
       missingOutcomeExpressions(action, `/actions/${actionIndex}`);
+    } else if (action.kind === "draw" || action.kind === "shuffle") {
+      missing(deckIds.has(action.deckId), `/actions/${actionIndex}/deckId`);
     } else {
       missing(resourceIds.has(action.resourceId), `/actions/${actionIndex}/resourceId`);
     }

@@ -2,7 +2,7 @@ import { createImageEditorApi, type ImageEditorApi } from "../ui/imageEditorApi.
 import { ApiError, type ApiClient } from "../api/client.js";
 import { createCharacterImagesApi, type CharacterImagesApi } from "./imageApi.js";
 import type {
-  PushOptionsResponse,ReadRollResponse,RollOptionsResponse,
+  CharacterDecksResponse,PushOptionsResponse,ReadRollResponse,RollOptionsResponse,
   ActivityResponse,
   AddCharacterEntryBody,
   AddCharacterEntryResponse,
@@ -44,6 +44,8 @@ export type CharactersApi = {
   images?: CharacterImagesApi;
   entryImages?: (characterId: string, entryId: string) => ImageEditorApi;
   rollOptions?(characterId: string, actionId: string, entryId?: string): Promise<RollOptionsResponse>;
+  /** Design 6.4: cards left in each deck of the character's system. */
+  decks?(characterId: string): Promise<CharacterDecksResponse>;
   pushOptions(characterId:string,rollId:string):Promise<PushOptionsResponse>;
   readRoll(characterId:string,rollId:string):Promise<ReadRollResponse>;
   open(characterId: string): Promise<OpenCharacterResponse>;
@@ -107,6 +109,7 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       "GET", `/characters/${encodeURIComponent(characterId)}/actions/${encodeURIComponent(actionId)}/roll-options`,
       entryId === undefined ? undefined : { query: { entryId } },
     ),
+    decks: (characterId) => client.fetch<CharacterDecksResponse>("GET", `/characters/${encodeURIComponent(characterId)}/decks`),
     pushOptions:(characterId,rollId)=>client.fetch<PushOptionsResponse>("GET",`/characters/${characterId}/rolls/${rollId}/push-options`),
     readRoll:(characterId,rollId)=>client.fetch<ReadRollResponse>("GET",`/characters/${characterId}/rolls/${rollId}`),
     open: (characterId) => client.fetch<OpenCharacterResponse>("GET", `/characters/${characterId}`),

@@ -85,13 +85,24 @@ export async function playAtEachViewport(
   await expectAccessible(page, `${state}: after use`);
 }
 
-/** The creator page: accessible at desktop size, and no sideways page scroll at tablet and phone widths. */
+/** The creator page: accessible at desktop size, no sideways page scroll at tablet and phone widths, and a working editor/preview switch on the phone. */
 export async function expectCreatorUsable(page: Page, state: string): Promise<void> {
   await expectAccessible(page, state);
-  for (const viewport of [PLAY_VIEWPORTS[1], PLAY_VIEWPORTS[0]]) {
-    await page.setViewportSize(viewport);
-    await expectNoPageOverflow(page);
-  }
+  await page.setViewportSize(PLAY_VIEWPORTS[1]);
+  await expectNoPageOverflow(page);
+  // On a phone the creator is for review and small edits: one pane at a time.
+  await page.setViewportSize(PLAY_VIEWPORTS[0]);
+  await expectNoPageOverflow(page);
+  const preview = page.getByTestId("document-editor-preview-view-preview");
+  const editor = page.getByTestId("document-editor-preview-view-editor");
+  await expectWithinViewport(preview);
+  await preview.click();
+  await expect(preview).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("document-editor-editor-pane")).toBeHidden();
+  await expectNoPageOverflow(page);
+  await editor.click();
+  await expect(editor).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByTestId("document-editor-editor-pane")).toBeVisible();
   await page.setViewportSize(DESKTOP);
 }
 

@@ -1,4 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
+import { expectCreatorUsable, playAtEachViewport } from "../fixtures/guiChecks";
 import { expectSheetSaved } from "../fixtures/sheetSaved";
 import { d20Document } from "../../../src/systems/implementation/package/fixtures/d20.js";
 import { uid } from "../offline/test-auth.js";
@@ -41,6 +42,7 @@ test("creator, player and GM use conditional rules from the same published versi
     await page.getByTestId("roll-action-try-check").click();
     await expect(page.getByTestId("roll-action-try-total-check")).toHaveText("1");
 
+    await expectCreatorUsable(page, "conditional rules creator");
     await page.getByTestId("document-editor-publish").click();
     await page.getByTestId("publish-dialog-semver").fill("1.0.0");
     await page.getByTestId("publish-dialog-release-notes").fill("Conditional proficiency and class bonuses");
@@ -59,8 +61,8 @@ test("creator, player and GM use conditional rules from the same published versi
       await expect(proficient).toBeChecked();
     }).toPass();
     await expectSheetSaved(page);
-    await page.getByRole("button", { name: "Check", exact: true }).click();
-    await expect(page.getByText("Result: 6", { exact: true })).toBeVisible();
+    await playAtEachViewport(page, "conditional roll on the sheet", page.getByRole("button", { name: "Check", exact: true }),
+      () => expect(page.getByText("Result: 6", { exact: true })).toBeVisible());
 
     await page.goto("/campaigns/new");
     await page.getByRole("button", { name: `${systemName} 1.0.0` }).click();
@@ -76,8 +78,8 @@ test("creator, player and GM use conditional rules from the same published versi
     await page.getByRole("tab", { name: "Session" }).click();
     await page.getByRole("button", { name: "Open GM Fighter" }).click();
     const roll = page.getByRole("button", { name: "Roll Check" });
-    await roll.click();
-    await expect(roll.locator("..").getByRole("status")).toHaveText("4");
+    await playAtEachViewport(page, "conditional roll on the GM board", roll,
+      () => expect(roll.locator("..").getByRole("status")).toHaveText("4"));
   } finally {
     if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
   }

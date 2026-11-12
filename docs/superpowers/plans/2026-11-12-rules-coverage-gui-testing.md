@@ -1,6 +1,6 @@
 # GUI testing of the rules coverage features
 
-**Test plan · 12 November 2026 · Proposed, not yet approved**
+**Test plan · 12 November 2026 · Owner decided D1–D3 on 2026-11-12; D4 is open and blocks only T3**
 
 ## Goal
 
@@ -158,7 +158,9 @@ Physical devices, real provider sign-in, table and remote playtests, load
 testing, the hosted public-API journey (B6), scene and display testing, and
 application-version transition tests (design Section 17.0).
 
-## Decisions for the owner
+## Decisions
+
+Owner answers of 2026-11-12: D1 all stages, D2 yes, D3 no. D4 is not answered yet.
 
 | # | Question | Recommendation |
 |---|----------|----------------|
@@ -175,3 +177,35 @@ application-version transition tests (design Section 17.0).
 | Flaky multi-context journeys | Wait on committed state (the settled-save helper and server-rendered counts), never on timing |
 | Visual baselines drift with the bundled Chromium | Update them only together with a Playwright upgrade, in a commit of their own |
 | Card counts on another player's sheet update only on reload | Assert the documented behaviour (count refreshes on load and after the player's own draw or shuffle), not a live update |
+
+## Implementation record
+
+**T1 items 1–3 — 2026-11-12, implemented.**
+
+- `web/tests/fixtures/guiChecks.ts` holds the shared checks: the three play
+  sizes, no sideways page scroll, a control inside the viewport, an axe scan
+  that fails on serious or critical violations, and activation by keyboard.
+- The stage journeys `rulesGrammar`, `rulesData`, `dynamicPools`,
+  `rulesOutcomes`, `customDice`, `opposedRolls` and `cardDecks` use them. On the
+  player sheet and the GM board each action is used once per width in the same
+  session, by keyboard at 360 px and by pointer at 768 and 1280 px, and each use
+  waits for its own command response. The page is scanned before the first and
+  after the last use.
+- The creator page is scanned at 1280 px and checked for sideways scroll at 768
+  and 360 px. The 360 px creator step does not yet open the editor/preview
+  switch and read values, as item 1 asks.
+- Roadwardens checks the computed maximum on the GM board at each width, since
+  its roll is granted by an item and is not on the board. Bridge Contest plays
+  the striker on a phone by keyboard, the defender on a tablet and the GM on a
+  desktop, and checks both pickers at every width.
+- Two defects found by the scans and fixed: the creator's "no issues" text and
+  discarded dice in the creator's Try it result failed colour contrast
+  (`ExpressionEditor.module.css`, `RollActionEditor.module.css`).
+- Verified locally: all eleven tests of the seven specs pass against PostgreSQL
+  16 with the container's Chromium. Not verified: CI on the pinned Chromium, and
+  whether the two style fixes touch an existing visual baseline.
+
+Open in T1: items 4 (resource editing journey, online and offline), 5 (error and
+edge states), 6 (two-player shared deck), 7 (visual baselines, which must be
+generated with the pinned Chromium and reviewed by a person) and 8 (dark theme
+and enlarged text). T2 and T3 are not started.

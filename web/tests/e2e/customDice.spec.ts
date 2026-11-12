@@ -1,4 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
+import { expectCreatorUsable, playAtEachViewport } from "../fixtures/guiChecks";
 import { customDiceDocument, customDiceFixtures } from "../../../src/systems/implementation/package/fixtures/custom-dice.js";
 import { uid } from "../offline/test-auth.js";
 
@@ -49,6 +50,7 @@ for (const fixture of customDiceFixtures) {
       await page.getByTestId("roll-action-try-check").click();
       await expect(faces.getByRole("listitem")).toHaveCount(4);
 
+      await expectCreatorUsable(page, "custom dice creator");
       await page.getByTestId("document-editor-publish").click();
       await page.getByTestId("publish-dialog-semver").fill("1.0.0");
       await page.getByTestId("publish-dialog-release-notes").fill("Custom dice");
@@ -59,8 +61,8 @@ for (const fixture of customDiceFixtures) {
       await page.getByLabel("Character name").fill("Rin");
       await page.getByRole("button", { name: "Create character", exact: true }).click();
       await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
-      await page.getByRole("button", { name: fixture.action, exact: true }).click();
-      await expect(faces.getByRole("listitem")).toHaveCount(4);
+      await playAtEachViewport(page, `${fixture.name} roll on the sheet`, page.getByRole("button", { name: fixture.action, exact: true }),
+        () => expect(faces.getByRole("listitem")).toHaveCount(4));
 
       await page.goto("/campaigns/new");
       await page.getByRole("button", { name: `${systemName} 1.0.0` }).click();
@@ -75,8 +77,8 @@ for (const fixture of customDiceFixtures) {
       await page.goto(campaignUrl);
       await page.getByRole("tab", { name: "Session" }).click();
       await page.getByRole("button", { name: "Open Guide" }).click();
-      await page.getByRole("button", { name: `Roll ${fixture.action}`, exact: true }).click();
-      await expect(faces.getByRole("listitem")).toHaveCount(4);
+      await playAtEachViewport(page, `${fixture.name} roll on the GM board`, page.getByRole("button", { name: `Roll ${fixture.action}`, exact: true }),
+        () => expect(faces.getByRole("listitem")).toHaveCount(4));
     } finally {
       if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
     }

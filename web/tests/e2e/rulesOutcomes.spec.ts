@@ -1,4 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
+import { expectCreatorUsable, playAtEachViewport } from "../fixtures/guiChecks";
 import { movesDocument } from "../../../src/systems/implementation/package/fixtures/outcome-systems.js";
 import { uid } from "../offline/test-auth.js";
 
@@ -39,6 +40,7 @@ test("Hearthbound names move outcomes in the creator, player sheet and GM sessio
     await output.fill("{outcome} ({total}, margin {detail.detail_1})");
     await output.blur();
 
+    await expectCreatorUsable(page, "outcome bands creator");
     await page.getByTestId("document-editor-publish").click();
     await page.getByTestId("publish-dialog-semver").fill("1.0.0");
     await page.getByTestId("publish-dialog-release-notes").fill("Hearthbound moves");
@@ -50,8 +52,8 @@ test("Hearthbound names move outcomes in the creator, player sheet and GM sessio
     await page.getByLabel("Character name").fill("Wren");
     await page.getByRole("button", { name: "Create character", exact: true }).click();
     await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
-    await page.getByRole("button", { name: "Make Move", exact: true }).click();
-    await expect(page.getByTestId("roll-outcome")).toHaveText(outcome);
+    await playAtEachViewport(page, "outcome roll on the sheet", page.getByRole("button", { name: "Make Move", exact: true }),
+      () => expect(page.getByTestId("roll-outcome")).toHaveText(outcome));
     await expect(page.getByText("Margin", { exact: true })).toBeVisible();
     await expect(page.getByText(/^(Strong hit|Weak hit|Miss) \(\d+, margin -?\d+\)$/)).toBeVisible();
 
@@ -68,8 +70,8 @@ test("Hearthbound names move outcomes in the creator, player sheet and GM sessio
     await page.goto(campaignUrl);
     await page.getByRole("tab", { name: "Session" }).click();
     await page.getByRole("button", { name: "Open Elder" }).click();
-    await page.getByRole("button", { name: "Roll Make Move", exact: true }).click();
-    await expect(page.getByRole("status").filter({ hasText: /^\d+ — (Strong hit|Weak hit|Miss)$/ })).toBeVisible();
+    await playAtEachViewport(page, "outcome roll on the GM board", page.getByRole("button", { name: "Roll Make Move", exact: true }),
+      () => expect(page.getByRole("status").filter({ hasText: /^\d+ — (Strong hit|Weak hit|Miss)$/ })).toBeVisible());
   } finally {
     if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
   }

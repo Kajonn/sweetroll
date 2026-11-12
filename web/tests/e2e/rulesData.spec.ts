@@ -1,4 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
+import { atEachViewport, expectAccessible, expectCreatorUsable, expectWithinViewport, playAtEachViewport } from "../fixtures/guiChecks";
 import { expectSheetSaved } from "../fixtures/sheetSaved";
 import { advancedD20Document } from "../../../src/systems/implementation/package/fixtures/advanced-d20.js";
 import { uid } from "../offline/test-auth.js";
@@ -28,6 +29,7 @@ test("Roadwardens derive armor and health in the creator, player sheet and GM se
     await healthField.getByText("Maximum formula", { exact: true }).first().click();
     await expect(healthField.getByRole("combobox", { name: "Maximum formula" })).toHaveValue("health_max");
 
+    await expectCreatorUsable(page, "tables and equipment creator");
     await page.getByTestId("document-editor-publish").click();
     await page.getByTestId("publish-dialog-semver").fill("1.0.0");
     await page.getByTestId("publish-dialog-release-notes").fill("Roadwardens rules");
@@ -49,8 +51,8 @@ test("Roadwardens derive armor and health in the creator, player sheet and GM se
     await page.getByTestId("slot-template-picker-equipment").selectOption("leather");
     await page.getByTestId("slot-add-confirm-equipment").click();
     await expect.poll(readDerived).toMatchObject({ defense: 12, carried: 3 });
-    await page.getByRole("button", { name: "Inspect armor", exact: true }).click();
-    await expect(page.getByText("Armor check: 4", { exact: true })).toBeVisible();
+    await playAtEachViewport(page, "table and equipment roll on the sheet", page.getByRole("button", { name: "Inspect armor", exact: true }),
+      () => expect(page.getByText("Armor check: 4", { exact: true })).toBeVisible());
     const level = page.getByLabel("Level", { exact: true });
     await level.fill("4");
     await level.press("Enter");
@@ -78,6 +80,9 @@ test("Roadwardens derive armor and health in the creator, player sheet and GM se
     await page.getByRole("tab", { name: "Session" }).click();
     await page.getByRole("button", { name: "Open Watch captain" }).click();
     await expect(page.getByText("10 / 18", { exact: true })).toBeVisible();
+    // The armor check is granted by an item, so the board shows the computed maximum only.
+    await atEachViewport(page, () => expectWithinViewport(page.getByText("10 / 18", { exact: true })));
+    await expectAccessible(page, "computed maximum on the GM board");
   } finally {
     if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
   }

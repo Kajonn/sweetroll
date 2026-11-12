@@ -92,5 +92,7 @@ privacy layer and cards are simple draw/shuffle decks. Linter/formatter tooling 
 not part of it. Stages R0–R8 are implemented (R8: card decks, 2026-11-12). See the plan's implementation record before changing the rules engine.
 
 A [GUI test plan for the rules coverage features](docs/superpowers/plans/2026-11-12-rules-coverage-gui-testing.md)
-is proposed and not yet approved. Do not start its work before the owner
-approves it and its decisions D1–D4.
+was decided by the owner on 2026-11-12: all stages run at three widths (D1), the
+twelve visual baselines are added (D2) and the hosted run is not required before
+PR 75 merges (D3). D4 (who performs the human checks) is open and blocks only T3.
+See the plan's implementation record for what is done.

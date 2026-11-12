@@ -1,4 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
+import { expectCreatorUsable, playAtEachViewport } from "../fixtures/guiChecks";
 import { dynamicPoolDocument, dynamicPoolFixtures } from "../../../src/systems/implementation/package/fixtures/dynamic-pools.js";
 import { uid } from "../offline/test-auth.js";
 
@@ -39,6 +40,7 @@ for (const fixture of dynamicPoolFixtures) {
       await page.getByTestId("roll-action-try-check").click();
       for (const group of fixture.groups) await expect(page.getByTestId(`roll-group-${group}`)).toBeVisible();
 
+      await expectCreatorUsable(page, "dynamic pools creator");
       await page.getByTestId("document-editor-publish").click();
       await page.getByTestId("publish-dialog-semver").fill("1.0.0");
       await page.getByTestId("publish-dialog-release-notes").fill("Dynamic pools");
@@ -49,8 +51,9 @@ for (const fixture of dynamicPoolFixtures) {
       await page.getByLabel("Character name").fill("Rin");
       await page.getByRole("button", { name: "Create character", exact: true }).click();
       await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
-      await page.getByRole("button", { name: fixture.label, exact: true }).click();
-      for (const group of fixture.groups) await expect(page.getByTestId(`roll-group-${group}`)).toBeVisible();
+      await playAtEachViewport(page, `${fixture.name} roll on the sheet`, page.getByRole("button", { name: fixture.label, exact: true }), async () => {
+        for (const group of fixture.groups) await expect(page.getByTestId(`roll-group-${group}`)).toBeVisible();
+      });
 
       await page.goto("/campaigns/new");
       await page.getByRole("button", { name: `${systemName} 1.0.0` }).click();
@@ -65,8 +68,9 @@ for (const fixture of dynamicPoolFixtures) {
       await page.goto(campaignUrl);
       await page.getByRole("tab", { name: "Session" }).click();
       await page.getByRole("button", { name: "Open Guide" }).click();
-      await page.getByRole("button", { name: `Roll ${fixture.label}`, exact: true }).click();
-      for (const group of fixture.groups) await expect(page.getByTestId(`roll-group-${group}`)).toBeVisible();
+      await playAtEachViewport(page, `${fixture.name} roll on the GM board`, page.getByRole("button", { name: `Roll ${fixture.label}`, exact: true }), async () => {
+        for (const group of fixture.groups) await expect(page.getByTestId(`roll-group-${group}`)).toBeVisible();
+      });
     } finally {
       if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
     }

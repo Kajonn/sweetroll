@@ -1,5 +1,6 @@
 import { bridgeContestDocument } from "../../../src/systems/implementation/package/fixtures/opposed.js";
 import { expect, test } from "../fixtures/browserTest";
+import { PLAY_VIEWPORTS, atEachViewport, expectAccessible, expectCreatorUsable, expectWithinViewport, pressFromKeyboard } from "../fixtures/guiChecks";
 import { cleanup, json, key, resultOf, signIn } from "../fixtures/configurablePush.js";
 
 test("creator, players and GM play the Bridge Contest", async ({ page, browser }) => {
@@ -33,6 +34,7 @@ test("creator, players and GM play the Bridge Contest", async ({ page, browser }
     await counterEditor.getByLabel("Respond to a recorded roll").check();
     await attackEditor.getByTestId("roll-action-try-attack").click();
     await expect(attackEditor.getByTestId("roll-breakdown")).toBeVisible();
+    await expectCreatorUsable(page, "targeted and opposed rolls creator");
     await page.getByTestId("document-editor-publish").click();
     await page.getByTestId("publish-dialog-semver").fill("1.0.0");
     await page.getByTestId("publish-dialog-release-notes").fill("Attack and contest");
@@ -71,7 +73,14 @@ test("creator, players and GM play the Bridge Contest", async ({ page, browser }
     await expect(attack.getByRole("button", { name: "Bridge attack", exact: true })).toBeDisabled();
     await attack.getByRole("button", { name: "Load roll options" }).click();
     await attack.getByLabel("Target character").selectOption({ label: "Defender" });
-    const hit = (await resultOf(striker!, () => attack.getByRole("button", { name: "Bridge attack", exact: true }).click(), "/actions/attack")).result.roll;
+    // The striker plays on a phone by keyboard, the defender on a tablet, the GM on a desktop.
+    await atEachViewport(striker!, async () => {
+      await expectWithinViewport(attack.getByLabel("Target character"));
+      await expectWithinViewport(attack.getByRole("button", { name: "Bridge attack", exact: true }));
+    });
+    await expectAccessible(striker!, "target picker on the sheet");
+    await striker!.setViewportSize(PLAY_VIEWPORTS[0]);
+    const hit = (await resultOf(striker!, () => pressFromKeyboard(attack.getByRole("button", { name: "Bridge attack", exact: true })), "/actions/attack")).result.roll;
     expect(hit.targetCharacterId).toBe(characterIds[1]);
     expect(hit.total).toBe(hit.dice[0].value - 10);
     await striker!.getByText("Show roll details", { exact: true }).first().click();
@@ -80,6 +89,12 @@ test("creator, players and GM play the Bridge Contest", async ({ page, browser }
     const counter = defender!.locator("form").filter({ has: defender!.getByRole("button", { name: "Counter the challenge", exact: true }) });
     await counter.getByRole("button", { name: "Load roll options" }).click();
     await counter.getByLabel("Recorded roll").selectOption({ label: hit.output });
+    await atEachViewport(defender!, async () => {
+      await expectWithinViewport(counter.getByLabel("Recorded roll"));
+      await expectWithinViewport(counter.getByRole("button", { name: "Counter the challenge", exact: true }));
+    });
+    await expectAccessible(defender!, "recorded-roll picker on the sheet");
+    await defender!.setViewportSize(PLAY_VIEWPORTS[1]);
     const reply = (await resultOf(defender!, () => counter.getByRole("button", { name: "Counter the challenge", exact: true }).click(), "/actions/counter")).result.roll;
     expect(reply.total).toBe(reply.dice[0].value - hit.total);
     expect(reply.bindings).toEqual([{ scope: "opposed", definitionId: "total", value: hit.total }]);
@@ -92,6 +107,8 @@ test("creator, players and GM play the Bridge Contest", async ({ page, browser }
     await gmAttack.getByLabel("Target character").selectOption({ label: "Defender" });
     const gmRoll = (await resultOf(page, () => gmAttack.getByRole("button", { name: "Roll Bridge attack", exact: true }).click(), "/actions/attack")).result.roll;
     expect(gmRoll.bindings).toEqual([{ scope: "target", definitionId: "defense", value: 10 }]);
+    await atEachViewport(page, () => expectWithinViewport(gmAttack.getByLabel("Target character")));
+    await expectAccessible(page, "targeted roll on the GM board");
   } finally {
     await Promise.all(contexts.map(context => context.close()));
     if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await cleanup(page.request, systemId, characterIds, campaignId);

@@ -1,4 +1,5 @@
 import { expect, test } from "../fixtures/browserTest";
+import { expectAccessible, expectCreatorUsable, playAtEachViewport, pressFromKeyboard } from "../fixtures/guiChecks";
 import { emberRoadDocument } from "../../../src/systems/implementation/package/fixtures/card-decks.js";
 import { uid } from "../offline/test-auth.js";
 
@@ -31,6 +32,7 @@ test("creator, player and GM draw from the Ember Road omen deck", async ({ page 
     await page.getByTestId("deck-action-count-read_omens").fill("3");
     await expect(page.getByTestId("deck-action-gather_omens").getByLabel("Deck")).toHaveValue("omen_deck");
 
+    await expectCreatorUsable(page, "card decks creator");
     await page.getByTestId("document-editor-publish").click();
     await page.getByTestId("publish-dialog-semver").fill("1.0.0");
     await page.getByTestId("publish-dialog-release-notes").fill("Omen deck");
@@ -45,19 +47,21 @@ test("creator, player and GM draw from the Ember Road omen deck", async ({ page 
     await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+$/);
     const drawCount = page.getByTestId("deck-count-read_omens_element");
     await expect(drawCount).toHaveText("Omen deck: 12 of 12 cards left");
-    await page.getByRole("button", { name: "Read the omens", exact: true }).click();
+    const draw = page.getByRole("button", { name: "Read the omens", exact: true });
     const cards = page.getByRole("region", { name: "Cards drawn from Omen deck" });
-    await expect(cards.getByRole("listitem")).toHaveCount(3);
-    await expect(cards.getByRole("listitem").first()).toContainText(/ of (Ember|Tide|Gale) \(rank: \d, suit: (Ember|Tide|Gale)\)/);
-    await expect(cards).toContainText("Omen deck: 9 cards left");
-    await expect(drawCount).toHaveText("Omen deck: 9 of 12 cards left");
-    for (const left of [6, 3, 0]) {
-      await page.getByRole("button", { name: "Read the omens", exact: true }).click();
-      await expect(cards).toContainText(`Omen deck: ${left} cards left`);
-    }
+    // One draw of three cards per width: by keyboard at 360 px, by pointer at 768 and 1280 px.
+    await playAtEachViewport(page, "card draw on the sheet", draw, async () => {
+      await expect(cards.getByRole("listitem")).toHaveCount(3);
+      await expect(cards.getByRole("listitem").first()).toContainText(/ of (Ember|Tide|Gale) \(rank: \d, suit: (Ember|Tide|Gale)\)/);
+    });
+    await expect(cards).toContainText("Omen deck: 3 cards left");
+    await expect(drawCount).toHaveText("Omen deck: 3 of 12 cards left");
+    await draw.click();
+    await expect(cards).toContainText("Omen deck: 0 cards left");
     await expect(drawCount).toHaveText("Omen deck has no cards left. Shuffle it to draw again.");
     await expect(page.getByRole("button", { name: "Read the omens", exact: true })).toBeDisabled();
-    await page.getByRole("button", { name: "Gather the omens", exact: true }).click();
+    await expectAccessible(page, "empty deck on the sheet");
+    await pressFromKeyboard(page.getByRole("button", { name: "Gather the omens", exact: true }));
     await expect(drawCount).toHaveText("Omen deck: 12 of 12 cards left");
     await expect(page.getByRole("button", { name: "Read the omens", exact: true })).toBeEnabled();
 
@@ -76,9 +80,9 @@ test("creator, player and GM draw from the Ember Road omen deck", async ({ page 
     await page.goto(campaignUrl);
     await page.getByRole("tab", { name: "Session" }).click();
     await page.getByRole("button", { name: "Open Guide" }).click();
-    await page.getByRole("button", { name: "Read the omens", exact: true }).click();
-    await expect(cards.getByRole("listitem")).toHaveCount(3);
-    await expect(cards).toContainText("Omen deck: 9 cards left");
+    await playAtEachViewport(page, "card draw on the GM board", draw,
+      () => expect(cards.getByRole("listitem")).toHaveCount(3));
+    await expect(cards).toContainText("Omen deck: 3 cards left");
     await page.getByRole("button", { name: "Gather the omens", exact: true }).click();
     await expect(page.getByText("Omen deck shuffled.")).toBeVisible();
   } finally {

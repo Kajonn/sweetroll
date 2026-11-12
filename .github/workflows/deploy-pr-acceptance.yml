@@ -1,0 +1,111 @@
+name: Deploy PR to acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Reviewed same-repository PR number
+        type: number
+        required: true
+      hold_minutes:
+        description: Optional manual testing time after the GUI check (0 to 30 minutes)
+        type: number
+        default: 0
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  acceptance:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    environment: acceptance
+    concurrency:
+      group: sweetroll-acceptance
+      cancel-in-progress: false
+    env:
+      RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+      RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+      RAILWAY_SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+      RAILWAY_APP_URL: ${{ vars.RAILWAY_APP_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - id: source
+        name: Verify the exact PR commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          HOLD_MINUTES: ${{ inputs.hold_minutes }}
+        run: |
+          [[ "$HOLD_MINUTES" =~ ^(0|[1-9]|[12][0-9]|30)$ ]]
+          printf 'Testing PR #%s\n' "$PR_NUMBER" >> "$GITHUB_STEP_SUMMARY"
+          node scripts/railway-deploy.mjs select pr "$PR_NUMBER"
+      - id: baseline
+        name: Resolve verified main before overriding acceptance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/railway-deploy.mjs select main
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          path: deploy-source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.baseline.outputs.sha }}
+          path: baseline-source
+          persist-credentials: false
+      - name: Check that the PR can share the main database baseline
+        run: |
+          if ! cmp -s baseline-source/database/schema.sql deploy-source/database/schema.sql; then
+            echo "This PR changes the schema baseline. Use a coordinated disposable database reset for this test."
+            exit 1
+          fi
+      - run: npm install --global @railway/cli@5.71.0
+      - run: npm ci
+      - run: npm --prefix web ci
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - id: deploy
+        name: Deploy and verify the PR
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: node scripts/railway-deploy.mjs deploy deploy-source "$SOURCE_SHA" acceptance
+      - name: Run the hosted GUI sign-in journey
+        working-directory: web
+        env:
+          G9_ACCEPTANCE_URL: ${{ vars.RAILWAY_APP_URL }}
+        run: npx playwright test --config playwright.g9-acceptance.config.ts deploymentSmoke.spec.ts --workers=1
+      - name: Keep the verified PR live for manual tests
+        env:
+          HOLD_MINUTES: ${{ inputs.hold_minutes }}
+        run: |
+          printf 'Manual acceptance window: %s minutes.\n' "$HOLD_MINUTES"
+          sleep "$((HOLD_MINUTES * 60))"
+      - id: restore
+        name: Resolve current verified main for restoration
+        if: always() && steps.deploy.outcome != '' && steps.deploy.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/railway-deploy.mjs select main
+      - uses: actions/checkout@v4
+        if: always() && steps.restore.outcome == 'success'
+        with:
+          ref: ${{ steps.restore.outputs.sha }}
+          path: restore-source
+          persist-credentials: false
+      - name: Restore and verify main
+        if: always() && steps.restore.outcome == 'success'
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          SOURCE_SHA: ${{ steps.restore.outputs.sha }}
+        run: node scripts/railway-deploy.mjs deploy restore-source "$SOURCE_SHA" acceptance

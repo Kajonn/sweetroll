@@ -240,5 +240,31 @@ Owner answers of 2026-11-12: D1 all stages, D2 yes, D3 no. D4 is not answered ye
   [2026-11-12 record](../../acceptance/rules-coverage-gui-2026-11-12.md), which
   also lists everything that is left.
 
+**T2 findings fixed — 2026-11-13.**
+
+The hosted run of 2026-11-12 (recorded in PR #83) was partial. Its findings and
+what was done:
+
+- Deck count stayed at zero after a shuffle (step 5, fail). The sheet read the
+  count when the command was queued and never again after the server applied
+  it. It now reads the count whenever the queue of pending commands changes
+  (`CharacterSheet.tsx`). Regression tests: `CharacterDecks.test.tsx` and a
+  player's own shuffle in `cardDecks.spec.ts`.
+- The GM Session view and the players' campaign Activity showed roll entries
+  without the result (steps 2, 3 and 5, partial). The activity feed now carries
+  `rollOutput`, the roll's result text, read under the same audience predicate
+  that decides whether the reader sees the event (design 14.1, `/api/v1`
+  included). Both views show it. Tests: the Ember Road API scenario checks who
+  sees a campaign and a private draw, and `cardDecks.spec.ts` checks both views.
+- A deploy reported success and ready on an outdated database, and rolls
+  returned HTTP 500. This follows from the pre-release database policy, which
+  has no old-schema detection. No code was changed; `docs/operations/railway.md`
+  now says to point the service at a new empty database when
+  `database/schema.sql` changed and to confirm with one roll.
+- Verified locally on `5f53f18`: 93 of 93 browser journeys, server unit 676 of
+  676, web unit 1,319 of 1,319, typechecks and the contract check pass, and
+  integration 451 of 452 with the known timeout. Not verified: the hosted
+  deployment. T2 steps 2, 3 and 5 need a rerun on a deployment of this fix.
+
 Open in T1: item 7 (visual baselines) and the exit condition (three passing CI
 runs on the pinned Chromium). T2 and T3 are not started.

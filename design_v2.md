@@ -457,7 +457,7 @@ own plan and approval.
 
 ## 7.1 Campaign workspace
 
-The campaign workspace combines member management, content, characters, and an in-session activity feed. The **Session view** is a curated mobile surface: recent content, recent rolls, quick character access, and reveal/hide controls. Content pinning is not implemented (reconciled 2026-11-08); the Session view shows the ten most recent permitted content items instead.
+The campaign workspace combines member management, content, characters, and an in-session activity feed. Roll entries in the feed show the roll's result text under its audience (Section 14.1). The **Session view** is a curated mobile surface: recent content, recent rolls, quick character access, and reveal/hide controls. Content pinning is not implemented (reconciled 2026-11-08); the Session view shows the ten most recent permitted content items instead.
 
 Campaign creation distinguishes versions with the same display name and semantic version by showing their publication date and a short version identifier. The campaign's pinned version supplies character creation choices automatically; players and GMs should not need to enter an internal version ID. A GM's roster access is labelled as GM access when they do not control a character. Member, sharing and content-preview controls use existing roster display names. Duplicate or absent names have an identifying suffix; short-ID collisions use full IDs, and debug mode shows full IDs. Requests retain exact user IDs and membership generations. Campaign and Session activity show local dates and readable actor labels; the exact actor identifier remains available for identification. Sheet previews show a section title once when its first heading repeats that title.
 
@@ -934,6 +934,11 @@ process.
   access follows the existing controller and GM permissions.
 - A response can use the recorded roll's audience or a narrower one. The
   responder must be able to see the source roll under current campaign membership.
+- The campaign activity feed and the Session view show the result text of a
+  roll or card draw to the readers its audience allows (2026-11-13). A reader
+  who may not see a roll gets no event for it. The feed carries the result text
+  only: dice, bindings and inputs stay in the roller's own activity and in the
+  GM export.
 
 - Publish a clear ownership model for system definitions, user uploads, and copies derived from shared systems.
 

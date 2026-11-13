@@ -151,6 +151,8 @@ export type ActivityEventView = {
   sourceContentId: string | null;
   /** Roll source for `roll_executed` events; NULL for content events. */
   sourceRollId: string | null;
+  /** Result text of a roll the reader may see (design 14.1); NULL for other events. */
+  rollOutput: string | null;
   requestId: string;
   occurredAt: Date;
 };
@@ -535,6 +537,7 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
       actorId: record.actorId,
       sourceContentId: record.sourceContentId,
       sourceRollId: record.sourceRollId,
+      rollOutput: record.rollOutput,
       requestId: record.requestId,
       occurredAt: record.occurredAt,
     };

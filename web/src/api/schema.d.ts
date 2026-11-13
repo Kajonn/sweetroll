@@ -30976,6 +30976,7 @@ export interface operations {
                             actorId: string;
                             sourceContentId: string | null;
                             sourceRollId: string | null;
+                            rollOutput?: string | null;
                             requestId: string;
                             /** Format: date-time */
                             occurredAt: string;
@@ -31198,6 +31199,7 @@ export interface operations {
                                 actorId: string;
                                 sourceContentId: string | null;
                                 sourceRollId: string | null;
+                                rollOutput?: string | null;
                                 requestId: string;
                                 /** Format: date-time */
                                 occurredAt: string;

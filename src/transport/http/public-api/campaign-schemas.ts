@@ -243,7 +243,7 @@ export const campaignSchemas = {
   CampaignActivity: object({
     events: Type.Array(object({
       eventId: uuid, kind: text, actorId: uuid, sourceContentId: nullable(uuid), sourceRollId: nullable(text),
-      requestId: text, occurredAt: dateTime,
+      rollOutput: nullable(text), requestId: text, occurredAt: dateTime,
     })),
     nextCursor: pageCursor,
   }),

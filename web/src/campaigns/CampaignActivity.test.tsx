@@ -15,4 +15,14 @@ describe("CampaignActivityView", () => {
     expect(screen.queryByText("2026-09-01T12:34:00Z")).toBeNull();
     expect(screen.getAllByRole("time")[0]).toHaveAttribute("datetime", "2026-09-01T12:34:00Z");
   });
+
+  it("shows the result text of a roll the server included and nothing for other events", () => {
+    render(<CampaignActivityView actorId="u1" events={[
+      { eventId: "e1", kind: "roll_executed", actorId: "u2", occurredAt: "2026-11-12T12:34:00Z", rollOutput: "Read the omens: Crown of Ember, First of Tide" },
+      { eventId: "e2", kind: "roll_executed", actorId: "u2", occurredAt: "2026-11-12T12:35:00Z", rollOutput: null },
+      { eventId: "e3", kind: "content_created", actorId: "u1", occurredAt: "2026-11-12T12:36:00Z" },
+    ]} />);
+    expect(screen.getAllByTestId("activity-roll-output")).toHaveLength(1);
+    expect(screen.getByText("Read the omens: Crown of Ember, First of Tide")).toBeVisible();
+  });
 });

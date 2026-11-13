@@ -282,6 +282,10 @@ export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdju
     section.elements.some(element => element.kind === "action" && element.deck !== undefined))) ? character.characterId : undefined;
   const lastDrawRemaining = snapshot.lastRoll?.breakdown?.cards?.remaining;
   const connected = snapshot.connected;
+  // A deck command is queued first and acknowledged later. The count is read
+  // again when the queue changes, so it follows the acknowledgement: a shuffle
+  // returns no roll that would otherwise show the new count.
+  const unsettled = snapshot.entries.length + snapshot.pendingOnlineAttempts.length;
   useEffect(() => {
     if (deckCharacterId === undefined || loadDecks === undefined || !connected) return;
     let current = true;
@@ -290,7 +294,7 @@ export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdju
       () => { if (current) setDecks([]); },
     );
     return () => { current = false; };
-  }, [deckCharacterId, loadDecks, connected, deckRead, lastDrawRemaining, character?.campaignId]);
+  }, [deckCharacterId, loadDecks, connected, deckRead, lastDrawRemaining, character?.campaignId, unsettled, snapshot.phase]);
   // A purged snapshot carries no private content: the session nulls
   // confirmed/tentative/entries on purge, so report availability only.
   if (character === null) {

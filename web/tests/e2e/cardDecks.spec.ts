@@ -163,9 +163,21 @@ test("two players share the campaign's omen deck and never see the same card", a
     expect(new Set([...ids(first), ...ids(second), ...ids(third), ...ids(fourth)]).size).toBe(8);
     expect([third.breakdown.cards.remaining, fourth.breakdown.cards.remaining].sort()).toEqual([4, 6]);
 
-    // The GM reads both campaign-audience draws on the session board's sheet and may shuffle the shared deck.
+    // A player's own shuffle shows the full deck without a reload (hosted T2 finding, 2026-11-12).
+    await scout!.reload();
+    await expect(count(scout!)).toHaveText("Omen deck: 4 of 12 cards left");
+    await scout!.getByRole("button", { name: "Gather the omens", exact: true }).click();
+    await expect(count(scout!)).toHaveText("Omen deck: 12 of 12 cards left");
+    const fifth = await draw(scout!);
+    await expect(count(scout!)).toHaveText("Omen deck: 10 of 12 cards left");
+
+    // The other player's campaign Activity and the GM's Session view show each draw's cards.
+    await seer!.goto(`/campaigns/${campaignId}`);
+    await seer!.getByRole("tab", { name: "Activity", exact: true }).click();
+    for (const roll of [first, second, fifth]) await expect(seer!.getByText(roll.output, { exact: true })).toBeVisible();
     await page.goto(`/campaigns/${campaignId}`);
     await page.getByRole("tab", { name: "Session", exact: true }).click();
+    for (const roll of [first, second, third, fourth, fifth]) await expect(page.getByText(roll.output, { exact: true }).first()).toBeVisible();
     await page.getByRole("button", { name: "Open Seer", exact: true }).click();
     await page.getByRole("button", { name: "Gather the omens", exact: true }).click();
     await expect(page.getByText("Omen deck shuffled.")).toBeVisible();

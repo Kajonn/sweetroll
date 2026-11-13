@@ -128,6 +128,14 @@ uses disposable test databases. Recreate them after schema changes, then run the
 initializer; there is no database-version conversion or automatic reset. See
 [database policy](../../database/README.md).
 
+A successful deploy and a ready health check do not show that the schema is
+current. The initializer leaves a non-empty database as it is, so a deploy of a
+commit that changed `database/schema.sql` onto an older database starts normally
+and then fails at run time: on 2026-11-12 rolls and draws returned HTTP 500 on
+acceptance until the database was recreated. When `database/schema.sql` differs
+between the deployed and the new commit, point the service at a new empty
+database before deploying, and confirm with one roll after the deploy.
+
 ## Domain and verification
 
 Generate a Railway domain in Networking and target the service's HTTP port.

@@ -112523,6 +112523,16 @@
                               }
                             ]
                           },
+                          "rollOutput": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "requestId": {
                             "type": "string"
                           },
@@ -113517,6 +113527,16 @@
                                 ]
                               },
                               "sourceRollId": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "rollOutput": {
                                 "anyOf": [
                                   {
                                     "type": "string"

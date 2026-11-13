@@ -1,6 +1,6 @@
-// Activity tab body: campaign events (kind + actor + timestamp). Events
-// carry no secret payloads server-side, and this view renders nothing
-// beyond those three fields.
+// Activity tab body: campaign events (kind + actor + timestamp). A roll event
+// also shows the roll's result text, which the server sends only to readers
+// the roll's audience allows (design 14.1). Nothing else is rendered.
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -51,7 +51,7 @@ export function activityKindLabel(kind: CampaignActivityEvent["kind"]): string {
 export type ActivityListItem = Pick<
   CampaignActivityEvent,
   "eventId" | "kind" | "actorId" | "occurredAt"
->;
+> & { rollOutput?: string | null | undefined };
 
 export function CampaignActivityLine(props: { event: ActivityListItem; actorId?: string | null | undefined }) {
   const { event, actorId } = props;
@@ -65,6 +65,7 @@ export function CampaignActivityLine(props: { event: ActivityListItem; actorId?:
     <span>{activityKindLabel(event.kind)}</span>{" "}
     <span title={event.actorId}>{actor}</span>{" "}
     <time dateTime={event.occurredAt}>{formatted}</time>
+    {event.rollOutput ? <>{" "}<span data-testid="activity-roll-output">{event.rollOutput}</span></> : null}
   </>;
 }
 

@@ -265,6 +265,8 @@ const ActivityEventDto = Type.Object({
   actorId: Type.String({ format: UUID_FORMAT }),
   sourceContentId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
   sourceRollId: Type.Union([Type.String(), Type.Null()]),
+  // Present on the activity feed; the export lists results under `rolls` instead.
+  rollOutput: Type.Optional(Type.Union([Type.String(), Type.Null()])),
   requestId: Type.String(),
   occurredAt: Type.String({ format: DATE_TIME_FORMAT }),
 });

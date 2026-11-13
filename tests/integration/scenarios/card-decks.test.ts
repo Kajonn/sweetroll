@@ -102,6 +102,15 @@ scenario("Ember Road: a shared campaign deck and a standalone deck", async ({ ac
   const secret = await seer.command<DrawResult>(act(a, "read_omens"), command(a, { audience: "owner_only" }));
   expect(secret.roll).toMatchObject({ audience: "owner_only" });
   expect(await gm.json<Decks>(decksOf(b))).toMatchObject({ decks: [{ remaining: 10 }] });
+  // The campaign feed shows a roll's result text to exactly the readers its audience allows.
+  type Feed = { events: { kind: string; rollOutput: string | null }[] };
+  const outputs = async (reader: typeof gm) => (await reader.json<Feed>(`GET ${campaign}/activity`)).events
+    .filter(event => event.kind === "roll_executed").map(event => event.rollOutput);
+  for (const reader of [gm, scout, seer]) expect(await outputs(reader)).toContain(last.roll!.output);
+  expect(await outputs(seer)).toContain(secret.roll!.output);
+  expect(await outputs(scout)).not.toContain(secret.roll!.output);
+  expect(await outputs(gm)).not.toContain(secret.roll!.output);
+  expect((await outputs(scout)).every(output => typeof output === "string")).toBe(true);
   const history = await seer.json<{ events: { roll?: NormalizedRoll }[] }>(`GET /characters/${a.characterId}/activity`);
   expect(history.events).toContainEqual(expect.objectContaining({
     roll: expect.objectContaining({ output: draws[0]!.roll!.output, breakdown: draws[0]!.roll!.breakdown }),

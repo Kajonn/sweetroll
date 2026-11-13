@@ -75,6 +75,8 @@ export type ActivityEventRecord = {
   sourceContentId: string | null;
   /** Roll source for `roll_executed` events; NULL for content events. */
   sourceRollId: string | null;
+  /** Result text of that roll, on reads that apply the roll's audience; NULL otherwise. */
+  rollOutput: string | null;
   requestId: string;
   occurredAt: Date;
 };
@@ -293,6 +295,7 @@ type ActivityEventRow = {
   kind: string;
   source_content_id: string | null;
   source_roll_id: string | null;
+  roll_output?: string | null;
   request_id: string;
   occurred_at: Date;
 };
@@ -467,6 +470,7 @@ function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
     kind: row.kind,
     sourceContentId: row.source_content_id,
     sourceRollId: row.source_roll_id,
+    rollOutput: row.roll_output ?? null,
     requestId: row.request_id,
     occurredAt: row.occurred_at,
   };
@@ -1554,7 +1558,9 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       }
       params.push(input.limit + 1);
       const result = await client.query<ActivityEventRow>(
-        `SELECT ${ACTIVITY_COLUMNS.split(", ").map((column) => `e.${column}`).join(", ")}
+        // The result text is read under the same audience predicate that
+        // decides whether the reader sees the roll event at all.
+        `SELECT ${ACTIVITY_COLUMNS.split(", ").map((column) => `e.${column}`).join(", ")}, r.rendered_output AS roll_output
            FROM campaign_activity_events e
            LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
            LEFT JOIN character_rolls r ON r.id = e.source_roll_id

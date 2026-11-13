@@ -43,6 +43,28 @@ describe("card decks on the character sheet", () => {
     await waitFor(() => expect(screen.getByTestId("deck-count-read")).toHaveTextContent("Omen deck: 12 of 12 cards left"));
   });
 
+  it("reads the count again when a queued shuffle is acknowledged, not only when it is queued", async () => {
+    // Hosted T2 run 2026-11-12: the read made when the command was queued still
+    // saw the empty deck, and nothing read it again after the server applied it.
+    const user = userEvent.setup();
+    let applied = false;
+    const loadDecks = vi.fn(async () => counts(applied ? 12 : 0));
+    const pendingShuffle = { id: "pending", actorId: "a", characterId: "character", sequence: 0, baseRevision: 1, packageChecksum: "checksum", createdAt: "2026-11-12T00:00:00Z", intent: { kind: "executeAction" as const, actionId: "gather_omens" }, attempt: null };
+    const props = { loadDecks, onSetField: vi.fn(), onBump: vi.fn(), onExecuteAction: vi.fn().mockResolvedValue(undefined) };
+    const view = render(<CharacterSheet snapshot={snapshot()} {...props} />);
+    await expect(screen.findByTestId("deck-count-gather")).resolves.toHaveTextContent("Omen deck: 0 of 12 cards left");
+
+    await user.click(screen.getByRole("button", { name: "Gather the omens" }));
+    view.rerender(<CharacterSheet snapshot={snapshot({ entries: [pendingShuffle] })} {...props} />);
+    await waitFor(() => expect(loadDecks.mock.calls.length).toBeGreaterThanOrEqual(2));
+    expect(screen.getByTestId("deck-count-gather")).toHaveTextContent("Omen deck: 0 of 12 cards left");
+
+    applied = true;
+    view.rerender(<CharacterSheet snapshot={snapshot()} {...props} />);
+    await waitFor(() => expect(screen.getByTestId("deck-count-gather")).toHaveTextContent("Omen deck: 12 of 12 cards left"));
+    expect(screen.getByRole("button", { name: "Read the omens" })).toBeEnabled();
+  });
+
   it("stops draws from an empty deck and keeps shuffle available", async () => {
     render(<CharacterSheet snapshot={snapshot()} loadDecks={vi.fn().mockResolvedValue(counts(0))} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(await screen.findByTestId("deck-count-read")).toHaveTextContent("Omen deck has no cards left. Shuffle it to draw again.");

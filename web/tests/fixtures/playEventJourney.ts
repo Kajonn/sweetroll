@@ -111,6 +111,7 @@ export async function playEventJourney(page: Page, browser: Browser) {
     await expect(stack(tablet).getByText(`Content updated · ${note} revised`, { exact: true })).toBeVisible({ timeout: 5000 });
     await expect(stack(tablet)).not.toContainText("GM secret handout");
     await open(tablet, `/characters/${characters[1]}`);
+    await expect(stack(page)).toHaveCount(0, { timeout: 10_000 });
 
     await page.getByRole("tab", { name: "Session" }).click();
     await page.getByRole("button", { name: "Open Roller 3", exact: true }).click();

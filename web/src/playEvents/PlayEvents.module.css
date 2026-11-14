@@ -1,0 +1,70 @@
+.overlay {
+  position: fixed;
+  z-index: 90;
+  inset-block-start: var(--play-events-top, 56px);
+  inset-inline-end: max(16px, env(safe-area-inset-right));
+  width: min(26rem, calc(100% - 32px));
+  pointer-events: none;
+}
+
+.stack {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(50dvh, 24rem);
+  overflow: clip;
+}
+
+.card {
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-inline-start: 4px solid var(--action-primary);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-dialog);
+  padding: 8px 12px;
+  overflow-wrap: anywhere;
+  transition: opacity 240ms ease-out;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.card[data-fading="true"] {
+  opacity: 0;
+}
+
+.overflow {
+  justify-self: end;
+  color: var(--text-primary);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-panel);
+  padding: 2px 8px;
+}
+
+.announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 599px) {
+  .overlay {
+    inset-block-start: var(--play-events-top, calc(52px + env(safe-area-inset-top)));
+    inset-inline: max(8px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-right));
+    width: auto;
+    max-width: 26rem;
+  }
+
+  .card {
+    -webkit-line-clamp: 2;
+  }
+}

@@ -83,7 +83,7 @@ test("creator, player and GM use conditional rules from the same published versi
     await page.getByRole("button", { name: "Open GM Fighter" }).click();
     const roll = page.getByRole("button", { name: "Roll Check" });
     await playAtEachViewport(page, "conditional roll on the GM board", roll,
-      () => expect(roll.locator("..").getByRole("status")).toHaveText("4"));
+      () => expect(roll.locator("..").getByText("4", { exact: true })).toBeVisible());
   } finally {
     if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
   }

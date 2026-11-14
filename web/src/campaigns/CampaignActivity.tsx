@@ -1,9 +1,9 @@
-// Activity tab body: campaign events (kind + actor + timestamp). Events
-// carry no secret payloads server-side, and this view renders nothing
-// beyond those three fields.
+// Activity tab body. Roll summaries use the same audience-checked projection as the overlay.
 import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import type { CampaignPlayFeed } from "../playEvents/CampaignPlayFeed.js";
+import { memberLabel } from "./memberLabels.js";
 import { t } from "../i18n/index.js";
 import { Button, EmptyState } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
@@ -50,7 +50,7 @@ export function activityKindLabel(kind: CampaignActivityEvent["kind"]): string {
 
 export type ActivityListItem = Pick<
   CampaignActivityEvent,
-  "eventId" | "kind" | "actorId" | "occurredAt"
+  "eventId" | "kind" | "actorId" | "occurredAt" | "actorName" | "summary"
 >;
 
 export function CampaignActivityLine(props: { event: ActivityListItem; actorId?: string | null | undefined }) {
@@ -60,10 +60,15 @@ export function CampaignActivityLine(props: { event: ActivityListItem; actorId?:
     : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
   const actor = actorId === event.actorId
     ? t("campaign.detail.activity.actor.you")
-    : t("campaign.detail.activity.actor.member", { id: event.actorId.slice(0, 8) });
+    : event.actorName ? memberLabel({ userId: event.actorId, displayName: event.actorName })
+      : t("campaign.detail.activity.actor.member", { id: event.actorId.slice(0, 8) });
+  const summary = event.summary;
+  const result = summary?.kind === "draw" ? summary.cards.join(", ")
+    : summary?.kind === "roll" || summary?.kind === "push" ? String(summary.total) : null;
   return <>
     <span>{activityKindLabel(event.kind)}</span>{" "}
     <span title={event.actorId}>{actor}</span>{" "}
+    {result === null ? null : <><span>{result}</span>{" "}</>}
     <time dateTime={event.occurredAt}>{formatted}</time>
   </>;
 }
@@ -92,13 +97,17 @@ export function CampaignActivityTab(props: {
   api: Pick<CampaignsApi, "listActivity">;
   campaignId: string;
   actorId?: string | null;
+  sharedActivity?: CampaignPlayFeed | undefined;
   /** Campaign-level revocation: the feed is not_found for a previously-readable campaign. */
   onAccessRevoked?: () => void;
 }) {
-  const feed = useQuery({
+  const shared = props.sharedActivity;
+  const fallback = useQuery({
+    enabled: shared === undefined,
     queryKey: campaignActivityKey(props.campaignId),
     queryFn: () => props.api.listActivity(props.campaignId),
   });
+  const feed = shared ?? fallback;
   const revocationNotified = useRef(false);
 
   useEffect(() => {

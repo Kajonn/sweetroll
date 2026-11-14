@@ -12,6 +12,7 @@ import type { CampaignLimits } from "../platform/config.js";
 import type {
   ActivityEventKind,
   ActivityEventRecord,
+  ActivitySummary,
   CampaignPersistenceRepository,
   ContentAudience,
   ContentRecord,
@@ -85,6 +86,8 @@ export type ListActivityInput = {
   campaignId: string;
   limit?: number;
   cursor?: string | null;
+  includeSummary?: boolean;
+  watch?: readonly string[];
 };
 
 export type ExportCampaignInput = {
@@ -153,11 +156,15 @@ export type ActivityEventView = {
   sourceRollId: string | null;
   requestId: string;
   occurredAt: Date;
+  summary?: ActivitySummary;
+  actorName?: string;
 };
 
 export type ListActivityResult = {
   events: ActivityEventView[];
   nextCursor: string | null;
+  serverTime: Date;
+  visibleWatch: string[];
 };
 
 export type CampaignExportSnapshot = {
@@ -537,6 +544,8 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
       sourceRollId: record.sourceRollId,
       requestId: record.requestId,
       occurredAt: record.occurredAt,
+      ...(record.summary ? { summary: record.summary } : {}),
+      ...(record.actorName ? { actorName: record.actorName } : {}),
     };
   }
 
@@ -1648,15 +1657,17 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           if (campaign === null || !isActiveMember(membership)) {
             return { authorized: false as const };
           }
-          const rows = await repo.listActivityPage(client, {
+          const page = await repo.listActivityPage(client, {
             campaignId: activityInput.campaignId,
             actorId: ctx.actorId,
             isGm: isGameMaster(membership),
             limit: checked.limit,
             cursorOccurredAt: decoded.cursor?.at ?? null,
             cursorId: decoded.cursor?.id ?? null,
+            ...(activityInput.includeSummary ? { includeSummary: true } : {}),
+            ...(activityInput.watch ? { watch: activityInput.watch } : {}),
           });
-          return { authorized: true as const, rows };
+          return { authorized: true as const, ...page };
         });
         if (!outcome.authorized) return { ok: false, error: errors.campaign_not_found() };
         const hasMore = outcome.rows.length > checked.limit;
@@ -1666,6 +1677,8 @@ export function createContentCommands(input: CreateContentCommandsInput): Conten
           ok: true,
           value: {
             events: page.map(toEventView),
+            serverTime: now(),
+            visibleWatch: outcome.visibleWatch,
             nextCursor:
               hasMore && last !== undefined
                 ? encodeCursor(last.occurredAt.toISOString(), last.eventId, scope, true)

@@ -247,6 +247,13 @@ const ContentViewDto = Type.Object({
   grantedUserIds: Type.Optional(Type.Array(Type.String({ format: UUID_FORMAT }))),
 });
 
+const ActivityRollAudience = Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]);
+const ActivitySummaryDto = Type.Union([
+  Type.Object({ kind: Type.Union([Type.Literal("roll"), Type.Literal("push")]), total: Type.Number(), audience: ActivityRollAudience }),
+  Type.Object({ kind: Type.Literal("draw"), cards: Type.Array(Type.String()), audience: ActivityRollAudience }),
+  Type.Object({ kind: Type.Literal("content"), title: Type.String() }),
+]);
+
 const ActivityEventDto = Type.Object({
   eventId: Type.String({ format: UUID_FORMAT }),
   kind: Type.Union([
@@ -267,6 +274,8 @@ const ActivityEventDto = Type.Object({
   sourceRollId: Type.Union([Type.String(), Type.Null()]),
   requestId: Type.String(),
   occurredAt: Type.String({ format: DATE_TIME_FORMAT }),
+  summary: Type.Optional(ActivitySummaryDto),
+  actorName: Type.Optional(Type.String()),
 });
 
 const CampaignExportDto = Type.Object({
@@ -1341,12 +1350,14 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
     operationId: "get_campaigns_id_activity",
     schema: {
       params: CampaignIdParams,
-      querystring: PageQuery,
+      querystring: Type.Composite([PageQuery, Type.Object({ watch: Type.Optional(Type.String({ maxLength: 2048 })) })]),
       response: {
         "200": Type.Object({
           events: Type.Array(ActivityEventDto),
           nextCursor: Type.Union([Type.String(), Type.Null()]),
           requestId: Type.String(),
+          serverTime: Type.Optional(Type.String({ format: DATE_TIME_FORMAT })),
+          visibleWatch: Type.Optional(Type.Array(Type.String())),
         }),
         "400": CampaignErrorEnvelope,
         "401": UnauthorizedEnvelope,
@@ -2493,10 +2504,17 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         const params = request.params as { id: string };
         const page = parsePageQuery(request, reply);
         if (page === null) return null;
+        const rawWatch = (request.query as { watch?: string }).watch;
+        const watch = rawWatch?.split(",") ?? [];
+        if (watch.length > 24 || watch.some(key => !/^(?:event|roll):[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(key))) {
+          return sendError(reply, badRequest("watch must contain up to 24 activity keys."), request.id);
+        }
         const result = await campaigns.listActivity(ctxOf(request), {
           campaignId: params.id,
           limit: page.limit,
           cursor: page.cursor,
+          includeSummary: true,
+          watch,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return {
@@ -2505,6 +2523,8 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
             occurredAt: event.occurredAt.toISOString(),
           })),
           nextCursor: result.value.nextCursor,
+          serverTime: result.value.serverTime.toISOString(),
+          visibleWatch: result.value.visibleWatch,
           requestId: request.id,
         };
       },

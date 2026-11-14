@@ -27,6 +27,7 @@ import { t } from "./i18n/index.js";
 import { DocumentEditor } from "./editor/DocumentEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
 import { SystemLibrary } from "./library/SystemLibrary.js";
+import type { PublishCommand } from "./playEvents/PlayEvents.js";
 import { AppShell, useIdentity } from "./shell/AppShell.js";
 import { registerAppRouter } from "./shell/appNavigation.js";
 
@@ -528,10 +529,10 @@ function CampaignDetailRouteView() {
   const charactersApi = useCharactersApi();
   const navigate = useNavigate();
   const store=useSharedCharacterStore();
-  const createSession=useMemo(()=>identity&&store?((characterId:string)=>{
+  const createSession=useMemo(()=>identity&&store?((characterId:string, publishRoll?: PublishCommand)=>{
     const actorId=identity.getActorId();if(!actorId)throw new Error("Sign in to manage this character.");
     const coordination=createCoordination({actorId,characterId});
-    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID()});
+    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID(),captureRollPublisher:()=>publishRoll});
     return {...session,dispose(){session.dispose();coordination.dispose();}};
   }):undefined,[identity,store,charactersApi]);
   if (identity === null) {
@@ -650,6 +651,7 @@ function CharacterDetailRouteView() {
   useIdentityTick(identity);
   const store = useSharedCharacterStore();
   const api = useCharactersApi();
+  const campaignEventsApi = useCampaignsApi();
   const navigate = useNavigate();
   const actorId = identity?.getActorId() ?? null;
   // Coordination ownership: each effect setup owns a fresh handle (see
@@ -672,6 +674,7 @@ function CharacterDetailRouteView() {
   }
   return (
     <CharacterDetail
+      campaignEventsApi={campaignEventsApi}
       characterId={characterId}
       api={api}
       store={store}

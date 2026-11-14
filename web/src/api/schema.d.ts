@@ -9602,6 +9602,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -10288,6 +10290,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -10974,6 +10978,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -11660,6 +11666,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -12347,6 +12355,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -14076,6 +14086,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -14778,6 +14790,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -15490,6 +15504,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -16175,6 +16191,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -16864,6 +16882,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -17845,6 +17865,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -19064,6 +19086,8 @@ export interface operations {
                                 output: string;
                                 audience: "owner_only" | "gm_only" | "campaign";
                             } | null;
+                            /** Format: uuid */
+                            rollId?: string;
                             nominal: {
                                 actionId: string;
                                 entryId: string;
@@ -30953,6 +30977,7 @@ export interface operations {
             query?: {
                 limit?: number;
                 cursor?: string;
+                watch?: string;
             };
             header?: never;
             path: {
@@ -30979,9 +31004,27 @@ export interface operations {
                             requestId: string;
                             /** Format: date-time */
                             occurredAt: string;
+                            summary?: {
+                                kind: "roll" | "push";
+                                total: number;
+                                audience: "owner_only" | "gm_only" | "campaign";
+                            } | {
+                                /** @constant */
+                                kind: "draw";
+                                cards: string[];
+                                audience: "owner_only" | "gm_only" | "campaign";
+                            } | {
+                                /** @constant */
+                                kind: "content";
+                                title: string;
+                            };
+                            actorName?: string;
                         }[];
                         nextCursor: string | null;
                         requestId: string;
+                        /** Format: date-time */
+                        serverTime?: string;
+                        visibleWatch?: string[];
                     };
                 };
             };
@@ -31201,6 +31244,21 @@ export interface operations {
                                 requestId: string;
                                 /** Format: date-time */
                                 occurredAt: string;
+                                summary?: {
+                                    kind: "roll" | "push";
+                                    total: number;
+                                    audience: "owner_only" | "gm_only" | "campaign";
+                                } | {
+                                    /** @constant */
+                                    kind: "draw";
+                                    cards: string[];
+                                    audience: "owner_only" | "gm_only" | "campaign";
+                                } | {
+                                    /** @constant */
+                                    kind: "content";
+                                    title: string;
+                                };
+                                actorName?: string;
                             }[];
                             rolls: {
                                 rollId: string;

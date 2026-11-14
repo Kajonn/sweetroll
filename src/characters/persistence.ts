@@ -137,6 +137,7 @@ export type TxBuildArgs = {
    * attached rolls.
    */
   rollAudience?: RollAudience | null;
+  rollId?: string | null;
 };
 
 export type CampaignRollOptions = {
@@ -782,7 +783,7 @@ async function applyCommandCampaignTx(
     membershipGeneration: membership.generation,
     audience: rollId === null ? null : effectiveAudience,
   };
-  const resultJson = input.buildResult({ record, controllers, scope, rollAudience: rollId === null ? null : effectiveAudience });
+  const resultJson = input.buildResult({ record, controllers, scope, rollId, rollAudience: rollId === null ? null : effectiveAudience });
   await client.query(
     `UPDATE character_command_executions
         SET status = 'completed', result_json = $1::jsonb, expires_at = $2
@@ -1413,6 +1414,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
           record,
           controllers: [],
           scope: null,
+          rollId,
           rollAudience: input.roll === null ? null : "owner_only",
         });
         await client.query(

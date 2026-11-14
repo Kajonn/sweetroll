@@ -219,6 +219,38 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
   // audience visibility across two controllers and multiple GMs
   // ------------------------------------------------------------------
 
+  it("returns only authorized popup summaries and watches events outside the first page", async () => {
+    const s = await setup();
+    const key = randomUUID();
+    const first = await roll(h.users.player, s.sharedId, 1, { audience: "gm_only", key });
+    const replay = await roll(h.users.player, s.sharedId, 1, { audience: "gm_only", key });
+    if (!first.ok || !replay.ok) throw new Error("roll failed");
+    const path = `/campaigns/${s.campaignId}/activity`;
+    const activity = await h.app.inject({ url: path, headers: { cookie: h.users.gm.cookie } });
+    const body = activity.json();
+    const rollId = body.events[0].sourceRollId;
+    expect(first.value).toHaveProperty("rollId", rollId);
+    expect(replay.value).toHaveProperty("rollId", rollId);
+    expect(body.serverTime).toEqual(expect.any(String));
+    expect(body.events[0].summary).toEqual({ kind: "roll", total: first.value.roll?.total, audience: "gm_only" });
+    const shared = await roll(h.users.player, s.sharedId, 1, { audience: "campaign" });
+    if (!shared.ok) throw new Error("shared roll failed");
+    for (const [actor, allowed] of [[h.users.gm, [`roll:${rollId}`]], [h.users.other, [`roll:${rollId}`]]] as const) {
+      const watched = await h.app.inject({
+        url: `${path}?limit=1&watch=roll:${rollId}`,
+        headers: { cookie: actor.cookie },
+      });
+      expect(watched.json()).toMatchObject({ events: [{ summary: { audience: "campaign" } }], visibleWatch: allowed });
+    }
+    await h.pool.query("UPDATE campaign_members SET role = 'player' WHERE campaign_id = $1 AND user_id = $2", [s.campaignId, h.users.other.actorId]);
+    const denied = await h.app.inject({
+      url: `${path}?watch=roll:${rollId}`,
+      headers: { cookie: h.users.other.cookie },
+    });
+    expect(denied.json()).toMatchObject({ events: [{ summary: { audience: "campaign" } }], visibleWatch: [] });
+    expect(denied.json().events).toHaveLength(1);
+  });
+
   it("keeps actor-private rolls visible only to the roller", async () => {
     const s = await setup();
     const first = await roll(h.users.player, s.sharedId, 1, { audience: "owner_only" });

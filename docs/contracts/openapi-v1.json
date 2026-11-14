@@ -25122,6 +25122,10 @@
                             }
                           ]
                         },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
                         "nominal": {
                           "anyOf": [
                             {
@@ -28601,6 +28605,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
                         },
                         "nominal": {
                           "anyOf": [
@@ -32093,6 +32101,10 @@
                             }
                           ]
                         },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
                         "nominal": {
                           "anyOf": [
                             {
@@ -35574,6 +35586,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
                         },
                         "nominal": {
                           "anyOf": [
@@ -39058,6 +39074,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
                         },
                         "nominal": {
                           "anyOf": [
@@ -47010,6 +47030,10 @@
                             }
                           ]
                         },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
                         "nominal": {
                           "anyOf": [
                             {
@@ -50544,6 +50568,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
                         },
                         "nominal": {
                           "anyOf": [
@@ -54131,6 +54159,10 @@
                             }
                           ]
                         },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
                         "nominal": {
                           "anyOf": [
                             {
@@ -57608,6 +57640,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
                         },
                         "nominal": {
                           "anyOf": [
@@ -61094,6 +61130,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
                         },
                         "nominal": {
                           "anyOf": [
@@ -65868,6 +65908,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
                         },
                         "nominal": {
                           "anyOf": [
@@ -71530,6 +71574,10 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "rollId": {
+                          "format": "uuid",
+                          "type": "string"
                         },
                         "nominal": {
                           "anyOf": [
@@ -112406,6 +112454,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "watch",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "maxLength": 2048,
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -112529,6 +112586,106 @@
                           "occurredAt": {
                             "format": "date-time",
                             "type": "string"
+                          },
+                          "summary": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "total",
+                                  "audience"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "anyOf": [
+                                      {
+                                        "const": "roll",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "push",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  },
+                                  "total": {
+                                    "type": "number"
+                                  },
+                                  "audience": {
+                                    "anyOf": [
+                                      {
+                                        "const": "owner_only",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "gm_only",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "campaign",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "cards",
+                                  "audience"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "draw",
+                                    "type": "string"
+                                  },
+                                  "cards": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "audience": {
+                                    "anyOf": [
+                                      {
+                                        "const": "owner_only",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "gm_only",
+                                        "type": "string"
+                                      },
+                                      {
+                                        "const": "campaign",
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                }
+                              },
+                              {
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "title"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "content",
+                                    "type": "string"
+                                  },
+                                  "title": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "actorName": {
+                            "type": "string"
                           }
                         }
                       }
@@ -112545,6 +112702,16 @@
                     },
                     "requestId": {
                       "type": "string"
+                    },
+                    "serverTime": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "visibleWatch": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
                     }
                   }
                 }
@@ -113531,6 +113698,106 @@
                               },
                               "occurredAt": {
                                 "format": "date-time",
+                                "type": "string"
+                              },
+                              "summary": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "total",
+                                      "audience"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "anyOf": [
+                                          {
+                                            "const": "roll",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "push",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      },
+                                      "total": {
+                                        "type": "number"
+                                      },
+                                      "audience": {
+                                        "anyOf": [
+                                          {
+                                            "const": "owner_only",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "gm_only",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "campaign",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "cards",
+                                      "audience"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "draw",
+                                        "type": "string"
+                                      },
+                                      "cards": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "audience": {
+                                        "anyOf": [
+                                          {
+                                            "const": "owner_only",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "gm_only",
+                                            "type": "string"
+                                          },
+                                          {
+                                            "const": "campaign",
+                                            "type": "string"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": "object",
+                                    "required": [
+                                      "kind",
+                                      "title"
+                                    ],
+                                    "properties": {
+                                      "kind": {
+                                        "const": "content",
+                                        "type": "string"
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              "actorName": {
                                 "type": "string"
                               }
                             }

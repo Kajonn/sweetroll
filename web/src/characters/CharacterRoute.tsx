@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import type { CampaignsApi } from "../campaigns/api.js";
+import { commandEvent, PlayEventOverlay, usePlayEvents, type PublishCommand } from "../playEvents/PlayEvents.js";
+import { CampaignPlayListener } from "../playEvents/CampaignPlayFeed.js";
 import { t } from "../i18n/index.js";
 import type { CharactersApi } from "./api.js";
 import { CharacterSheet } from "./CharacterSheet.js";
@@ -33,6 +36,7 @@ export type CharacterDetailProps = {
   store: CharacterStore;
   identity: IdentityPort;
   coordination: CoordinationPort;
+  campaignEventsApi?: Pick<CampaignsApi, "listActivity"> | undefined;
   navigation?: CharacterDetailNavigation | undefined;
   /**
    * Whether the browser supports Web Lock takeover. Defaults to a runtime
@@ -58,7 +62,7 @@ function browserSupportsTakeover(): boolean {
  * character session, so no session is ever opened or sent with an empty
  * identity.
  */
-export function CharacterDetail({ characterId, api, store, identity, coordination, navigation, locksSupported }: CharacterDetailProps) {
+export function CharacterDetail({ characterId, api, store, identity, coordination, navigation, locksSupported, campaignEventsApi }: CharacterDetailProps) {
   const actorId = identity.getActorId();
   if (actorId === null) {
     return (
@@ -70,6 +74,8 @@ export function CharacterDetail({ characterId, api, store, identity, coordinatio
   }
   return (
     <CharacterDetailLoaded
+      key={`${actorId}:${identity.getGeneration()}:${characterId}`}
+      campaignEventsApi={campaignEventsApi}
       characterId={characterId}
       api={api}
       store={store}
@@ -135,8 +141,10 @@ function CharacterDetailLoaded({
   actorId,
   navigation,
   locksSupported: locksSupportedProp,
+  campaignEventsApi,
 }: CharacterDetailProps & { actorId: string }) {
   const online = identity.isOnline();
+  const publisher = useRef<PublishCommand>();
   const createSession = useMemo(
     () => () =>
       createCharacterSession({
@@ -148,11 +156,29 @@ function CharacterDetailLoaded({
         coordination,
         now: () => new Date().toISOString(),
         newId: () => randomUUID(),
+        captureRollPublisher: () => publisher.current,
       }),
     [actorId, characterId, api, store, identity, coordination],
   );
   const { session, snapshot } = useCharacterSession(createSession);
-  const offline = useOfflineAvailability(snapshot.confirmed);
+  const confirmed = snapshot.confirmed;
+  const campaignId = confirmed?.campaignId ?? null;
+  const placement = confirmed?.placementGeneration ?? null;
+  const events = usePlayEvents(confirmed ? `${characterId}:${campaignId ?? ""}:${placement}` : null);
+  const { publish } = events;
+  useLayoutEffect(() => {
+    publisher.current = (response, startedAt) => {
+      const { character, roll } = response.result;
+      if (character.campaignId !== campaignId || character.placementGeneration !== placement) return;
+      const actions = character.projection.sheets.flatMap(sheet => sheet.sections.flatMap(section => section.elements))
+        .filter(element => element.kind === "action" && element.actionId === roll?.actionId);
+      const action = actions.length === 1 ? actions[0] : undefined;
+      const popup = commandEvent(response, startedAt, action?.kind === "action" ? action.label : undefined);
+      if (popup) publish([popup]);
+    };
+    return () => { publisher.current = undefined; };
+  }, [campaignId, placement, publish]);
+  const offline = useOfflineAvailability(confirmed);
 
   // Task 7: template catalog for slot pickers and granted-action buttons.
   // Fetched only when the projected sheet actually contains a slot, so
@@ -287,6 +313,11 @@ function CharacterDetailLoaded({
   }
   return (
     <div className={styles.detail}>
+      {campaignEventsApi && campaignId !== null && events.target ? (
+        <CampaignPlayListener api={campaignEventsApi} campaignId={campaignId} actorId={actorId}
+          generation={identity.getGeneration()} online={online} events={events} />
+      ) : null}
+      <PlayEventOverlay events={events} presentation={snapshot.confirmed.projection.presentation} />
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}
       <p role="status">{snapshot.editing.owned ? t("character.detail.editing") : t("character.detail.readOnly")}</p>
       {readOnly ? (

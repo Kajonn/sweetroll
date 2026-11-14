@@ -180,6 +180,7 @@ export type CreateCharacterSessionInput = {
   coordination: CoordinationPort;
   now: () => string;
   newId: () => string;
+  captureRollPublisher?: () => ((response: CommandResultResponse, startedAt: string) => void) | undefined;
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -742,6 +743,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const generationAtSend = generation;
     const attempt = current.attempt;
     if (attempt === null) return "blocked";
+    const publishRoll = input.captureRollPublisher?.();
     let response: CommandResultResponse;
     try {
       response = await api.send(attempt);
@@ -774,6 +776,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (current.intent.kind === "executeAction") {
       lastRoll = response.result.roll;
       lastNominal = response.result.nominal;
+      publishRoll?.(response, current.createdAt);
     }
     generation += 1;
     transientFailures = 0;
@@ -1365,6 +1368,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function sendOnlineAttemptInner(attempt: OnlineAttempt): Promise<void> {
     const generationAtSend = generation;
     const guard = { generation: generationAtSend, accountGeneration };
+    const publishRoll = input.captureRollPublisher?.();
     let response: CommandResultResponse;
     try {
       response = await api.send(attempt.request);
@@ -1497,7 +1501,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     confirmed = character;
     // Authoritative action results survive later online acknowledgments: only
     // a non-null roll replaces the retained one (online ops return null).
-    if (response.result.roll !== null && response.result.roll !== undefined) lastRoll = response.result.roll;
+    if (response.result.roll !== null && response.result.roll !== undefined) {
+      lastRoll = response.result.roll;
+      publishRoll?.(response, attempt.createdAt);
+    }
     generation += 1;
     transientFailures = 0;
     needsFresh = false;

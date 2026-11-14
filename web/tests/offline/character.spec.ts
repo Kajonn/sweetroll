@@ -213,7 +213,7 @@ async function runJourney(context: BrowserContext, system: ReferenceSystem) {
   await expect(page.getByRole("heading", { name: "Roll result" })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("Expression", { exact: true })).toBeVisible();
   await expect(page.getByText("Total", { exact: true })).toBeVisible();
-  await expect(page.getByText("Owner only")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Roll result", exact: true }).getByText("Owner only", { exact: true })).toBeVisible();
   await page.getByText("Show roll details", { exact: true }).click();
   const details = (await page.getByRole("region", { name: "Roll result", exact: true }).textContent()) ?? "";
   expect(details).toMatch(/d\d+=/);

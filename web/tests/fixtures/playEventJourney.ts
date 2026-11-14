@@ -1,13 +1,22 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import { cleanup, json, key, publish, resultOf, signIn, workspace, pushDocument } from "./configurablePush.js";
+import { emberRoadDocument } from "../../../src/systems/implementation/package/fixtures/card-decks.js";
 import { expectNoPageOverflow, PLAY_VIEWPORTS } from "./guiChecks.js";
 
 export async function playEventJourney(page: Page, browser: Browser) {
   const gmId = await signIn(page, "code-journey-gm");
   const baseURL = new URL(page.url()).origin;
-  const contexts = await Promise.all(PLAY_VIEWPORTS.slice(0, 2).map(viewport => browser.newContext({ baseURL, viewport })));
+  const extraHTTPHeaders = { Origin: baseURL };
+  const contexts = await Promise.all(PLAY_VIEWPORTS.slice(0, 2).map(viewport =>
+    browser.newContext({ baseURL, viewport, extraHTTPHeaders })));
   const rules = pushDocument();
   rules.metadata.name = `Play events ${key()}`;
+  rules.referenceData.push(...emberRoadDocument.referenceData.filter(dataset => dataset.id === "omens"));
+  rules.decks = emberRoadDocument.decks!;
+  rules.actions.push(...emberRoadDocument.actions.filter(action => action.kind === "draw"));
+  rules.sheets[0]!.sections.at(-1)!.elements.push(
+    { kind: "action", id: "read_omens_element", actionId: "read_omens" },
+  );
   const { id } = await workspace(page.request, rules);
   const characters: string[] = [];
   let campaignId: string | undefined;
@@ -90,24 +99,31 @@ export async function playEventJourney(page: Page, browser: Browser) {
     await expect(page.getByRole("list", { name: "Campaign activity" }).getByText("Roll executed")).toHaveCount(3);
 
     const note = `Visible handout ${key()}`;
-    await json(page.request, "POST", `${path}/content`, {
+    const { content } = await json(page.request, "POST", `${path}/content`, {
       title: note, body: "shareable notes", audience: "all_players", idempotencyKey: key(),
+    });
+    await json(page.request, "PATCH", `/api/content/${content.contentId}`, {
+      title: `${note} revised`, expectedContentRevision: content.revision, idempotencyKey: key(),
     });
     await json(page.request, "POST", `${path}/content`, {
       title: "GM secret handout", body: "secret notes", audience: "gm_only", idempotencyKey: key(),
     });
-    await expect(stack(tablet).getByText(note, { exact: false })).toBeVisible({ timeout: 5000 });
+    await expect(stack(tablet).getByText(`Content updated · ${note} revised`, { exact: true })).toBeVisible({ timeout: 5000 });
     await expect(stack(tablet)).not.toContainText("GM secret handout");
     await open(tablet, `/characters/${characters[1]}`);
 
     await page.getByRole("tab", { name: "Session" }).click();
     await page.getByRole("button", { name: "Open Roller 3", exact: true }).click();
-    await page.getByLabel("Roll audience").selectOption("owner_only");
-    await resultOf(page, () => page.getByRole("button", { name: "Roll Test Pool", exact: true }).click(), "/actions/test_pool");
+    await gmRoll.locator("..").getByLabel("Roll audience").selectOption("owner_only");
+    await resultOf(page, () => gmRoll.click(), "/actions/test_pool");
     await expect(stack(page).getByText(/You rolled .*Owner only/)).toBeVisible();
     const afterPrivate = tablet.waitForResponse(r => new URL(r.url()).pathname === `${path}/activity` && r.ok());
     await afterPrivate;
     await expect(stack(tablet)).toHaveCount(0);
+    const draw = await resultOf(phone, () => phone.getByRole("button", { name: "Read the omens", exact: true }).click(), "/actions/read_omens");
+    const labels = draw.result.roll.breakdown.cards.drawn.map((card: { label: string }) => card.label).join(", ");
+    await expect(stack(phone).getByText(`You drew ${labels}`, { exact: false })).toBeVisible();
+    await expect(stack(tablet).getByText(`Journey Player One drew ${labels}`, { exact: false })).toBeVisible({ timeout: 5000 });
     console.log(`First remote card observed ${remoteObserved} ms after the roll began.`);
   } finally {
     await Promise.all(contexts.map(context => context.close()));

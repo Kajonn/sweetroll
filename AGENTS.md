@@ -98,3 +98,11 @@ PR 75 merges (D3). D4 (who performs the human checks) is open and blocks only T3
 T1 is implemented except the visual baselines and its CI exit. The
 [2026-11-12 local record](docs/acceptance/rules-coverage-gui-2026-11-12.md) has the
 results and the list of what is left; T2 and T3 are not started.
+
+The fifth-edition SRD 5.1 (CC BY 4.0) was built as a system through public API v1 on
+2026-11-15: fixture `tests/integration/fixtures/dnd5e/`, scenario
+`tests/integration/scenarios/dnd5e.test.ts`. The [system record](docs/systems/dnd5e-srd.md)
+lists what the SRD has and the system lacks, and the 14 platform limits behind it
+(the 1 MiB document and package size first). Read it before extending that system.
+It was run through the API only, not in the web app. The record proposes no feature
+and changes no design; the licence confirmation in it is open for the owner.

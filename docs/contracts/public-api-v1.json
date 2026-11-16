@@ -1059,7 +1059,7 @@
           "systems:write"
         ],
         "x-rate-bucket": "validate",
-        "x-max-body-bytes": 1052672,
+        "x-max-body-bytes": 5246976,
         "requestBody": {
           "required": true,
           "content": {
@@ -1149,7 +1149,7 @@
             }
           }
         ],
-        "x-max-body-bytes": 1052672,
+        "x-max-body-bytes": 5246976,
         "requestBody": {
           "required": true,
           "content": {
@@ -15488,6 +15488,28 @@
                   "minimum": 1,
                   "maximum": 9007199254740991,
                   "type": "integer"
+                },
+                "derivedValues": {
+                  "description": "Computed template fields of the entry. Read-only; absent when the template has none.",
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_]{0,63}$": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
                 },
                 "extensionId": {
                   "format": "uuid",

@@ -138,6 +138,9 @@ const entryProperties = {
 const entrySource = Type.Optional(EntrySourceSchema);
 export const entry = object({
   ...entryProperties,
+  derivedValues: Type.Optional(Type.Record(definitionId, scalar, {
+    description: "Computed template fields of the entry. Read-only; absent when the template has none.",
+  })),
   extensionId: Type.Optional({ ...uuid, description: "Extension of the entry's template; absent for base-system templates." }),
   source: entrySource,
 });

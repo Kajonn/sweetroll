@@ -1,5 +1,6 @@
 import { campaignRollRequirements } from "./roll-context.js";
 import {effectiveEntryDefinition} from "./effective-entry.js";
+import { entryItemScope } from "./entry-values.js";
 import type {
   CharacterProjectionElement,
   CharacterProjectionFieldConstraints,
@@ -160,6 +161,7 @@ function projectSlot(
       label: entry.snapshot && "base" in entry.snapshot ? entry.snapshot.values.name : template?.label ?? customEntryLabel(entry.values),
       ...(entry.snapshot && "base" in entry.snapshot && template ? {definition:projectEntryDefinition(template), metadata:structuredClone(entry.snapshot.values)} : {}),
       values: structuredClone(entry.values),
+      ...derivedEntryValues(lookups.packageValue, template, entry),
       ...(entry.quantity === undefined ? {} : { quantity: entry.quantity }),
     };
   });
@@ -179,6 +181,24 @@ function projectSlot(
     }
   }
   return elements;
+}
+
+/** Computed template fields are read-only sheet values; one that fails to evaluate is left out. */
+function derivedEntryValues(
+  packageValue: SystemPackageV1,
+  template: ObjectTemplateV1 | undefined,
+  entry: RuntimeStateV1["entries"][string],
+): Pick<CharacterProjectionSlotEntry, "derived"> {
+  if (template === undefined || !template.fields.some((field) => field.kind === "computed")) return {};
+  const scope = entryItemScope(packageValue, template, entry);
+  return {
+    derived: template.fields.flatMap((field) => {
+      if (field.kind !== "computed" || !scope.derive(field.id)) return [];
+      const value = scope.item[field.id];
+      return typeof value === "number" || typeof value === "string" || typeof value === "boolean"
+        ? [{ id: field.id, label: field.label, value }] : [];
+    }),
+  };
 }
 
 function projectGrantedAction(

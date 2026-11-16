@@ -58,7 +58,7 @@ Arithmetic and ordering require numbers. Equality operands have the same scalar 
 
 | Limit | Ceiling |
 |-------|---------|
-| Encoded input | 1 MiB |
+| Encoded document, and the package compiled from it | 5 MiB each |
 | Expression source | 1,024 UTF-8 bytes |
 | AST | 256 nodes, depth 32 |
 | All computed fields and validations of one sheet | 8,192 nodes, checked when the system is published |
@@ -93,9 +93,14 @@ fallback.
 | `countWhere("equipment", "equipped")` | Count entries with a true boolean flag |
 | `maxOf("equipment", "armor")` | Largest individual value, or zero for an empty set |
 
-Entries missing a requested field make no contribution. Sums and counts use
-quantity when the template sets `aggregateQuantity`. Each call scans one
-slot, and its declared capacity is charged to the sheet evaluation budget.
+A requested field may be a stored number or a computed number field of the
+template, and a filter may be a stored or computed boolean. A computed field
+is evaluated for each entry from the entry's own values and reference data.
+Entries missing a requested field make no contribution. Sums multiply a
+template's per-unit fields (`quantityFields`) by the entry's quantity; a
+computed field is never multiplied. Each call scans one slot. Its declared
+capacity, times the cost of any computed field the call reads, is charged to
+the sheet evaluation budget.
 `fields.<id>` resolves character fields and `item.<id>` resolves the entry
 for a granted roll or template formula. Both scopes support resource parts.
 

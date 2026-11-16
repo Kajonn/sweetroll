@@ -59,6 +59,8 @@ export type SlotListEntry = {
   templateId: string | null;
   label: string;
   values: Record<string, unknown>;
+  /** Read-only computed template fields of the entry. */
+  derived?: Array<{ id: string; label: string; value: string | number | boolean }>;
   quantity?: number;
 };
 
@@ -490,6 +492,16 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
                       ? <p className={styles.personalText} key={key}><strong>{t(key === "description" ? "character.slot.description" : "character.slot.notes")}: </strong>{String((entry.metadata ?? entry.values)[key])}</p> : null)}
                   </> : null}
                   {summary !== null ? <span className={styles.meta}>{summary}</span> : null}
+                  {entry.derived?.map(({ id, label, value }) => {
+                    const shown = String(value);
+                    if (shown === "") return null;
+                    // Long looked-up text (a spell or feature description) stays folded until opened.
+                    return shown.length > 120
+                      ? <details key={id} data-testid={`slot-entry-derived-${entry.entryId}-${id}`}>
+                          <summary>{label}</summary><p className={styles.personalText}>{shown}</p>
+                        </details>
+                      : <p className={styles.personalText} key={id} data-testid={`slot-entry-derived-${entry.entryId}-${id}`}><strong>{label}: </strong>{shown}</p>;
+                  })}
                   {template?.grantedActions.map((action) => (
                     <GrantedActionForm
                       key={action.id}

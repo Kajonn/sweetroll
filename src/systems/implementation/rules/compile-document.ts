@@ -1,7 +1,7 @@
 import { validateDataset, fieldWithDatasetOptions } from "../package/reference-data.js";
 import { dataObservationCost } from "./data.js";
 import { sheetActionOwners, validationOwner } from "./owners.js";
-import { slotEnvironment } from "./slots.js";
+import { computedAggregateCost, slotEnvironment } from "./slots.js";
 import { namedGroups } from "./groups.js";
 import { outputPlaceholders, placeholderProblem } from "./outcomes.js";
 import {validatePushPolicies} from "./push-policy.js";
@@ -305,11 +305,12 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   // entity on each observation (runtime/resolve.ts). Reject a sheet that could
   // never be observed instead of publishing it.
   const compiledById = new Map(document.expressions.map((expression, index) => [expression.id, compiled[index]!]));
+  const computedCost = computedAggregateCost(document, compiledById);
   for (const [entityIndex, entity] of document.entities.entries()) {
     const capacities = new Map(Object.entries(entityEnvironments.get(entity.id)?.slots ?? {}).map(([id, slot]) => [id, slot.capacity]));
     const costOf = (id: string) => {
       const expression = compiledById.get(id);
-      return expression === undefined ? 0 : expression.cost + dataObservationCost(expression.ast, capacities);
+      return expression === undefined ? 0 : expression.cost + dataObservationCost(expression.ast, capacities, computedCost);
     };
     let cost = 0;
     for (const field of entity.fields) {
@@ -360,7 +361,14 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
 
   const pushErrors=validatePushPolicies(unsigned);
   if(pushErrors.length)return {ok:false,diagnostics:pushErrors};
-  return { ok: true, value: signSystemPackage(unsigned) };
+  const signed = signSystemPackage(unsigned);
+  // A package is larger than its document (compiled formulas, resolved choice
+  // options). An oversized one could be published but never imported again.
+  const packageBytes = new TextEncoder().encode(JSON.stringify(signed)).length;
+  if (packageBytes > PACKAGE_LIMITS.encodedBytes) {
+    return scopeDiagnostic("limit_exceeded", "", `The compiled system needs ${packageBytes} bytes; the limit is ${PACKAGE_LIMITS.encodedBytes}.`);
+  }
+  return { ok: true, value: signed };
 }
 
 function addOwner(owners: Map<string, Set<string>>, expressionId: string, owner: string): void {

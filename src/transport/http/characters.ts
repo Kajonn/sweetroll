@@ -148,6 +148,9 @@ const ProjectionSlotEntryDto = Type.Object({
   extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   label: Type.String(),
   values: Type.Object({}, { additionalProperties: true }),
+  derived: Type.Optional(Type.Array(Type.Object({
+    id: Type.String(), label: Type.String(), value: Type.Union([Type.String(), Type.Number(), Type.Boolean()]),
+  }), { maxItems: 64 })),
   quantity: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 const ProjectionElementDto = Type.Union([

@@ -58,6 +58,22 @@ function renderControl(overrides: Partial<Parameters<typeof SlotListControl>[0]>
 }
 
 describe("SlotListControl", () => {
+  it("shows computed template fields read-only and folds long text", () => {
+    renderControl({ entries: [{
+      ...entries[0]!,
+      derived: [
+        { id: "level", label: "Spell level", value: 3 },
+        { id: "description", label: "Description", value: "A bright streak flashes. ".repeat(10) },
+        { id: "empty", label: "Empty", value: "" },
+      ],
+    }] });
+    expect(screen.getByTestId(`slot-entry-derived-${SWORD_ENTRY_ID}-level`)).toHaveTextContent("Spell level: 3");
+    const description = screen.getByTestId(`slot-entry-derived-${SWORD_ENTRY_ID}-description`);
+    expect(description.tagName).toBe("DETAILS");
+    expect(description).toHaveTextContent("A bright streak flashes.");
+    expect(screen.queryByTestId(`slot-entry-derived-${SWORD_ENTRY_ID}-empty`)).not.toBeInTheDocument();
+  });
+
   it("lists entries with their values and shows an empty state when bare", () => {
     renderControl();
     expect(screen.getByTestId("slot-list-inventory")).toBeVisible();

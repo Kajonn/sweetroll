@@ -1,4 +1,5 @@
 import { dataObservationCost } from "../rules/data.js";
+import { computedAggregateCost } from "../rules/slots.js";
 import { sheetActionOwners, validationOwner } from "../rules/owners.js";
 import { DEFAULT_SLOT_MAX_ENTRIES } from "./entries.js";
 import { characterRuleBindings } from "./rule-bindings.js";
@@ -37,6 +38,7 @@ export function resolveObservedValues(
   }));
   const bindings = characterRuleBindings(packageValue, entity, state);
   const capacities = new Map(packageValue.slots.map(slot => [slot.id, slot.maxEntries ?? DEFAULT_SLOT_MAX_ENTRIES]));
+  const computedCost = computedAggregateCost(packageValue, expressions);
   let resolvedState = state;
   const derivedValues: Record<string, RuntimeScalar> = {};
   const validations: RuntimeValidation[] = entity.fields.flatMap((field) => {
@@ -68,7 +70,7 @@ export function resolveObservedValues(
       const dependencyResult = evaluateComputed(dependency);
       if (!dependencyResult.ok) return dependencyResult;
     }
-    spent += expression.cost + dataObservationCost(expression.ast, capacities);
+    spent += expression.cost + dataObservationCost(expression.ast, capacities, computedCost);
     if (spent > packageValue.effectiveLimits.sheetEvaluationNodes) return budgetExceeded();
     const result = evaluate(expression, bindings);
     if (!result.ok) return invalidPackage(expression.id);
@@ -111,7 +113,7 @@ export function resolveObservedValues(
     if (validationOwner(packageValue, validation, actionOwners) !== entity.id) continue;
     const expression = expressions.get(validation.expressionId);
     if (expression === undefined) return invalidPackage(validation.expressionId);
-    spent += expression.cost + dataObservationCost(expression.ast, capacities);
+    spent += expression.cost + dataObservationCost(expression.ast, capacities, computedCost);
     if (spent > packageValue.effectiveLimits.sheetEvaluationNodes) return budgetExceeded();
     const result = evaluate(expression, bindings);
     if (!result.ok) return invalidPackage(expression.id);

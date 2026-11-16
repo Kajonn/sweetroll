@@ -16,11 +16,12 @@ type Named = { id: string; name: string; description: string };
 type Srd = {
   classes: Array<{
     id: string; name: string; number: number; hit_die: number; saves: string[]; spell_ability: string; prepares: string;
-    proficiencies: string; subclass: string; resources: Array<{ name: string; charisma: boolean }>; roll_name: string; progression: string;
+    caster: string; unarmored: string; proficiencies: string; subclass: string; roll_name: string; progression: string;
   }>;
   levels: Array<{
     key: number; prof: number; notes: string; cantrips: number; spells_known: number; slots: number[];
-    resources: number[]; roll: [number, number, number]; speed_bonus: number;
+    pact_slots: number; pact_slot_level: number; resources: Record<string, number>; roll: [number, number, number];
+    speed_bonus: number; speed_bonus_unarmored: number;
   }>;
   races: Array<{ id: string; name: string; speed: number; size: string; bonuses: Record<string, number>; hp_per_level: number; languages: string; traits: string }>;
   skills: Array<Named & { ability: string }>;
@@ -36,7 +37,8 @@ type Srd = {
     roll: Dice & { mod: boolean; dice_step: number; flat_step: number; by_character_level: boolean };
   }>;
   features: Array<Named & { level: number; source: string }>;
-  magicItems: Array<{ id: string; name: string; summary: string }>;
+  magicItems: Array<Named & { summary: string }>;
+  rules: Named[];
   conditions: Named[]; damageTypes: Named[]; schools: Named[]; alignments: Named[]; weaponProperties: Named[];
   languages: Named[]; abilityScores: Named[];
 };
@@ -150,6 +152,15 @@ function slotTableOf(classNumber: number): number {
   return known >= 0 ? known + 1 : slotTables.push(table);
 }
 
+// Limited-use class features. A character's maximum is the sum over its classes,
+// except Channel Divinity, which a second class does not add uses to.
+const CLASS_RESOURCES = [
+  ["rage", "Rage"], ["bardic_inspiration", "Bardic Inspiration"], ["channel_divinity", "Channel Divinity"], ["wild_shape", "Wild Shape"],
+  ["second_wind", "Second Wind"], ["action_surge", "Action Surge"], ["indomitable", "Indomitable"], ["ki", "Ki points"],
+  ["lay_on_hands", "Lay on Hands (hit points)"], ["divine_sense", "Divine Sense"], ["sorcery_points", "Sorcery points"],
+  ["arcane_recovery", "Arcane Recovery"],
+] as const;
+
 // --- Reference data ---------------------------------------------------------
 const rolls = (spell: Srd["spells"][number]): boolean => spell.roll.dice > 0 || spell.roll.flat > 0;
 const reference = (id: string, label: string, entries: Named[]): ReferenceDataV1 => ({
@@ -160,20 +171,16 @@ const referenceData: ReferenceDataV1[] = [
     id: "classes", label: "Classes", keyColumn: "key",
     columns: {
       key: "text", number: "number", slot_table: "number", hit_die: "number", ...Object.fromEntries(abilities.map(([id]) => [`save_${id}`, "boolean" as const])),
-      spell_ability: "text", prepares: "text", proficiencies: "text", subclass: "text", progression: "text",
-      res1_name: "text", res1_cha: "boolean", res2_name: "text", res2_cha: "boolean", res3_name: "text", res3_cha: "boolean", roll_name: "text",
+      spell_ability: "text", prepares: "text", caster: "text", unarmored: "text", proficiencies: "text", subclass: "text",
+      progression: "text", roll_name: "text",
     },
     records: srd.classes.map((entry) => ({
       id: entry.id, label: entry.name,
       values: {
         key: entry.id, number: entry.number, slot_table: slotTableOf(entry.number), hit_die: entry.hit_die,
         ...Object.fromEntries(abilities.map(([id]) => [`save_${id}`, entry.saves.includes(id)])),
-        spell_ability: entry.spell_ability, prepares: entry.prepares, proficiencies: entry.proficiencies,
-        subclass: entry.subclass, progression: entry.progression,
-        ...Object.fromEntries(entry.resources.flatMap((resource, index) => [
-          [`res${index + 1}_name`, resource.name], [`res${index + 1}_cha`, resource.charisma],
-        ])),
-        roll_name: entry.roll_name,
+        spell_ability: entry.spell_ability, prepares: entry.prepares, caster: entry.caster, unarmored: entry.unarmored,
+        proficiencies: entry.proficiencies, subclass: entry.subclass, progression: entry.progression, roll_name: entry.roll_name,
       },
     })),
   },
@@ -181,20 +188,22 @@ const referenceData: ReferenceDataV1[] = [
     // One row per class and level; the key is the class number times 100 plus the level.
     id: "levels", label: "Class levels", keyColumn: "key",
     columns: {
-      key: "number", prof: "number", notes: "text", cantrips: "number", spells_known: "number",
-      res1: "number", res2: "number", res3: "number", roll_dice: "number", roll_die: "number", roll_flat: "number", speed_bonus: "number",
+      key: "number", notes: "text", cantrips: "number", spells_known: "number", pact_slots: "number", pact_slot_level: "number",
+      ...Object.fromEntries(CLASS_RESOURCES.map(([id]) => [id, "number" as const])),
+      roll_dice: "number", roll_die: "number", roll_flat: "number", speed_bonus: "number", speed_bonus_unarmored: "number",
     },
     records: srd.levels.map((row) => ({
       id: `row_${row.key}`, label: `${srd.classes[Math.floor(row.key / 100) - 1]!.name} ${row.key % 100}`,
       values: {
-        key: row.key, prof: row.prof, notes: row.notes, cantrips: row.cantrips, spells_known: row.spells_known,
-        res1: row.resources[0]!, res2: row.resources[1]!, res3: row.resources[2]!,
-        roll_dice: row.roll[0], roll_die: row.roll[1], roll_flat: row.roll[2], speed_bonus: row.speed_bonus,
+        key: row.key, notes: row.notes, cantrips: row.cantrips, spells_known: row.spells_known,
+        pact_slots: row.pact_slots, pact_slot_level: row.pact_slot_level, ...row.resources,
+        roll_dice: row.roll[0], roll_die: row.roll[1], roll_flat: row.roll[2],
+        speed_bonus: row.speed_bonus, speed_bonus_unarmored: row.speed_bonus_unarmored,
       },
     })),
   },
   {
-    // Spell slots per level for each distinct progression (full casters, half casters, pact magic).
+    // Spell slots per level for each distinct progression (full casters, paladin, ranger).
     id: "spell_slots", label: "Spell slots", keyColumn: "key",
     columns: { key: "number", ...Object.fromEntries(SLOT_LEVELS.map((slot) => [`slots_${slot}`, "number" as const])) },
     records: slotTables.flatMap((table, index) => table.map((slots, levelIndex) => ({
@@ -255,8 +264,10 @@ const referenceData: ReferenceDataV1[] = [
     })),
   },
   {
-    id: "magic_items", label: "Magic items", keyColumn: "key", columns: { key: "text", summary: "text" },
-    records: srd.magicItems.map((item) => ({ id: item.id, label: item.name, values: { key: item.id, summary: item.summary } })),
+    id: "magic_items", label: "Magic items", keyColumn: "key", columns: { key: "text", summary: "text", description: "text" },
+    records: srd.magicItems.map((item) => ({
+      id: item.id, label: item.name, values: { key: item.id, summary: item.summary, description: item.description },
+    })),
   },
   {
     id: "weapons", label: "Weapons", keyColumn: "key",
@@ -278,6 +289,7 @@ const referenceData: ReferenceDataV1[] = [
       id: skill.id, label: skill.name, values: { ability: skill.ability, description: skill.description },
     })),
   },
+  reference("rules", "Rules", srd.rules),
   reference("abilities", "Ability scores", srd.abilityScores),
   reference("conditions", "Conditions", srd.conditions),
   reference("alignments", "Alignments", srd.alignments),
@@ -289,57 +301,63 @@ const referenceData: ReferenceDataV1[] = [
 ];
 
 // --- Player character -------------------------------------------------------
-const ROW = "fields.class_row";
-const level = (column: string) => `lookup("levels", ${ROW}, "${column}")`;
-const ofClass = (column: string) => `lookup("classes", fields.class, "${column}")`;
+// A character's classes are entries in the `class_list` slot: adding a class is
+// adding an entry. Everything a class contributes is a computed field of its
+// entry (see `classTemplate`), and the character sums those over the slot.
 const ofRace = (column: string) => `lookup("races", fields.race, "${column}")`;
+const classes = (field: string) => `sum("class_list", "${field}")`;
 const ARMOR = 'sumWhere("equipment", "armor_base", "equipped")';
 const SHIELD = 'sumWhere("equipment", "shield_bonus", "equipped")';
 // Bards add half their proficiency bonus to ability checks that lack it (Jack of All Trades, level 2).
 const halfProficiency = "fields.half_proficiency";
 const skillBonus = (skill: Srd["skills"][number]) => `fields.${skill.ability}_mod + if(has(fields.skill_expertise, "${skill.id}"), 2 * fields.proficiency_bonus, `
   + `if(has(fields.skill_proficiencies, "${skill.id}"), fields.proficiency_bonus, ${halfProficiency}))`;
-const resourceMaximum = (index: number) => `if(${ofClass(`res${index}_cha`)}, max(1, ${level(`res${index}`)} + fields.cha_mod), ${level(`res${index}`)})`;
 function resource(id: string, label: string, maximum: string, initial = 0, resetTo: "min" | "max" = "max"): FieldV1 {
   expressions.push({ id: `c_${id}_max`, context: "computed", resultType: "number", source: maximum, fallback: 0 });
   return { kind: "resource", id, label, default: { current: initial, max: initial }, min: 0, max: 999, step: 1, maxExpressionId: `c_${id}_max`, resetTo };
 }
+// Uses of a limited class feature: summed over the character's classes.
+const classResourceMaximum: Record<string, string> = {
+  ...Object.fromEntries(CLASS_RESOURCES.map(([id]) => [id, classes(id)])),
+  channel_divinity: 'maxOf("class_list", "channel_divinity")',
+  bardic_inspiration: `if(${classes("bardic_inspiration")} > 0, max(1, fields.cha_mod), 0)`,
+  divine_sense: `if(${classes("divine_sense")} > 0, max(1, 1 + fields.cha_mod), 0)`,
+};
+// The table of a full caster is also the multiclass spellcaster table.
+const FULL_CASTER_TABLE = slotTableOf(srd.classes.find((entry) => entry.id === "wizard")!.number);
 
 const characterFields: FieldV1[] = [
   choice("race", "Race", "races", "human"),
-  choice("class", "Class", "classes", "fighter"),
-  integer("level", "Level", 1, 1, 20),
+  computed("level", "Character level", classes("level")),
   integer("xp", "Experience points", 0, 0, 1_000_000),
   choice("alignment", "Alignment", "alignments", null),
   longText("background", "Background", 120),
   ...abilities.map(([id, label]) => integer(`${id}_base`, `${label} (before racial increase)`, 10, 1, 30)),
   ...abilities.map(([id, label]) => computed(id, label, `fields.${id}_base + ${ofRace(id)}`)),
   ...abilities.map(([id, label]) => computed(`${id}_mod`, `${label} modifier`, `floor((fields.${id} - 10) / 2)`)),
-  computed("class_row", "Class table row", `${ofClass("number")} * 100 + fields.level`),
-  computed("proficiency_bonus", "Proficiency bonus", level("prof")),
-  computed("half_proficiency", "Bonus to checks without proficiency",
-    `if(fields.class == "bard" && fields.level >= 2, floor(fields.proficiency_bonus / 2), 0)`),
+  computed("proficiency_bonus", "Proficiency bonus", "2 + floor((max(1, fields.level) - 1) / 4)"),
+  computed("half_proficiency", "Bonus to checks without proficiency", `if(${classes("jack_of_all_trades")} > 0, floor(fields.proficiency_bonus / 2), 0)`),
   choices("extra_saves", "Additional saving throw proficiencies", "abilities"),
   ...abilities.map(([id, label]) => computed(`save_${id}`, `${label} saving throw`,
-    `fields.${id}_mod + if(${ofClass(`save_${id}`)} || has(fields.extra_saves, "${id}"), fields.proficiency_bonus, 0)`)),
+    `fields.${id}_mod + if(${classes(`save_${id}`)} > 0 || has(fields.extra_saves, "${id}"), fields.proficiency_bonus, 0)`)),
   choices("skill_proficiencies", "Skill proficiencies", "skills"),
   choices("skill_expertise", "Expertise (double proficiency)", "skills"),
   ...srd.skills.map((skill) => computed(`skill_${skill.id}`, `${skill.name} (${skill.ability.toUpperCase()})`, skillBonus(skill))),
   computed("passive_perception", "Passive Wisdom (Perception)", "10 + fields.skill_perception"),
   computed("initiative", "Initiative", `fields.dex_mod + ${halfProficiency}`),
   integer("ac_bonus", "Other Armor Class bonus", 0, -10, 20),
+  // Unarmored Defense and Draconic Resilience do not combine: the best one a class grants applies.
   computed("armor_class", "Armor Class",
     `if(${ARMOR} > 0, ${ARMOR} + min(fields.dex_mod, sumWhere("equipment", "dex_cap", "equipped")), `
-    + `10 + fields.dex_mod + if(fields.class == "barbarian", fields.con_mod, if(fields.class == "monk" && ${SHIELD} == 0, fields.wis_mod, if(fields.class == "sorcerer", 3, 0)))) `
+    + `10 + fields.dex_mod + max(if(${classes("unarmored_con")} > 0, fields.con_mod, 0), `
+    + `if(${classes("unarmored_wis")} > 0 && ${SHIELD} == 0, fields.wis_mod, 0), if(${classes("draconic")} > 0, 3, 0))) `
     + `+ ${SHIELD} + sumWhere("equipment", "armor_magic", "equipped") + fields.ac_bonus`),
-  computed("speed", "Speed (ft.)", `${ofRace("speed")} + if(fields.class == "monk" && ${ARMOR} + ${SHIELD} > 0, 0, ${level("speed_bonus")})`),
+  computed("speed", "Speed (ft.)", `${ofRace("speed")} + ${classes("speed_bonus")} + if(${ARMOR} + ${SHIELD} > 0, 0, ${classes("speed_bonus_unarmored")})`),
   computed("size", "Size", ofRace("size"), "text"),
-  computed("hit_die", "Hit die (sides)", ofClass("hit_die")),
   integer("hp_adjustment", "Hit point maximum adjustment", 0, -200, 400),
   // Fixed hit points per level, as the SRD allows instead of rolling; rolled totals go into the adjustment.
   resource("hp", "Hit points",
-    `max(1, fields.hit_die + fields.con_mod + (fields.level - 1) * (fields.hit_die / 2 + 1 + fields.con_mod) `
-    + `+ fields.level * (${ofRace("hp_per_level")} + if(fields.class == "sorcerer", 1, 0)) + fields.hp_adjustment)`, 10),
+    `max(1, ${classes("hit_points")} + fields.level * (fields.con_mod + ${ofRace("hp_per_level")}) + fields.hp_adjustment)`, 10),
   integer("temp_hp", "Temporary hit points", 0, 0, 999),
   resource("hit_dice", "Hit dice", "fields.level", 1),
   { kind: "resource", id: "death_successes", label: "Death save successes", default: { current: 0, max: 3 }, min: 0, max: 3, step: 1, resetTo: "min" },
@@ -347,27 +365,26 @@ const characterFields: FieldV1[] = [
   flag("inspiration", "Inspiration"),
   integer("exhaustion", "Exhaustion level", 0, 0, 6),
   choices("conditions", "Conditions", "conditions"),
-  computed("spell_ability", "Spellcasting ability", ofClass("spell_ability"), "text"),
-  computed("spell_mod", "Spellcasting ability modifier",
-    `if(fields.spell_ability == "int", fields.int_mod, if(fields.spell_ability == "wis", fields.wis_mod, if(fields.spell_ability == "cha", fields.cha_mod, 0)))`),
-  computed("spell_save_dc", "Spell save DC", `if(fields.spell_ability == "none", 0, 8 + fields.proficiency_bonus + fields.spell_mod)`),
-  computed("spell_attack_bonus", "Spell attack bonus", `if(fields.spell_ability == "none", 0, fields.proficiency_bonus + fields.spell_mod)`),
-  computed("cantrips_known", "Cantrips known", level("cantrips")),
+  // With several spellcasting classes these show the best ability; a spell entry can name another.
+  computed("spell_mod", "Spellcasting ability modifier (best)",
+    `max(if(${classes("casts_int")} > 0, fields.int_mod, -5), if(${classes("casts_wis")} > 0, fields.wis_mod, -5), if(${classes("casts_cha")} > 0, fields.cha_mod, -5))`),
+  computed("spell_save_dc", "Spell save DC", "if(fields.spell_mod == -5, 0, 8 + fields.proficiency_bonus + fields.spell_mod)"),
+  computed("spell_attack_bonus", "Spell attack bonus", "if(fields.spell_mod == -5, 0, fields.proficiency_bonus + fields.spell_mod)"),
+  computed("cantrips_known", "Cantrips known", classes("cantrips")),
   computed("spells_available", "Spells known or prepared",
-    `if(${ofClass("prepares")} == "full", max(1, fields.spell_mod + fields.level), `
-    + `if(${ofClass("prepares")} == "half", max(1, fields.spell_mod + floor(fields.level / 2)), ${level("spells_known")}))`),
-  computed("slot_row", "Spell slot table row", `${ofClass("slot_table")} * 100 + fields.level`),
+    `${classes("spells_known")} + ${classes("prepared_levels")} + ${classes("prepares_int")} * fields.int_mod `
+    + `+ ${classes("prepares_wis")} * fields.wis_mod + ${classes("prepares_cha")} * fields.cha_mod`),
+  // One spellcasting class uses its own table. Two or more add their caster
+  // levels (half for paladin and ranger) and use the full caster table.
+  computed("caster_classes", "Spellcasting classes", classes("is_caster")),
+  computed("slot_row", "Spell slot table row",
+    `if(fields.caster_classes == 1, ${classes("slot_row")}, `
+    + `if(fields.caster_classes > 1 && ${classes("caster_level")} > 0, ${FULL_CASTER_TABLE * 100} + min(20, ${classes("caster_level")}), 0))`),
   ...SLOT_LEVELS.map((slot) => resource(`slots_${slot}`, `Level ${slot} spell slots`,
     `if(fields.slot_row < 100, 0, lookup("spell_slots", fields.slot_row, "slots_${slot}"))`)),
-  ...[1, 2, 3].flatMap((index) => [
-    computed(`class_resource_${index}_name`, `Class resource ${index}`, ofClass(`res${index}_name`), "text"),
-    resource(`class_resource_${index}`, `Class resource ${index} uses`, resourceMaximum(index)),
-  ]),
-  computed("class_roll_name", "Class die", ofClass("roll_name"), "text"),
-  computed("subclass", "Subclass", ofClass("subclass"), "text"),
-  computed("class_notes", "Class table", level("notes"), "text"),
-  computed("class_progression", "Class features by level", ofClass("progression"), "text"),
-  computed("class_proficiencies", "Class proficiencies", ofClass("proficiencies"), "text"),
+  resource("pact_slots", "Pact Magic slots", classes("pact_slots")),
+  computed("pact_slot_level", "Pact Magic slot level", classes("pact_slot_level")),
+  ...CLASS_RESOURCES.map(([id, label]) => resource(id, label, classResourceMaximum[id]!)),
   computed("race_traits", "Racial traits", ofRace("traits"), "text"),
   computed("race_languages", "Languages (race)", ofRace("languages"), "text"),
   longText("proficiencies", "Other proficiencies and languages"),
@@ -396,22 +413,12 @@ const characterActions: ActionV1[] = [
     ]),
   },
   {
-    kind: "roll", id: "spend_hit_dice", label: "Spend hit dice (short rest)", inputs: [input("count", "Hit dice spent", "integer", 1)],
-    outputTemplate: "Regain {total} hit points",
-    expressionId: expression("spend_hit_dice_roll", "roll", "max(0, dice(inputs.count, fields.hit_die) + inputs.count * fields.con_mod)"),
-  },
-  {
-    kind: "roll", id: "class_roll", label: "Class die", inputs: [input("bonus", "Other bonus or penalty", "integer", 0)],
-    outputTemplate: "{fields.class_roll_name}: {total}",
-    expressionId: expression("class_roll_roll", "roll", `dice(${level("roll_dice")}, ${level("roll_die")}) + ${level("roll_flat")} + inputs.bonus`),
-  },
-  {
     kind: "roll", id: "roll_dice", label: "Roll any dice", inputs: diceInputs, outputTemplate: "{inputs.count}d{inputs.sides}: {total}",
     expressionId: expression("roll_dice_roll", "roll", "dice(inputs.count, inputs.sides) + inputs.modifier"),
   },
   reset("restore_hp", "Long rest: restore hit points", "hp"),
   ...SLOT_LEVELS.map((slot) => reset(`restore_slots_${slot}`, `Restore level ${slot} slots`, `slots_${slot}`)),
-  ...[1, 2, 3].map((index) => reset(`restore_class_resource_${index}`, `Restore class resource ${index}`, `class_resource_${index}`)),
+  reset("restore_pact_slots", "Restore Pact Magic slots", "pact_slots"),
   reset("clear_death_successes", "Clear death save successes", "death_successes"),
   reset("clear_death_failures", "Clear death save failures", "death_failures"),
 ];
@@ -419,8 +426,8 @@ const characterActions: ActionV1[] = [
 const characterSections: SheetSectionV1[] = [
   {
     id: "sec_identity", label: "Character", elements: [
-      ...show("pc", ["race", "class", "subclass", "level", "xp", "background", "alignment", "size", "proficiency_bonus"]),
-      ...show("pc", ["inspiration"]),
+      ...show("pc", ["race", "level", "xp", "background", "alignment", "size", "proficiency_bonus", "inspiration"]),
+      { kind: "slot", id: "pc_classes", slotId: "class_list" },
     ],
   },
   {
@@ -439,26 +446,22 @@ const characterSections: SheetSectionV1[] = [
   {
     id: "sec_combat", label: "Combat", elements: [
       ...show("pc", ["armor_class", "ac_bonus", "initiative"]), ...use("pc", ["initiative_roll"]), ...show("pc", ["speed"]),
-      ...meter("pc", ["hp"]), ...show("pc", ["temp_hp", "hp_adjustment", "hit_die"]), ...meter("pc", ["hit_dice"]),
-      ...use("pc", ["spend_hit_dice", "restore_hp"]),
+      ...meter("pc", ["hp"]), ...show("pc", ["temp_hp", "hp_adjustment"]), ...meter("pc", ["hit_dice"]), ...use("pc", ["restore_hp"]),
       ...meter("pc", ["death_successes", "death_failures"]), ...use("pc", ["death_save", "clear_death_successes", "clear_death_failures"]),
       ...show("pc", ["conditions", "exhaustion"]), ...use("pc", ["roll_dice"]),
     ],
   },
   {
     id: "sec_class", label: "Class features", elements: [
-      ...[1, 2, 3].flatMap((index) => [
-        ...show("pc", [`class_resource_${index}_name`]), ...meter("pc", [`class_resource_${index}`]), ...use("pc", [`restore_class_resource_${index}`]),
-      ]),
-      ...show("pc", ["class_roll_name"]), ...use("pc", ["class_roll"]),
-      ...show("pc", ["class_notes", "class_progression", "class_proficiencies"]),
+      ...meter("pc", CLASS_RESOURCES.map(([id]) => id)),
       { kind: "slot", id: "pc_features", slotId: "feature_list" },
     ],
   },
   {
     id: "sec_spellcasting", label: "Spellcasting", elements: [
-      ...show("pc", ["spell_ability", "spell_mod", "spell_save_dc", "spell_attack_bonus", "cantrips_known", "spells_available"]),
+      ...show("pc", ["spell_mod", "spell_save_dc", "spell_attack_bonus", "cantrips_known", "spells_available"]),
       ...SLOT_LEVELS.flatMap((slot) => [...meter("pc", [`slots_${slot}`]), ...use("pc", [`restore_slots_${slot}`])]),
+      ...meter("pc", ["pact_slots"]), ...show("pc", ["pact_slot_level"]), ...use("pc", ["restore_pact_slots"]),
       { kind: "slot", id: "pc_spells", slotId: "spell_list" },
     ],
   },
@@ -473,17 +476,15 @@ const characterSections: SheetSectionV1[] = [
   },
 ];
 
+function validation(id: string, targetId: string, message: string, source: string): ValidationV1 {
+  expressions.push({ id: `v_${id}`, context: "validation", resultType: "boolean", source, fallback: true });
+  return { id, severity: "warning", message, targetEntityId: "character", targetId, expressionId: `v_${id}` };
+}
 const validations: ValidationV1[] = [
-  {
-    id: "attunement_limit", severity: "warning", message: "A character can be attuned to at most three magic items.",
-    targetEntityId: "character", targetId: "carried_weight",
-    expressionId: (expressions.push({ id: "v_attunement", context: "validation", resultType: "boolean", source: 'countWhere("equipment", "attuned") <= 3', fallback: true }), "v_attunement"),
-  },
-  {
-    id: "carrying_limit", severity: "warning", message: "Carried weight exceeds carrying capacity (Strength score × 15).",
-    targetEntityId: "character", targetId: "carrying_capacity",
-    expressionId: (expressions.push({ id: "v_carrying", context: "validation", resultType: "boolean", source: "fields.carried_weight <= fields.carrying_capacity", fallback: true }), "v_carrying"),
-  },
+  validation("attunement_limit", "carried_weight", "A character can be attuned to at most three magic items.", 'countWhere("equipment", "attuned") <= 3'),
+  validation("carrying_limit", "carrying_capacity", "Carried weight exceeds carrying capacity (Strength score × 15).", "fields.carried_weight <= fields.carrying_capacity"),
+  validation("first_class", "level", "Add a class and mark exactly one class as the first class.", 'countWhere("class_list", "first") == 1'),
+  validation("level_limit", "level", "A character's class levels add up to at most 20.", "fields.level <= 20"),
 ];
 
 // --- Monsters and other non-player characters ------------------------------
@@ -571,12 +572,6 @@ const monsterSections: SheetSectionV1[] = [
 // --- Catalog templates ------------------------------------------------------
 const itemText = (id: string, label: string, dataset: string, key: string, column: string, prefix: string): FieldV1 => (
   computed(id, label, `lookup("${dataset}", item.${key}, "${column}")`, "text", prefix));
-// The sheet does not show computed entry fields, so each data-driven entry
-// gets an action that reports its looked-up text as the action's result.
-const describe = (prefix: string, label: string, outputTemplate: string): GrantedActionV1 => ({
-  kind: "roll", id: "describe", label, inputs: [], outputTemplate,
-  expressionId: expression(`${prefix}_describe`, "roll", "0"),
-});
 // Weapons share one template: every template needs its own copy of each
 // formula, and 37 copies of the attack rolls do not fit the package size limit.
 const weapon = (column: string) => `lookup("weapons", item.weapon, "${column}")`;
@@ -600,7 +595,6 @@ const weaponTemplate: ObjectTemplateV1 = {
     { ...targetedAttack("w_attack_monster", "Attack a monster", "monster", WEAPON_TO_HIT, "{total} to hit against Armor Class {detail.armor_class}"), id: "attack_monster" },
     weaponDamage("damage", "Damage", weapon("dice"), weapon("die"), weapon("flat")),
     weaponDamage("damage_two_handed", "Damage (two hands, versatile weapons)", weapon("two_handed_dice"), weapon("two_handed_die"), "0"),
-    describe("w", "Show properties", "{item.properties}\nCost {item.cost}, weight {item.listed_weight} lb."),
   ],
 };
 function armorTemplate(entry: Srd["armor"][number]): ObjectTemplateV1 {
@@ -646,19 +640,85 @@ const usesActions: GrantedActionV1[] = [
 ];
 const spell = (column: string) => `lookup("spell_rolls", item.spell, "${column}")`;
 const UPCAST = 'max(0, inputs.slot_level - lookup("spells", item.spell, "level"))';
+const SPELL_MOD = 'if(item.ability == "int", fields.int_mod, if(item.ability == "wis", fields.wis_mod, if(item.ability == "cha", fields.cha_mod, fields.spell_mod)))';
 const CANTRIP_TIER = "1 + if(fields.level >= 5, 1, 0) + if(fields.level >= 11, 1, 0) + if(fields.level >= 17, 1, 0)";
+// One entry per class the character has levels in. Its computed fields are
+// what the class contributes at that level; the character sheet sums them.
+const row = (column: string) => `lookup("levels", item.row, "${column}")`;
+const ofClass = (column: string) => `lookup("classes", item.class, "${column}")`;
+const classNumber = (id: string, label: string, source: string): FieldV1 => computed(id, label, source, "number", "k");
+const classText = (id: string, label: string, source: string): FieldV1 => computed(id, label, source, "text", "k");
+const isAbility = (column: string, ability: string) => `${ofClass(column)} == "${ability}"`;
+const classTemplate: ObjectTemplateV1 = {
+  kind: "effect", id: "class_levels", label: "Class",
+  description: "Choose the class and its level after adding the entry. Add one entry per class to multiclass.",
+  fields: [
+    choice("class", "Class", "classes", "fighter"), integer("level", "Class level", 1, 1, 20),
+    flag("first", "First class (saving throws and full first hit die)", true),
+    classText("subclass", "Subclass", ofClass("subclass")),
+    classText("table", "Class table", row("notes")),
+    classText("progression", "Features by level", ofClass("progression")),
+    classText("proficiencies", "Proficiencies", ofClass("proficiencies")),
+    classText("roll_name", "Class die", ofClass("roll_name")),
+    classText("spell_ability", "Spellcasting ability", ofClass("spell_ability")),
+    classNumber("row", "Class table row", `${ofClass("number")} * 100 + item.level`),
+    classNumber("hit_die", "Hit die (sides)", ofClass("hit_die")),
+    // Fixed hit points: the full die at the first character level, the average after that. Draconic Resilience adds 1 per level.
+    classNumber("hit_points", "Hit points from this class",
+      'item.level * (item.hit_die / 2 + 1) + if(item.first, item.hit_die / 2 - 1, 0) + if(item.class == "sorcerer", item.level, 0)'),
+    ...abilities.map(([id, label]) => classNumber(`save_${id}`, `${label} saving throw proficiency`, `if(item.first && ${ofClass(`save_${id}`)}, 1, 0)`)),
+    classNumber("is_caster", "Has the Spellcasting feature", `if(${ofClass("caster")} == "none", 0, 1)`),
+    classNumber("caster_level", "Levels counted for multiclass spell slots",
+      `if(${ofClass("caster")} == "full", item.level, if(${ofClass("caster")} == "half", floor(item.level / 2), 0))`),
+    classNumber("slot_row", "Spell slot table row", `if(${ofClass("caster")} == "none", 0, ${ofClass("slot_table")} * 100 + item.level)`),
+    classNumber("pact_slots", "Pact Magic slots", row("pact_slots")), classNumber("pact_slot_level", "Pact Magic slot level", row("pact_slot_level")),
+    classNumber("cantrips", "Cantrips known", row("cantrips")), classNumber("spells_known", "Spells known", row("spells_known")),
+    classNumber("prepared_levels", "Levels counted for prepared spells",
+      `if(${ofClass("prepares")} == "full", item.level, if(${ofClass("prepares")} == "half", floor(item.level / 2), 0))`),
+    ...(["int", "wis", "cha"] as const).flatMap((ability) => [
+      classNumber(`casts_${ability}`, `Casts with ${ability.toUpperCase()}`, `if(${isAbility("spell_ability", ability)}, 1, 0)`),
+      classNumber(`prepares_${ability}`, `Prepares with ${ability.toUpperCase()}`,
+        `if(${ofClass("prepares")} != "none" && ${isAbility("spell_ability", ability)}, 1, 0)`),
+    ]),
+    classNumber("unarmored_con", "Unarmored Defense (Constitution)", `if(${isAbility("unarmored", "con")}, 1, 0)`),
+    classNumber("unarmored_wis", "Unarmored Defense (Wisdom)", `if(${isAbility("unarmored", "wis")}, 1, 0)`),
+    classNumber("draconic", "Draconic Resilience", `if(${isAbility("unarmored", "draconic")}, 1, 0)`),
+    classNumber("speed_bonus", "Speed bonus", row("speed_bonus")),
+    classNumber("speed_bonus_unarmored", "Speed bonus without armor", row("speed_bonus_unarmored")),
+    classNumber("jack_of_all_trades", "Jack of All Trades", 'if(item.class == "bard" && item.level >= 2, 1, 0)'),
+    ...CLASS_RESOURCES.map(([id, label]) => classNumber(id, `${label} uses`, row(id))),
+  ],
+  grantedActions: [
+    {
+      kind: "roll", id: "class_roll", label: "Class die", inputs: [input("bonus", "Other bonus or penalty", "integer", 0)],
+      outputTemplate: "{item.roll_name}: {total}",
+      expressionId: expression("k_class_roll", "roll", `dice(${row("roll_dice")}, ${row("roll_die")}) + ${row("roll_flat")} + inputs.bonus`),
+    },
+    {
+      kind: "roll", id: "spend_hit_dice", label: "Spend hit dice (short rest)", inputs: [input("count", "Hit dice spent", "integer", 1)],
+      outputTemplate: "Regain {total} hit points",
+      expressionId: expression("k_spend_hit_dice", "roll", "max(0, dice(inputs.count, item.hit_die) + inputs.count * fields.con_mod)"),
+    },
+  ],
+};
+
 const genericTemplates: ObjectTemplateV1[] = [
   {
     // One entry per spell known or prepared; the spell is chosen from the SRD list.
     kind: "spell", id: "spell", label: "Spell", description: "Choose the spell after adding the entry.",
     fields: [
       choice("spell", "Spell", "spells", srd.spells[0]!.id), flag("prepared", "Prepared", true),
+      // A multiclass caster names the ability of the class the spell belongs to.
+      {
+        kind: "singleChoice", id: "ability", label: "Spellcasting ability", required: false, default: "best",
+        options: [{ id: "best", label: "The character's best" }, { id: "int", label: "Intelligence" }, { id: "wis", label: "Wisdom" }, { id: "cha", label: "Charisma" }],
+      },
       computed("level", "Spell level (0 = cantrip)", 'lookup("spells", item.spell, "level")', "number", "s"),
       itemText("summary", "Casting", "spells", "spell", "summary", "s"), computed("roll_type", "Rolls", `if(lookup("spells", item.spell, "rolls"), ${spell("result")}, "no dice")`, "text", "s"),
       itemText("description", "Description", "spells", "spell", "description", "s"),
     ],
     grantedActions: [
-      { ...attack("s_attack", "Spell attack", "fields.spell_attack_bonus", "Spell attack: {total} to hit"), id: "spell_attack" },
+      { ...attack("s_attack", "Spell attack", `fields.proficiency_bonus + ${SPELL_MOD}`, "Spell attack: {total} to hit"), id: "spell_attack" },
       {
         kind: "roll", id: "spell_roll", label: "Damage or healing",
         inputs: [input("slot_level", "Spell slot level (0 = the spell's own level)", "integer", 0), ...damageInputs],
@@ -667,9 +727,8 @@ const genericTemplates: ObjectTemplateV1[] = [
           // Only spells that roll have a row in `spell_rolls`; the other branch is never evaluated for them.
           `if(lookup("spells", item.spell, "rolls"), dice(if(inputs.critical, 2, 1) * (${spell("dice")} * if(${spell("by_character_level")}, ${CANTRIP_TIER}, 1) `
           + `+ ${spell("dice_step")} * ${UPCAST}), ${spell("die")}) + ${spell("flat")} + ${spell("flat_step")} * ${UPCAST} `
-          + `+ if(${spell("add_modifier")}, fields.spell_mod, 0) + inputs.bonus, 0)`),
+          + `+ if(${spell("add_modifier")}, ${SPELL_MOD}, 0) + inputs.bonus, 0)`),
       },
-      describe("s", "Show spell", "{item.summary}\n{item.description}"),
     ],
   },
   {
@@ -679,7 +738,7 @@ const genericTemplates: ObjectTemplateV1[] = [
       computed("level", "Gained at level", 'lookup("features", item.feature, "level")', "number", "f"),
       itemText("description", "Description", "features", "feature", "description", "f"), usesResource,
     ],
-    grantedActions: [...usesActions, describe("f", "Show feature", "{item.source}, level {item.level}\n{item.description}")],
+    grantedActions: usesActions,
   },
   {
     kind: "item", id: "other_gear", label: "Other gear, tool, mount or vehicle", quantityFields: ["weight"],
@@ -690,15 +749,16 @@ const genericTemplates: ObjectTemplateV1[] = [
       computed("listed_weight", "Listed weight (lb.)", 'lookup("gear", item.item, "weight")', "number", "g"),
       itemText("description", "Description", "gear", "item", "description", "g"), weight(0),
     ],
-    grantedActions: [describe("g", "Show item", "{item.category}. Cost {item.cost}, weight {item.listed_weight} lb.\n{item.description}")],
+    grantedActions: [],
   },
   {
     kind: "item", id: "magic_item", label: "Magic item", quantityFields: ["weight"], description: "Choose the item after adding the entry.",
     fields: [
       choice("item", "Item", "magic_items", srd.magicItems[0]!.id), itemText("summary", "Type and rarity", "magic_items", "item", "summary", "x"),
+      itemText("description", "Description", "magic_items", "item", "description", "x"),
       flag("attuned", "Attuned"), usesResource, weight(0), longText("notes", "Notes"),
     ],
-    grantedActions: [...usesActions, describe("x", "Show item", "{item.summary}")],
+    grantedActions: usesActions,
   },
 ];
 
@@ -727,8 +787,10 @@ export const dnd5eDocument: SystemDocumentV1 = {
   expressions,
   actions: [...characterActions, ...monsterActions],
   validations,
-  templates: [weaponTemplate, ...srd.armor.map(armorTemplate), ...catalogGear.map(gearTemplate), ...potions, ...genericTemplates],
+  templates: [classTemplate, weaponTemplate, ...srd.armor.map(armorTemplate), ...catalogGear.map(gearTemplate), ...potions, ...genericTemplates],
   slots: [
+    // Twelve classes exist; a character meets the ability requirements of a few at most.
+    { id: "class_list", label: "Classes", accepts: ["effect"], maxEntries: 6 },
     { id: "equipment", label: "Equipment", accepts: ["item"], maxEntries: EQUIPMENT_CAPACITY },
     { id: "spell_list", label: "Spells", accepts: ["spell"], maxEntries: 80 },
     { id: "feature_list", label: "Features and feats", accepts: ["talent"], maxEntries: 60 },

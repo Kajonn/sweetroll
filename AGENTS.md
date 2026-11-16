@@ -99,10 +99,20 @@ T1 is implemented except the visual baselines and its CI exit. The
 [2026-11-12 local record](docs/acceptance/rules-coverage-gui-2026-11-12.md) has the
 results and the list of what is left; T2 and T3 are not started.
 
-The fifth-edition SRD 5.1 (CC BY 4.0) was built as a system through public API v1 on
-2026-11-15: fixture `tests/integration/fixtures/dnd5e/`, scenario
+The fifth-edition SRD 5.1 (CC BY 4.0) is built as a system through public API v1:
+fixture `tests/integration/fixtures/dnd5e/`, scenario
 `tests/integration/scenarios/dnd5e.test.ts`. The [system record](docs/systems/dnd5e-srd.md)
-lists what the SRD has and the system lacks, and the 14 platform limits behind it
-(the 1 MiB document and package size first). Read it before extending that system.
-It was run through the API only, not in the web app. The record proposes no feature
-and changes no design; the licence confirmation in it is open for the owner.
+lists what it contains and what is still missing. Read it before extending that system.
+It was run through the API only, not in the web app; the licence confirmation in
+the record is open for the owner.
+
+Owner instruction 2026-11-16: address the record's gaps, raise the size limit to
+5 MiB, make multiclassing "a way to add new classes to a character" and suggest
+a way to share formulas. Implemented: the 5 MiB document and package limit with a
+publish-time package check, slot aggregates over computed template fields, and
+computed entry fields on the sheet and in `/api/v1` (design Section 6.4). The 5e
+system multiclasses with one class entry per class. The
+[plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md)
+proposes formula sharing (decision F1) and stages S1–S11 for the remaining gaps
+(decisions G1–G10). None of those is approved; do not build them before the
+owner decides.

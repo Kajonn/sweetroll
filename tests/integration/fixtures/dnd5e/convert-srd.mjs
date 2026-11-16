@@ -39,30 +39,22 @@ function parseDice(source) {
 }
 
 // --- Classes and levels -----------------------------------------------------
-// Limited-use class features shown as sheet resources. `value(level, specific)`
-// gives the table part of the maximum; `charisma: true` adds the Charisma
-// modifier (minimum total 1), as the SRD does for these two features.
+// Limited-use class features shown as sheet resources: the uses a class level
+// grants. Bardic Inspiration and Divine Sense depend on Charisma; their rows
+// hold 1 where the class has the feature and the sheet adds the modifier.
 const classResources = {
-  barbarian: [{ name: "Rage", value: (_, s) => Math.min(s.rage_count, 99) }],
-  bard: [{ name: "Bardic Inspiration", value: () => 0, charisma: true }],
-  cleric: [{ name: "Channel Divinity", value: (_, s) => s.channel_divinity_charges }],
-  druid: [{ name: "Wild Shape", value: (level) => (level >= 2 ? 2 : 0) }],
-  fighter: [
-    { name: "Second Wind", value: () => 1 },
-    { name: "Action Surge", value: (_, s) => s.action_surges },
-    { name: "Indomitable", value: (_, s) => s.indomitable_uses },
-  ],
-  monk: [{ name: "Ki points", value: (_, s) => s.ki_points }],
-  paladin: [
-    { name: "Lay on Hands (hit points)", value: (level) => level * 5 },
-    { name: "Channel Divinity", value: (level) => (level >= 3 ? 1 : 0) },
-    { name: "Divine Sense", value: () => 1, charisma: true },
-  ],
-  ranger: [],
-  rogue: [],
-  sorcerer: [{ name: "Sorcery points", value: (_, s) => s.sorcery_points }],
-  warlock: [],
-  wizard: [{ name: "Arcane Recovery", value: () => 1 }],
+  rage: { barbarian: (_, s) => Math.min(s.rage_count, 99) },
+  bardic_inspiration: { bard: () => 1 },
+  channel_divinity: { cleric: (_, s) => s.channel_divinity_charges, paladin: (level) => (level >= 3 ? 1 : 0) },
+  wild_shape: { druid: (level) => (level >= 2 ? 2 : 0) },
+  second_wind: { fighter: () => 1 },
+  action_surge: { fighter: (_, s) => s.action_surges },
+  indomitable: { fighter: (_, s) => s.indomitable_uses },
+  ki: { monk: (_, s) => s.ki_points },
+  lay_on_hands: { paladin: (level) => level * 5 },
+  divine_sense: { paladin: () => 1 },
+  sorcery_points: { sorcerer: (_, s) => s.sorcery_points },
+  arcane_recovery: { wizard: () => 1 },
 };
 // The class die rolled from the sheet: [name, dice, die, flat] per level.
 const classRolls = {
@@ -78,7 +70,6 @@ const rawLevels = load("Levels");
 const subclasses = load("Subclasses");
 const classes = rawClasses.map((entry, index) => {
   const proficiencies = entry.proficiencies.map((p) => p.name).filter((name) => !name.startsWith("Saving Throw"));
-  const resources = classResources[entry.index];
   return {
     id: id(entry.index), name: entry.name, number: index + 1, hit_die: entry.hit_die,
     saves: entry.saving_throws.map((save) => save.index),
@@ -86,12 +77,15 @@ const classes = rawClasses.map((entry, index) => {
     // Paladins and rangers prepare/know spells from half their level; the SRD
     // lists prepared casters by class feature text.
     prepares: ["cleric", "druid", "wizard"].includes(entry.index) ? "full" : entry.index === "paladin" ? "half" : "none",
+    // Share of a class level that counts towards multiclass spell slots. Pact Magic is separate.
+    caster: ["bard", "cleric", "druid", "sorcerer", "wizard"].includes(entry.index) ? "full"
+      : ["paladin", "ranger"].includes(entry.index) ? "half" : "none",
+    unarmored: { barbarian: "con", monk: "wis", sorcerer: "draconic" }[entry.index] ?? "none",
     proficiencies: text([
       `Proficiencies: ${proficiencies.join(", ") || "none"}.`,
       ...entry.proficiency_choices.map((choice) => `${choice.desc}.`),
     ]),
     subclass: subclasses.find((subclass) => subclass.class.index === entry.index)?.name ?? "",
-    resources: [0, 1, 2].map((slot) => ({ name: resources[slot]?.name ?? "—", charisma: resources[slot]?.charisma === true })),
     roll_name: classRolls[entry.index]?.[0] ?? "—",
     progression: "",
   };
@@ -113,14 +107,20 @@ for (const entry of classes) {
       const shown = typeof value === "object" ? `${value.dice_count}d${value.dice_value}` : value === 9999 ? "unlimited" : value;
       return [`${key.replaceAll("_", " ")}: ${shown}`];
     });
+    const slots = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((slot) => row.spellcasting?.[`spell_slots_level_${slot}`] ?? 0);
     levels.push({
       key: entry.number * 100 + level, class: entry.id, level, prof: row.prof_bonus,
       notes: notes.join("; ") || "—",
       cantrips: row.spellcasting?.cantrips_known ?? 0, spells_known: row.spellcasting?.spells_known ?? 0,
-      slots: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((slot) => row.spellcasting?.[`spell_slots_level_${slot}`] ?? 0),
-      resources: [0, 1, 2].map((slot) => classResources[source][slot]?.value(level, specific) ?? 0),
-      roll, speed_bonus: speedBonus[source]?.(level, specific) ?? 0,
-      rage_damage: specific.rage_damage_bonus ?? 0,
+      // A warlock's slots are Pact Magic: one pool of slots of a single level.
+      slots: source === "warlock" ? Array(9).fill(0) : slots,
+      pact_slots: source === "warlock" ? Math.max(...slots) : 0,
+      pact_slot_level: source === "warlock" ? slots.findIndex((count) => count > 0) + 1 : 0,
+      resources: Object.fromEntries(Object.entries(classResources).map(([resource, byClass]) => [resource, byClass[source]?.(level, specific) ?? 0])),
+      roll,
+      // Fast Movement applies in any armor but heavy; Unarmored Movement needs no armor and no shield.
+      speed_bonus: source === "barbarian" ? speedBonus.barbarian(level) : 0,
+      speed_bonus_unarmored: source === "monk" ? speedBonus.monk(level, specific) : 0,
     });
   }
 }
@@ -140,7 +140,7 @@ const races = load("Races").map((race) => {
     languages: race.language_desc,
     traits: text([
       ...(race.index === "half-elf" ? ["Ability Score Increase: two ability scores other than Charisma each increase by 1. Add them to your base scores."] : []),
-      `Size: ${race.size_description}`,
+      `Age: ${race.age}`, `Alignment: ${race.alignment}`, `Size: ${race.size_description}`,
       ...traitIndexes.map((index) => {
         const trait = traits.find((candidate) => candidate.index === index);
         return `${trait.name}: ${trait.desc.join(" ")}`;
@@ -300,10 +300,8 @@ const feats = load("Feats").map((feat) => ({
   description: text([`Prerequisite: ${feat.prerequisites.map((p) => `${p.ability_score.name} ${p.minimum_score}`).join(", ")}`, ...feat.desc]),
 }));
 // The first description line is the item's type, rarity and attunement note.
-// Full descriptions and the rule sections do not fit the 1 MiB document limit.
-// Numbered variants ("Armor, +1") repeat their parent entry ("Armor, +1, +2, or +3") and are left out.
-const magicItems = load("Magic-Items").filter((item) => !item.variant).map((item) => ({
-  id: id(item.index), name: item.name, summary: text(item.desc[0] ?? "", 500),
+const magicItems = load("Magic-Items").map((item) => ({
+  id: id(item.index), name: item.name, summary: text(item.desc[0] ?? "", 500), description: text(item.desc.slice(1)),
 }));
 const simple = (name, describe = (entry) => text(entry.desc)) => load(name).map((entry) => ({
   id: id(entry.index), name: entry.name ?? entry.full_name, description: describe(entry),
@@ -318,6 +316,19 @@ const background = load("Backgrounds").map((entry) => ({
     `${entry.feature.name}: ${entry.feature.desc.join(" ")}`,
   ]),
 }));
+// A text value holds at most 10,000 characters, so long rule sections are split at paragraph breaks.
+const rules = load("Rule-Sections").flatMap((section) => {
+  const parts = [""];
+  for (const paragraph of section.desc.split("\n")) {
+    if (parts.at(-1).length + paragraph.length + 1 > 9_500) parts.push("");
+    parts[parts.length - 1] += `${paragraph}\n`;
+  }
+  return parts.map((part, index) => ({
+    id: id(section.index) + (index > 0 ? `_${index + 1}` : ""),
+    name: section.name + (parts.length > 1 ? ` (${index + 1}/${parts.length})` : ""), description: part.trim(),
+  }));
+});
+
 const output = {
   source: {
     title: "System Reference Document 5.1", publisher: "Wizards of the Coast LLC",
@@ -325,7 +336,7 @@ const output = {
     license: "CC BY 4.0, https://creativecommons.org/licenses/by/4.0/legalcode",
     data: "Structured data converted from https://github.com/5e-bits/5e-database (src/2014/en, MIT License)",
   },
-  classes, levels, races, skills, background, weapons, armor, gear, spells, features: [...features, ...feats], magicItems,
+  classes, levels, races, skills, background, weapons, armor, gear, spells, features: [...features, ...feats], magicItems, rules,
   conditions: simple("Conditions"), damageTypes: simple("Damage-Types"), schools: simple("Magic-Schools", (entry) => entry.desc),
   alignments: simple("Alignments", (entry) => entry.desc), weaponProperties: simple("Weapon-Properties"),
   languages: simple("Languages", (entry) => `${entry.type} language. Typical speakers: ${entry.typical_speakers.join(", ")}.${entry.script ? ` Script: ${entry.script}.` : ""}`),

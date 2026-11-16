@@ -8043,6 +8043,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -8975,6 +8980,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -9474,6 +9484,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -10160,6 +10175,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -10846,6 +10866,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -11532,6 +11557,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -12219,6 +12249,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -13948,6 +13983,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -14650,6 +14690,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -15362,6 +15407,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -16047,6 +16097,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -16736,6 +16791,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -17717,6 +17777,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -18936,6 +19001,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -19618,6 +19688,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -28086,6 +28161,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -28663,6 +28743,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -29144,6 +29229,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -29627,6 +29717,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];

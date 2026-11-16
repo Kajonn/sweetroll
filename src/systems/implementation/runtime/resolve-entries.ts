@@ -27,6 +27,7 @@ import { validateEntryForSlot } from "./entries.js";
 import { resolveObservedValues } from "./resolve.js";
 import { actionEvaluationFailure } from "./action-evaluation.js";
 import { evaluate } from "../rules/evaluate.js";
+import { entryItemScope, isResourceValue } from "./entry-values.js";
 import { describeRoll, mergeBindings } from "../rules/outcomes.js";
 
 export type GrantedActionRequest = {
@@ -284,43 +285,8 @@ function itemRuleBindings(
   template: ObjectTemplateV1,
   entry: CharacterEntryV1,
 ): RuntimeResult<EvaluationBindings["fields"]> {
-  const item: EvaluationBindings["fields"] = {};
-  const computed = new Map(template.fields.flatMap(field =>
-    field.kind === "computed" ? [[field.id, field.expressionId] as const] : [],
-  ));
-  for (const field of template.fields) {
-    if (field.kind === "computed" || field.kind === "image") continue;
-    const value = Object.hasOwn(entry.values, field.id) ? entry.values[field.id] : field.default;
-    if (field.kind === "resource" && isResourceValue(value)) {
-      item[field.id] = value.current;
-      item[`${field.id}.current`] = value.current;
-      item[`${field.id}.max`] = value.max;
-    } else {
-      item[field.id] = value as EvaluationBindings["fields"][string];
-    }
-  }
-  const visiting = new Set<string>();
-  const derive = (id: string): boolean => {
-    const expressionId = computed.get(id);
-    if (expressionId === undefined || Object.hasOwn(item, id)) return true;
-    if (visiting.has(id)) return false;
-    visiting.add(id);
-    const expression = pkg.expressions.find(candidate => candidate.id === expressionId);
-    if (!expression || !expression.dependencies.every(derive)) return false;
-    const result = evaluate(expression, { fields: {}, inputs: {}, item, datasets: pkg.referenceData });
-    if (!result.ok) return false;
-    item[id] = result.result;
-    visiting.delete(id);
-    return true;
-  };
-  return [...computed.keys()].every(derive) ? { ok: true, value: item } : invalidPackage(template.id);
-}
-
-function isResourceValue(value: unknown): value is { current: number; max: number } {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const { current, max } = value as { current: unknown; max: unknown };
-  return typeof current === "number" && typeof max === "number"
-    && Number.isFinite(current) && Number.isFinite(max);
+  const scope = entryItemScope(pkg, template, entry);
+  return scope.computedIds.every(scope.derive) ? { ok: true, value: scope.item } : invalidPackage(template.id);
 }
 
 function onStep(value: number, min: number, step: number): boolean {

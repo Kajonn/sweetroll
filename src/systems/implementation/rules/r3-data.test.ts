@@ -3,6 +3,8 @@ import { advancedD20Document } from "../package/fixtures/advanced-d20.js";
 import { compileExtensionDocument } from "./compile-extension.js";
 import { composeRules } from "./compose.js";
 import { initializeState } from "../runtime/state.js";
+import { resolveObservedValues } from "../runtime/resolve.js";
+import { buildCharacterProjection } from "../runtime/projection.js";
 import { checkVersionChange } from "../runtime/version-change.js";
 import { d20Document, d20Package } from "../package/fixtures/d20.js";
 import { comparePackages } from "../package/compatibility.js";
@@ -130,4 +132,54 @@ it("recomputes the maximum from the target table during a version dry run", () =
   if (!state.ok) throw Error("Roadwardens must initialize");
   expect(checkVersionChange({ from: from.value, to: to.value, entityId: "character", state: state.value, direction: "upgrade" }))
     .toMatchObject({ ok: true, nextState: { values: { health: { current: 14, max: 14 } } } });
+});
+
+/** Roadwardens with a computed field on its armor template: twice the weight of one unit. */
+function bulkDocument() {
+  const doc = advancedD20Document();
+  doc.templates[0]!.fields.push({ kind: "computed", id: "bulk", label: "Bulk", valueType: "number", expressionId: "bulk_expr" });
+  doc.expressions.push({ id: "bulk_expr", context: "computed", resultType: "number", fallback: 0, source: "item.weight * 2" });
+  doc.expressions.find(expression => expression.id === "carried_expr")!.source = 'sum("equipment", "bulk")';
+  return doc;
+}
+
+it("sums a computed template field over a slot and returns it with the entry", () => {
+  const compiled = compileDocument(bulkDocument(), ids);
+  if (!compiled.ok) throw Error(JSON.stringify(compiled.diagnostics));
+  const entity = compiled.value.entities[0]!;
+  const state = initializeState(entity, {});
+  if (!state.ok) throw Error("Roadwardens must initialize");
+  const entry = (entryId: string, weight: number) => ({ entryId, slotId: "equipment", templateId: "leather", values: { armor: 2, weight, equipped: true }, quantity: 3 });
+  state.value.entries = { a: entry("a", 3), b: entry("b", 5) };
+  const observed = resolveObservedValues(compiled.value, entity, state.value);
+  // A computed field is not per unit, so the quantity does not multiply it.
+  expect(observed).toMatchObject({ ok: true, value: { derivedValues: { carried: 16 } } });
+  const projection = buildCharacterProjection({ packageValue: compiled.value, entity, state: state.value, derivedValues: {}, validations: [] });
+  const slot = projection.sheets.flatMap(sheet => sheet.sections.flatMap(section => section.elements)).find(element => element.kind === "slot");
+  expect(slot).toMatchObject({ entries: [
+    { entryId: "a", derived: [{ id: "bulk", label: "Bulk", value: 6 }] },
+    { entryId: "b", derived: [{ id: "bulk", label: "Bulk", value: 10 }] },
+  ] });
+});
+
+it("charges a computed template field read by an aggregate for every entry the slot can hold", () => {
+  const doc = bulkDocument();
+  expect(compileDocument(doc, ids).ok).toBe(true);
+  // 200 entries, each evaluating a three-node formula, 14 times: over the 8,192-step sheet budget.
+  doc.slots[0]!.maxEntries = 200;
+  doc.expressions.find(expression => expression.id === "carried_expr")!.source = Array.from({ length: 14 }, () => 'sum("equipment", "bulk")').join("+");
+  expect(compileDocument(doc, ids)).toMatchObject({ ok: false, diagnostics: [{ path: "/entities/0/fields", code: "limit_exceeded" }] });
+  doc.expressions.find(expression => expression.id === "carried_expr")!.source = Array.from({ length: 14 }, () => 'sum("equipment", "weight")').join("+");
+  expect(compileDocument(doc, ids).ok).toBe(true);
+});
+
+it("rejects a system whose compiled package exceeds the size limit", () => {
+  const doc = advancedD20Document();
+  doc.referenceData.push({
+    id: "lore", label: "Lore",
+    records: Array.from({ length: 530 }, (_, index) => ({ id: `entry_${index}`, label: `Entry ${index}`, values: { text: "x".repeat(10_000) } })),
+  });
+  expect(compileDocument(doc, ids)).toMatchObject({ ok: false, diagnostics: [{ code: "limit_exceeded", path: "" }] });
+  doc.referenceData.at(-1)!.records.length = 100;
+  expect(compileDocument(doc, ids).ok).toBe(true);
 });

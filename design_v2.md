@@ -302,6 +302,26 @@ The sheet permits edits to the current value and clamps it when the maximum
 decreases. Version dry runs evaluate the target version's data and formulas
 before saving the new pin.
 
+**Size and entry formulas (owner decision 2026-11-16).** An encoded system
+document may be 5 MiB (was 1 MiB), and so may the package compiled from it.
+Validation and publishing reject a larger package with `limit_exceeded`, so a
+version that publishes can always be exported and imported again. Draft saves
+in the browser API accept the same body size as the public API.
+
+A computed template field reads its own entry and reference data. Slot
+aggregates may read computed number fields, and computed boolean fields as the
+filter of `sumWhere` and `countWhere`. Each such read is charged to the sheet
+evaluation budget for every entry the slot can hold: the field's formula plus
+the computed fields it depends on. Quantity never multiplies a computed field.
+The sheet and `/api/v1` return an entry's computed fields with the entry
+(`derived` in the projection, `derivedValues` in v1), read-only.
+
+These two rules make "one entry per class" possible: a class entry computes what
+the class contributes at its level and the character sums the slot. The
+[5e SRD system](docs/systems/dnd5e-srd.md) multiclasses this way. Sharing one
+formula between templates is proposed, not decided, in the
+[entry formulas plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md).
+
 ## 6.5 Draft, validation, and publishing
 
 | **State**          | **Mutable?**  | **Use**                                                                 |

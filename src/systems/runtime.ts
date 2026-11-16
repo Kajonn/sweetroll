@@ -256,6 +256,8 @@ export type CharacterProjectionSlotEntry = {
   extensionId?: string;
   label: string;
   values: Record<string, unknown>;
+  /** Computed template fields of the entry, in template order. Absent when the template has none. */
+  derived?: Array<{ id: DefinitionId; label: string; value: RuntimeScalar }>;
   quantity?: number;
 };
 

@@ -67,6 +67,11 @@ export type ActivityEventKind =
   | "extension_added"
   | "extension_removed";
 
+export type ActivitySummary =
+  | { kind: "roll" | "push"; total: number; audience: RollExportRecord["audience"] }
+  | { kind: "draw"; cards: string[]; audience: RollExportRecord["audience"] }
+  | { kind: "content"; title: string };
+
 export type ActivityEventRecord = {
   eventId: string;
   campaignId: string;
@@ -77,6 +82,8 @@ export type ActivityEventRecord = {
   sourceRollId: string | null;
   requestId: string;
   occurredAt: Date;
+  summary?: ActivitySummary;
+  actorName?: string;
 };
 
 /**
@@ -296,6 +303,28 @@ type ActivityEventRow = {
   request_id: string;
   occurred_at: Date;
 };
+
+type ActivitySummaryRow = ActivityEventRow & {
+  total: number | null;
+  audience: RollExportRecord["audience"] | null;
+  cards: string[] | null;
+  pushed: boolean | null;
+  content_title: string | null;
+  actor_name: string | null;
+};
+
+function activitySummary(row: ActivitySummaryRow): ActivitySummary | undefined {
+  if (row.audience !== null && row.total !== null) {
+    if (row.cards?.length) return { kind: "draw", cards: row.cards, audience: row.audience };
+    return { kind: row.pushed ? "push" : "roll", total: row.total, audience: row.audience };
+  }
+  if (row.content_title !== null && (
+    row.kind === "content_created" || row.kind === "content_updated" || row.kind === "content_grants_replaced"
+  )) {
+    return { kind: "content", title: row.content_title };
+  }
+  return undefined;
+}
 
 type RollExportRow = {
   target_character_id: string | null;
@@ -1543,30 +1572,72 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         limit: number;
         cursorOccurredAt: string | null;
         cursorId: string | null;
+        watch?: readonly string[];
+        includeSummary?: boolean;
       },
-    ): Promise<ActivityEventRecord[]> {
+    ): Promise<{ rows: ActivityEventRecord[]; visibleWatch: string[] }> {
+      const predicates = `
+            e.campaign_id = $3
+            AND (e.source_content_id IS NULL OR (c.campaign_id = $3 AND c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
+            AND (e.source_roll_id IS NULL OR (r.scope_campaign_id = $3 AND ${ROLL_VISIBILITY_PREDICATE}))`;
+      const sources = `FROM campaign_activity_events e
+           LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
+           LEFT JOIN character_rolls r ON r.id = e.source_roll_id`;
       const params: unknown[] = [input.actorId, input.isGm, input.campaignId];
       let cursorClause = "";
       if (input.cursorOccurredAt !== null && input.cursorId !== null) {
         params.push(input.cursorOccurredAt, input.cursorId);
-        // Millisecond-precision keyset anchor (see listCampaignsPage).
         cursorClause = `AND ((date_trunc('milliseconds', e.occurred_at), e.id) < ($4::timestamptz, $5))`;
       }
       params.push(input.limit + 1);
-      const result = await client.query<ActivityEventRow>(
-        `SELECT ${ACTIVITY_COLUMNS.split(", ").map((column) => `e.${column}`).join(", ")}
-           FROM campaign_activity_events e
-           LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
-           LEFT JOIN character_rolls r ON r.id = e.source_roll_id
-          WHERE e.campaign_id = $3
-            AND (c.id IS NULL OR (c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
-            AND (r.id IS NULL OR ${ROLL_VISIBILITY_PREDICATE})
-            ${cursorClause}
-          ORDER BY date_trunc('milliseconds', e.occurred_at) DESC, e.id DESC
-          LIMIT $${params.length}`,
+      const watchKey = `CASE WHEN r.id IS NULL THEN 'event:' || e.id::text ELSE 'roll:' || r.id::text END`;
+      const watch = input.watch ?? [];
+      const watchQuery = watch.length === 0 ? "" : `,
+        watched AS (
+          SELECT ${watchKey} AS key
+          ${sources}
+          WHERE ${predicates}
+            AND (e.id = ANY($${params.length + 1}::uuid[]) OR r.id = ANY($${params.length + 2}::uuid[]))
+        )`;
+      const columnList = ACTIVITY_COLUMNS.split(", ").map(column => `e.${column}`).join(", ");
+      const selectSummary = input.includeSummary ? `, r.total, r.audience,
+        (r.parent_roll_id IS NOT NULL) AS pushed,
+        ARRAY(SELECT card->>'label' FROM jsonb_array_elements(r.breakdown_json #> '{cards,drawn}') card) AS cards,
+        c.title AS content_title, u.display_name AS actor_name` : "";
+      const actorJoin = input.includeSummary ? "LEFT JOIN users u ON u.id = e.actor_id" : "";
+      const limitParam = params.length;
+      if (watch.length > 0) {
+        params.push(watch.filter(key => key.startsWith("event:")).map(key => key.slice(6)));
+        params.push(watch.filter(key => key.startsWith("roll:")).map(key => key.slice(5)));
+      }
+      const result = await client.query<{ events: ActivitySummaryRow[]; visible_watch: string[] }>(
+        `WITH page AS (
+           SELECT ${columnList}${selectSummary}
+           ${sources}
+           ${actorJoin}
+           WHERE ${predicates}
+           ${cursorClause}
+           ORDER BY date_trunc('milliseconds', e.occurred_at) DESC, e.id DESC
+           LIMIT $${limitParam}
+         )${watchQuery}
+         SELECT COALESCE((SELECT jsonb_agg(to_jsonb(page) ORDER BY date_trunc('milliseconds', occurred_at) DESC, id DESC) FROM page), '[]') AS events,
+                ${watch.length === 0 ? "ARRAY[]::text[]" : "ARRAY(SELECT key FROM watched)"} AS visible_watch`,
         params,
       );
-      return result.rows.map(toActivityEventRecord);
+      const page = result.rows[0]!;
+      return {
+        rows: page.events.map(row => {
+          const record = toActivityEventRecord({ ...row, occurred_at: new Date(row.occurred_at) });
+          if (!input.includeSummary) return record;
+          const summary = activitySummary(row);
+          return {
+            ...record,
+            ...(summary ? { summary } : {}),
+            ...(row.actor_name ? { actorName: row.actor_name } : {}),
+          };
+        }),
+        visibleWatch: page.visible_watch,
+      };
     },
 
     /** Full roster (any status) for the export projection, ordered by user. */

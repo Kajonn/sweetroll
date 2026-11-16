@@ -279,7 +279,7 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     deleteContent: async () => ({ ok: true, value: contentView() }),
     recoverContent: async () => ({ ok: true, value: contentView() }),
     replaceGrants: async () => ({ ok: true, value: contentView() }),
-    listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null } }),
+    listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null, serverTime: new Date(), visibleWatch: [] } }),
     exportCampaign: async () => ({
       ok: true,
       value: {

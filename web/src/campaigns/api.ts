@@ -94,7 +94,7 @@ type DeclineResponse =
   operations["post_invitations_decline"]["responses"]["200"]["content"]["application/json"];
 export type ContentListQuery = { cursor?: string | null; limit?: number; status?: "active" | "deleted" };
 export type ClaimableCharactersQuery = { cursor?: string | null; limit?: number };
-export type ActivityListQuery = { cursor?: string | null; limit?: number };
+export type ActivityListQuery = { cursor?: string | null; limit?: number; watch?: string; signal?: AbortSignal };
 
 export type SceneLibraryApi = Pick<CampaignsApi, "uploadImage" | "deleteImage" | "createScene" | "updateScene"> & {
   listImages(campaignId: string, input?: { cursor?: string | null }): Promise<Omit<operations["get_campaigns_id_images"]["responses"][200]["content"]["application/json"], "requestId">>;
@@ -232,7 +232,8 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       input === undefined
         ? client.fetch<CampaignActivityResponse>("GET", `/campaigns/${campaignId}/activity`)
         : client.fetch<CampaignActivityResponse>("GET", `/campaigns/${campaignId}/activity`, {
-          query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined },
+          query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined, watch: input.watch },
+          ...(input.signal ? { signal: input.signal } : {}),
         }),
     createCampaign: (body) =>
       client.fetch<CreateCampaignResponse>("POST", "/campaigns", { body }),

@@ -1,6 +1,13 @@
 export type MessageTable = Record<string, string>;
 
 export const defaultMessages: MessageTable = {
+  "playEvents.label": "Recent play events",
+  "playEvents.roll": "{actor} rolled {result} · {audience}",
+  "playEvents.push": "{actor} pushed a roll to {result} · {audience}",
+  "playEvents.draw": "{actor} drew {result} · {audience}",
+  "playEvents.content": "{kind} · {title}",
+  "playEvents.overflow": "+{count} more",
+  "playEvents.burst": "{count} new play events. See Activity for details.",
   "debug.enabled": "Show debug information",
   "debug.hint": "Show technical identifiers, revisions and diagnostics on this device.",
   "debug.tools": "Developer tools",

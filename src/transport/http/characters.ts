@@ -335,6 +335,7 @@ const NominalActionResultDto = Type.Object({
 const CharacterCommandResultDto = Type.Object({
   character: CharacterViewDto,
   roll: Type.Union([RollDto, Type.Null()]),
+  rollId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   nominal: Type.Union([NominalActionResultDto, Type.Null()]),
 });
 
@@ -1102,6 +1103,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
     const toCommandResultDto = (result: CharacterCommandResult): unknown => ({
       character: toCharacterDto(result.character),
       roll: result.roll,
+      ...(result.rollId ? { rollId: result.rollId } : {}),
       nominal: result.nominal ?? null,
     });
 

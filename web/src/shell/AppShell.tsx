@@ -18,6 +18,7 @@ import { createApiClient } from "../api/client.js";
 import { createIdentityGate, type IdentityGate } from "../characters/identity.js";
 import { openCharacterStore } from "../characters/store.js";
 import { queryClient } from "../queryClient.js";
+import { PlayEventHost } from "../playEvents/PlayEvents.js";
 import { randomUUID } from "../utils/uuid";
 
 export type AuthState =
@@ -250,10 +251,38 @@ export function AppShell({ children }: { children: ReactNode }) {
   // states, never private data without an actor) instead of flashing the
   // sign-in panel for a frame on every full-page navigation.
   const bootAnonymous = auth.state === "anonymous" && !booted;
+  const routedContent = auth.state === "loading" || auth.state === "authenticated" || bootAnonymous ? (
+    children
+  ) : showFirstRunWelcome ? (
+    // Anonymous first-run on player paths sees the welcome inline:
+    // /welcome itself is exempt below and renders the routed
+    // Onboarding, while returning visitors fall through to the
+    // sign-in prompt. Dismissing only persists the flag and never
+    // blocks sign-in.
+    <Onboarding actorId={null} onDismiss={() => setOnboardingTick(tick => tick + 1)} />
+  ) : auth.state === "anonymous" && pathname === "/welcome" ? (
+    children
+  ) : auth.state === "anonymous" && (pathname === "/cb" || sessionExpired) ? (
+    // /cb is the provider-agnostic sign-in return leg and must
+    // render while anonymous; expired sessions render children so
+    // the Account screen owns the re-auth entry.
+    children
+  ) : auth.state === "anonymous" && isDevMode() ? (
+    <DevSignInPanel onSignedIn={markSignedIn} />
+  ) : auth.state === "anonymous" && acceptanceSignInAvailable ? (
+    <DevSignInPanel acceptance onSignedIn={markSignedIn} />
+  ) : auth.state === "anonymous" ? (
+    // Production anonymous never keeps protected views mounted:
+    // sign-out unmounts routed children (editor, library) instead
+    // of leaving previous-identity data on screen.
+    <p role="status">{t("character.detail.signIn")}</p>
+  ) : (
+    children
+  );
   return (
     <IdentityContext.Provider value={identity}>
       <AuthProvider initial={auth}>
-        <div className={styles.shell}>
+        <div className={styles.shell} data-testid="app-shell">
           {/* Intentional plain anchor: the skip link is a same-document
               fragment, always handled by the browser. */}
           <a href="#main-content" className={styles.skipLink}>{t("shell.skipToContent")}</a>
@@ -286,34 +315,9 @@ export function AppShell({ children }: { children: ReactNode }) {
           <ErrorBoundary>
             <main role="main" id="main-content" data-testid="app-content" className={styles.main}>
               {storageUnavailable && <p role="status">{t("shell.characterStorageUnavailable")}</p>}
-              {auth.state === "loading" || auth.state === "authenticated" || bootAnonymous ? (
-                children
-              ) : showFirstRunWelcome ? (
-                // Anonymous first-run on player paths sees the welcome inline:
-                // /welcome itself is exempt below and renders the routed
-                // Onboarding, while returning visitors fall through to the
-                // sign-in prompt. Dismissing only persists the flag and never
-                // blocks sign-in.
-                <Onboarding actorId={null} onDismiss={() => setOnboardingTick(tick => tick + 1)} />
-              ) : auth.state === "anonymous" && pathname === "/welcome" ? (
-                children
-              ) : auth.state === "anonymous" && (pathname === "/cb" || sessionExpired) ? (
-                // /cb is the provider-agnostic sign-in return leg and must
-                // render while anonymous; expired sessions render children so
-                // the Account screen owns the re-auth entry.
-                children
-              ) : auth.state === "anonymous" && isDevMode() ? (
-                <DevSignInPanel onSignedIn={markSignedIn} />
-              ) : auth.state === "anonymous" && acceptanceSignInAvailable ? (
-                <DevSignInPanel acceptance onSignedIn={markSignedIn} />
-              ) : auth.state === "anonymous" ? (
-                // Production anonymous never keeps protected views mounted:
-                // sign-out unmounts routed children (editor, library) instead
-                // of leaving previous-identity data on screen.
-                <p role="status">{t("character.detail.signIn")}</p>
-              ) : (
-                children
-              )}
+              <PlayEventHost lifetime={auth.state === "authenticated" ? `${auth.userId}:${identity?.getGeneration() ?? 0}` : null}>
+                {routedContent}
+              </PlayEventHost>
               {/* Phone bottom nav: Characters · Campaigns · Activity · Account.
                   AppLink keeps deep-link hrefs and falls back to plain
                   navigation without a registered router. Hidden on desktop,

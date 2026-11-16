@@ -145,7 +145,12 @@ export function registerCampaignRoutes(route: Route, { campaigns, characters, ru
     method: "GET", path: "/campaigns/:campaignId/activity", id: "listCampaignActivity",
     description: "Read the campaign activity feed, filtered to what the caller may see.",
     scope: "campaigns:read", input: { params: c.campaignId, querystring: c.pageQuery }, output: "CampaignActivity",
-  }, async (ctx, { params, query }) => asWire(await campaigns.listActivity(ctx, { ...params, ...page(query) })));
+  }, async (ctx, { params, query }) => {
+    const result = await campaigns.listActivity(ctx, { ...params, ...page(query) });
+    if (!result.ok) return asWire(result);
+    const { events, nextCursor } = result.value;
+    return asWire({ ok: true, value: { events, nextCursor } });
+  });
 
   route({
     method: "POST", path: "/campaigns/:campaignId/exports", id: "exportCampaign",

@@ -72,7 +72,7 @@ test("Hearthbound names move outcomes in the creator, player sheet and GM sessio
     await page.getByRole("tab", { name: "Session" }).click();
     await page.getByRole("button", { name: "Open Elder" }).click();
     await playAtEachViewport(page, "outcome roll on the GM board", page.getByRole("button", { name: "Roll Make Move", exact: true }),
-      () => expect(page.getByRole("status").filter({ hasText: /^\d+ — (Strong hit|Weak hit|Miss)$/ })).toBeVisible());
+      () => expect(page.getByRole("button", { name: "Roll Make Move", exact: true }).locator("..").getByText(/^\d+ — (Strong hit|Weak hit|Miss)$/)).toBeVisible());
   } finally {
     if (process.env.SWEETROLL_E2E_EPHEMERAL_DB !== "1") await page.request.delete(`/api/systems/${systemId}`);
   }

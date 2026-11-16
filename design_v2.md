@@ -485,7 +485,7 @@ Campaign creation distinguishes versions with the same display name and semantic
 
 A dedicated **GM Session board** lists all characters with their key resources at a glance (health, stress, ammo, etc.). The GM can one-tap a bump control on any resource without opening each sheet. Designed for the GM at a physical table, and works across the GM's multiple devices (Section 4.2).
 
-The board and the campaign Characters tab load every attached character by following the paged `GET /campaigns/:id/characters` list at the maximum page size (100), up to a 20-page safety cap, and show a notice when the cap cuts the list short (issue #57). Each listed character's sheet is read separately through the Characters route; there is no dedicated `GET /campaigns/{id}/session` endpoint. Content, activity and the character list refresh every 15 seconds while online. If an operator lowers `CAMPAIGN_PAGE_MAX` below 100, the server rejects that page size with 400 and the client retries once without `limit`, reading at the server's default page size (issue #71).
+The board and the campaign Characters tab load every attached character by following the paged `GET /campaigns/:id/characters` list at the maximum page size (100), up to a 20-page safety cap, and show a notice when the cap cuts the list short (issue #57). Each listed character's sheet is read separately through the Characters route; there is no dedicated `GET /campaigns/{id}/session` endpoint. Content and the character list refresh every 15 seconds while online. The board shares the foreground campaign activity refresh described in Section 7.5. If an operator lowers `CAMPAIGN_PAGE_MAX` below 100, the server rejects that page size with 400 and the client retries once without `limit`, reading at the server's default page size (issue #71).
 
 ## 7.3 Content model and visibility
 
@@ -512,6 +512,8 @@ Visibility is enforced in server queries and storage access, never only by hidin
 ## 7.5 Dice and activity
 
 Actions may produce private, GM-only, or campaign-visible rolls according to campaign policy and per-roll choice. Authoritative rolls are evaluated by the server and include normalized expression, individual dice, modifiers, result, actor, character, visibility, timestamp, and a request id for idempotency. Logging manual or physical-dice results distinctly from verified platform rolls is post-MVP (owner decision 2026-11-08); players announce physical rolls at the table.
+
+The authenticated play-event overlay shows committed rolls, pushes, card draws and visible campaign content changes. The roller sees the acknowledged result immediately. Other participants on the active campaign page or an attached character sheet receive audience-filtered summaries through a shared three-second foreground activity refresh. The browser uses the persisted roll ID to combine command and activity deliveries. The activity projection returns safe summaries and checks displayed event IDs separately from pagination so a role or grant change can remove a card immediately on the next refresh.
 
 ## 7.6 Content types (narrowed)
 
@@ -593,7 +595,7 @@ state; Escape closes the disclosure and restores focus to its trigger.
 - Platform-owned bottom navigation for Characters, Activity, and Account; Campaigns is added in I6. System creators cannot add navigation destinations or divide the linear sheet into tabs.
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).
-- A roll result opens as a compact sheet showing dice, modifiers, total, and audience.
+- A roll popup appears below the app header and leaves the sheet controls usable. Detailed dice, modifiers, total, audience and push controls are available on the sheet and in character history.
 - Roll expressions and field bindings use character attribute labels when available, retaining the field identifier for unresolved references. The creator presents the `talent` template kind as “ability” while preserving its stored kind value.
 
 ## 10.3 GM mobile session view
@@ -604,6 +606,8 @@ state; Escape closes the disclosure and restores focus to its trigger.
 - Conflicts between co-GMs and the GM's own devices resolve via revision/`409` and an immediate refresh prompt.
 
 ## 10.4 Accessibility and localization
+
+The play overlay shows up to three cards with an overflow count. Each event stays visible for six seconds after receipt, then fades for 240 ms independently. Reduced-motion mode removes the fade. A polite announcement region groups bursts without moving keyboard focus, and Activity gives readers time to revisit outcomes.
 
 Target WCAG 2.2 AA for the authored application. The builder must flag missing labels, low contrast, ambiguous names, and controls available only by drag. Store display strings separately from stable IDs and design all UI for localization, plural rules, time zones, and longer translated labels. Bidirectional layout is a post-MVP validation item unless required at launch.
 
@@ -726,7 +730,7 @@ Authoritative dice derive from a server-secret HMAC of a server-generated comman
 
 **Future character command:** the Characters Module reads a character revision, calls `SystemRuntime.resolve`, then locks and rechecks the character revision in a short transaction before storing state, roll, activity, and idempotency result. Publishing a system version can never start this flow or mutate a character or campaign.
 
-**Real-time read:** use poll-on-view plus server revision. Clients refresh permitted data when a view becomes active; the GM Session view also refreshes on a 15-second interval while online (Section 7.2), and the scene-streaming load comparison should cover those reads. Add authorized asynchronous notifications only when user research or measured polling load justifies them; secret payloads are never sent to a mixed-audience channel. The owner-approved exception (2026-11-07) is the paired scene display, which receives complete credential-scoped snapshots over server-sent events driven by PostgreSQL `LISTEN`/`NOTIFY` change signals (Section 7.7); notifications carry only internal IDs and revisions.
+**Real-time read:** use poll-on-view plus server revision. Clients refresh permitted data when a view becomes active; the GM Session view refreshes roster/content reads on a 15-second interval while online (Section 7.2), and campaign activity shares one three-second foreground refresh per active tab (Section 7.5), and the scene-streaming load comparison should cover those reads. Add authorized asynchronous notifications only when user research or measured polling load justifies them; secret payloads are never sent to a mixed-audience channel. The owner-approved exception (2026-11-07) is the paired scene display, which receives complete credential-scoped snapshots over server-sent events driven by PostgreSQL `LISTEN`/`NOTIFY` change signals (Section 7.7); notifications carry only internal IDs and revisions.
 
 ## 11.6 I1 source layout
 

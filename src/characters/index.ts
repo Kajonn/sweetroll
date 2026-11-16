@@ -493,6 +493,7 @@ export type CharacterVersionCheck = {
 export type CharacterCommandResult = {
   character: CharacterView;
   roll: NormalizedRoll | null;
+  rollId?: string | null;
   /**
    * Task 5: activity-only outcome of a nominal granted action (display
    * text). Set by executeAction when the runtime returns one; omitted
@@ -808,6 +809,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           scope: StoredResultScope;
           character: unknown;
           roll: NormalizedRoll | null;
+          rollId?: string | null;
           nominal?: NominalActionResult | null;
         };
       }
@@ -1012,6 +1014,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       value: {
         character: { ...view, reconciliation: { ...view.reconciliation, replayed: true } },
         roll: stored.value.roll,
+        rollId: stored.value.rollId ?? null,
         nominal: stored.value.nominal ?? null,
       },
     };
@@ -1106,7 +1109,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const stored = outcome.resultJson as StoredCommandOutcome;
     if (!stored.ok) return { ok: false, error: stored.error };
     const view = deserializeView(stored.value.character);
-    return { ok: true, value: { character: view, roll: stored.value.roll, nominal: stored.value.nominal ?? null } };
+    return { ok: true, value: { character: view, roll: stored.value.roll, rollId: stored.value.rollId ?? null, nominal: stored.value.nominal ?? null } };
   }
 
   /**
@@ -2420,7 +2423,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             resultExpiresAt: replayExpiresAt,
             ...(attachedCampaignId === null ? {} : { campaign: { campaignId: attachedCampaignId } }),
             ...(command.kind === "executeAction" ? { rollAudience: { requested: command.audience ?? null } } : {}),
-            buildResult: ({ record, controllers, scope, rollAudience }) => {
+            buildResult: ({ record, controllers, scope, rollAudience, rollId }) => {
               const view = toView(
                 record,
                 {
@@ -2444,7 +2447,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               // membership.
               const composedRoll =
                 roll === null ? null : { ...roll, audience: rollAudience ?? ("owner_only" as const) };
-              return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll, nominal } };
+              return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll, rollId: rollId ?? null, nominal } };
             },
           };
         };

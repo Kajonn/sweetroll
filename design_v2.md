@@ -493,6 +493,8 @@ Visibility is enforced in server queries and storage access, never only by hidin
 
 Actions may produce private, GM-only, or campaign-visible rolls according to campaign policy and per-roll choice. Authoritative rolls are evaluated by the server and include normalized expression, individual dice, modifiers, result, actor, character, visibility, timestamp, and a request id for idempotency. Logging manual or physical-dice results distinctly from verified platform rolls is post-MVP (owner decision 2026-11-08); players announce physical rolls at the table.
 
+The [shared physical dice plan](docs/superpowers/plans/2026-11-20-physical-dice.md) adds an optional simulated throw for online campaign play. The initiating player supplies settled dice and the server applies the system rules. Slice 1 provides calibrated numbered models, collision hulls and pose-to-face reading for d4, d6, d8, d10, d12 and d20. Command integration and player-visible rendering follow in later slices.
+
 The authenticated play-event overlay shows committed rolls, pushes, card draws and visible campaign content changes. The roller sees the acknowledged result immediately. Other participants on the active campaign page or an attached character sheet receive audience-filtered summaries through a shared three-second foreground activity refresh. The browser uses the persisted roll ID to combine command and activity deliveries. The activity projection returns safe summaries and checks displayed event IDs separately from pagination so a role or grant change can remove a card immediately on the next refresh.
 
 ## 7.6 Content types (narrowed)

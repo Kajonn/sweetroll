@@ -1,5 +1,7 @@
 # GUI integration implementation plan
 
+The [shared physical dice plan](2026-11-20-physical-dice.md) tracks the optional campaign dice overlay. Slice 1 supplies the six numbered models and calibrated face reader. Player settings, overlay interaction and the hosted multi-user journey remain open.
+
 **Play-event overlay follow-up (2026-11-14):** [Event overlay plan](2026-11-14-event-overlay.md) covers roll, push, draw and visible content popups, shared campaign activity refresh, and the local and hosted multi-user journey.
 
 **Planned follow-up (2026-11-03):** [System themes and image uploads](2026-11-03-system-themes-and-images.md) adds T1 system color presets, then T2 themed GUI elements; M0 durable resource-scoped media, then M1 character portraits, M2 item art and M3 adventure backgrounds. These are new unchecked feature stages built on G2/G8, not retroactive claims that the app-wide theme work or all image journeys are complete. The follow-up owns its package/attachment contract changes; this historical GUI foundation does not acquire that scope. Preserve the open G9 release gates.

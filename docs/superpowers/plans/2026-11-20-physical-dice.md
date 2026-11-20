@@ -62,6 +62,16 @@ Each slice starts with an observed failing test, implements the smallest passing
 | 4. Event delivery and overlay | A roller with visuals off can roll for a viewer with visuals on. The viewer sees the thrower's color and both receive exactly one result. | Assert one start and one finish for a successful roll and zero per-tick messages. Exercise duplicate, missed and late events, a deliberately mismatched final pose, incompatible client versions, reconnect across server instances, roller disconnect and audience revocation. Test preference persistence, reduced motion, keyboard focus, touch-through and renderer cleanup. |
 | 5. Hosted campaign journey | GM and two players in independent browser contexts exercise the feature through normal campaign controls. | Check acceptance source branch, deployed commit and readiness. Roll each shape, a mixed pool and a push. At 360 px verify the full 20-die tray fits after rotating the screen. Compare settled faces against history and the rules total. Repeat with a private roll, a roller with 3D off, two simultaneous rolls and a disconnected observer. Record device/browser, build and observed results. |
 
+### Slice 1 implementation record
+
+The six numbered OBJ/MTL pairs from Vtrpg commit `0050784` are available under `/dice/v1/`. The `White` material is the body and `Black` is the engraving. Each `dN.hull.json` contains convex-hull points in the OBJ coordinate frame. Apply the same uniform scale and origin to the model and collider. To regenerate the points, run `python scripts/bake-dice-hulls.py` with SciPy installed.
+
+The renderer-independent `readPhysicalFace` function takes the model-to-world quaternion for a Z-up tray. It returns a game value when the reading direction is within 10° of vertical. Invalid rotations and cocked poses return `null`. The simulation worker will decide when the body has stopped moving. For the d4 the reading direction points away from the support face, and for the d10 the engraving 0 means 10.
+
+The first two tests failed on the +Z d6 and the −Y support face of the d4 before implementing the reader. The collider tests then failed for all six missing hulls. The passing suite checks each numbered resting pose at eight headings with a 5° tilt, using OBJ support triangles as a fixture independent of the runtime normal table. Run `npm test -- tests/physical-dice src/systems/physical-dice/faces.test.ts`.
+
+Next is slice 2, physical resolution through the existing character command. Cross-device physics, the interactive overlay and hosted acceptance belong to subsequent slices.
+
 ## Appendix A · Measured normals for the numbered models
 
 These vectors are in the **unmodified OBJ local frame** and point outward from the physical face. They were calculated from the six numbered Vtrpg OBJ meshes at `0050784`. For each model, group near-coplanar convex-hull facets by outward direction, select the large physical faces, and refine their directions with area-weighted coplanar white body triangles. Project the black numeral geometry onto each face to associate that plane with its actual engraving. Vertex shading normals, engravings and bevels do not define separate die faces. Pin the model revision with the table. If the build converts, scales non-uniformly or rotates a model, bake the matching normal transform and collider alignment during import.

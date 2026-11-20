@@ -357,7 +357,7 @@ test.describe("campaign accessibility", () => {
       await expect(page.getByRole("heading", { name: "Latest content" })).toBeVisible({
         timeout: STEP_TIMEOUT,
       });
-      await expect(page.getByText(noteTitle)).toBeVisible({ timeout: STEP_TIMEOUT });
+      await expect(page.getByText(noteTitle, { exact: true })).toBeVisible({ timeout: STEP_TIMEOUT });
       const openHero = page.getByRole("button", { name: `Open ${characterName}` });
       await expect(openHero).toBeVisible({ timeout: STEP_TIMEOUT });
 

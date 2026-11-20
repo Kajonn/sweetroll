@@ -5598,6 +5598,8 @@ export interface operations {
                         state: "authenticated";
                         /** Format: uuid */
                         userId: string;
+                        /** @constant */
+                        physicalDiceEnabled?: true;
                     } | {
                         /** @constant */
                         state: "anonymous";

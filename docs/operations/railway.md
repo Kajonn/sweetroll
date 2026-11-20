@@ -47,6 +47,7 @@ or secret variables.
 | `NODE_ENV` | `production` |
 | `HOST` | `0.0.0.0` |
 | `SWEETROLL_SERVE_STATIC` | `1` |
+| `SWEETROLL_PHYSICAL_DICE` | Optional. Defaults to `false`. Set to `true` on the intended app service and redeploy to enable physical-dice support. |
 | `COOKIE_SECURE` | Defaults to `true` in production. |
 | `METRICS_TOKEN` | Optional. Use a separate random secret for metrics scraping. |
 | `TRUSTED_PROXY_CIDRS` | Optional comma-separated addresses or CIDRs of trusted forwarding proxies. |

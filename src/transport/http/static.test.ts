@@ -1,5 +1,5 @@
 import Fastify from "fastify";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -8,6 +8,23 @@ import { buildIdentityRoutes } from "./identity.js";
 import { registerApiRoutes, registerStaticServing } from "./static.js";
 
 describe("static serving", () => {
+  it.each([false, true])("gates the dice assets when physicalDiceEnabled is %s", async physicalDiceEnabled => {
+    const distDir = await mkdtemp(join(tmpdir(), "sweetroll-dice-assets-"));
+    const app = Fastify();
+    try {
+      await mkdir(join(distDir, "dice", "v1"), { recursive: true });
+      await writeFile(join(distDir, "index.html"), "<html>app</html>");
+      await writeFile(join(distDir, "dice", "v1", "6Dice.obj"), "o d6");
+      await app.register(registerStaticServing, { distDir, enabled: true, physicalDiceEnabled });
+      const response = await app.inject("/dice/v1/6Dice.obj");
+      expect(response.statusCode).toBe(physicalDiceEnabled ? 200 : 404);
+      if (physicalDiceEnabled) expect(response.body).toBe("o d6");
+    } finally {
+      await app.close();
+      await rm(distDir, { recursive: true, force: true });
+    }
+  });
+
   it("serves index.html for unknown non-API routes and never for /api", async () => {
     const distDir = await mkdtemp(join(tmpdir(), "sweetroll-static-test-"));
     const app = Fastify();

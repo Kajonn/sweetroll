@@ -143,6 +143,7 @@ export function loadCampaignLimits(env: NodeJS.ProcessEnv = process.env): Campai
 }
 
 export type AppConfig = {
+  physicalDiceEnabled: boolean;
   allowedOrigins: string[];
   authoritativeRollSecret: string;
   cookieSecure: boolean;
@@ -209,6 +210,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("NODE_ENV must be development, production, or test");
   }
 
+  const physicalDice = env.SWEETROLL_PHYSICAL_DICE ?? "false";
+  if (physicalDice !== "true" && physicalDice !== "false") {
+    throw new Error("SWEETROLL_PHYSICAL_DICE must be true or false");
+  }
+
   const cookieSecureSetting = env.COOKIE_SECURE;
   if (cookieSecureSetting !== undefined && cookieSecureSetting !== "true" && cookieSecureSetting !== "false") {
     throw new Error("COOKIE_SECURE must be true or false");
@@ -229,6 +235,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   return {
+    physicalDiceEnabled: physicalDice === "true",
     allowedOrigins,
     authoritativeRollSecret,
     cookieSecure,

@@ -56,7 +56,7 @@ function makeAnonymousIdentity() {
 
 const apps: ReturnType<typeof Fastify>[] = [];
 
-async function build(identity: Identity, allowedOrigins: string[] = []): Promise<ReturnType<typeof Fastify>> {
+async function build(identity: Identity, allowedOrigins: string[] = [], physicalDiceEnabled = false): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) });
   await app.register(cookiePlugin);
   await app.register(
@@ -67,7 +67,7 @@ async function build(identity: Identity, allowedOrigins: string[] = []): Promise
       allowedOrigins,
     }),
   );
-  await app.register(buildIdentityRoutes({ identity, cookieName: COOKIE_NAME, secure: true }));
+  await app.register(buildIdentityRoutes({ identity, cookieName: COOKIE_NAME, secure: true, physicalDiceEnabled }));
   await app.ready();
   apps.push(app);
   return app;
@@ -92,6 +92,14 @@ describe("identity HTTP routes", () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ state: "authenticated" });
     expect(response.json().userId).toBeTypeOf("string");
+  });
+
+  it.each([false, true])("advertises physical dice only when enabled and signed in (%s)", async enabled => {
+    const { identity, validToken } = makeStatefulIdentity();
+    const app = await build(identity, [], enabled);
+    const signedIn = await app.inject({ url: "/me", headers: cookie(validToken) });
+    expect(signedIn.json().physicalDiceEnabled).toBe(enabled ? true : undefined);
+    expect((await app.inject("/me")).json()).toEqual({ state: "anonymous" });
   });
 
   it("GET /me returns session_expired distinctly while preferences stay 401", async () => {

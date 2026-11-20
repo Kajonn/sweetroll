@@ -3,6 +3,14 @@
 Feature plan · 20 November 2026  
 Based on Sweetroll `c10903f` and Vtrpg `0050784`. Appendix A contains newly measured normals for all 60 outcomes on the six numbered dice.
 
+## Server feature toggle
+
+The operator enables physical dice per server deployment with `SWEETROLL_PHYSICAL_DICE=true`. The default is `false`. Apply a change by restarting or redeploying the app service, using the same value on all its replicas. The existing roll engine handles every roll while the switch is off.
+
+When enabled, authenticated browser sessions receive `physicalDiceEnabled: true` from `GET /api/me`. The browser only offers the physical-dice controls or loads the worker and numbered models when this capability is present. A player's **Show 3D dice** setting controls their own rendering within an enabled deployment. A thrower who hides animation still supplies the physical outcome.
+
+As the remaining slices land, apply the server switch to preparation, completion, event publication and active-attempt recovery. When disabled, reject physical-only command requests before creating a roll or publishing an event. Keep existing committed results readable and let unfinished attempts expire. Acceptance must exercise both server settings, including a direct physical request with the switch off and a roller with 3D hidden when it is on.
+
 ## What players will see
 
 A player taps the existing roll action. Dice in that player's chosen color roll across a transparent layer over the character sheet or campaign screen. Everyone currently allowed to see the roll sees the same throws, collisions and final faces. The camera fits the same tray on a phone and a desktop. The existing result card still shows the rules outcome, stacks with nearby events and fades as it does today. A kept pool die, a discarded die and a modifier can contribute differently to the result. The result card and breakdown continue to explain that distinction.

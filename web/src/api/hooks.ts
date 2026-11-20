@@ -3,7 +3,7 @@ import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import type { ApiClient } from "./client.js";
 
 export type MeState =
-  | { state: "authenticated"; userId: string }
+  | { state: "authenticated"; userId: string; physicalDiceEnabled?: true }
   | { state: "anonymous" }
   | { state: "session_expired" };
 

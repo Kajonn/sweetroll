@@ -2,7 +2,8 @@
 
 > **Moved (owner decision 2026-11-21):** the 5e SRD system, its record, data and
 > scenario left this repository so that the SRD licence stays out of Sweetroll
-> core; it is published to a server through `/api/v1` from its own repository.
+> core; it is published to a server through `/api/v1` from
+> [Kajonn/sweetroll-dnd5e](https://github.com/Kajonn/sweetroll-dnd5e).
 > Paths below that name `tests/integration/fixtures/dnd5e/`, `docs/systems/` or
 > the 5e scenario are historical. The stages S1–S11 are covered here by the
 > original Ember Trail test system (`tests/integration/scenarios/ember-trail.test.ts`).

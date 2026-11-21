@@ -101,7 +101,7 @@ results and the list of what is left; T2 and T3 are not started.
 
 The fifth-edition SRD 5.1 system was built through public API v1 and, by owner
 decision 2026-11-21, moved out of this repository so that its licence stays out
-of Sweetroll core. It lives in its own repository and is published to a server
+of Sweetroll core. It lives in [Kajonn/sweetroll-dnd5e](https://github.com/Kajonn/sweetroll-dnd5e) and is published to a server
 through `/api/v1` only; the licence confirmation is postponed. Sweetroll keeps
 the original Ember Trail test system (`tests/integration/fixtures/ember-trail/`,
 scenario `tests/integration/scenarios/ember-trail.test.ts`), which covers the

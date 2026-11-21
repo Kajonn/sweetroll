@@ -596,6 +596,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/characters/{characterId}/resources/{resourceId}/apply-roll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_resources_resourceId_apply_roll"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/characters/{characterId}/resources/{resourceId}/set": {
         parameters: {
             query?: never;
@@ -606,6 +622,54 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["post_characters_characterId_resources_resourceId_set"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/applicable-rolls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_applicable_rolls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/reference-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_reference_data"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/reference-data/{datasetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_characters_characterId_reference_data_datasetId"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -804,14 +868,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/characters/{characterId}/version-options": {
+    "/characters/{characterId}/composition-options": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["get_characters_characterId_version_options"];
+        get: operations["get_characters_characterId_composition_options"];
         put?: never;
         post?: never;
         delete?: never;
@@ -820,23 +884,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/characters/{characterId}/version-check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_characters_characterId_version_check"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/characters/{characterId}/version": {
+    "/characters/{characterId}/composition-check": {
         parameters: {
             query?: never;
             header?: never;
@@ -845,7 +893,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["post_characters_characterId_version"];
+        post: operations["post_characters_characterId_composition_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/composition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_composition"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1220,14 +1284,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/campaigns/{id}/version-options": {
+    "/campaigns/{id}/composition-options": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["get_campaigns_id_version_options"];
+        get: operations["get_campaigns_id_composition_options"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1236,23 +1300,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/campaigns/{id}/version-check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_campaigns_id_version_check"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/campaigns/{id}/version": {
+    "/campaigns/{id}/composition-check": {
         parameters: {
             query?: never;
             header?: never;
@@ -1261,7 +1309,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["post_campaigns_id_version"];
+        post: operations["post_campaigns_id_composition_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/composition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_composition"];
         delete?: never;
         options?: never;
         head?: never;
@@ -7776,6 +7840,7 @@ export interface operations {
                     initialValues?: {
                         [key: string]: unknown;
                     };
+                    presetId?: string;
                     idempotencyKey: string;
                 };
             };
@@ -7999,7 +8064,7 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                             deck?: {
                                                 deckId: string;
                                                 label: string;
@@ -8007,6 +8072,9 @@ export interface operations {
                                             };
                                             target?: {
                                                 entityId: string;
+                                                otherEntityIds?: string[];
+                                                /** @constant */
+                                                optional?: true;
                                             };
                                             /** @constant */
                                             respondsTo?: true;
@@ -8058,6 +8126,9 @@ export interface operations {
                                                         kind: "roll" | "resourceBump";
                                                         target?: {
                                                             entityId: string;
+                                                            otherEntityIds?: string[];
+                                                            /** @constant */
+                                                            optional?: true;
                                                         };
                                                         /** @constant */
                                                         respondsTo?: true;
@@ -8099,6 +8170,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -8369,6 +8445,18 @@ export interface operations {
                                 id: string;
                                 label: string;
                                 kind: "playable" | "npc";
+                                presets?: {
+                                    id: string;
+                                    label: string;
+                                }[];
+                            }[];
+                            extensions?: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                name: string;
+                                /** Format: uuid */
+                                versionId: string;
+                                semanticVersion: string;
                             }[];
                         };
                         requestId: string;
@@ -8931,7 +9019,7 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                             deck?: {
                                                 deckId: string;
                                                 label: string;
@@ -8939,6 +9027,9 @@ export interface operations {
                                             };
                                             target?: {
                                                 entityId: string;
+                                                otherEntityIds?: string[];
+                                                /** @constant */
+                                                optional?: true;
                                             };
                                             /** @constant */
                                             respondsTo?: true;
@@ -8990,6 +9081,9 @@ export interface operations {
                                                         kind: "roll" | "resourceBump";
                                                         target?: {
                                                             entityId: string;
+                                                            otherEntityIds?: string[];
+                                                            /** @constant */
+                                                            optional?: true;
                                                         };
                                                         /** @constant */
                                                         respondsTo?: true;
@@ -9031,6 +9125,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -9430,7 +9529,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -9438,6 +9537,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -9489,6 +9591,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -9530,6 +9635,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -10118,7 +10228,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -10126,6 +10236,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -10177,6 +10290,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -10218,6 +10334,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -10806,7 +10927,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -10814,6 +10935,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -10865,6 +10989,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -10906,6 +11033,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -11494,7 +11626,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -11502,6 +11634,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -11553,6 +11688,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -11594,6 +11732,712 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
+                                                    quantity?: number;
+                                                }[];
+                                            })[];
+                                        }[];
+                                    }[];
+                                    derivedValues: {
+                                        [key: string]: string | number | boolean | null;
+                                    };
+                                    validations: {
+                                        validationId: string;
+                                        severity: "error" | "warning";
+                                        message: string;
+                                        targetDefinitionId: string;
+                                    }[];
+                                };
+                                reconciliation: {
+                                    /** Format: uuid */
+                                    characterId: string;
+                                    baseRevision: number | null;
+                                    revision: number;
+                                    packageChecksum: string;
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    commandExecutionId: string;
+                                    /** Format: date-time */
+                                    replayExpiresAt: string;
+                                    replayed: boolean;
+                                    changedDefinitionIds: string[];
+                                    activityCursor: string | null;
+                                    cacheDisposition: "retain" | "replace" | "purge";
+                                };
+                            };
+                            roll: {
+                                /** Format: uuid */
+                                targetCharacterId?: string;
+                                /** Format: uuid */
+                                respondsTo?: string;
+                                push?: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rollId: string;
+                                    rootRollId: string;
+                                    parentRollId: string | null;
+                                    attempt: number;
+                                    maxAttempts: number;
+                                    rerolledDiceIds: string[];
+                                    faceOutcomes: {
+                                        groupId: string;
+                                        face: number;
+                                        combinedCount: number;
+                                        rerolledCount: number;
+                                    }[];
+                                };
+                                breakdown: {
+                                    /** @constant */
+                                    version: "1.0";
+                                    rootId: string;
+                                    cards?: {
+                                        deckId: string;
+                                        deckLabel: string;
+                                        remaining: number;
+                                        drawn: {
+                                            id: string;
+                                            label: string;
+                                            values: {
+                                                [key: string]: string | number | boolean | null;
+                                            };
+                                        }[];
+                                    };
+                                    groups: {
+                                        id: string;
+                                        label: string;
+                                        count: number;
+                                        sides: number;
+                                        dieId?: string;
+                                        symbol?: string;
+                                        operation: "sum" | "countAtLeast" | "countAtMost" | "countEqual" | "countSymbol" | "keepHighest" | "keepLowest";
+                                        threshold?: number;
+                                        keepCount?: number;
+                                        modifiers?: ("explode" | "rerollOnce")[];
+                                        diceIds: string[];
+                                        total: number;
+                                    }[];
+                                    terms: {
+                                        id: string;
+                                        operation: string;
+                                        operandIds: string[];
+                                        value: (string | number | boolean | null) | string[];
+                                        groupId?: string;
+                                        symbol?: string;
+                                        /** @constant */
+                                        reused?: true;
+                                    }[];
+                                };
+                                actionId: string;
+                                expression: string;
+                                dice: {
+                                    sides: number;
+                                    value: number;
+                                    faceLabel?: string;
+                                    symbols?: {
+                                        [key: string]: number;
+                                    };
+                                    kept: boolean;
+                                    id?: string;
+                                    groupId?: string;
+                                    success?: boolean;
+                                    rerolledFrom?: string;
+                                    explodedFrom?: string;
+                                }[];
+                                bindings: {
+                                    scope: "fields" | "inputs" | "item" | "aggregates" | "target" | "opposed";
+                                    definitionId: string;
+                                    value: (string | number | boolean | null) | string[];
+                                }[];
+                                total: number;
+                                outcome?: {
+                                    id: string;
+                                    label: string;
+                                };
+                                details?: {
+                                    id: string;
+                                    label: string;
+                                    value: number;
+                                }[];
+                                output: string;
+                                audience: "owner_only" | "gm_only" | "campaign";
+                            } | null;
+                            /** Format: uuid */
+                            rollId?: string;
+                            nominal: {
+                                actionId: string;
+                                entryId: string;
+                                output: string;
+                            } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    post_characters_characterId_resources_resourceId_apply_roll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                resourceId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    rollId: string;
+                    direction: "subtract" | "add";
+                    expectedRevision: number;
+                    idempotencyKey: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        result: {
+                            character: {
+                                /** Format: uuid */
+                                characterId: string;
+                                ownerId: string | null;
+                                campaignId: string | null;
+                                controllers: string[];
+                                placementGeneration: number;
+                                returnOwnerId: string | null;
+                                name: string;
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
+                                entityDefinitionId: string;
+                                revision: number;
+                                lifecycle: "active" | "archived";
+                                archivedAt: string | null;
+                                /** Format: date-time */
+                                createdAt: string;
+                                /** Format: date-time */
+                                updatedAt: string;
+                                state: {
+                                    /** @constant */
+                                    schemaVersion: "1.0";
+                                    values: {
+                                        [key: string]: unknown;
+                                    };
+                                    entries: {
+                                        [key: string]: {
+                                            entryId: string;
+                                            image?: {
+                                                fileId: string;
+                                                description: string;
+                                                contentType: "image/png" | "image/jpeg" | "image/webp";
+                                                width: number;
+                                                height: number;
+                                                sizeBytes: number;
+                                                checksum: string;
+                                            };
+                                            slotId: string;
+                                            templateId: string | null;
+                                            /** Format: uuid */
+                                            extensionId?: string;
+                                            source?: {
+                                                /** @constant */
+                                                kind: "personal";
+                                            } | {
+                                                /** @constant */
+                                                kind: "system";
+                                                templateId: string;
+                                                extensionId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "campaign";
+                                                campaignId: string;
+                                                templateId: string;
+                                                templateRevision: number;
+                                                contentRevision: number;
+                                            };
+                                            snapshot?: {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                            } | {
+                                                kind: "item" | "spell" | "talent" | "effect";
+                                                values: {
+                                                    name: string;
+                                                    description?: string;
+                                                    notes?: string;
+                                                };
+                                                quantity?: number;
+                                                base: {
+                                                    versionId: string;
+                                                    packageChecksum: string;
+                                                    templateId: string;
+                                                };
+                                                defaultValues: {
+                                                    [key: string]: unknown;
+                                                };
+                                            };
+                                            values: {
+                                                [key: string]: unknown;
+                                            };
+                                            quantity?: number;
+                                        };
+                                    };
+                                };
+                                derivedValues: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                                validations: {
+                                    validationId: string;
+                                    severity: "error" | "warning";
+                                    message: string;
+                                    targetDefinitionId: string;
+                                }[];
+                                projection: {
+                                    presentation?: {
+                                        componentStyle?: "default" | "classic";
+                                        colorPreset: "default" | "blue" | "ochre";
+                                    };
+                                    /** @constant */
+                                    projectionVersion: "1.0";
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    packageChecksum: string;
+                                    entityId: string;
+                                    entityLabel: string;
+                                    completionFields?: {
+                                        /** @constant */
+                                        kind: "field";
+                                        id: string;
+                                        fieldId: string;
+                                        label: string;
+                                        fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                        value: string | number | boolean | null | string[];
+                                        editable: boolean;
+                                        constraints: {
+                                            required?: boolean;
+                                            min?: number;
+                                            max?: number;
+                                            step?: number;
+                                            minLength?: number;
+                                            maxLength?: number;
+                                            options?: {
+                                                id: string;
+                                                label: string;
+                                            }[];
+                                        };
+                                        validations: {
+                                            validationId: string;
+                                            severity: "error" | "warning";
+                                            message: string;
+                                            targetDefinitionId: string;
+                                        }[];
+                                    }[];
+                                    sheets: {
+                                        id: string;
+                                        label: string;
+                                        sections: {
+                                            id: string;
+                                            label: string;
+                                            elements: ({
+                                                /** @constant */
+                                                kind: "heading";
+                                                id: string;
+                                                text: string;
+                                                level: 2 | 3;
+                                            } | {
+                                                /** @constant */
+                                                kind: "field";
+                                                id: string;
+                                                fieldId: string;
+                                                label: string;
+                                                fieldKind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "computed" | "image";
+                                                value: string | number | boolean | null | string[];
+                                                editable: boolean;
+                                                constraints: {
+                                                    required?: boolean;
+                                                    min?: number;
+                                                    max?: number;
+                                                    step?: number;
+                                                    minLength?: number;
+                                                    maxLength?: number;
+                                                    options?: {
+                                                        id: string;
+                                                        label: string;
+                                                    }[];
+                                                };
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "resource";
+                                                id: string;
+                                                resourceId: string;
+                                                label: string;
+                                                value: {
+                                                    current: number;
+                                                    max: number;
+                                                };
+                                                min: number;
+                                                max: number;
+                                                step: number;
+                                                resetTo: "min" | "max";
+                                                computedMaximum?: boolean;
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                            } | {
+                                                /** @constant */
+                                                kind: "action";
+                                                id: string;
+                                                actionId: string;
+                                                label: string;
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
+                                                deck?: {
+                                                    deckId: string;
+                                                    label: string;
+                                                    count?: number;
+                                                };
+                                                target?: {
+                                                    entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
+                                                };
+                                                /** @constant */
+                                                respondsTo?: true;
+                                                inputs: {
+                                                    id: string;
+                                                    label: string;
+                                                    valueType: "integer" | "decimal" | "boolean" | "text";
+                                                    required: boolean;
+                                                    default: string | number | boolean | null;
+                                                }[];
+                                                validations: {
+                                                    validationId: string;
+                                                    severity: "error" | "warning";
+                                                    message: string;
+                                                    targetDefinitionId: string;
+                                                }[];
+                                                entryId?: string;
+                                            } | {
+                                                /** @constant */
+                                                kind: "slot";
+                                                id: string;
+                                                slotId: string;
+                                                label: string;
+                                                accepts: ("item" | "spell" | "talent" | "effect")[];
+                                                entries: {
+                                                    definition?: {
+                                                        id: string;
+                                                        label: string;
+                                                        kind: "item" | "spell" | "talent" | "effect";
+                                                        fields: {
+                                                            required?: boolean;
+                                                            min?: number;
+                                                            max?: number;
+                                                            step?: number;
+                                                            minLength?: number;
+                                                            maxLength?: number;
+                                                            options?: {
+                                                                id: string;
+                                                                label: string;
+                                                            }[];
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "text" | "integer" | "decimal" | "boolean" | "singleChoice" | "multiChoice" | "resource";
+                                                            default: unknown;
+                                                        }[];
+                                                        grantedActions: {
+                                                            id: string;
+                                                            label: string;
+                                                            kind: "roll" | "resourceBump";
+                                                            target?: {
+                                                                entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
+                                                            };
+                                                            /** @constant */
+                                                            respondsTo?: true;
+                                                            inputs: {
+                                                                id: string;
+                                                                label: string;
+                                                                valueType: "integer" | "decimal" | "boolean" | "text";
+                                                                required: boolean;
+                                                                default: string | number | boolean | null;
+                                                            }[];
+                                                        }[];
+                                                    };
+                                                    metadata?: {
+                                                        name: string;
+                                                        description?: string;
+                                                        notes?: string;
+                                                    };
+                                                    source?: {
+                                                        /** @constant */
+                                                        kind: "personal";
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "system";
+                                                        templateId: string;
+                                                        extensionId?: string;
+                                                    } | {
+                                                        /** @constant */
+                                                        kind: "campaign";
+                                                        campaignId: string;
+                                                        templateId: string;
+                                                        templateRevision: number;
+                                                        contentRevision: number;
+                                                    };
+                                                    entryId: string;
+                                                    templateId: string | null;
+                                                    /** Format: uuid */
+                                                    extensionId?: string;
+                                                    label: string;
+                                                    values: {
+                                                        [key: string]: unknown;
+                                                    };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -12183,7 +13027,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -12191,6 +13035,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -12242,6 +13089,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -12283,6 +13133,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -12418,6 +13273,718 @@ export interface operations {
                                 entryId: string;
                                 output: string;
                             } | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId_applicable_rolls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        rolls: {
+                            rollId: string;
+                            output: string;
+                            total: number;
+                        }[];
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId_reference_data: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        datasets: {
+                            datasetId: string;
+                            label: string;
+                            records: number;
+                        }[];
+                        requestId: string;
+                    };
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            /** @constant */
+                            code: "unauthorized";
+                            message: string;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            pushReason?: string;
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                            diagnostics?: {
+                                validationId: string;
+                                severity: "error" | "warning";
+                                message: string;
+                                targetDefinitionId: string;
+                            }[];
+                            actionDiagnostics?: {
+                                /** @constant */
+                                code: "arithmetic_failure";
+                                actionId: string;
+                                expressionId: string;
+                                message: string;
+                            }[];
+                            changedDefinitionIds?: string[];
+                            activityCursor?: string | null;
+                            cacheDisposition?: "retain" | "replace" | "purge";
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_characters_characterId_reference_data_datasetId: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                characterId: string;
+                datasetId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        dataset: {
+                            datasetId: string;
+                            label: string;
+                            records: {
+                                id: string;
+                                label: string;
+                                values: {
+                                    [key: string]: string | number | boolean | null;
+                                };
+                            }[];
                         };
                         requestId: string;
                     };
@@ -13661,7 +15228,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -13669,6 +15236,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -13720,6 +15290,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -13761,6 +15334,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -14914,7 +16492,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -14922,6 +16500,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -14973,6 +16554,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -15014,6 +16598,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -15618,7 +17207,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -15626,6 +17215,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -15677,6 +17269,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -15718,6 +17313,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -16332,7 +17932,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -16340,6 +17940,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -16391,6 +17994,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -16432,6 +18038,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -17019,7 +18630,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -17027,6 +18638,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -17078,6 +18692,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -17119,6 +18736,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -17710,7 +19332,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -17718,6 +19340,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -17769,6 +19394,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -17810,6 +19438,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -18195,6 +19828,7 @@ export interface operations {
                             };
                             /** Format: uuid */
                             extensionId?: string;
+                            extensionName?: string;
                             defaultQuantity?: number;
                             id: string;
                             label: string;
@@ -18273,6 +19907,8 @@ export interface operations {
                                 step: number;
                                 maxExpressionId?: string;
                                 resetTo: "min" | "max";
+                                /** @constant */
+                                startFull?: true;
                             } | {
                                 /** @constant */
                                 kind: "computed";
@@ -18293,6 +19929,9 @@ export interface operations {
                                 actionKind: "roll" | "resourceBump";
                                 target?: {
                                     entityId: string;
+                                    otherEntityIds?: string[];
+                                    /** @constant */
+                                    optional?: true;
                                 };
                                 /** @constant */
                                 respondsTo?: true;
@@ -18693,7 +20332,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -18701,6 +20340,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -18752,6 +20394,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -18793,6 +20438,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -19142,7 +20792,7 @@ export interface operations {
             };
         };
     };
-    get_characters_characterId_version_options: {
+    get_characters_characterId_composition_options: {
         parameters: {
             query?: never;
             header?: never;
@@ -19161,26 +20811,80 @@ export interface operations {
                     "application/json": {
                         options: {
                             current: {
-                                /** Format: uuid */
-                                versionId: string;
-                                /** Format: uuid */
-                                systemId: string;
-                                semanticVersion: string;
-                                releaseNotes: string;
-                                /** Format: date-time */
-                                createdAt: string;
+                                systemVersion: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    name: string;
+                                    version: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    };
+                                    upgrades: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    }[];
+                                }[];
                             };
                             revertTo: {
-                                /** Format: uuid */
-                                versionId: string;
-                                /** Format: uuid */
-                                systemId: string;
-                                semanticVersion: string;
-                                releaseNotes: string;
-                                /** Format: date-time */
-                                createdAt: string;
+                                systemVersion: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    name: string;
+                                    version: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    };
+                                    upgrades: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    }[];
+                                }[];
                             } | null;
-                            upgrades: {
+                            systemUpgrades: {
                                 /** Format: uuid */
                                 versionId: string;
                                 /** Format: uuid */
@@ -19189,6 +20893,31 @@ export interface operations {
                                 releaseNotes: string;
                                 /** Format: date-time */
                                 createdAt: string;
+                            }[];
+                            available: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                name: string;
+                                version: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                upgrades: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                }[];
                             }[];
                         };
                         requestId: string;
@@ -19404,18 +21133,31 @@ export interface operations {
             };
         };
     };
-    get_characters_characterId_version_check: {
+    post_characters_characterId_composition_check: {
         parameters: {
-            query: {
-                targetVersionId: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 characterId: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    target: {
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
+                    };
+                };
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -19426,6 +21168,31 @@ export interface operations {
                         check: {
                             revision: number;
                             direction: "upgrade" | "revert";
+                            change: {
+                                /** @constant */
+                                kind: "revert";
+                            } | {
+                                /** @constant */
+                                kind: "system_upgrade";
+                                fromVersionId: string;
+                                toVersionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_add";
+                                extensionId: string;
+                                versionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_remove";
+                                extensionId: string;
+                                versionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_upgrade";
+                                extensionId: string;
+                                fromVersionId: string;
+                                toVersionId: string;
+                            };
                             report: {
                                 ok: boolean;
                                 direction: "upgrade" | "revert";
@@ -19675,7 +21442,7 @@ export interface operations {
             };
         };
     };
-    post_characters_characterId_version: {
+    post_characters_characterId_composition: {
         parameters: {
             query?: never;
             header?: never;
@@ -19687,8 +21454,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    targetVersionId: string;
+                    target: {
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
+                    };
                     expectedRevision: number;
                     idempotencyKey: string;
                 };
@@ -19914,7 +21689,7 @@ export interface operations {
                                                 id: string;
                                                 actionId: string;
                                                 label: string;
-                                                actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                                actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                                 deck?: {
                                                     deckId: string;
                                                     label: string;
@@ -19922,6 +21697,9 @@ export interface operations {
                                                 };
                                                 target?: {
                                                     entityId: string;
+                                                    otherEntityIds?: string[];
+                                                    /** @constant */
+                                                    optional?: true;
                                                 };
                                                 /** @constant */
                                                 respondsTo?: true;
@@ -19973,6 +21751,9 @@ export interface operations {
                                                             kind: "roll" | "resourceBump";
                                                             target?: {
                                                                 entityId: string;
+                                                                otherEntityIds?: string[];
+                                                                /** @constant */
+                                                                optional?: true;
                                                             };
                                                             /** @constant */
                                                             respondsTo?: true;
@@ -20014,6 +21795,11 @@ export interface operations {
                                                     values: {
                                                         [key: string]: unknown;
                                                     };
+                                                    derived?: {
+                                                        id: string;
+                                                        label: string;
+                                                        value: string | number | boolean;
+                                                    }[];
                                                     quantity?: number;
                                                 }[];
                                             })[];
@@ -20598,7 +22384,7 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                             deck?: {
                                                 deckId: string;
                                                 label: string;
@@ -20606,6 +22392,9 @@ export interface operations {
                                             };
                                             target?: {
                                                 entityId: string;
+                                                otherEntityIds?: string[];
+                                                /** @constant */
+                                                optional?: true;
                                             };
                                             /** @constant */
                                             respondsTo?: true;
@@ -20657,6 +22446,9 @@ export interface operations {
                                                         kind: "roll" | "resourceBump";
                                                         target?: {
                                                             entityId: string;
+                                                            otherEntityIds?: string[];
+                                                            /** @constant */
+                                                            optional?: true;
                                                         };
                                                         /** @constant */
                                                         respondsTo?: true;
@@ -20698,6 +22490,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -23091,6 +24888,8 @@ export interface operations {
                                 step: number;
                                 maxExpressionId?: string;
                                 resetTo: "min" | "max";
+                                /** @constant */
+                                startFull?: true;
                             } | {
                                 /** @constant */
                                 kind: "computed";
@@ -23108,6 +24907,9 @@ export interface operations {
                             grantedActions: ({
                                 target?: {
                                     entityId: string;
+                                    otherEntityIds?: string[];
+                                    /** @constant */
+                                    optional?: true;
                                 };
                                 /** @constant */
                                 respondsTo?: true;
@@ -26155,7 +27957,7 @@ export interface operations {
             };
         };
     };
-    get_campaigns_id_version_options: {
+    get_campaigns_id_composition_options: {
         parameters: {
             query?: never;
             header?: never;
@@ -26174,26 +27976,80 @@ export interface operations {
                     "application/json": {
                         options: {
                             current: {
-                                /** Format: uuid */
-                                versionId: string;
-                                /** Format: uuid */
-                                systemId: string;
-                                semanticVersion: string;
-                                releaseNotes: string;
-                                /** Format: date-time */
-                                createdAt: string;
+                                systemVersion: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    name: string;
+                                    version: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    };
+                                    upgrades: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    }[];
+                                }[];
                             };
                             revertTo: {
-                                /** Format: uuid */
-                                versionId: string;
-                                /** Format: uuid */
-                                systemId: string;
-                                semanticVersion: string;
-                                releaseNotes: string;
-                                /** Format: date-time */
-                                createdAt: string;
+                                systemVersion: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    name: string;
+                                    version: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    };
+                                    upgrades: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    }[];
+                                }[];
                             } | null;
-                            upgrades: {
+                            systemUpgrades: {
                                 /** Format: uuid */
                                 versionId: string;
                                 /** Format: uuid */
@@ -26202,6 +28058,31 @@ export interface operations {
                                 releaseNotes: string;
                                 /** Format: date-time */
                                 createdAt: string;
+                            }[];
+                            available: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                name: string;
+                                version: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                upgrades: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                }[];
                             }[];
                         };
                         requestId: string;
@@ -26315,18 +28196,31 @@ export interface operations {
             };
         };
     };
-    get_campaigns_id_version_check: {
+    post_campaigns_id_composition_check: {
         parameters: {
-            query: {
-                targetVersionId: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    target: {
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
+                    };
+                };
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -26337,8 +28231,53 @@ export interface operations {
                         check: {
                             revision: number;
                             direction: "upgrade" | "revert";
+                            change: {
+                                /** @constant */
+                                kind: "revert";
+                            } | {
+                                /** @constant */
+                                kind: "system_upgrade";
+                                fromVersionId: string;
+                                toVersionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_add";
+                                extensionId: string;
+                                versionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_remove";
+                                extensionId: string;
+                                versionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_upgrade";
+                                extensionId: string;
+                                fromVersionId: string;
+                                toVersionId: string;
+                            };
                             fromVersionId: string;
                             toVersionId: string;
+                            from: {
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
+                            };
+                            to: {
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
+                            };
                             ok: boolean;
                             characters: {
                                 /** Format: uuid */
@@ -26504,7 +28443,7 @@ export interface operations {
             };
         };
     };
-    post_campaigns_id_version: {
+    post_campaigns_id_composition: {
         parameters: {
             query?: never;
             header?: never;
@@ -26516,8 +28455,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    targetVersionId: string;
+                    target: {
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
+                    };
                     expectedCampaignRevision: number;
                     idempotencyKey: string;
                 };
@@ -28841,6 +30788,7 @@ export interface operations {
                     initialValues?: {
                         [key: string]: unknown;
                     };
+                    presetId?: string;
                     controllerUserIds?: string[];
                     expectedCampaignRevision: number;
                     idempotencyKey: string;
@@ -29066,7 +31014,7 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                             deck?: {
                                                 deckId: string;
                                                 label: string;
@@ -29074,6 +31022,9 @@ export interface operations {
                                             };
                                             target?: {
                                                 entityId: string;
+                                                otherEntityIds?: string[];
+                                                /** @constant */
+                                                optional?: true;
                                             };
                                             /** @constant */
                                             respondsTo?: true;
@@ -29125,6 +31076,9 @@ export interface operations {
                                                         kind: "roll" | "resourceBump";
                                                         target?: {
                                                             entityId: string;
+                                                            otherEntityIds?: string[];
+                                                            /** @constant */
+                                                            optional?: true;
                                                         };
                                                         /** @constant */
                                                         respondsTo?: true;
@@ -29166,6 +31120,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -29643,7 +31602,7 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                             deck?: {
                                                 deckId: string;
                                                 label: string;
@@ -29651,6 +31610,9 @@ export interface operations {
                                             };
                                             target?: {
                                                 entityId: string;
+                                                otherEntityIds?: string[];
+                                                /** @constant */
+                                                optional?: true;
                                             };
                                             /** @constant */
                                             respondsTo?: true;
@@ -29702,6 +31664,9 @@ export interface operations {
                                                         kind: "roll" | "resourceBump";
                                                         target?: {
                                                             entityId: string;
+                                                            otherEntityIds?: string[];
+                                                            /** @constant */
+                                                            optional?: true;
                                                         };
                                                         /** @constant */
                                                         respondsTo?: true;
@@ -29743,6 +31708,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -30124,7 +32094,7 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                             deck?: {
                                                 deckId: string;
                                                 label: string;
@@ -30132,6 +32102,9 @@ export interface operations {
                                             };
                                             target?: {
                                                 entityId: string;
+                                                otherEntityIds?: string[];
+                                                /** @constant */
+                                                optional?: true;
                                             };
                                             /** @constant */
                                             respondsTo?: true;
@@ -30183,6 +32156,9 @@ export interface operations {
                                                         kind: "roll" | "resourceBump";
                                                         target?: {
                                                             entityId: string;
+                                                            otherEntityIds?: string[];
+                                                            /** @constant */
+                                                            optional?: true;
                                                         };
                                                         /** @constant */
                                                         respondsTo?: true;
@@ -30224,6 +32200,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -30607,7 +32588,7 @@ export interface operations {
                                             id: string;
                                             actionId: string;
                                             label: string;
-                                            actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+                                            actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
                                             deck?: {
                                                 deckId: string;
                                                 label: string;
@@ -30615,6 +32596,9 @@ export interface operations {
                                             };
                                             target?: {
                                                 entityId: string;
+                                                otherEntityIds?: string[];
+                                                /** @constant */
+                                                optional?: true;
                                             };
                                             /** @constant */
                                             respondsTo?: true;
@@ -30666,6 +32650,9 @@ export interface operations {
                                                         kind: "roll" | "resourceBump";
                                                         target?: {
                                                             entityId: string;
+                                                            otherEntityIds?: string[];
+                                                            /** @constant */
+                                                            optional?: true;
                                                         };
                                                         /** @constant */
                                                         respondsTo?: true;
@@ -30707,6 +32694,11 @@ export interface operations {
                                                 values: {
                                                     [key: string]: unknown;
                                                 };
+                                                derived?: {
+                                                    id: string;
+                                                    label: string;
+                                                    value: string | number | boolean;
+                                                }[];
                                                 quantity?: number;
                                             }[];
                                         })[];
@@ -32052,7 +34044,7 @@ export interface operations {
                         events: {
                             /** Format: uuid */
                             eventId: string;
-                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed";
+                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed" | "extension_upgraded";
                             /** Format: uuid */
                             actorId: string;
                             sourceContentId: string | null;
@@ -32292,7 +34284,7 @@ export interface operations {
                             activity: {
                                 /** Format: uuid */
                                 eventId: string;
-                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed";
+                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed" | "extension_upgraded";
                                 /** Format: uuid */
                                 actorId: string;
                                 sourceContentId: string | null;

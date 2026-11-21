@@ -282,5 +282,29 @@ describeWithDatabase("System extensions authoring (E2)", () => {
     const bytes = await call("GET", `/system-versions/${version.versionId}/templates/frost_axe/image/${image.fileId}`);
     expect(bytes.statusCode).toBe(200);
     expect(createHash("sha256").update(bytes.rawPayload).digest("hex")).toBe(image.checksum);
+
+    // E6: a character placing the extension item keeps its art, readable like base template art.
+    const created = await call("POST", "/characters", ada, {
+      name: "Frost hero", systemVersionId: base.versionId, entityDefinitionId: "character",
+      extensions: [{ extensionId, versionId: version.versionId }], idempotencyKey: randomUUID(),
+    });
+    expect(created.statusCode, created.body).toBe(201);
+    const character = created.json().character;
+    const entryId = randomUUID();
+    const placed = await call("POST", `/characters/${character.characterId}/entries`, ada, {
+      entry: { entryId, slotId: "inventory", templateId: "frost_axe", extensionId, source: { kind: "system", templateId: "frost_axe", extensionId }, values: {} },
+      expectedRevision: character.revision, idempotencyKey: randomUUID(),
+    });
+    expect(placed.statusCode, placed.body).toBe(200);
+    expect(placed.json().result.character.state.entries[entryId].image).toEqual(image);
+    const entryUrl = `/characters/${character.characterId}/entries/${entryId}/image`;
+    const entryImage = await call("GET", entryUrl, ada);
+    expect(entryImage.statusCode, entryImage.body).toBe(200);
+    expect(entryImage.json().image).toEqual(image);
+    const entryBytes = await call("GET", `${entryUrl}/${image.fileId}`, ada);
+    expect(entryBytes.statusCode, entryBytes.body).toBe(200);
+    expect(createHash("sha256").update(entryBytes.rawPayload).digest("hex")).toBe(image.checksum);
+    expect((await call("GET", `${entryUrl}/thumbnail`, ada)).statusCode).toBe(200);
+    expect((await call("GET", `${entryUrl}/${image.fileId}`, bob)).statusCode).toBe(404);
   });
 });

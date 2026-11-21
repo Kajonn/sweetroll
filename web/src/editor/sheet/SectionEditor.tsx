@@ -7,7 +7,7 @@ import { useShortcut } from "../../shell/useShortcut.js";
 import type { DefinitionId } from "../../state/documentFieldTypes.js";
 import { Button, EmptyState, FormField } from "../../ui/index.js";
 
-import { ElementEditor, makeElementOfKind } from "./ElementEditor.js";
+import { ElementEditor, makeElementOfKind, VisibleWhenSelect, type VisibilityCondition } from "./ElementEditor.js";
 import styles from "./SheetEditor.module.css";
 import type {
   SheetElementKind,
@@ -35,6 +35,7 @@ export type SectionEditorProps = {
    */
   allocateElementId?: (() => DefinitionId) | undefined;
   definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string; ownerId?: string}>;
+  conditions?: ReadonlyArray<VisibilityCondition>;
 };
 
 export function SectionEditor({
@@ -51,6 +52,7 @@ export function SectionEditor({
   onMoveDown,
   allocateElementId,
   definitions = [],
+  conditions = [],
 }: SectionEditorProps) {
   const replaceSection = (patch: Partial<SheetSectionV1>) => {
     onChange({ ...section, ...patch });
@@ -167,6 +169,15 @@ export function SectionEditor({
             />
           </FormField>
         </div>
+        <VisibleWhenSelect
+          id={section.id}
+          value={section.visibleWhen}
+          conditions={conditions}
+          onChange={(visibleWhen) => {
+            const { visibleWhen: _old, ...rest } = section;
+            onChange(visibleWhen === undefined ? rest : { ...rest, visibleWhen });
+          }}
+        />
 
       </div>
       <div className={styles.elementsHeader}>
@@ -251,6 +262,7 @@ export function SectionEditor({
                 <ElementEditor
                   element={element}
                   definitions={definitions}
+                  conditions={conditions}
                   onChange={(next) => replaceElement(idx, next)}
                 />
               </li>

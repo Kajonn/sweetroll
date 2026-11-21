@@ -98,3 +98,33 @@ PR 75 merges (D3). D4 (who performs the human checks) is open and blocks only T3
 T1 is implemented except the visual baselines and its CI exit. The
 [2026-11-12 local record](docs/acceptance/rules-coverage-gui-2026-11-12.md) has the
 results and the list of what is left; T2 and T3 are not started.
+
+The fifth-edition SRD 5.1 system was built through public API v1 and, by owner
+decision 2026-11-21, moved out of this repository so that its licence stays out
+of Sweetroll core. It lives in [Kajonn/sweetroll-dnd5e](https://github.com/Kajonn/sweetroll-dnd5e) and is published to a server
+through `/api/v1` only; the licence confirmation is postponed. Sweetroll keeps
+the original Ember Trail test system (`tests/integration/fixtures/ember-trail/`,
+scenario `tests/integration/scenarios/ember-trail.test.ts`), which covers the
+same rules features. Do not add third-party game text to this repository.
+
+Owner instruction 2026-11-16: address the record's gaps, raise the size limit to
+5 MiB, make multiclassing "a way to add new classes to a character" and suggest
+a way to share formulas. Owner instruction 2026-11-21: "Implement plan"; the owner
+chose to add the apply-roll command (G5, a narrow reopening of C10: rolls never
+change characters on their own, a person may apply a saved roll). All stages
+S1–S11 of the [plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md)
+are implemented (design Sections 6.1, 6.3 and 6.4); see its implementation record
+for what is not done.
+
+System extensions ([plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
+owner-approved X1–X13): stages E1–E5 are implemented. E5 (2026-11-21) replaced
+the character and campaign `version-*` routes with `composition-options`,
+`composition-check` and `composition`: one change per command (base upgrade, or
+add/remove/upgrade one extension) or a revert to the previous composition.
+E6 (GUI) is implemented, including extension template art, a keyboard-only
+path and light/dark checks at three widths (see the plan); human visual
+sign-off is not part of it. E7 (owner-approved 2026-11-21) is
+implemented: extension authoring and composition changes through `/api/v1`.
+E4b is deferred. The E8 local journey passed on 2026-11-21
+([record](docs/acceptance/extensions-e8-local-2026-11-21.md)); the hosted E8
+journey is open.

@@ -243,6 +243,7 @@ export async function prepareCampaignCharacter(
     systemVersionId: VersionId;
     entityDefinitionId: DefinitionId;
     initialValues?: Record<DefinitionId, unknown>;
+    presetId?: DefinitionId;
   },
 ): Promise<
   | { ok: true; value: PreparedCampaignCharacter }
@@ -252,10 +253,11 @@ export async function prepareCampaignCharacter(
     const resolved = await runtime.resolve({
       versionId: input.systemVersionId,
       entityId: input.entityDefinitionId,
-      intent:
-        input.initialValues === undefined
-          ? { kind: "initialize" }
-          : { kind: "initialize", values: input.initialValues },
+      intent: {
+        kind: "initialize",
+        ...(input.initialValues === undefined ? {} : { values: input.initialValues }),
+        ...(input.presetId === undefined ? {} : { preset: input.presetId }),
+      },
     });
     if (!resolved.ok) {
       if (resolved.error.code === "not_found") {

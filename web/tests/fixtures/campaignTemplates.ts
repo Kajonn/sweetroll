@@ -133,7 +133,7 @@ export async function campaignTemplateReviewJourney(
     await player.setOffline(false);
   } finally { await Promise.all([gm.close(), co.close(), player.close()]); }
 }
-async function signIn(request: APIRequestContext, code: string) {
+export async function signIn(request: APIRequestContext, code: string) {
   return (
     await post(request, "/dev/signin", {
       code,
@@ -141,7 +141,7 @@ async function signIn(request: APIRequestContext, code: string) {
     })
   ).userId as string;
 }
-async function join(
+export async function join(
   gm: APIRequestContext,
   member: APIRequestContext,
   campaignId: string,

@@ -46,12 +46,12 @@ db("M2 retained character entry images", () => {
     if (!placed.ok) throw new Error(JSON.stringify(placed.error));
     const url = `/characters/${ch.characterId}/entries/${entryId}/image`;
     expect((await request("player", "GET", url)).json().image).toBeNull();
-    const upgraded = await h.characters.manage(ctxFor(h.users.player), { kind: "changeVersion", characterId: ch.characterId, targetVersionId: artVersion, expectedRevision: placed.value.character.revision, idempotencyKey: randomUUID() });
+    const upgraded = await h.characters.manage(ctxFor(h.users.player), { kind: "changeVersion", characterId: ch.characterId, target: { systemVersionId: artVersion, extensions: [] }, expectedRevision: placed.value.character.revision, idempotencyKey: randomUUID() });
     if (!upgraded.ok) throw new Error(JSON.stringify(upgraded.error));
     expect(upgraded.value.character.state.entries![entryId]!.image).toEqual(systemArt.image);
     expect((await request("player", "GET", url)).json().image).toEqual(systemArt.image);
     expect((await request("player", "GET", `${url}/${systemArt.image.fileId}`)).statusCode).toBe(200);
-    const reverted = await h.characters.manage(ctxFor(h.users.player), { kind: "changeVersion", characterId: ch.characterId, targetVersionId: h.versionId, expectedRevision: upgraded.value.character.revision, idempotencyKey: randomUUID() });
+    const reverted = await h.characters.manage(ctxFor(h.users.player), { kind: "changeVersion", characterId: ch.characterId, target: { systemVersionId: h.versionId, extensions: [] }, expectedRevision: upgraded.value.character.revision, idempotencyKey: randomUUID() });
     if (!reverted.ok) throw new Error(JSON.stringify(reverted.error));
     expect((await request("player", "GET", url)).json().image).toBeNull();
     expect((await request("player", "GET", `${url}/${systemArt.image.fileId}`)).statusCode).toBe(404);

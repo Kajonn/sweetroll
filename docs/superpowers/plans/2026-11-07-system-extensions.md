@@ -336,7 +336,7 @@ the design document updated (red → green, per existing plans).
   character tools and campaign Settings; it offers each single change and runs
   the check first (`web/src/characters/compositionChoices.ts`).
 
-### E6 — GUI — mostly done 2026-11-21
+### E6 — GUI — done 2026-11-21
 
 Follow the [GUI integration plan](2026-09-08-gui-integration.md) gates.
 
@@ -365,10 +365,16 @@ Follow the [GUI integration plan](2026-09-08-gui-integration.md) gates.
 - [x] Offline: cached item templates are keyed by the projection's
   `packageChecksum`, which is the composition checksum (E3), so an extension
   change drops them; queued offline edits were already keyed by it.
-- [ ] Browser tests: `tests/e2e/extensionAuthoring.spec.ts` covers the library,
+- [x] Browser tests: `tests/e2e/extensionAuthoring.spec.ts` covers the library,
   creator, publish, creation picker and grouped item picker, with no
-  horizontal scroll at 360/768/1280px. **Not done:** a keyboard-only path and
-  light/dark screenshots.
+  horizontal scroll at 360/768/1280px. `tests/e2e/extensionAccessibility.spec.ts`
+  (2026-11-21) adds a keyboard-only path (every control reached with Tab and
+  used with Enter, Space or the arrow keys: library, create, editor tabs,
+  template, save, publish, then a character's Rules and extensions) and the
+  library panel, the three editor tabs, character creation, the grouped item
+  picker and the Rules and extensions dialog in light and dark at
+  360/768/1280px, with the theme confirmed, no horizontal scroll and no
+  serious or critical axe findings. Human visual sign-off is not part of this.
 - [x] Template art in the extension editor (2026-11-21): the Templates tab
   offers the item artwork control over the system art routes with the
   extension's ID, enabled while the draft has no unsaved changes, and reloads

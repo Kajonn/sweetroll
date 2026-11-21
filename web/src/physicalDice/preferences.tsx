@@ -32,16 +32,21 @@ export function DicePreferencesPanel({
   online: boolean;
 }) {
   const { preferences, save } = useDicePreferences(client, actor);
+  const [showDraft, setShowDraft] = useState<boolean | null>(null);
   const [colorDraft, setColorDraft] = useState<string | null>(null);
-  const disabled = !online || save.isPending || !preferences.data;
+  const disabled = !online || showDraft !== null || save.isPending || !preferences.data;
   return (
     <fieldset disabled={disabled}>
       <legend>{t("physicalDice.settings")}</legend>
       <label>
         <input
           type="checkbox"
-          checked={preferences.data?.show_3d_dice ?? false}
-          onChange={(event) => save.mutate({ show_3d_dice: event.target.checked })}
+          checked={showDraft ?? preferences.data?.show_3d_dice ?? false}
+          onChange={(event) => {
+            const checked = event.target.checked;
+            setShowDraft(checked);
+            save.mutate({ show_3d_dice: checked }, { onSettled: () => setShowDraft(null) });
+          }}
         />
         {t("physicalDice.show")}
       </label>{" "}

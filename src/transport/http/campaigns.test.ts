@@ -1,3 +1,4 @@
+import type { PhysicalDiceStreams } from "../../campaigns/physical-dice-stream.js";
 import { randomUUID } from "node:crypto";
 
 import cookiePlugin from "@fastify/cookie";
@@ -426,6 +427,7 @@ async function build(input?: {
   runtime?: SystemRuntime;
   anonymous?: boolean;
   serveStatic?: boolean;
+  physicalDiceStreams?: PhysicalDiceStreams;
 }): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) as FastifyBaseLogger });
   await app.register(cookiePlugin);
@@ -442,6 +444,7 @@ async function build(input?: {
     buildCampaignsRoutes({
       identity: input?.identity ?? { getDisplayNames: async () => ({ ok: true, value: [] }) },
       campaigns: input?.campaigns ?? makeCampaigns(),
+      ...(input?.physicalDiceStreams && {physicalDiceStreams:input.physicalDiceStreams}),
       characters: input?.characters ?? ({ open: async () => ({ ok: true, value: fakeCharacterView() }) } as unknown as Characters),
       runtime: input?.runtime ?? makeRuntime(),
     }),
@@ -1681,6 +1684,28 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
       payload: {},
     });
     expect(noBody.statusCode).toBe(400);
+  });
+
+  it("gates physical roll event streams and sends authenticated SSE without caching", async () => {
+    const url = `/campaigns/${randomUUID()}/physical-rolls/events`;
+    const inactive = await build();
+    expect((await inactive.inject({url,headers:cookie})).statusCode).toBe(404);
+    const anonymous = await build({anonymous:true});
+    expect((await anonymous.inject({url})).statusCode).toBe(401);
+    const active = await build({physicalDiceStreams:{
+      close(){},
+      async open(){
+        return {ok:true,value:{
+          close(){},
+          attach(sink){sink.write("event: roll.started\ndata: {}\n\n");sink.end();},
+        }};
+      },
+    }});
+    const streamed = await active.inject({url,headers:cookie});
+    expect(streamed.statusCode).toBe(200);
+    expect(streamed.headers["content-type"]).toMatch(/^text\/event-stream/);
+    expect(streamed.headers["cache-control"]).toBe("no-store");
+    expect(streamed.body).toContain("event: roll.started");
   });
 
   it("pairs, redeems and projects displays without a GM session", async () => {

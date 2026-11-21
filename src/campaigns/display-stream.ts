@@ -179,6 +179,8 @@ export function createDisplayStreams(input: CreateDisplayStreamsInput): DisplayS
           return event.displayId === request.displayId;
         case "campaign":
           return campaignId === null || event.campaignId === campaignId;
+        case "physicalRoll":
+          return false;
       }
     }
 

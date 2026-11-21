@@ -7,13 +7,13 @@ import {
   createIdentityRepository,
   type IdentityRepository,
   type SessionId,
-  type ThemeDefault,
+  type AccountPreferences,
   type UserId,
 } from "./repository.js";
 import { hashToken, newSessionToken } from "./util.js";
 
 export type { AppError } from "./errors.js";
-export type { ThemeDefault } from "./repository.js";
+export type { ThemeDefault, AccountPreferences } from "./repository.js";
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AppError };
 
 export type SessionHandle = {
@@ -39,8 +39,8 @@ export interface Identity {
   signOut(token: string): Promise<Result<void>>;
   /** Internal bounded projection. Callers must authorize the resource roster first. */
   getDisplayNames(userIds: readonly UserId[]): Promise<Result<Array<{ userId: UserId; displayName: string | null }>>>;
-  getThemeDefault(actorId: UserId): Promise<Result<ThemeDefault | null>>;
-  setThemeDefault(actorId: UserId, value: ThemeDefault | null): Promise<Result<ThemeDefault | null>>;
+  getPreferences(actorId: UserId): Promise<Result<AccountPreferences>>;
+  patchPreferences(actorId: UserId, patch: Partial<AccountPreferences>): Promise<Result<AccountPreferences>>;
 }
 
 export type CreateIdentityModuleInput = {
@@ -133,17 +133,17 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
       }
     },
 
-    async getThemeDefault(actorId) {
+    async getPreferences(actorId) {
       try {
-        return { ok: true, value: await repo.getThemeDefault(actorId) };
+        return { ok: true, value: await repo.getPreferences(actorId) };
       } catch {
         return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
       }
     },
 
-    async setThemeDefault(actorId, value) {
+    async patchPreferences(actorId, patch) {
       try {
-        return { ok: true, value: await repo.setThemeDefault(actorId, value) };
+        return { ok: true, value: await repo.patchPreferences(actorId, patch) };
       } catch {
         return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
       }

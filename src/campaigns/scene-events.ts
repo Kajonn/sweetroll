@@ -18,7 +18,8 @@ export type SceneEvent =
   /** A display credential changed (revocation). */
   | { kind: "display"; displayId: string; campaignId: string }
   /** Campaign-scoped access change (e.g. a media file was deleted). */
-  | { kind: "campaign"; campaignId: string };
+  | { kind: "campaign"; campaignId: string }
+  | { kind: "physicalRoll"; campaignId: string };
 
 type Queryable = { query(text: string, values?: unknown[]): Promise<unknown> };
 
@@ -34,7 +35,8 @@ export function encodeSceneEvent(event: SceneEvent): string {
     case "display":
       return JSON.stringify({ k: "display", d: event.displayId, c: event.campaignId });
     case "campaign":
-      return JSON.stringify({ k: "campaign", c: event.campaignId });
+    case "physicalRoll":
+      return JSON.stringify({ k: event.kind, c: event.campaignId });
   }
 }
 
@@ -55,7 +57,7 @@ export function decodeSceneEvent(payload: string | undefined): SceneEvent | null
   if (value.k === "display" && typeof value.d === "string") {
     return { kind: "display", displayId: value.d, campaignId: value.c };
   }
-  if (value.k === "campaign") return { kind: "campaign", campaignId: value.c };
+  if (value.k === "campaign" || value.k === "physicalRoll") return { kind: value.k, campaignId: value.c };
   return null;
 }
 

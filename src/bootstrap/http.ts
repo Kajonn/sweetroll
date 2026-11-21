@@ -9,6 +9,7 @@ import { createExtensionAuthoringModule } from "../systems/extensions.js";
 import { createCharactersModule } from "../characters/index.js";
 import { createCampaignPlacement } from "../characters/campaignPlacement.js";
 import { createCampaignsModule } from "../campaigns/index.js";
+import { createPhysicalDiceStreams } from "../campaigns/physical-dice-stream.js";
 import { createSceneEventHub } from "../campaigns/scene-events.js";
 import {
   createSystemPersistenceRepository,
@@ -182,7 +183,10 @@ registerApiRoutes(app, [
   buildPersonalTokenRoutes({ identity }),
   buildSystemsRoutes({ authoring, extensions: extensionAuthoring }),
   buildCharactersRoutes({ characters }),
-  buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
+  buildCampaignsRoutes({
+    campaigns, characters, runtime, identity,
+    ...(config.physicalDiceEnabled && {physicalDiceStreams:createPhysicalDiceStreams({pool,hub:sceneEvents})}),
+  }),
 ], serveStatic, { pool });
 void app.register(buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime }), { prefix: publicApiPrefix });
 void app.register(

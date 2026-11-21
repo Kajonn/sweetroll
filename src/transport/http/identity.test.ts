@@ -1,3 +1,4 @@
+import { defaultPreferences } from "../../identity/repository.js";
 import { randomUUID } from "node:crypto";
 
 import cookiePlugin from "@fastify/cookie";
@@ -30,10 +31,10 @@ function makeStatefulIdentity() {
       return { ok: true, value: undefined };
     },
     getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: themeDefault }),
-    setThemeDefault: async (_actorId, value) => {
-      themeDefault = value;
-      return { ok: true, value: themeDefault };
+    getPreferences: async () => ({ ok: true, value: { ...defaultPreferences, theme_default: themeDefault } }),
+    patchPreferences: async (_actorId, patch) => {
+      themeDefault = patch.theme_default ?? null;
+      return { ok: true, value: { ...defaultPreferences, theme_default: themeDefault } };
     },
   };
   return { identity, validToken, revoked, getRevoked: () => revoked };
@@ -48,8 +49,8 @@ function makeAnonymousIdentity() {
     resolveSession: async () => ({ state: "anonymous" }),
     signOut: async () => ({ ok: true, value: undefined }),
     getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: null }),
-    setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    getPreferences: async () => ({ ok: true, value: defaultPreferences }),
+    patchPreferences: async (_actorId, patch) => ({ ok: true, value: { ...defaultPreferences, ...patch } }),
   };
   return { identity };
 }
@@ -111,8 +112,8 @@ describe("identity HTTP routes", () => {
       resolveSession: async () => ({ state: "session_expired" }),
       signOut: async () => ({ ok: true, value: undefined }),
       getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: null }),
-      setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    getPreferences: async () => ({ ok: true, value: defaultPreferences }),
+      patchPreferences: async (_actorId, patch) => ({ ok: true, value: { ...defaultPreferences, ...patch } }),
     };
     const app = await build(expired);
     const me = await app.inject({ method: "GET", url: "/me", headers: cookie("expired-token") });

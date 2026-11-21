@@ -2,7 +2,7 @@ import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 
-import type { Identity } from "../../identity/index.js";
+import type { AccountPreferences, Identity } from "../../identity/index.js";
 
 const UUID_FORMAT = "uuid";
 
@@ -42,12 +42,18 @@ const ThemeDefaultDto = Type.Union([
   Type.Literal("system"),
 ]);
 
+const DicePreferencesDto = {
+  show_3d_dice: Type.Optional(Type.Boolean()),
+  dice_color: Type.Optional(Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" })),
+};
 const PreferencesResponseDto = Type.Object({
   theme_default: Type.Union([ThemeDefaultDto, Type.Null()]),
+  ...DicePreferencesDto,
 });
 
 const PatchPreferencesBodyDto = Type.Object({
   theme_default: Type.Optional(Type.Union([ThemeDefaultDto, Type.Null()])),
+  ...DicePreferencesDto,
 });
 
 export type BuildIdentityRoutesInput = {
@@ -208,14 +214,14 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
       async (request, reply) => {
         const actorId = await requireActor(request, reply);
         if (actorId === null) return;
-        const result = await identity.getThemeDefault(actorId);
+        const result = await identity.getPreferences(actorId);
         if (!result.ok) {
           return reply.code(500).send({
             error: { code: result.error.code, message: result.error.message },
             requestId: request.id,
           });
         }
-        return { theme_default: result.value };
+        return physicalDiceEnabled ? result.value : { theme_default: result.value.theme_default };
       },
     );
 
@@ -234,27 +240,25 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
       async (request, reply) => {
         const actorId = await requireActor(request, reply);
         if (actorId === null) return;
-        // PATCH is partial: an omitted theme_default leaves the stored
-        // default untouched; an explicit null clears it.
-        const body = (request.body ?? {}) as { theme_default?: "light" | "dark" | "system" | null };
-        if (body.theme_default === undefined) {
-          const current = await identity.getThemeDefault(actorId);
-          if (!current.ok) {
-            return reply.code(500).send({
-              error: { code: current.error.code, message: current.error.message },
-              requestId: request.id,
-            });
-          }
-          return { theme_default: current.value };
+        const body = (request.body ?? {}) as Partial<AccountPreferences>;
+        if (!physicalDiceEnabled && (body.show_3d_dice !== undefined || body.dice_color !== undefined)) {
+          return reply.code(400).send({error:{code:"bad_request",message:"Physical dice are disabled."},requestId:request.id});
         }
-        const result = await identity.setThemeDefault(actorId, body.theme_default);
+        const patch = {
+          ...(body.theme_default !== undefined && {theme_default:body.theme_default}),
+          ...(body.dice_color !== undefined && {dice_color:body.dice_color}),
+          ...(body.show_3d_dice !== undefined && {show_3d_dice:body.show_3d_dice}),
+        };
+        const result = Object.keys(patch).length
+          ? await identity.patchPreferences(actorId, patch)
+          : await identity.getPreferences(actorId);
         if (!result.ok) {
           return reply.code(500).send({
             error: { code: result.error.code, message: result.error.message },
             requestId: request.id,
           });
         }
-        return { theme_default: result.value };
+        return physicalDiceEnabled ? result.value : { theme_default: result.value.theme_default };
       },
     );
   });

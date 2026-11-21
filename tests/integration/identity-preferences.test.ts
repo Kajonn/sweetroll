@@ -16,11 +16,11 @@ const describeWithDatabase = databaseUrl === undefined ? describe.skip : describ
 
 type App = I3AppHandle & { cleanup: () => Promise<void> };
 
-async function makeApp(): Promise<App> {
+async function makeApp(physicalDiceEnabled = false): Promise<App> {
   const schema = `i3_prefs_${randomUUID().replaceAll("-", "")}`;
   await createI3Schema(databaseUrl!, schema);
   const pool = createI3Pool(databaseUrl!, schema);
-  const handle = await buildI3App({ pool });
+  const handle = await buildI3App({ pool, physicalDiceEnabled });
   return {
     ...handle,
     cleanup: async () => {
@@ -80,6 +80,22 @@ describeWithDatabase("account theme default (GET/PATCH /me/preferences)", () => 
     });
     expect(noop.statusCode, noop.body).toBe(200);
     expect(noop.json()).toEqual({ theme_default: "dark" });
+  });
+
+  it("partially updates actor-scoped physical dice preferences", async () => {
+    app = await makeApp(true);
+    const headers = cookieHeader(app.users.ada);
+    const patch = (payload:object) => app!.app.inject({method:"PATCH",url:"/me/preferences",headers,payload});
+    const [theme,dice] = await Promise.all([
+      patch({theme_default:"dark"}),
+      patch({show_3d_dice:false,dice_color:"#bc4781"}),
+    ]);
+    expect(theme.statusCode).toBe(200);
+    expect(dice.statusCode).toBe(200);
+    expect((await patch({})).json()).toEqual({theme_default:"dark",show_3d_dice:false,dice_color:"#bc4781"});
+    expect((await patch({dice_color:"red"})).statusCode).toBe(400);
+    expect((await app.app.inject({method:"GET",url:"/me/preferences",headers:cookieHeader(app.users.bob)})).json())
+      .toEqual({theme_default:null,show_3d_dice:true,dice_color:"#4c79c9"});
   });
 
   it("invalid value rejected, anonymous rejected", async () => {

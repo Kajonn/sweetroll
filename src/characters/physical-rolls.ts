@@ -1,4 +1,5 @@
 import { createDiceLaunch, type DiceLaunch } from "../systems/physical-dice/launch.js";
+import { defaultDiceColor } from "../identity/repository.js";
 import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import type {
@@ -41,6 +42,7 @@ type Scope = {
   defaultAudience: RollAudience;
 };
 type Attempt = {
+  color: string;
   launch: DiceLaunch;
   attemptId: string;
   expiresAt: string;
@@ -51,12 +53,14 @@ type Preparation = {
   command: PhysicalCommand;
   dice: PhysicalDie[];
   audience: RollAudience;
+  principalId: string;
   placement: number;
   generation: number;
   contextHash: string;
   defaultAudience: RollAudience;
 };
 type Row = {
+  color: string;
   launch: DiceLaunch;
   id: string;
   campaign_id: string;
@@ -143,6 +147,7 @@ export function createPhysicalRolls({
       if (!evaluator.ok)
         return { ok: false, error: mapRuntimeError(evaluator.error) };
       let audience = defaultAudience;
+      let principalId = ctx.actorId;
       let context: CampaignRollContext | undefined;
       let intent: RuntimeIntent;
       if (command.kind === "pushRoll") {
@@ -161,6 +166,7 @@ export function createPhysicalRolls({
         if (!options.value.canPush)
           return { ok: false, error: conflict("This roll cannot be pushed.") };
         audience = narrowerAudience(parent.roll.audience, defaultAudience);
+        principalId = parent.principalId;
         intent = {
           kind: "push",
           parent: parent.roll,
@@ -228,6 +234,7 @@ export function createPhysicalRolls({
         command,
         dice: draws.dice,
         audience,
+        principalId,
         defaultAudience,
         placement: record.placementGeneration,
         generation: member.generation,
@@ -238,8 +245,8 @@ export function createPhysicalRolls({
       const launch = createDiceLaunch(draws.dice.length, randomBytes(4).readUInt32LE(), new Date(preparedAt + 200));
       await pool.query(
         `INSERT INTO physical_roll_attempts
-         (id, actor_id, character_id, campaign_id, idempotency_key, input_hash, preparation, expires_at, launch)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (actor_id,idempotency_key) DO NOTHING`,
+         (id, actor_id, character_id, campaign_id, idempotency_key, input_hash, preparation, expires_at, launch, color)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE((SELECT dice_color FROM user_preferences WHERE user_id=$2),$10)) ON CONFLICT (actor_id,idempotency_key) DO NOTHING`,
         [
           attemptId,
           ctx.actorId,
@@ -250,6 +257,7 @@ export function createPhysicalRolls({
           preparation,
           new Date(preparedAt + 60_000),
           launch,
+          defaultDiceColor,
         ],
       );
       const {
@@ -290,6 +298,7 @@ export function createPhysicalRolls({
         value: {
           attemptId: row.id,
           launch: row.launch,
+          color: row.color,
           expiresAt: row.expires_at.toISOString(),
           dice: row.preparation.dice,
           audience,

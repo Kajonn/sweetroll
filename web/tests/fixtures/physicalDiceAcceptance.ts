@@ -80,20 +80,17 @@ async function rolled(page: Page, click: () => Promise<void>) {
       r.url().endsWith("/complete") &&
       r.url().includes("/physical-rolls/"),
   );
-  const result = Promise.all([
-    prepare.then((r) => r.json()),
-    completion.then(async (r) => {
-      const body = await r.json();
-      expect(r.status(), JSON.stringify(body)).toBe(200);
-      return body as CommandResultResponse;
-    }),
-  ]);
-  // Stop waiting at the first rejected preparation response.
-  void result.catch(() => {});
+  const total = completion.then(async (r) => {
+    const body = await r.json();
+    expect(r.status(), JSON.stringify(body)).toBe(200);
+    return (body as CommandResultResponse).result;
+  });
+  // The caller can assert the overlay before awaiting settlement.
+  void total.catch(() => {});
   await click();
   const { attempt } = await (await prepare).json();
   expect(attempt).toBeTruthy();
-  return { id: attempt.attemptId as string, total: result.then(([, body]) => body.result) };
+  return { id: attempt.attemptId as string, total };
 }
 
 async function checkThrow(viewer: Page, id: string, result: CommandResultResponse["result"], count: number) {
@@ -124,9 +121,10 @@ async function setDicePreferences(page: Page, show: boolean, color: string) {
     const saved = page.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().endsWith("/me/preferences") && r.ok(),
     );
-    await checkbox.setChecked(show);
+    await checkbox.click();
     expect((await (await saved).json()).show_3d_dice).toBe(show);
   }
+  await expect(checkbox).toBeChecked({ checked: show });
   const input = page.getByLabel("My dice color");
   if ((await input.inputValue()) !== color) {
     const saved = page.waitForResponse(
@@ -159,7 +157,7 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
     }),
     browser.newContext({
       baseURL,
-      viewport: { width: 1024, height: 768 },
+      viewport: { width: 390, height: 844 },
       extraHTTPHeaders: { Origin: baseURL },
     }),
   ]);
@@ -247,9 +245,21 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
       if (action.id === "d4" || action.id === "large")
         await expect(canvas(other)).toBeVisible({ timeout: 12000 });
       if (action.id === "large") {
-        await other.setViewportSize({ width: 720, height: 360 });
-        await expect(canvas(other)).toBeVisible();
-        expect(await canvas(other).boundingBox()).toMatchObject({ width: 720, height: 360 });
+        const rotated = { width: 720, height: 360 };
+        await Promise.all([
+          other.waitForFunction(
+            ({ width, height }) => {
+              const element = document.querySelector(
+                '[data-testid="physical-dice-canvas"][data-dice-ready="true"]',
+              );
+              const bounds = element?.getBoundingClientRect();
+              return bounds?.width === width && bounds?.height === height;
+            },
+            rotated,
+            { timeout: 5000 },
+          ),
+          other.setViewportSize(rotated),
+        ]);
       }
       const result = await thrower.total;
       const starts = await Promise.all([

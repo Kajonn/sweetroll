@@ -75,6 +75,7 @@ export type ResourceFieldV1 = {
   step: number;
   resetTo: "min" | "max";
   maxExpressionId?: DefinitionId;
+  startFull?: true;
 };
 
 export type ComputedFieldV1 = {

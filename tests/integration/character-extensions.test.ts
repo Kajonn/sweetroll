@@ -175,8 +175,8 @@ describeWithDatabase("Characters built with extensions (E3)", () => {
     expect(copy.statusCode, copy.body).toBe(201);
     expect(copy.json().character).toMatchObject({ extensions: refs });
 
-    // Rules version changes and campaign adoption wait for E5/E4.
-    expect((await call("GET", `/characters/${character.characterId}/version-check?targetVersionId=${base.versionId}`, bob)).statusCode).toBe(409);
+    // E5: the composition can be checked; the same composition is no change.
+    expect((await call("POST", `/characters/${character.characterId}/composition-check`, bob, { target: { systemVersionId: base.versionId, extensions: refs } })).statusCode).toBe(422);
   });
 
   it("authorizes each extension and keeps existing characters working after sharing is revoked", async () => {

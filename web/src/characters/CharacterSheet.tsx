@@ -9,6 +9,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } f
 
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
+import { Select } from "../ui/Select.js";
 import { resourceMaxKey, type CharacterSnapshot } from "./session.js";
 import { FieldControl, type ProjectedField } from "./FieldControl.js";
 import { SlotListControl, type SlotTemplate } from "./SlotListControl.js";
@@ -21,6 +22,9 @@ export type CharacterSheetCallbacks = {
   onAdjustResource?(resourceId: string, delta: number): void | Promise<void>;
   /** Design 6.3: direct input of current value and maximum. The editor is hidden when absent. */
   onSetResource?(resourceId: string, values: { current?: number; max?: number }): void | Promise<void>;
+  /** Design 6.3 (S6): saved rolls this sheet's editor may apply, and applying one. Online only; hidden when absent. */
+  loadApplicableRolls?(): Promise<Array<{ rollId: string; output: string; total: number }>>;
+  onApplyRoll?(resourceId: string, rollId: string, direction: "subtract" | "add"): void | Promise<void>;
   /** Optional so standalone routes can bind fields/resources without owning action execution. */
   onExecuteAction?(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): void | Promise<void>;
   /**
@@ -74,6 +78,48 @@ function parseAmount(text: string): number | null {
 }
 
 /** Amount and direct-input controls for one resource (design 6.3). */
+/** Design 6.3 (S6): subtract or add the total of a saved roll the reader can see. */
+function ApplyRollControl({ element, disabled, invoke, loadApplicableRolls, onApplyRoll }: {
+  element: Extract<Element, { kind: "resource" }>;
+  disabled: boolean;
+  invoke(command: () => void | Promise<void>): void;
+  loadApplicableRolls: NonNullable<CharacterSheetCallbacks["loadApplicableRolls"]>;
+  onApplyRoll: NonNullable<CharacterSheetCallbacks["onApplyRoll"]>;
+}) {
+  const [rolls, setRolls] = useState<Array<{ rollId: string; output: string; total: number }> | null>(null);
+  const [rollId, setRollId] = useState("");
+  const [failed, setFailed] = useState(false);
+  const label = element.label;
+  const apply = (direction: "subtract" | "add") => {
+    if (rollId === "") return;
+    invoke(() => onApplyRoll(element.resourceId, rollId, direction));
+    setRolls(null);
+    setRollId("");
+  };
+  if (rolls === null) {
+    return <div className={styles.resource}>
+      <Button disabled={disabled} onClick={() => {
+        setFailed(false);
+        void loadApplicableRolls().then(setRolls, () => setFailed(true));
+      }}>{t("character.resource.applyRoll", { label })}</Button>
+      {failed ? <p role="alert">{t("character.resource.applyRollFailed")}</p> : null}
+    </div>;
+  }
+  return <div className={styles.resource}>
+    <Select
+      label={t("character.resource.applyRollChoose", { label })}
+      value={rollId}
+      disabled={disabled || rolls.length === 0}
+      options={[{ value: "", label: t(rolls.length === 0 ? "character.resource.applyRollNone" : "character.resource.applyRollSelect") },
+        ...rolls.map((roll) => ({ value: roll.rollId, label: `${roll.total} · ${roll.output}` }))]}
+      onChange={(event) => setRollId(event.target.value)}
+    />
+    <Button disabled={disabled || rollId === ""} onClick={() => apply("subtract")}>{t("character.resource.subtract", { label })}</Button>
+    <Button disabled={disabled || rollId === ""} onClick={() => apply("add")}>{t("character.resource.add", { label })}</Button>
+    <Button onClick={() => { setRolls(null); setRollId(""); }}>{t("character.resource.cancel")}</Button>
+  </div>;
+}
+
 function ResourceEditor({ element, current, max, disabled, invoke, onAdjustResource, onSetResource }: {
   element: Extract<Element, { kind: "resource" }>;
   current: number;
@@ -268,7 +314,7 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
   </section>;
 }
 
-export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdjustResource, onSetResource, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, loadRollOptions, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
+export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdjustResource, onSetResource, loadApplicableRolls, onApplyRoll, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, loadRollOptions, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
   const characterIdForImages = snapshot.confirmed?.characterId;
   const imageFactory = useMemo(() => entryImages && characterIdForImages ? (id: string) => entryImages(characterIdForImages, id) : undefined, [entryImages, characterIdForImages]);
   const character = snapshot.confirmed;
@@ -370,6 +416,7 @@ export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdju
             <Button variant="primary" disabled={!editable || current >= max} onClick={() => invokeCommand(() => onBump(element.resourceId, "up"))}>{t("character.resource.increase", { label: element.label })}</Button>
           </div>
           <ResourceEditor element={element} current={current} max={max} disabled={!editable} invoke={invokeCommand} onAdjustResource={onAdjustResource} onSetResource={onSetResource} />
+          {loadApplicableRolls && onApplyRoll ? <ApplyRollControl element={element} disabled={!editable} invoke={invokeCommand} loadApplicableRolls={loadApplicableRolls} onApplyRoll={onApplyRoll} /> : null}
           <ValidationList validations={element.validations} />
         </div>;
       }

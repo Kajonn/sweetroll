@@ -28,10 +28,18 @@ export function hasDiceGroups(ast: ExpressionAstV1): boolean {
   return (ast.kind === "pool" && ast.group !== undefined) || children(ast).some(hasDiceGroups);
 }
 
-/** Named groups of an expression, in the order they are rolled. */
+/** Named groups of an expression, in the order they are rolled; a group named in two branches is listed once. */
 export function namedGroups(ast: ExpressionAstV1): string[] {
-  const own = ast.kind === "pool" && ast.group !== undefined && ast.source.kind !== "rolled" ? [ast.group.id] : [];
-  return [...children(ast).flatMap(namedGroups), ...own];
+  const walk = (node: ExpressionAstV1): string[] => {
+    const own = node.kind === "pool" && node.group !== undefined && node.source.kind !== "rolled" ? [node.group.id] : [];
+    return [...children(node).flatMap(walk), ...own];
+  };
+  return [...new Set(walk(ast))];
+}
+
+function replace(target: Set<string>, source: ReadonlySet<string>): void {
+  target.clear();
+  for (const id of source) target.add(id);
 }
 
 /**
@@ -58,7 +66,20 @@ export function validateDiceGroups(
     if (node.kind === "call" && node.function === "if") {
       const [condition, ...branches] = node.arguments;
       if (condition) walk(condition);
-      branches.forEach(branch);
+      // Only one branch runs, so each branch may name the same group (design
+      // 6.4, SRD gaps S8). A group rolled on every branch is available after.
+      const beforeIds = new Set(ids);
+      const beforeAvailable = new Set(available);
+      const outcomes = branches.map((node) => {
+        replace(ids, beforeIds);
+        replace(available, beforeAvailable);
+        walk(node);
+        return { ids: new Set(ids), available: new Set(available) };
+      });
+      replace(ids, new Set(outcomes.flatMap((outcome) => [...outcome.ids])));
+      replace(available, new Set([...beforeAvailable, ...[...(outcomes[0]?.available ?? [])]
+        .filter((id) => outcomes.every((outcome) => outcome.available.has(id)))]));
+      if (ids.size > 32) fail("At most 32 named dice groups are supported.");
       return;
     }
     if (node.kind === "binary" && (node.operator === "&&" || node.operator === "||")) {

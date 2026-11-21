@@ -19,6 +19,8 @@ import { createRouter, errorStatuses, failure, imageBodyLimit, map, packageDiagn
 import { registerSceneRoutes } from "./scenes.js";
 import * as s from "./schemas.js";
 import { registerSystemRoutes } from "./systems.js";
+import { extensionSchemas, registerExtensionRoutes } from "./extensions.js";
+import type { ExtensionAuthoring } from "../../../systems/extensions.js";
 import { characterMutation, characterSheet } from "./views.js";
 
 export const publicApiPrefix = "/api/v1";
@@ -47,6 +49,7 @@ const outputSchemas = {
   CharacterPage: s.characterPage, CharacterSheet: s.characterSheet, CharacterMutation: s.characterMutation,
   ImageState: s.imageState, PortraitState: s.portraitState, SystemExport: SystemExportV1Schema, Preview: s.preview,
   ...cs.outputSchemas,
+  ...extensionSchemas,
 };
 export type OutputName = keyof typeof outputSchemas;
 
@@ -64,6 +67,8 @@ const openApiPackageSchemas = {
 type Dependencies = {
   identity: Identity; authoring: SystemAuthoring; characters: Characters; pool: Pool;
   campaigns: Campaigns; runtime: SystemRuntime;
+  /** Design 6.8 (E7): extension authoring; the extension routes are absent without it. */
+  extensions?: ExtensionAuthoring;
 };
 
 function assessment({ ok, diagnostics }: ReturnType<SystemAuthoring["validateDocument"]>) {
@@ -85,7 +90,7 @@ function workspace(value: AuthoringWorkspace) {
   };
 }
 
-export function buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime }: Dependencies): FastifyPluginAsync {
+export function buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime, extensions }: Dependencies): FastifyPluginAsync {
   return async (app) => {
     app.addHook("onRequest", async (_request, reply) => {
       reply.header("cache-control", "no-store");
@@ -246,6 +251,16 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
     ));
 
     route({
+      method: "POST", path: "/characters/:characterId/resources/:resourceId/apply-roll", id: "applyRollToCharacterResource",
+      description: "Apply a saved roll's total to a resource of a character the caller may edit: subtract it (damage, spending) or add it (healing). The roll must be one the caller can see, from the character's campaign or, for a standalone character, its own. Rolls never change characters on their own.",
+      scope: "characters:write", input: { params: s.resourceId, body: s.applyRoll }, output: "CharacterMutation",
+      example: { rollId: "00000000-0000-4000-8000-000000000001", direction: "subtract", expectedRevision: 3, idempotencyKey: "damage-roll-1" },
+    }, async (ctx, { params, body }) => map(
+      await characters.apply(ctx, { kind: "applyRoll", ...params, ...body }),
+      ({ character }) => characterMutation(character),
+    ));
+
+    route({
       method: "PUT", path: "/characters/:characterId/resources/:resourceId", id: "setCharacterResource",
       description: "Set a character resource's current value, editable maximum, or both. A computed maximum follows the published formula. Lowering a maximum clamps the current value.",
       scope: "characters:write", input: { params: s.resourceId, body: s.setResource }, output: "CharacterMutation",
@@ -329,6 +344,7 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
     registerCharacterRoutes(route, { characters });
     registerCampaignRoutes(route, { campaigns, characters, runtime, identity });
     registerSceneRoutes(route, { campaigns });
+    if (extensions !== undefined) registerExtensionRoutes(route, { extensions, characters, campaigns });
 
     paths["/openapi.json"] = { get: {
       operationId: "getOpenApiDocument", description: "Download the public API contract.",

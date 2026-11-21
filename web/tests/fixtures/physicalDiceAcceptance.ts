@@ -2,7 +2,7 @@ import { expect, type Browser, type Page } from "@playwright/test";
 import type { RollFinished, RollStarted } from "../../../src/campaigns/physical-dice-stream.js";
 import { readPhysicalFace, type PhysicalDieSides } from "../../../src/systems/physical-dice/faces.js";
 import type { CommandResultResponse } from "../../src/characters/types.js";
-import { cleanup, json, key, publish, pushDocument, signIn, workspace } from "./configurablePush.js";
+import { cleanup, json, key, publish, pushDocument, workspace } from "./configurablePush.js";
 
 const shapes = [4, 6, 8, 10, 12, 20] as const;
 const actions = [
@@ -138,10 +138,19 @@ async function setDicePreferences(page: Page, show: boolean, color: string) {
   }
 }
 
+async function signInAcceptance(page: Page, baseURL: string, code: string) {
+  const signed = await json(page.request, "POST", "/dev/signin", {
+    code,
+    redirectUri: new URL("/cb", baseURL).href,
+  });
+  const actor = await json(page.request, "GET", "/api/me");
+  expect(actor).toMatchObject({ state: "authenticated", userId: signed.userId, physicalDiceEnabled: true });
+  return signed.userId as string;
+}
+
 export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL: string) {
   expect((await json(gm.request, "GET", "/health/ready")).status).toBe("ok");
-  await signIn(gm, "code-journey-gm");
-  expect((await json(gm.request, "GET", "/api/me")).physicalDiceEnabled).toBe(true);
+  await signInAcceptance(gm, baseURL, "code-journey-gm");
   const contexts = await Promise.all([
     browser.newContext({
       baseURL,
@@ -161,8 +170,8 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
   try {
     const roller = await contexts[0]!.newPage();
     const other = await contexts[1]!.newPage();
-    const rollerId = await signIn(roller, "code-journey-p1");
-    const otherId = await signIn(other, "code-journey-p2");
+    const rollerId = await signInAcceptance(roller, baseURL, "code-journey-p1");
+    const otherId = await signInAcceptance(other, baseURL, "code-journey-p2");
     const rules = testRules();
     const system = await workspace(gm.request, rules);
     systemId = system.id;

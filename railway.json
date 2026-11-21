@@ -6,9 +6,9 @@
   },
   "deploy": {
     "preDeployCommand": [
-      "npm run start:db:init"
+      "node database/physical-dice-preview.mjs init"
     ],
-    "startCommand": "sweetroll-entrypoint node dist/bootstrap/http.js",
+    "startCommand": "sweetroll-entrypoint node database/physical-dice-preview.mjs serve",
     "healthcheckPath": "/health/ready",
     "healthcheckTimeout": 120,
     "restartPolicyType": "ON_FAILURE",

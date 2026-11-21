@@ -14,6 +14,16 @@ export const registerStaticServing: FastifyPluginAsync<{
   if (!opts.enabled) return;
   const root = path.resolve(opts.distDir);
   if (!existsSync(path.join(root, "index.html"))) return;
+  if (opts.physicalDiceEnabled) {
+    app.addHook("onSend", async (request, reply) => {
+      if (request.url.split("?", 1)[0] !== "/dice/v1/worker.js") return;
+      // Rapier compiles WebAssembly in this worker and fetches its hulls from this origin.
+      reply.header(
+        "content-security-policy",
+        "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; frame-ancestors 'none'",
+      );
+    });
+  }
   await app.register(fastifyStatic, {
     root, prefix: "/", decorateReply: false,
     ...(opts.physicalDiceEnabled ? {} : { allowedPath: (pathname: string) => !pathname.startsWith("/dice/") }),

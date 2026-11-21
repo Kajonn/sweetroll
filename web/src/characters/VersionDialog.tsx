@@ -7,7 +7,7 @@ import { focusFirst, trapTabKey } from "./dialogTrap.js";
 import type { CharacterSession } from "./session.js";
 import type { VersionCheckResponse, VersionOptionsResponse } from "./types.js";
 import { VersionReportSummary } from "./VersionReport.js";
-import { compositionChoices, compositionLabel, type CompositionChoice } from "./compositionChoices.js";
+import { compositionChoices, compositionLabel, confirmLabel, type CompositionChoice } from "./compositionChoices.js";
 import styles from "./characters.module.css";
 
 type Props = {
@@ -128,7 +128,7 @@ export function VersionDialog({ characterId, api, session, blocked, onClose }: P
           disabled={busy || blocked || check === null || !check.report.ok}
           onClick={() => void confirm()}
         >
-          {t(check?.direction === "revert" ? "version.confirmRevert" : "version.confirmUpgrade")}
+          {confirmLabel(check?.change)}
         </Button>
         <Button type="button" variant="secondary" disabled={busy && check !== null} onClick={onClose}>
           {t("character.tools.close")}

@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 import { t } from "../i18n/index.js";
 import { Button, Dialog, Panel } from "../ui/index.js";
 import { VersionReportSummary } from "../characters/VersionReport.js";
-import { compositionChoices, compositionLabel, type CompositionChoice } from "../characters/compositionChoices.js";
+import { compositionChoices, compositionLabel, confirmLabel, type CompositionChoice } from "../characters/compositionChoices.js";
 import type { CampaignsApi } from "./api.js";
 import type { CampaignVersionCheck, CampaignVersionOptionsResponse, CampaignView } from "./types.js";
 import { randomUUID } from "../utils/uuid";
@@ -141,18 +141,18 @@ export function CampaignVersionSection(props: {
             <VersionReportSummary key={character.characterId} heading={character.name} report={character.report} />
           ))}
           <Button variant="primary" disabled={disabled || !check.ok} onClick={() => setConfirming(true)}>
-            {t(check.direction === "revert" ? "version.confirmRevert" : "version.confirmUpgrade")}
+            {confirmLabel(check.change)}
           </Button>
         </section>
       )}
       <Dialog
         open={confirming}
         onOpenChange={(open) => { if (!open) setConfirming(false); }}
-        title={t(check?.direction === "revert" ? "campaign.version.confirmRevertTitle" : "campaign.version.confirmUpgradeTitle")}
+        title={t(check?.direction === "revert" ? "campaign.version.confirmRevertTitle" : "campaign.version.confirmChangeTitle")}
         description={t("campaign.version.confirmDescription", { characters: check?.characters.length ?? 0 })}
         actions={
           <Button variant="primary" pending={busy} disabled={disabled && !busy} onClick={() => void change()}>
-            {t(check?.direction === "revert" ? "version.confirmRevert" : "version.confirmUpgrade")}
+            {confirmLabel(check?.change)}
           </Button>
         }
       >

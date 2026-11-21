@@ -399,12 +399,14 @@ publishing extensions through `/api/v1` is in scope.
   blocked by the item, revert; a GM adds the extension to a campaign; a token
   without campaign scopes is refused).
 
-### E8 — Acceptance
+### E8 — Acceptance (local journey done 2026-11-21; hosted open)
 
-- [ ] Local ordered journey: creator publishes system and extension; player A
+- [x] Local ordered journey: creator publishes system and extension; player A
   creates a character with extension X; GM campaign adds extension Y; A's
   character is adopted (campaign now has X and Y); player B places an X item;
   extension X is upgraded campaign-wide; revert; removal blocked then allowed.
+  Done 2026-11-21: `web/tests/e2e/extensionsAcceptance.spec.ts`, record
+  [extensions-e8-local-2026-11-21](../../acceptance/extensions-e8-local-2026-11-21.md).
 - [ ] Isolated hosted journey with the same steps and independent cleanup.
 - [ ] No G9 release gate is closed by this feature.
 

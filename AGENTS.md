@@ -124,4 +124,6 @@ add/remove/upgrade one extension) or a revert to the previous composition.
 E6 (GUI) is implemented except a keyboard-only path, light/dark checks and
 extension template art (see the plan). E7 (owner-approved 2026-11-21) is
 implemented: extension authoring and composition changes through `/api/v1`.
-E4b is deferred. The E8 journeys are open.
+E4b is deferred. The E8 local journey passed on 2026-11-21
+([record](docs/acceptance/extensions-e8-local-2026-11-21.md)); the hosted E8
+journey is open.

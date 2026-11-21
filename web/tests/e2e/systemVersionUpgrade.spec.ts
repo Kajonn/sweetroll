@@ -106,7 +106,7 @@ test("player upgrades and reverts a character; GM upgrades the campaign", async 
     const campaignChanged = gmPage.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith(`/campaigns/${campaignId}/composition`));
     await gmPage.getByRole("dialog").getByRole("button", { name: "Upgrade" }).click();
     expect((await campaignChanged).status()).toBe(200);
-    await expect(gmPage.getByText("The rules version was changed.")).toBeVisible();
+    await expect(gmPage.getByText("The rules were changed.")).toBeVisible();
     const campaign = await json(gm.request, "GET", `/api/campaigns/${campaignId}`);
     expect(campaign.campaign.systemVersionId).toBe(v2);
   } finally {

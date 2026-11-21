@@ -80,3 +80,13 @@ export function compositionLabel(description: CompositionOptions["current"]): st
   if (description.extensions.length === 0) return base;
   return [base, ...description.extensions.map((choice) => `${choice.name} ${choice.version.semanticVersion}`)].join(" + ");
 }
+
+/** The confirm button's label for the checked change. */
+export function confirmLabel(change: { kind: string } | undefined): string {
+  switch (change?.kind) {
+    case "revert": return t("version.confirmRevert");
+    case "extension_add": return t("version.confirmAdd");
+    case "extension_remove": return t("version.confirmRemove");
+    default: return t("version.confirmUpgrade");
+  }
+}

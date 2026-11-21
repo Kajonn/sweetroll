@@ -10,6 +10,7 @@ const MeResponseDto = Type.Union([
   Type.Object({
     state: Type.Literal("authenticated"),
     userId: Type.String({ format: UUID_FORMAT }),
+    physicalDiceEnabled: Type.Optional(Type.Literal(true)),
   }),
   Type.Object({
     state: Type.Literal("anonymous"),
@@ -50,6 +51,7 @@ const PatchPreferencesBodyDto = Type.Object({
 });
 
 export type BuildIdentityRoutesInput = {
+  physicalDiceEnabled?: boolean;
   identity: Identity;
   cookieName: string;
   secure: boolean;
@@ -119,7 +121,7 @@ export const identityRouteDefinitions: readonly IdentityRouteDefinition[] = [
 ];
 
 export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPluginCallback =
-  ({ identity, cookieName, secure }) =>
+  ({ identity, cookieName, secure, physicalDiceEnabled = false }) =>
   fp(async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
@@ -157,7 +159,11 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
         // cleared by the auth hook) so the UI can offer re-auth. Anything
         // else unauthenticated stays anonymous.
         if (auth.state === "authenticated") {
-          return { state: "authenticated" as const, userId: auth.actorId };
+          return {
+            state: "authenticated" as const,
+            userId: auth.actorId,
+            ...(physicalDiceEnabled && { physicalDiceEnabled: true as const }),
+          };
         }
         if (auth.state === "session_expired") {
           return { state: "session_expired" as const };

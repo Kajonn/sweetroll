@@ -8,15 +8,19 @@ import { registerBrowserRateLimits } from "./browser-rate-limit.js";
 
 export const registerStaticServing: FastifyPluginAsync<{
   distDir: string;
+  physicalDiceEnabled?: boolean;
   enabled: boolean;
 }> = async (app: FastifyInstance, opts) => {
   if (!opts.enabled) return;
   const root = path.resolve(opts.distDir);
   if (!existsSync(path.join(root, "index.html"))) return;
-  await app.register(fastifyStatic, { root, prefix: "/", decorateReply: false });
+  await app.register(fastifyStatic, {
+    root, prefix: "/", decorateReply: false,
+    ...(opts.physicalDiceEnabled ? {} : { allowedPath: (pathname: string) => !pathname.startsWith("/dice/") }),
+  });
   app.setNotFoundHandler((request, reply) => {
     const url = request.url.split("?")[0] ?? "";
-    if (url.startsWith("/api") || url.startsWith("/metrics") || url.startsWith("/health")) {
+    if (url.startsWith("/dice/") || url.startsWith("/api") || url.startsWith("/metrics") || url.startsWith("/health")) {
       reply.code(404).send({ code: "not_found", message: "Not found" });
       return;
     }

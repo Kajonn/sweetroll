@@ -16,6 +16,7 @@ describe("loadConfig", () => {
         PORT: "4100",
         SESSION_COOKIE_NAME: "sid",
         SESSION_TTL_DAYS: "7",
+        SWEETROLL_PHYSICAL_DICE: "true",
         SWEETROLL_PRUNE_INTERVAL_MS: "600000",
       }),
     ).toEqual({
@@ -26,6 +27,7 @@ describe("loadConfig", () => {
       host: "127.0.0.1",
       logLevel: "debug",
       nodeEnv: "production",
+      physicalDiceEnabled: true,
       port: 4100,
       pruneIntervalMs: 600_000,
       sessionCookieName: "sid",
@@ -45,11 +47,18 @@ describe("loadConfig", () => {
       host: "0.0.0.0",
       logLevel: "info",
       nodeEnv: "development",
+      physicalDiceEnabled: false,
       port: 3000,
       pruneIntervalMs: 3_600_000,
       sessionCookieName: "session",
       sessionTtlDays: 30,
     });
+  });
+
+  it("accepts an explicit physical dice opt-out and rejects invalid settings", () => {
+    const env = { DATABASE_URL: "postgres://localhost/sweetroll", NODE_ENV: "test" };
+    expect(loadConfig({ ...env, SWEETROLL_PHYSICAL_DICE: "false" }).physicalDiceEnabled).toBe(false);
+    expect(() => loadConfig({ ...env, SWEETROLL_PHYSICAL_DICE: "enabled" })).toThrow(/SWEETROLL_PHYSICAL_DICE/);
   });
 
   it("parses the expired-row prune interval, where 0 disables pruning", () => {

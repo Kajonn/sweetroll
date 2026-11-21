@@ -3,6 +3,14 @@
 Feature plan · 20 November 2026  
 Based on Sweetroll `c10903f` and Vtrpg `0050784`. Appendix A contains newly measured normals for all 60 outcomes on the six numbered dice.
 
+## Server feature toggle
+
+The operator enables physical dice per server deployment with `SWEETROLL_PHYSICAL_DICE=true`. The default is `false`. Apply a change by restarting or redeploying the app service, using the same value on all its replicas. The existing roll engine handles every roll while the switch is off.
+
+When enabled, authenticated browser sessions receive `physicalDiceEnabled: true` from `GET /api/me`. The browser only offers the physical-dice controls or loads the worker and numbered models when this capability is present. A player's **Show 3D dice** setting controls their own rendering within an enabled deployment. A thrower who hides animation still supplies the physical outcome.
+
+As the remaining slices land, apply the server switch to preparation, completion, event publication and active-attempt recovery. When disabled, reject physical-only command requests before creating a roll or publishing an event. Keep existing committed results readable and let unfinished attempts expire. Acceptance must exercise both server settings, including a direct physical request with the switch off and a roller with 3D hidden when it is on.
+
 ## What players will see
 
 A player taps the existing roll action. Dice in that player's chosen color roll across a transparent layer over the character sheet or campaign screen. Everyone currently allowed to see the roll sees the same throws, collisions and final faces. The camera fits the same tray on a phone and a desktop. The existing result card still shows the rules outcome, stacks with nearby events and fades as it does today. A kept pool die, a discarded die and a modifier can contribute differently to the result. The result card and breakdown continue to explain that distinction.
@@ -61,6 +69,16 @@ Each slice starts with an observed failing test, implements the smallest passing
 | 3. Deterministic shared throw | The same start fixture must produce identical state at intermediate ticks and at rest across Android Chrome, iOS Safari and a desktop browser. | Run seeded single dice, mixed shapes and a colliding 20-die pool. Hash canonical physics snapshots at named ticks before and after collisions. Compare hashes, settle ticks, poses and face values. Repeat under different display rates, frame throttling, and resize. Report the first divergent tick. Synthetic viewport tests supplement the device runs. |
 | 4. Event delivery and overlay | A roller with visuals off can roll for a viewer with visuals on. The viewer sees the thrower's color and both receive exactly one result. | Assert one start and one finish for a successful roll and zero per-tick messages. Exercise duplicate, missed and late events, a deliberately mismatched final pose, incompatible client versions, reconnect across server instances, roller disconnect and audience revocation. Test preference persistence, reduced motion, keyboard focus, touch-through and renderer cleanup. |
 | 5. Hosted campaign journey | GM and two players in independent browser contexts exercise the feature through normal campaign controls. | Check acceptance source branch, deployed commit and readiness. Roll each shape, a mixed pool and a push. At 360 px verify the full 20-die tray fits after rotating the screen. Compare settled faces against history and the rules total. Repeat with a private roll, a roller with 3D off, two simultaneous rolls and a disconnected observer. Record device/browser, build and observed results. |
+
+### Slice 1 implementation record
+
+The six numbered OBJ/MTL pairs from Vtrpg commit `0050784` are available under `/dice/v1/`. The `White` material is the body and `Black` is the engraving. Each `dN.hull.json` contains convex-hull points in the OBJ coordinate frame. Apply the same uniform scale and origin to the model and collider. To regenerate the points, run `python scripts/bake-dice-hulls.py` with SciPy installed.
+
+The renderer-independent `readPhysicalFace` function takes the model-to-world quaternion for a Z-up tray. It returns a game value when the reading direction is within 10° of vertical. Invalid rotations and cocked poses return `null`. The simulation worker will decide when the body has stopped moving. For the d4 the reading direction points away from the support face, and for the d10 the engraving 0 means 10.
+
+The first two tests failed on the +Z d6 and the −Y support face of the d4 before implementing the reader. The collider tests then failed for all six missing hulls. The passing suite checks each numbered resting pose at eight headings with a 5° tilt, using OBJ support triangles as a fixture independent of the runtime normal table. Run `npm test -- tests/physical-dice src/systems/physical-dice/faces.test.ts`.
+
+Next is slice 2, physical resolution through the existing character command. Cross-device physics, the interactive overlay and hosted acceptance belong to subsequent slices.
 
 ## Appendix A · Measured normals for the numbered models
 

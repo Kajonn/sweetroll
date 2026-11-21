@@ -172,11 +172,13 @@ const serveStatic = process.env.SWEETROLL_SERVE_STATIC === "1";
 void app.register(registerStaticServing, {
   distDir: "web/dist",
   enabled: serveStatic,
+  physicalDiceEnabled: config.physicalDiceEnabled,
 });
 
 registerApiRoutes(app, [
   buildIdentityRoutes({
     identity,
+    physicalDiceEnabled: config.physicalDiceEnabled,
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
   }),

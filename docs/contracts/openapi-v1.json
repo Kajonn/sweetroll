@@ -10530,6 +10530,10 @@
                         "userId": {
                           "format": "uuid",
                           "type": "string"
+                        },
+                        "physicalDiceEnabled": {
+                          "const": true,
+                          "type": "boolean"
                         }
                       }
                     },

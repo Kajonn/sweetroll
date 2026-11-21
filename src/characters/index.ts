@@ -3322,6 +3322,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   if (input.physicalDiceEnabled) characters.physicalRolls = createPhysicalRolls({
     pool: input.pool, runtime: input.runtime, now,
     scope: async (ctx, characterId) => {
+      const owned = await repo.openOwnedCharacter(characterId, ctx.actorId);
+      if (owned) return { record: owned, member: null, defaultAudience: "owner_only", active: owned.lifecycle === "active" };
       const snapshot = await loadAttachedSnapshot(ctx, characterId);
       if (!snapshot) return null;
       const { record, membership, campaign } = snapshot.auth;

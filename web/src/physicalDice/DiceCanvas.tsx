@@ -26,7 +26,7 @@ export default function DiceCanvas({
   poses,
   onUnavailable,
 }: {
-  roll: RollStarted;
+  roll: Pick<RollStarted, "dice" | "color">;
   poses: PoseBuffer;
   onUnavailable: () => void;
 }) {

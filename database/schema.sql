@@ -818,7 +818,7 @@ CREATE TABLE physical_roll_attempts (
   id uuid PRIMARY KEY,
   actor_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
-  campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  campaign_id uuid REFERENCES campaigns(id) ON DELETE CASCADE,
   idempotency_key text NOT NULL,
   input_hash text NOT NULL,
   preparation jsonb NOT NULL,
@@ -836,8 +836,10 @@ CREATE INDEX physical_roll_attempts_campaign_expiry ON physical_roll_attempts (c
 -- authorized projection. PostgreSQL delivers it only if the write commits.
 CREATE FUNCTION announce_physical_roll() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  PERFORM pg_notify('sweetroll_scene_events',
-    json_build_object('k', 'physicalRoll', 'c', NEW.campaign_id)::text);
+  IF NEW.campaign_id IS NOT NULL THEN
+    PERFORM pg_notify('sweetroll_scene_events',
+      json_build_object('k', 'physicalRoll', 'c', NEW.campaign_id)::text);
+  END IF;
   RETURN NEW;
 END;
 $$;

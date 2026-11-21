@@ -1,5 +1,5 @@
 import type { ApiClient } from "../api/client.js";
-import { canSimulateDice, preparePhysicalRequest, type PrepareDice } from "../physicalDice/commands.js";
+import { canSimulateDice, preparePhysicalRequest, type PrepareDice, type SimulateDice } from "../physicalDice/commands.js";
 import { DiceOverlay } from "../physicalDice/DiceOverlay.js";
 import { RulesPanel } from "./RulesPanel.js";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -152,10 +152,13 @@ function CharacterDetailLoaded({
 }: CharacterDetailProps & { actorId: string }) {
   const online = identity.isOnline();
   const publisher = useRef<PublishCommand>();
-  const prepareDice = useRef<PrepareDice>();
+  const prepareDice = useRef<(campaignId: string | null) => PrepareDice>();
+  const localSimulation = useRef<SimulateDice>();
   useLayoutEffect(()=>{
     prepareDice.current = physicalDiceClient && canSimulateDice()
-      ? (request,signal)=>preparePhysicalRequest(physicalDiceClient,request,signal)
+      ? (campaignId) => (request, signal) => preparePhysicalRequest(
+          physicalDiceClient, request, signal, campaignId === null ? localSimulation.current : undefined,
+        )
       : undefined;
   },[physicalDiceClient]);
   const createSession = useMemo(
@@ -170,7 +173,7 @@ function CharacterDetailLoaded({
         now: () => new Date().toISOString(),
         newId: () => randomUUID(),
         captureRollPublisher: () => publisher.current,
-        captureDicePreparation: () => prepareDice.current,
+        captureDicePreparation: (campaignId) => prepareDice.current?.(campaignId),
       }),
     [actorId, characterId, api, store, identity, coordination],
   );
@@ -331,8 +334,9 @@ function CharacterDetailLoaded({
         <CampaignPlayListener api={campaignEventsApi} campaignId={campaignId} actorId={actorId}
           generation={identity.getGeneration()} online={online} events={events} />
       ) : null}
-      {physicalDiceClient && online && campaignId ? (
-        <DiceOverlay key={campaignId} client={physicalDiceClient} actor={actorId} campaignId={campaignId} />
+      {physicalDiceClient && online ? (
+        <DiceOverlay key={campaignId ?? characterId} client={physicalDiceClient} actor={actorId}
+          campaignId={campaignId} localSimulation={localSimulation} />
       ) : null}
       <PlayEventOverlay events={events} presentation={snapshot.confirmed.projection.presentation} />
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}

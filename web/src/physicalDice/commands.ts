@@ -6,13 +6,14 @@ import { t } from "../i18n/index.js";
 import { playThrow, serverClock } from "./playback.js";
 
 export type PrepareDice = (request: FrozenRequest, signal: AbortSignal) => Promise<FrozenRequest>;
-type PreparedThrow = { attemptId: string; expiresAt: string; launch: DiceLaunch; dice: PhysicalDie[] };
+type PreparedThrow = { attemptId: string; color: string; expiresAt: string; launch: DiceLaunch; dice: PhysicalDie[] };
+export type SimulateDice = (attempt: PreparedThrow, now: () => number, signal: AbortSignal) => ReturnType<typeof playThrow>;
 
 export async function preparePhysicalRequest(
   client: ApiClient,
   request: FrozenRequest,
   signal: AbortSignal,
-  simulate = playThrow,
+  simulate: SimulateDice = playThrow,
 ): Promise<FrozenRequest> {
   if (request.physical || request.method !== "POST") return request;
   const action = /^\/characters\/([^/]+)\/actions\/([^/]+)$/.exec(request.path);

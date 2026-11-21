@@ -1,10 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useState, useSyncExternalStore, type MutableRefObject } from "react";
 import { createPortal } from "react-dom";
 import type { ApiClient } from "../api/client.js";
 import type { RollStarted, RollFinished } from "../../../src/campaigns/physical-dice-stream.js";
 import { simulationVersion } from "../../../src/systems/physical-dice/launch.js";
 import type { PoseBuffer } from "./DiceCanvas.js";
-import { canSimulateDice } from "./commands.js";
+import { canSimulateDice, type SimulateDice } from "./commands.js";
 import { playThrow, serverClock } from "./playback.js";
 import { useDicePreferences } from "./preferences.js";
 
@@ -22,7 +22,7 @@ function subscribeMotion(update: () => void) {
     document.removeEventListener("visibilitychange", update);
   };
 }
-type Display = { roll: RollStarted; poses: PoseBuffer };
+type Display = { roll: Pick<RollStarted, "attemptId" | "color" | "dice">; poses: PoseBuffer };
 type Active = Display & {
   controller: AbortController;
   timer?: ReturnType<typeof setTimeout>;
@@ -33,10 +33,12 @@ export function DiceOverlay({
   client,
   actor,
   campaignId,
+  localSimulation,
 }: {
   client: ApiClient;
   actor: string;
-  campaignId: string;
+  campaignId: string | null;
+  localSimulation?: MutableRefObject<SimulateDice | undefined>;
 }) {
   const { preferences } = useDicePreferences(client, actor);
   const motion = useSyncExternalStore(subscribeMotion, shouldAnimate, () => false);
@@ -44,8 +46,39 @@ export function DiceOverlay({
   const [display, setDisplay] = useState<Display[]>([]);
   const unavailable = useCallback(() => setAvailable(false), []);
   const enabled = available && motion && preferences.data?.show_3d_dice === true;
+  useLayoutEffect(() => {
+    if (campaignId !== null || !localSimulation) return;
+    let mounted = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const remove = (id: string) => {
+      if (mounted) setDisplay(current => current.filter(item => item.roll.attemptId !== id));
+    };
+    localSimulation.current = async (roll, now, signal) => {
+      signal.throwIfAborted();
+      clearTimeout(timer);
+      const poses: PoseBuffer = { previous: null, frame: null, updated: 0 };
+      setDisplay([{ roll, poses }]);
+      try {
+        const settlement = await playThrow(roll, now, signal, (frame) => {
+          poses.previous = poses.frame;
+          poses.frame = frame;
+          poses.updated = performance.now();
+        });
+        if (mounted) timer = setTimeout(() => remove(roll.attemptId), 1500);
+        return settlement;
+      } catch (error) {
+        remove(roll.attemptId);
+        throw error;
+      }
+    };
+    return () => {
+      mounted = false;
+      clearTimeout(timer);
+      localSimulation.current = undefined;
+    };
+  }, [campaignId, localSimulation]);
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || campaignId === null) return;
     const stream = new EventSource(`/api/campaigns/${encodeURIComponent(campaignId)}/physical-rolls/events`);
     const active = new Map<string, Active>();
     // Don't replay a throw we've already seen after reconnect. A pending

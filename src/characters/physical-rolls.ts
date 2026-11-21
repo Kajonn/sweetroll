@@ -37,7 +37,7 @@ export type PhysicalCommand = CharacterActionCommand | CharacterPushCommand;
 export type Settlement = { tick: number; dice: SettledDie[] };
 type Scope = {
   record: CharacterRecord;
-  member: MembershipRecord;
+  member: MembershipRecord | null;
   active: boolean;
   defaultAudience: RollAudience;
 };
@@ -55,7 +55,7 @@ type Preparation = {
   audience: RollAudience;
   principalId: string;
   placement: number;
-  generation: number;
+  generation: number | null;
   contextHash: string;
   defaultAudience: RollAudience;
 };
@@ -63,7 +63,7 @@ type Row = {
   color: string;
   launch: DiceLaunch;
   id: string;
-  campaign_id: string;
+  campaign_id: string | null;
   preparation: Preparation;
   expires_at: Date;
   input_hash: string;
@@ -107,7 +107,7 @@ type Dependencies = {
 };
 const missing = (): CharacterError => ({
   code: "not_found",
-  message: "Campaign roll not found.",
+  message: "Physical roll not found.",
 });
 const conflict = (message: string): CharacterError => ({
   code: "conflict",
@@ -134,7 +134,7 @@ export function createPhysicalRolls({
       if (!current.active || command.expectedRevision !== record.revision)
         return {
           ok: false,
-          error: conflict("Refresh the campaign character before rolling."),
+          error: conflict("Refresh the character before rolling."),
         };
       const attemptId = randomUUID();
       const draws = new PhysicalDraws();
@@ -175,13 +175,17 @@ export function createPhysicalRolls({
           physical: draws,
         };
       } else {
+        if (!member && (command.targetCharacterId || command.respondsTo ||
+            (command.audience !== undefined && command.audience !== "owner_only"))) {
+          return { ok: false, error: invalid("Personal rolls are owner-only and cannot use campaign targets or opposed rolls.") };
+        }
         if (
           !command.entryId &&
           evaluator.value.deckIdFor(command.actionId) !== null
         )
           return { ok: true, value: null };
         audience = command.audience ?? defaultAudience;
-        if (command.targetCharacterId || command.respondsTo) {
+        if (member && (command.targetCharacterId || command.respondsTo)) {
           const observed = evaluator.value({
             state: record.state,
             intent: { kind: "observe" },
@@ -237,7 +241,7 @@ export function createPhysicalRolls({
         principalId,
         defaultAudience,
         placement: record.placementGeneration,
-        generation: member.generation,
+        generation: member?.generation ?? null,
         contextHash: hashInput(context ?? null),
       };
       const hash = hashInput(command);
@@ -251,7 +255,7 @@ export function createPhysicalRolls({
           attemptId,
           ctx.actorId,
           record.characterId,
-          member.campaignId,
+          record.campaignId,
           command.idempotencyKey,
           hash,
           preparation,
@@ -278,8 +282,8 @@ export function createPhysicalRolls({
       if (
         !live ||
         !live.active ||
-        live.member.campaignId !== row.campaign_id ||
-        live.member.generation !== row.preparation.generation ||
+        live.record.campaignId !== row.campaign_id ||
+        (live.member?.generation ?? null) !== row.preparation.generation ||
         live.record.placementGeneration !== row.preparation.placement
       )
         return { ok: false, error: missing() };
@@ -317,8 +321,8 @@ export function createPhysicalRolls({
       const live = await scope(ctx, characterId);
       if (
         !live ||
-        live.member.campaignId !== row.campaign_id ||
-        live.member.generation !== proof.generation ||
+        live.record.campaignId !== row.campaign_id ||
+        (live.member?.generation ?? null) !== proof.generation ||
         live.record.placementGeneration !== proof.placement
       )
         return { ok: false, error: missing() };
@@ -343,14 +347,17 @@ export function createPhysicalRolls({
             hashInput(context ?? null) !== proof.contextHash
           )
             return conflict("The roll inputs changed after preparation.");
-          // The normal command transaction holds the campaign and character locks.
+          // The normal command transaction holds the character and any campaign locks.
           const saved = await client.query(
             `UPDATE physical_roll_attempts a SET settled=$1, execution_id=$2
-             FROM characters c, campaign_members m, campaigns g
+             FROM characters c
              WHERE a.id=$3 AND a.execution_id IS NULL AND a.expires_at > $4 AND c.id=a.character_id
-               AND c.campaign_id=a.campaign_id AND c.placement_generation=$5 AND m.campaign_id=a.campaign_id
-               AND m.user_id=a.actor_id AND m.status='active' AND m.generation=$6 AND g.id=a.campaign_id
-               AND ($7::boolean OR g.roll_audience_default=$8)`,
+               AND c.campaign_id IS NOT DISTINCT FROM a.campaign_id AND c.placement_generation=$5
+               AND ((a.campaign_id IS NULL AND c.owner_id=a.actor_id) OR EXISTS (
+                 SELECT 1 FROM campaign_members m JOIN campaigns g ON g.id=m.campaign_id
+                 WHERE m.campaign_id=a.campaign_id AND m.user_id=a.actor_id AND m.status='active'
+                   AND m.generation=$6 AND ($7::boolean OR g.roll_audience_default=$8)
+               ))`,
             [
               settlement,
               executionId,
@@ -366,7 +373,7 @@ export function createPhysicalRolls({
           return saved.rowCount === 1
             ? null
             : conflict(
-                "The prepared roll expired or its campaign scope changed.",
+                "The prepared roll expired or its character scope changed.",
               );
         },
       });

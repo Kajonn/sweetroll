@@ -112,6 +112,18 @@ Account appearance settings control animation and dice color. Spectators use the
 
 The browser journey runs with physical dice explicitly enabled. It uses separate browser contexts to verify the account controls, a hidden-animation roller, a spectator’s responsive WebGL canvas and one result card per client. The hosted acceptance journey and testing on physical mobile devices remain separate.
 
+### Slice 5 acceptance runner
+
+Use the existing Railway acceptance URL and a clean database with this branch's schema baseline. Check the current successful deployment's SHA and readiness before running the journey. The pre-release database initializer does not update an existing schema. Keep the baseline acceptance database available for restoring main. Enable `SWEETROLL_PHYSICAL_DICE=true` on the build under test.
+
+```sh
+cd web
+G9_ACCEPTANCE_URL=https://sweetroll-acceptance-production.up.railway.app \
+  npx playwright test --config playwright.g9-acceptance.config.ts physicalDice.spec.ts --workers=1
+```
+
+The runner uses three signed-in browser contexts. It checks all six shapes, a mixed throw, a rotated 20-die viewport, a push, owner-only visibility, simultaneous throws and a reconnect. It compares numbered poses, committed results and history. It attaches roll IDs and values as JSON and restores the account preferences used by the test. The same matrix runs in CI against a disposable test database. This browser automation supplements testing on physical Android Chrome and iOS Safari.
+
 ## Appendix A · Measured normals for the numbered models
 
 These vectors are in the **unmodified OBJ local frame** and point outward from the physical face. They were calculated from the six numbered Vtrpg OBJ meshes at `0050784`. For each model, group near-coplanar convex-hull facets by outward direction, select the large physical faces, and refine their directions with area-weighted coplanar white body triangles. Project the black numeral geometry onto each face to associate that plane with its actual engraving. Vertex shading normals, engravings and bevels do not define separate die faces. Pin the model revision with the table. If the build converts, scales non-uniformly or rotates a model, bake the matching normal transform and collider alignment during import.

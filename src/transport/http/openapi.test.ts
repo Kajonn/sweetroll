@@ -108,6 +108,8 @@ describe("buildOpenApiDocument", () => {
       "/characters/{characterId}/exports",
       "/characters/{characterId}/fields/{fieldId}/set",
       "/characters/{characterId}/ownership-transfer",
+      "/characters/{characterId}/physical-rolls",
+      "/characters/{characterId}/physical-rolls/{attemptId}/complete",
       "/characters/{characterId}/portrait",
       "/characters/{characterId}/portrait/thumbnail",
       "/characters/{characterId}/portrait/{fileId}",

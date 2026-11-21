@@ -78,7 +78,13 @@ The renderer-independent `readPhysicalFace` function takes the model-to-world qu
 
 The first two tests failed on the +Z d6 and the −Y support face of the d4 before implementing the reader. The collider tests then failed for all six missing hulls. The passing suite checks each numbered resting pose at eight headings with a 5° tilt, using OBJ support triangles as a fixture independent of the runtime normal table. Run `npm test -- tests/physical-dice src/systems/physical-dice/faces.test.ts`.
 
-Next is slice 2, physical resolution through the existing character command. Cross-device physics, the interactive overlay and hosted acceptance belong to subsequent slices.
+### Slice 2 implementation record
+
+With the server flag enabled, an authenticated browser can post an `executeAction` or `pushRoll` to `/characters/:characterId/physical-rolls`. The response contains an attempt ID, expiry, audience and ordered die IDs, groups and sides. An `attempt` of `null` directs the client to the ordinary command for unsupported throws. Preparation never records a roll. The initial limits are 60 seconds to submit, 100 dice and a final tick from 1 through 3600.
+
+Only the initiating actor can post `{tick, dice}` to `/characters/:characterId/physical-rolls/:attemptId/complete`. Each die supplies its prepared ID, numeric value, position and Z-up orientation. The existing evaluator consumes the validated faces, including only eligible redraws on a push. The character command atomically saves the accepted poses, receipt, roll and activity. An identical completion can recover the authorized receipt after the animation deadline.
+
+The mixed-pose regression uses a d6 showing 3 and a d8 showing 7 for a total of 12 with a +2 modifier. Integration tests exercise actor binding, idempotency, concurrent completion, group success counts, a push, expiry, stale revisions and membership changes. Slice 3 supplies the versioned launch state and deterministic physics worker. Slice 4 connects it to event delivery, preferences and rendering.
 
 ## Appendix A · Measured normals for the numbered models
 

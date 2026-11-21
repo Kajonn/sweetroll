@@ -791,3 +791,18 @@ BEGIN
 END;
 $$;
 CREATE TRIGGER campaign_proposal_immutable BEFORE UPDATE ON campaign_item_proposals FOR EACH ROW EXECUTE FUNCTION guard_campaign_proposal();
+
+CREATE TABLE physical_roll_attempts (
+  id uuid PRIMARY KEY,
+  actor_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  idempotency_key text NOT NULL,
+  input_hash text NOT NULL,
+  preparation jsonb NOT NULL,
+  expires_at timestamptz NOT NULL,
+  settled jsonb,
+  execution_id uuid,
+  UNIQUE (actor_id, idempotency_key)
+);
+CREATE INDEX physical_roll_attempts_expiry ON physical_roll_attempts (expires_at);

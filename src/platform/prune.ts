@@ -25,6 +25,7 @@ export const PRUNE_TABLES = [
   "personal_access_tokens",
   "campaign_invitations",
   "display_codes",
+  "physical_roll_attempts",
 ] as const;
 
 export type PruneTable = (typeof PRUNE_TABLES)[number];
@@ -50,6 +51,8 @@ const PRUNE_CONDITIONS: Record<PruneTable, string> = {
   // revoked invitations are membership history and back replay checks.
   campaign_invitations: "status = 'pending' AND expires_at < $1",
   display_codes: "expires_at < $1",
+  // Retain accepted poses throughout the character command receipt window.
+  physical_roll_attempts: "expires_at < $1::timestamptz - interval '30 days'",
 };
 
 /** Session-level advisory lock key shared by every replica. */

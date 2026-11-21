@@ -1,4 +1,4 @@
-import type { CampaignRollContext, NormalizedRoll, RuntimeResult } from "../../runtime.js";
+import type { CharacterProjectionV1, CampaignRollContext, NormalizedRoll, RuntimeResult } from "../../runtime.js";
 import type { ActionV1, RollActionV1, SystemPackageV1 } from "../package/schema/index.js";
 import type { EvaluationBindings } from "../rules/evaluate.js";
 import { resolveObservedValues } from "./resolve.js";
@@ -48,4 +48,10 @@ export function rollContextReferences(context: CampaignRollContext | undefined):
     ...(context?.target ? { targetCharacterId: context.target.characterId } : {}),
     ...(context?.opposed ? { respondsTo: context.opposed.rollId } : {}),
   };
+}
+
+export function findProjectedAction(projection: CharacterProjectionV1, actionId: string, entryId: string | undefined) {
+  return projection.sheets.flatMap(sheet => sheet.sections).flatMap(section => section.elements)
+    .find((element): element is Extract<typeof element, { kind: "action" }> =>
+      element.kind === "action" && element.actionId === actionId && element.entryId === entryId);
 }

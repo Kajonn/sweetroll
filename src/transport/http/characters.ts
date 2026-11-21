@@ -1,3 +1,4 @@
+import type { PhysicalCommand, Settlement } from "../../characters/physical-rolls.js";
 import { BindingValueSchema } from "../../systems/implementation/rules/result.js";
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
 import { characterImageHandlers, characterImageRoutes } from "./characterImages.js";
@@ -474,6 +475,26 @@ const SetResourceBody = Type.Object({
 const PushParams=Type.Object({characterId:Type.String({format:"uuid"}),rollId:Type.String({format:"uuid"})},{additionalProperties:false});
 const PushBody=Type.Object({expectedRevision:Type.Integer({minimum:1}),idempotencyKey:Type.String({minLength:1,maxLength:200})},{additionalProperties:false});
 const PushOptionsDto=Type.Object({canPush:Type.Boolean(),reason:Type.Union([Type.String({maxLength:120}),Type.Null()]),eligibleDiceIds:Type.Array(Type.String({maxLength:256}),{maxItems:100}),revision:Type.Integer({minimum:1}),nextAttempt:Type.Integer({minimum:1,maximum:11}),maxAttempts:Type.Integer({minimum:1,maximum:10})});
+const physicalId = Type.String({format:"uuid"});
+const physicalKey = Type.String({minLength:1,maxLength:200});
+const physicalRevision = Type.Integer({minimum:1});
+const strict = {additionalProperties:false} as const;
+const physicalPrepareBody = Type.Union([
+  Type.Object({ kind:Type.Literal("executeAction"), actionId:Type.String({minLength:1}),
+    inputs:Type.Object({}, {additionalProperties:true}), expectedRevision:physicalRevision, idempotencyKey:physicalKey,
+    entryId:Type.Optional(Type.String({minLength:1})), audience:Type.Optional(RollAudienceDto),
+    targetCharacterId:Type.Optional(physicalId), respondsTo:Type.Optional(physicalId) }, strict),
+  Type.Object({kind:Type.Literal("pushRoll"), parentRollId:physicalId, expectedRevision:physicalRevision,
+    idempotencyKey:physicalKey}, strict),
+]);
+const xyz = {x:Type.Number(), y:Type.Number(), z:Type.Number()};
+const physicalSettlementBody = Type.Object({
+  tick:Type.Integer({minimum:1,maximum:3600}),
+  dice:Type.Array(Type.Object({id:Type.String({minLength:1,maxLength:256}), value:Type.Integer({minimum:1,maximum:20}),
+    position:Type.Object(xyz,strict), orientation:Type.Object({...xyz,w:Type.Number()},strict)},strict),{minItems:1,maxItems:100}),
+},strict);
+const physicalAttemptDto = Type.Object({attemptId:physicalId,expiresAt:Type.String({format:"date-time"}),
+  audience:RollAudienceDto,dice:Type.Array(Type.Object({id:Type.String(),groupId:Type.String(),sides:Type.Integer()}))});
 const ExecuteActionBody = Type.Object({
   targetCharacterId: Type.Optional(Type.String({ format: "uuid" })),
   respondsTo: Type.Optional(Type.String({ format: "uuid" })),
@@ -798,6 +819,12 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
     querystring: RollOptionsQuery,
     response: { "200": RollOptionsSchema, ...ErrorResponses },
   }},
+  {method:"post",path:"/characters/:characterId/physical-rolls",operationId:"prepare_character_physical_roll",
+    schema:{params:CharacterIdParams,body:physicalPrepareBody,
+      response:{"200":Type.Object({attempt:Type.Union([physicalAttemptDto,Type.Null()]),requestId:Type.String()}),...ErrorResponses}}},
+  {method:"post",path:"/characters/:characterId/physical-rolls/:attemptId/complete",operationId:"complete_character_physical_roll",
+    schema:{params:Type.Object({characterId:physicalId,attemptId:physicalId}),body:physicalSettlementBody,
+      response:{"200":Type.Object({result:CharacterCommandResultDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"get",path:"/characters/:characterId/rolls/:rollId",operationId:"get_characters_characterId_rolls_rollId",schema:{params:PushParams,response:{"200":Type.Object({roll:RollDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"get",path:"/characters/:characterId/rolls/:rollId/push-options",operationId:"get_characters_characterId_rolls_rollId_push_options",schema:{params:PushParams,response:{"200":Type.Object({options:PushOptionsDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"post",path:"/characters/:characterId/rolls/:rollId/push",operationId:"post_characters_characterId_rolls_rollId_push",schema:{params:PushParams,body:PushBody,response:{"200":Type.Object({result:CharacterCommandResultDto,requestId:Type.String()}),...ErrorResponses}}},
@@ -1275,6 +1302,21 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         reply.header("cache-control", "no-store");
         return result.value;
       },
+      prepare_character_physical_roll: async (request, reply) => {
+        if (!characters.physicalRolls) return sendError(reply, {code:"not_found",message:"Physical dice are disabled."}, request.id);
+        const {characterId} = request.params as {characterId:string};
+        const command = {...request.body as PhysicalCommand, characterId};
+        const result = await characters.physicalRolls.prepare(ctxOf(request), command);
+        if (!result.ok) return sendError(reply,result.error,request.id);
+        return {attempt:result.value,requestId:request.id};
+      },
+      complete_character_physical_roll: async (request, reply) => {
+        if (!characters.physicalRolls) return sendError(reply, {code:"not_found",message:"Physical dice are disabled."}, request.id);
+        const {characterId,attemptId} = request.params as {characterId:string;attemptId:string};
+        const result = await characters.physicalRolls.complete(ctxOf(request), characterId, attemptId, request.body as Settlement);
+        if (!result.ok) return sendError(reply,result.error,request.id);
+        return {result:toCommandResultDto(result.value),requestId:request.id};
+      },
       get_characters_characterId_rolls_rollId:async(request,reply)=>{
         const result=await characters.readRoll(ctxOf(request),request.params as {characterId:string;rollId:string});
         if(!result.ok)return sendError(reply,result.error,request.id);reply.header("cache-control","no-store");return {roll:result.value,requestId:request.id};
@@ -1542,6 +1584,6 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       app[route.method](route.path, { schema,
         ...((route.path.includes("/portrait") || route.path.includes("/image")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); } } : {}),
         ...((route.path.endsWith("/portrait") || route.path.endsWith("/image")) && route.method === "put" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}),
-        ...((route.path.includes("/entries") || route.path.includes("/rolls/") || route.path.includes("/portrait")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
+        ...((route.path.includes("/physical-rolls") || route.path.includes("/entries") || route.path.includes("/rolls/") || route.path.includes("/portrait")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
     }
   };

@@ -15,6 +15,7 @@ const completed: PruneResult = {
     personal_access_tokens: 0,
     campaign_invitations: 0,
     display_codes: 0,
+    physical_roll_attempts: 0,
   },
   totalDeleted: 3,
   truncated: false,

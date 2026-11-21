@@ -57,6 +57,8 @@ export type TemplatesTabProps = {
   document: SystemDocumentV1;
   dispatch: React.Dispatch<DocumentAction>;
   renderArtwork?: (template: ObjectTemplateV1) => ReactNode;
+  /** Design 6.8 (E6): extensions add templates only, so the extension editor hides slots. */
+  showSlots?: boolean;
 };
 
 /**
@@ -70,7 +72,7 @@ export type TemplatesTabProps = {
  * entry including template-owned ones. Resource bumps reuse
  * `ResourceBumpEditor` directly (grammar-free).
  */
-export function TemplatesTab({ client, document, dispatch, renderArtwork }: TemplatesTabProps) {
+export function TemplatesTab({ client, document, dispatch, renderArtwork, showSlots = true }: TemplatesTabProps) {
   const templates = readTemplates(document);
   const slots = readSlots(document);
 
@@ -147,7 +149,7 @@ export function TemplatesTab({ client, document, dispatch, renderArtwork }: Temp
           </ul>
         )}
       </section>
-      <section data-testid="slots-section" data-path="/slots">
+      {showSlots ? <section data-testid="slots-section" data-path="/slots">
         <header className={styles.tabHeader}>
           <h2 className={styles.tabTitle}>{t("editor.slots.title")}</h2>
           <Button variant="secondary" onClick={addSlot} data-testid="slots-add-button">
@@ -171,7 +173,7 @@ export function TemplatesTab({ client, document, dispatch, renderArtwork }: Temp
             ))}
           </ul>
         )}
-      </section>
+      </section> : null}
     </section>
   );
 }

@@ -2049,6 +2049,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           templateId,
           values: values ?? {},
           ...(source === undefined ? {} : {source:structuredClone(source)}),
+          // Design 6.8: an extension template's entry names its extension.
+          ...(source?.kind === "system" && source.extensionId !== undefined ? { extensionId: source.extensionId } : {}),
           ...(quantity === undefined ? {} : { quantity }),
         },
       }));

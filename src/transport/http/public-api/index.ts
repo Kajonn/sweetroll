@@ -193,7 +193,13 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
       method: "GET", path: "/characters/creation-options", id: "getCharacterCreationOptions",
       description: "Read entity types and writable initial fields for a usable exact version, including known link-only versions.",
       scope: "characters:read", input: { querystring: s.creationOptionsQuery }, output: "CreationOptions",
-    }, (ctx, { query }) => characters.creationOptions(ctx, { ...query, includeFields: true }));
+    }, async (ctx, { query }) => {
+      // The browser's extension picker list is not part of v1 (extensions plan E7).
+      const result = await characters.creationOptions(ctx, { ...query, includeFields: true });
+      if (!result.ok) return result;
+      const { extensions: _extensions, ...options } = result.value;
+      return { ok: true as const, value: options };
+    });
 
     route({
       method: "GET", path: "/characters", id: "listCharacters", description: "List standalone characters owned by the account.",

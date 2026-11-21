@@ -8394,6 +8394,14 @@ export interface operations {
                                     label: string;
                                 }[];
                             }[];
+                            extensions?: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                name: string;
+                                /** Format: uuid */
+                                versionId: string;
+                                semanticVersion: string;
+                            }[];
                         };
                         requestId: string;
                     };
@@ -18753,6 +18761,7 @@ export interface operations {
                             };
                             /** Format: uuid */
                             extensionId?: string;
+                            extensionName?: string;
                             defaultQuantity?: number;
                             id: string;
                             label: string;

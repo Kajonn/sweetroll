@@ -287,6 +287,12 @@ const CharacterCreationOptionsDto = Type.Object({
       presets: Type.Optional(Type.Array(Type.Object({ id: Type.String(), label: Type.String() }), { maxItems: 1000 })),
     }),
   ),
+  extensions: Type.Optional(Type.Array(Type.Object({
+    extensionId: Type.String({ format: UUID_FORMAT }),
+    name: Type.String(),
+    versionId: Type.String({ format: UUID_FORMAT }),
+    semanticVersion: Type.String(),
+  }), { maxItems: 100 })),
 });
 
 const CharacterCreationVersionsDto = Type.Object({
@@ -540,6 +546,7 @@ const EntryGrantedActionInputDto = Type.Object({
 const EntryTemplateDto = Type.Object({
   source:Type.Optional(EntrySourceSchema),
   extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
+  extensionName: Type.Optional(Type.String()),
   defaultQuantity:Type.Optional(Type.Integer()),
   id: Type.String(),
   label: Type.String(),

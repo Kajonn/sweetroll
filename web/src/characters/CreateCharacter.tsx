@@ -8,6 +8,7 @@ import { EmptyState } from "../ui/EmptyState.js";
 import { FormField } from "../ui/FormField.js";
 import { Panel } from "../ui/Panel.js";
 import { Select } from "../ui/Select.js";
+import { Checkbox } from "../ui/Checkbox.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt } from "./store.js";
 import type { CreationOptions, CreationVersionEntry, FrozenRequest, ReviewExpiredAttemptInput } from "./types.js";
@@ -109,6 +110,8 @@ export function CreateCharacter({
   const [metadata, setMetadata] = useState<CreationOptions["data"] | null>(null);
   const [entityId, setEntityId] = useState("");
   const [name, setName] = useState("");
+  // Design 6.8 (E6): optional extensions, chosen from the version's offers.
+  const [extensionIds, setExtensionIds] = useState<string[]>([]);
   const [metaLoading, setMetaLoading] = useState(false);
   const [metaDenied, setMetaDenied] = useState(false);
   const [pending, setPendingState] = useState<OnlineAttempt | null>(null);
@@ -167,6 +170,10 @@ export function CreateCharacter({
     if (typeof body.systemVersionId === "string") setVersionId(body.systemVersionId);
     if (typeof body.entityDefinitionId === "string") setEntityId(body.entityDefinitionId);
     if (typeof body.name === "string") setName(body.name);
+    const extensions = (attempt.request.body as { extensions?: unknown }).extensions;
+    setExtensionIds(Array.isArray(extensions)
+      ? extensions.flatMap((ref) => typeof ref === "object" && ref !== null && typeof (ref as { extensionId?: unknown }).extensionId === "string" ? [(ref as { extensionId: string }).extensionId] : [])
+      : []);
   };
 
   // Recover a durable creation attempt left by an uncertain outcome or reload.
@@ -193,6 +200,7 @@ export function CreateCharacter({
       setVersionId("");
       setEntityId("");
       setName("");
+      setExtensionIds([]);
       setMetadata(null);
       setMetaDenied(false);
       setError(null);
@@ -274,6 +282,7 @@ export function CreateCharacter({
       // The entity list belongs to the freshly loaded version; a selection
       // restored from an older attempt may not exist here, so always reset.
       setEntityId("");
+      setExtensionIds([]);
     } catch (metadataError) {
       if (!alive()) return;
       setMetadata(null);
@@ -510,6 +519,7 @@ export function CreateCharacter({
               systemVersionId: versionId.trim(),
               entityDefinitionId: entityId,
               name: name.trim(),
+              ...(chosenExtensions.length === 0 ? {} : { extensions: chosenExtensions }),
               idempotencyKey: newId(),
             };
         const request: FrozenRequest = {
@@ -702,6 +712,10 @@ export function CreateCharacter({
 
   // Non-player entities are created by a GM inside a campaign (design 6.1).
   const entities: EntityOption[] = (metadata?.entities ?? []).filter(entity => (entity.kind ?? "playable") !== "npc");
+  const offeredExtensions = metadata?.extensions ?? [];
+  const chosenExtensions = offeredExtensions
+    .filter((extension) => extensionIds.includes(extension.extensionId))
+    .map(({ extensionId, versionId: extensionVersionId }) => ({ extensionId, versionId: extensionVersionId }));
   const canCreate =
     metadata !== null &&
     expired === null &&
@@ -817,6 +831,25 @@ export function CreateCharacter({
               placeholder={t("character.choice.empty")}
               options={entities.map(entity => ({ value: entity.id, label: entity.label }))}
             />
+            {offeredExtensions.length > 0 ? (
+              <fieldset>
+                <legend>{t("character.create.extensions")}</legend>
+                <p>{t("character.create.extensionsHint")}</p>
+                {offeredExtensions.map((extension) => (
+                  <Checkbox
+                    key={extension.extensionId}
+                    label={t("character.create.extensionChoice", { name: extension.name, version: extension.semanticVersion })}
+                    checked={extensionIds.includes(extension.extensionId)}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setExtensionIds((current) => checked
+                        ? [...current, extension.extensionId]
+                        : current.filter((id) => id !== extension.extensionId));
+                    }}
+                  />
+                ))}
+              </fieldset>
+            ) : null}
             <FormField label={t("character.create.name")}>
               <input
                 id="create-character-name"

@@ -29,6 +29,9 @@ export type SlotGrantedAction = RollRequirements & {
 
 export type SlotTemplate = {
   source?: import("./types.js").EntrySource;
+  /** Design 6.8: templates from an extension; base templates have none. */
+  extensionId?: string;
+  extensionName?: string;
   defaultQuantity?: number;
   id: string;
   label: string;
@@ -345,6 +348,28 @@ function TemplateEntryForm({ entry, template, disabled, onUpdate }: {
   </form>;
 }
 
+/** Picker key: extension templates may reuse a base template ID (decision X5). */
+export function templateChoiceKey(template: Pick<SlotTemplate, "id" | "extensionId" | "source">): string {
+  if (template.source?.kind === "campaign") return `campaign:${template.id}`;
+  return template.extensionId === undefined ? template.id : `${template.extensionId}:${template.id}`;
+}
+
+function originLabel(template: SlotTemplate): string {
+  if (template.source?.kind === "campaign") return t("character.slot.originCampaign");
+  if (template.extensionId !== undefined) return template.extensionName ?? t("character.slot.originExtension");
+  return t("character.slot.originSystem");
+}
+
+function orderByOrigin(templates: SlotTemplate[]): SlotTemplate[] {
+  const rank = (template: SlotTemplate) => template.source?.kind === "campaign" ? 2 : template.extensionId === undefined ? 0 : 1;
+  return templates
+    .map((template, index) => ({ template, index }))
+    .sort((a, b) => rank(a.template) - rank(b.template)
+      || (a.template.extensionName ?? "").localeCompare(b.template.extensionName ?? "")
+      || a.index - b.index)
+    .map(({ template }) => template);
+}
+
 function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: {
   slotId: string;
   label: string;
@@ -354,19 +379,23 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
   onAdd(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const offered = templates.filter((template) => accepts.includes(template.kind));
-  const [selected, setSelected] = useState<string>(offered[0]?.id ?? "");
+  // Design 6.8 (E6): base templates first, then each extension and campaign
+  // items, so the picker can group them by origin. Keys qualify extension IDs.
+  const offered = orderByOrigin(templates.filter((template) => accepts.includes(template.kind)));
+  const [selected, setSelected] = useState<string>(offered[0] === undefined ? "" : templateChoiceKey(offered[0]));
   const [selectedTemplate, setSelectedTemplate] = useState<SlotTemplate | null>(null);
   const [customValues, setCustomValues] = useState<Record<string, unknown>>({ name: "" });
   const [quantity, setQuantity] = useState(1);
   const [pending, setPending] = useState(false);
   const [commandError, setCommandError] = useState("");
   const isCustom = selected === "";
-  const latest = offered.find(template => template.id === selected);
+  // Group only when the choices come from more than one origin.
+  const grouped = new Set(offered.map(originLabel)).size > 1;
+  const latest = offered.find(template => templateChoiceKey(template) === selected);
   const selectionChanged = selectedTemplate?.source?.kind === "campaign" &&
     JSON.stringify(latest?.source) !== JSON.stringify(selectedTemplate.source);
   // Keep the selected option visible while a refresh replaces or removes it.
-  const options = offered.map(template => template.id === selected ? selectedTemplate ?? template : template);
+  const options = offered.map(template => templateChoiceKey(template) === selected ? selectedTemplate ?? template : template);
   if (selectedTemplate && !latest) options.push(selectedTemplate);
   return (
     <>
@@ -377,7 +406,7 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
         data-testid={`slot-add-${slotId}`}
         onClick={() => {
           setCommandError("");
-          setSelected(offered[0]?.id ?? "");
+          setSelected(offered[0] === undefined ? "" : templateChoiceKey(offered[0]));
           setSelectedTemplate(offered[0] ? structuredClone(offered[0]) : null);
           setCustomValues({ name: "" });
           setQuantity(1);
@@ -405,7 +434,9 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
                 ? onAdd(slotId, null, { ...customValues, name: String(customValues.name).trim() }, quantity)
                 : selectedTemplate?.source?.kind === "campaign"
                   ? onAdd(slotId, null, {}, undefined, selectedTemplate.source)
-                  : onAdd(slotId, selectedTemplate!.id, {})).then(
+                  : selectedTemplate?.source?.kind === "system"
+                    ? onAdd(slotId, selectedTemplate.id, {}, undefined, selectedTemplate.source)
+                    : onAdd(slotId, selectedTemplate!.id, {})).then(
                 () => setOpen(false), (error: unknown) => setCommandError(describeCommandError(error)),
               ).finally(() => setPending(false));
             }}
@@ -421,12 +452,16 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
           disabled={disabled || pending}
           onChange={(event) => {
             setSelected(event.target.value);
-            const choice = offered.find(template => template.id === event.target.value);
+            const choice = offered.find(template => templateChoiceKey(template) === event.target.value);
             setSelectedTemplate(choice ? structuredClone(choice) : null);
           }}
           options={[
-            ...options.map((template) => ({ value: template.id, label: template.source?.kind === "campaign" ? `${template.label} · ${t("character.slot.campaign")}` : template.label })),
-            { value: "", label: t("character.slot.customEntry") },
+            ...options.map((template) => ({
+              value: templateChoiceKey(template),
+              label: template.source?.kind === "campaign" ? `${template.label} · ${t("character.slot.campaign")}` : template.label,
+              ...(grouped ? { group: originLabel(template) } : {}),
+            })),
+            { value: "", label: t("character.slot.customEntry"), ...(grouped ? { group: t("character.slot.originPersonal") } : {}) },
           ]}
         />
         {selectionChanged ? <div>
@@ -454,7 +489,7 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
  * against the template catalog passed down from the route.
  */
 export function SlotListControl({ slotId, label, accepts, entries, templates, disabled, actionsDisabled, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, renderEntryImage, characterId, loadRollOptions }: SlotListControlProps) {
-  const byId = new Map(templates.map((template) => [template.id, template]));
+  const byId = new Map(templates.map((template) => [templateChoiceKey(template), template]));
   const grantedDisabled = actionsDisabled ?? disabled;
   return (
     <div data-testid={`slot-list-${slotId}`}>
@@ -478,7 +513,7 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
         ) : (
           <ul className={styles.slotList}>
             {entries.map((entry) => {
-              const template:SlotTemplate|undefined = entry.definition ? {...entry.definition,grantedActions:entry.definition.grantedActions.map(a=>({ ...a, actionKind: a.kind, inputs: a.inputs ?? [] }))} : entry.templateId === null ? undefined : byId.get(entry.templateId);
+              const template:SlotTemplate|undefined = entry.definition ? {...entry.definition,grantedActions:entry.definition.grantedActions.map(a=>({ ...a, actionKind: a.kind, inputs: a.inputs ?? [] }))} : entry.templateId === null ? undefined : byId.get(entry.source?.kind === "system" && entry.source.extensionId !== undefined ? `${entry.source.extensionId}:${entry.templateId}` : entry.templateId);
               const summary = entry.templateId === null && !entry.definition ? null : scalarSummary(entry.values, entry.label);
               return (
                 <li key={entry.entryId} data-system-item data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>

@@ -542,6 +542,14 @@ extensions keep their origin (`added_by`), and the GM add and remove extension
 commands also record the previous composition, so a revert undoes the most recent
 GM change. Adoptions that bring extensions do not record one.
 
+**GUI (E6).** The system library shows a system's extensions and creates one
+on a published base version. The creator opens an extension at
+`/extensions/:extensionId` with Overview, Templates and Publish only; formulas
+are written against the base version's character fields. Character creation
+offers the system's extensions that fit the chosen version; campaigns add them
+in Settings. The item picker groups templates by origin (rules, each extension,
+campaign, your own). Cached item templates are keyed by the composed rules.
+
 **Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
 discovering and previewing published extensions. It depends on OD-07 and needs its
 own plan and approval.

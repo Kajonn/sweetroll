@@ -18900,6 +18900,35 @@
                               }
                             }
                           }
+                        },
+                        "extensions": {
+                          "maxItems": 100,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "name",
+                              "versionId",
+                              "semanticVersion"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "semanticVersion": {
+                                "type": "string"
+                              }
+                            }
+                          }
                         }
                       }
                     },
@@ -69367,6 +69396,9 @@
                           },
                           "extensionId": {
                             "format": "uuid",
+                            "type": "string"
+                          },
+                          "extensionName": {
                             "type": "string"
                           },
                           "defaultQuantity": {

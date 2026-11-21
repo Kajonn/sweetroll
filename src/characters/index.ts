@@ -243,7 +243,13 @@ export type CreateCharacter = {
   idempotencyKey: string;
 };
 
-export type CharacterCreationOptions = VersionDescription;
+export type CharacterCreationOptions = VersionDescription & {
+  /**
+   * Design 6.8 (E6): the system's owned and public extensions at their latest
+   * version that fit this base version, for the optional creation picker.
+   */
+  extensions?: Array<{ extensionId: string; name: string; versionId: VersionId; semanticVersion: string }>;
+};
 
 export type CreationOptionsInput = {
   systemVersionId: VersionId;
@@ -433,6 +439,8 @@ export type EntryTemplateSummary = {
   source?: EntrySource;
   /** Design 6.8: extension of a system template; absent for base templates. */
   extensionId?: string;
+  /** Design 6.8 (E6): the extension's name, so pickers can group by origin. */
+  extensionName?: string;
   defaultQuantity?: number;
   id: DefinitionId;
   label: string;
@@ -1875,8 +1883,17 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           ...(creationInput.includeFields ? { includeFields: true } : {}),
         });
         if (!described.ok) return { ok: false, error: mapRuntimeError(described.error) };
-
-        return { ok: true, value: described.value };
+        if (input.describeCompositionChoices === undefined) return { ok: true, value: described.value };
+        const choices = await input.describeCompositionChoices(ctx, { systemId: authorized.value.systemId, pinned: [] });
+        if (!choices.ok) return { ok: false, error: errors.internal() };
+        const extensions: NonNullable<CharacterCreationOptions["extensions"]> = [];
+        for (const choice of choices.value.available) {
+          const ref = { extensionId: choice.extensionId, versionId: choice.version.versionId };
+          // Only extensions that validate against this base version are offered.
+          if (!(await loadEffective(authorized.value.versionId, [ref])).ok) continue;
+          extensions.push({ ...ref, name: choice.name, semanticVersion: choice.version.semanticVersion });
+        }
+        return { ok: true, value: { ...described.value, extensions } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -2788,13 +2805,23 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             : { ok: false, error: errors.internal() };
         }
         const packageValue: SystemPackageV1 = loaded.value;
+        const extensionNames = new Map<string, string>();
+        if (record.extensions.length > 0) {
+          const names = await modulePool.query<{ id: string; name: string }>(
+            "SELECT id, name FROM systems WHERE id = ANY($1::uuid[])",
+            [record.extensions.map((ref) => ref.extensionId)],
+          );
+          for (const row of names.rows) extensionNames.set(row.id, row.name);
+        }
         // Design 6.8: extension templates are listed by plain ID with their extension.
         const systemChoices: EntryTemplateSummary[] = packageValue.templates.map((template) => {
           const key = unqualifiedId(template.id);
+          const extensionName = key.origin === null ? undefined : extensionNames.get(key.origin);
           return {
             id: key.id,
             ...(key.origin === null ? {} : {
               extensionId: key.origin,
+              ...(extensionName === undefined ? {} : { extensionName }),
               source: { kind: "system" as const, templateId: key.id, extensionId: key.origin },
             }),
             label: template.label,

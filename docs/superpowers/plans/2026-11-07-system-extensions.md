@@ -336,20 +336,40 @@ the design document updated (red → green, per existing plans).
   character tools and campaign Settings; it offers each single change and runs
   the check first (`web/src/characters/compositionChoices.ts`).
 
-### E6 — GUI
+### E6 — GUI — mostly done 2026-11-21
 
 Follow the [GUI integration plan](2026-09-08-gui-integration.md) gates.
 
-- [ ] System library: **Extensions** list per system and **Create extension**.
-- [ ] Creator: extension mode shows Overview, Templates and Publish only, with a
-  base-version selector for preview.
-- [ ] Character creation and campaign creation: optional extension picker with
-  compatible versions.
-- [ ] Item picker groups templates by origin (system name / extension name).
+- [x] System library: **Extensions** per system row lists the owned and public
+  extensions with their latest version, and **Create extension** asks for a
+  name and a published base version (`web/src/extensions/ExtensionsPanel.tsx`).
+- [x] Creator: `/extensions/:extensionId` shows Overview (name, description,
+  base version), Templates and Publish only. The templates editor is the
+  system one without slots; the base version's package (character fields,
+  sheets, slots, reference data) is loaded read-only as formula context, and
+  only metadata, templates and their expressions are saved. Publish shows the
+  server's problems and warnings, the version number, release notes and the
+  breaking acknowledgement (`web/src/extensions/ExtensionEditor.tsx`).
+- [x] Character creation: optional extension checkboxes. The creation options
+  list the system's owned and public extensions at their latest version that
+  validate against the chosen base version (browser route only; `/api/v1`
+  strips them, E7). **Campaign creation** has no picker: since E4 a campaign
+  takes extensions after creation, and campaign Settings → **Rules and
+  extensions** offers **Add** (E5).
+- [x] Item picker groups templates by origin: Rules, each extension by name
+  (`extensionName` on the template list), Campaign, then Your own. Picker keys
+  qualify extension templates, and an extension item is placed with its
+  `extensionId` and source.
 - [x] Character tools **Rules version** becomes **Rules and extensions**; campaign
   Settings likewise. Both run the check before offering a change (with E5).
-- [ ] Offline cache stores the composed rules keyed by `compositionChecksum`.
-- [ ] Browser tests at 360/768/1280px, keyboard path, light/dark.
+- [x] Offline: cached item templates are keyed by the projection's
+  `packageChecksum`, which is the composition checksum (E3), so an extension
+  change drops them; queued offline edits were already keyed by it.
+- [ ] Browser tests: `tests/e2e/extensionAuthoring.spec.ts` covers the library,
+  creator, publish, creation picker and grouped item picker, with no
+  horizontal scroll at 360/768/1280px. **Not done:** a keyboard-only path and
+  light/dark screenshots; template art in the extension editor (art for
+  extension templates is not uploaded from the GUI).
 
 ### E7 — Public API v1 (separate approval)
 

@@ -107,6 +107,7 @@ const runtime = createSystemRuntime({
 });
 
 const characters = createCharactersModule({
+  physicalDiceEnabled: config.physicalDiceEnabled,
     campaignTemplates:createTemplateRepository(pool),
   pool,
   runtime,

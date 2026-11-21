@@ -22,6 +22,7 @@ export type PushEvaluationInput = {
   bindings: EvaluationBindings;
   attempt: number;
   rng: Rng;
+  draw?: import("./evaluate.js").PoolDraw;
   limits: EvaluationLimits;
 };
 export type FaceOutcome = {
@@ -109,13 +110,13 @@ export function evaluatePush(input: PushEvaluationInput): PushEvaluationResult {
     const eligible = new Set(options.eligibleDiceIds);
     const savedDice = new Map(parent.dice.map((die) => [die.id, die]));
     const redrawn = new Set<string>();
-    const result = evaluate(expression, bindings, undefined, limits, (id, chainId) => {
+    const result = evaluate(expression, bindings, undefined, limits, (id, chainId, sides, groupId) => {
       if (!eligible.has(chainId)) {
         const saved = savedDice.get(id);
         if (!saved) throw Error("missing retained die");
         return (saved.value - 0.5) / saved.sides;
       }
-      const draw = input.rng();
+      const draw = input.draw ? input.draw(id, chainId, sides, groupId) : input.rng();
       if (!Number.isFinite(draw) || draw < 0 || draw > 1) throw Error("invalid draw");
       redrawn.add(id);
       return draw;

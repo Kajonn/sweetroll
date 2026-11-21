@@ -18,7 +18,7 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
   let unassigned: TestActor;
 
   beforeAll(async () => {
-    h = await buildI6Harness();
+    h = await buildI6Harness({ physicalDiceEnabled: true });
     // The fixture versions are private by default; shared-table rolls need
     // the campaign version usable by every member.
     await h.pool.query(`UPDATE systems SET access = 'public'`);
@@ -812,6 +812,74 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     const published=await h.app.inject({method:"POST",url:`/systems/${w.system.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.0.0",releaseNotes:"",acknowledgeBreaking:true,idempotencyKey:randomUUID()}});expect(published.statusCode,published.body).toBe(200);
     await h.pool.query("UPDATE systems SET access='public' WHERE id=$1",[w.system.systemId]);return setup(published.json().version.versionId);
   }
+  it("commits a physical campaign pool once and pushes only eligible dice", async () => {
+    const { sharedId } = await setupPushCampaign();
+    const url = `/characters/${sharedId}/physical-rolls`;
+    const post = (path: string, payload: object, actor = h.users.player) =>
+      h.app.inject({ method: "POST", url: path, headers: { cookie: actor.cookie }, payload });
+    const command = { kind: "executeAction", actionId: "test_pool", inputs: { bonus_dice: 1 },
+      expectedRevision: 1, idempotencyKey: randomUUID(), audience: "campaign" };
+    const prepare = await post(url, command);
+    expect(prepare.statusCode, prepare.body).toBe(200);
+    const attempt = prepare.json().attempt;
+    expect((await post(url, command)).json().attempt).toEqual(attempt);
+    expect(await rollCount(sharedId)).toBe(0);
+    const poses = attempt.dice.map((die: { id: string; sides: number }) => ({
+      id: die.id, value: die.sides === 6 ? 3 : 1,
+      orientation: die.sides === 6 ? {x:0,y:0,z:0,w:1} : {x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2},
+      position: { x: 0, y: 1, z: 1 },
+    }));
+    const settled = { tick: 140, dice: poses };
+    const complete = `${url}/${attempt.attemptId}/complete`;
+    expect((await post(complete, settled, h.users.gm)).statusCode).toBe(404);
+    expect((await post(complete, { ...settled, dice: poses.slice(1) })).statusCode).toBe(400);
+    expect((await post(complete, { ...settled, dice: [...poses, poses[0]] })).statusCode).toBe(400);
+    const concurrent = await Promise.all([post(complete, settled), post(complete, settled)]);
+    expect(concurrent.some(r => r.statusCode === 200)).toBe(true);
+    await h.pool.query("UPDATE physical_roll_attempts SET expires_at=now() WHERE id=$1",[attempt.attemptId]);
+    const replay = await post(complete, settled);
+    expect(replay.statusCode, replay.body).toBe(200);
+    const root = replay.json().result.roll;
+    expect(root.total).toBe(0);
+    expect(root.dice.map((d: {value:number}) => d.value)).toEqual(poses.map((p: {value:number}) => p.value));
+    expect((await post(complete, { ...settled, tick: 141 })).statusCode).toBe(409);
+    expect(await rollCount(sharedId)).toBe(1);
+    expect(await count("character_command_executions","actor_id=$1 AND idempotency_key=$2",
+      [h.users.player.actorId,command.idempotencyKey])).toBe(1);
+    expect(await count("campaign_activity_events","kind='roll_executed' AND source_roll_id=$1",
+      [replay.json().result.rollId])).toBe(1);
+    const push = await post(url, {kind:"pushRoll",parentRollId:root.push.rollId,
+      expectedRevision:1,idempotencyKey:randomUUID()});
+    expect(push.statusCode, push.body).toBe(200);
+    const child = push.json().attempt;
+    expect(child.dice.map((d: {id:string}) => d.id)).toEqual(root.dice.filter((d: {groupId:string}) =>
+      d.groupId === "attribute").map((d: {id:string}) => d.id));
+    const rerolled = child.dice.map((d: {id:string}) => ({...poses[0],id:d.id,value:6,
+      orientation:{x:-Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2}}));
+    const finish = await post(`${url}/${child.attemptId}/complete`, {tick: 160, dice: rerolled});
+    expect(finish.statusCode, finish.body).toBe(200);
+    expect(finish.json().result.roll.total).toBe(child.dice.length);
+    expect(await rollCount(sharedId)).toBe(2);
+  });
+
+  it.each(["expired", "revision", "membership"] as const)("rejects a physical settlement after %s changes", async (change) => {
+    const {sharedId,campaignId} = await setup();
+    const url = `/characters/${sharedId}/physical-rolls`;
+    const headers = {cookie:h.users.player.cookie};
+    const prepare = await h.app.inject({method:"POST",url,headers,payload:{kind:"executeAction",actionId:"check",
+      inputs:{bonus:2},expectedRevision:1,idempotencyKey:randomUUID()}});
+    expect(prepare.statusCode,prepare.body).toBe(200);
+    const attempt = prepare.json().attempt;
+    if (change === "expired") await h.pool.query("UPDATE physical_roll_attempts SET expires_at=now() WHERE id=$1",[attempt.attemptId]);
+    if (change === "revision") await h.pool.query("UPDATE characters SET revision=revision+1 WHERE id=$1",[sharedId]);
+    if (change === "membership") await h.pool.query("UPDATE campaign_members SET generation=generation+1 WHERE campaign_id=$1 AND user_id=$2",[campaignId,h.users.player.actorId]);
+    const result = await h.app.inject({method:"POST",url:`${url}/${attempt.attemptId}/complete`,headers,payload:{
+      tick:100,dice:attempt.dice.map((die:{id:string})=>({id:die.id,value:1,position:{x:1,y:0,z:1},
+        orientation:{x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2}}))}});
+    expect(result.statusCode,result.body).toBe(change==="membership"?404:409);
+    expect(await rollCount(sharedId)).toBe(0);
+  });
+
   async function pushRoot(s:Setup,audience:RollAudience="gm_only"){
     const r=await h.characters.apply(ctxFor(h.users.player),{kind:"executeAction",characterId:s.sharedId,actionId:"test_pool",inputs:{bonus_dice:1},expectedRevision:1,idempotencyKey:randomUUID(),audience});expect(r.ok).toBe(true);if(!r.ok)throw Error(JSON.stringify(r.error));return r.value.roll!;
   }

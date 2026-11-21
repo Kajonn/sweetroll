@@ -1,6 +1,6 @@
 # GUI integration implementation plan
 
-The [shared physical dice plan](2026-11-20-physical-dice.md) tracks the optional campaign dice overlay. Slice 1 supplies the six numbered models and calibrated face reader. Player settings, overlay interaction and the hosted multi-user journey remain open.
+The [shared physical dice plan](2026-11-20-physical-dice.md) tracks the optional campaign dice overlay. Slice 1 supplies the six numbered models and calibrated face reader. Slice 2 adds prepare and complete commands for campaign clients. Player settings, overlay interaction and the hosted multi-user journey remain open.
 
 **Play-event overlay follow-up (2026-11-14):** [Event overlay plan](2026-11-14-event-overlay.md) covers roll, push, draw and visible content popups, shared campaign activity refresh, and the local and hosted multi-user journey.
 

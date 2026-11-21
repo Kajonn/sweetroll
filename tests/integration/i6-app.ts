@@ -119,6 +119,7 @@ function cookieFromSignIn(response: {
 }
 
 export async function buildI6Harness(input?: {
+  physicalDiceEnabled?: boolean;
   scanImage?: import("../../src/platform/image-processing.js").ImageScanner;
   /** Wraps the runtime (e.g. to stall resolution for race tests). */
   wrapRuntime?: (runtime: SystemRuntime) => SystemRuntime;
@@ -149,6 +150,7 @@ export async function buildI6Harness(input?: {
   let placement!: CampaignPlacement;
   let campaigns!: Campaigns;
   const handle = await buildI3App({
+    physicalDiceEnabled: input?.physicalDiceEnabled ?? false,
     ...(input?.scanImage ? { scanImage: input.scanImage } : {}),
     pool,
     wrapRuntime: input?.wrapRuntime,

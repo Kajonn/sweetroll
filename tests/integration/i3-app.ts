@@ -71,6 +71,7 @@ export type I3AppHandle = {
 };
 
 export type BuildI3AppInput = {
+  physicalDiceEnabled?: boolean;
   allowPersonalTokens?: boolean;
   scanImage?: import("../../src/platform/image-processing.js").ImageScanner;
   pool: Pool;
@@ -126,6 +127,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
   const effectiveRuntime = input.wrapRuntime === undefined ? runtime : input.wrapRuntime(runtime);
 
   const characters = createCharactersModule({
+    physicalDiceEnabled: input.physicalDiceEnabled ?? false,
     scanImage: input.scanImage ?? (async () => "clean" as const),
     campaignTemplates:createTemplateRepository(input.pool),
     pool: input.pool,

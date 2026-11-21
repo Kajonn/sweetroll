@@ -62,8 +62,10 @@ export type DeckState = { deckId: DefinitionId; shuffleId: string; remaining: De
 /** The stored deck state read under the caller's lock; `state` is null before the deck is first used. */
 export type DeckContext = { state: Pick<DeckState, "shuffleId" | "remaining"> | null };
 
+import type { PhysicalDraws } from "./physical-dice/resolution.js";
+
 export type RuntimeIntent =
-  | {kind:"push";parent:NormalizedRoll;context:PushContext;executionId:string;optionsOnly?:boolean}
+  | {kind:"push";physical?: PhysicalDraws | undefined;parent:NormalizedRoll;context:PushContext;executionId:string;optionsOnly?:boolean}
   | { kind: "initialize"; values?: Record<DefinitionId, unknown> }
   | { kind: "observe" }
   | { kind: "set"; fieldId: DefinitionId; value: unknown }
@@ -74,6 +76,7 @@ export type RuntimeIntent =
   | { kind: "setResource"; resourceId: DefinitionId; current?: unknown; max?: unknown }
   | {
       kind: "action";
+      physical?: PhysicalDraws | undefined;
       actionId: DefinitionId;
       inputs: Record<DefinitionId, unknown>;
       executionId: CommandExecutionId;
@@ -501,7 +504,7 @@ export function createSystemRuntime(input: {
       if (!stateResult.ok) return stateResult;
 
       if(request.intent.kind==="push"){
-        const pushed=resolveRuntimePush({pkg:packageValue,entity,state:stateResult.value,parent:request.intent.parent,context:request.intent.context,executionId:request.intent.executionId,secret:input.authoritativeRollSecret,...(request.intent.optionsOnly?{optionsOnly:true}:{})});
+        const pushed=resolveRuntimePush({pkg:packageValue,entity,state:stateResult.value,parent:request.intent.parent,context:request.intent.context,executionId:request.intent.executionId,secret:input.authoritativeRollSecret,physical:request.intent.physical,...(request.intent.optionsOnly?{optionsOnly:true}:{})});
         if(!pushed.ok)return pushed;roll=pushed.value.roll;pushContext=pushed.value.context;
       } else if (request.intent.kind === "set") {
         const fieldId = request.intent.fieldId;
@@ -550,6 +553,7 @@ export function createSystemRuntime(input: {
           inputs: request.intent.inputs,
           executionId: request.intent.executionId,
           authoritativeRollSecret: input.authoritativeRollSecret,
+          physical: request.intent.physical,
           ...(request.intent.campaignRoll ? { campaignRoll: request.intent.campaignRoll } : {}),
         });
         if (!granted.ok) return granted;
@@ -637,11 +641,14 @@ export function createSystemRuntime(input: {
       const context = resolveRollContext(packageValue, pendingRoll.action, pendingRoll.campaignRoll);
       if (!context.ok) return context;
       Object.assign(bindings, context.value);
+      const physical = request.intent.kind === "action" ? request.intent.physical : undefined;
+      physical?.checkExpression(expression.ast);
       const evaluated = evaluate(
         expression,
         bindings,
         createDeterministicRng(input.authoritativeRollSecret, pendingRoll.executionId),
         packageValue.effectiveLimits,
+        physical?.draw,
       );
       if (!evaluated.ok) {
         return evaluated.diagnostics.some((diagnostic) => diagnostic.code === "budget_exceeded")

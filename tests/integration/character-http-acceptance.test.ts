@@ -256,6 +256,12 @@ describeWithDatabase("characters HTTP acceptance", () => {
     expect(created.statusCode, created.body).toBe(201);
     const c1 = created.json();
     const characterId = c1.character.characterId as string;
+    const disabled = await app.app.inject({
+      method: "POST", url: `/characters/${characterId}/physical-rolls`, headers: cookieHeader(ada),
+      payload: {kind:"executeAction",actionId:"check",inputs:{bonus:2},expectedRevision:1,idempotencyKey:randomUUID()},
+    });
+    expect(disabled.statusCode).toBe(404);
+    expect(disabled.body).toContain("Physical dice are disabled.");
     expect(c1.requestId).toBeTruthy();
     const createView = c1.character;
     expect(createView.revision).toBe(1);

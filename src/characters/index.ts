@@ -1,7 +1,8 @@
+import { createPhysicalRolls, type PhysicalEvidence, type PhysicalRolls } from "./physical-rolls.js";
 import { createCharacterImages, type CharacterImages } from "./images.js";
 import { createCharacterEntryImages, type CharacterEntryImages } from "./entry-images.js";
 import {canPlaceTemplate} from "../campaigns/templatePolicy.js";
-import { campaignRollRequirements, targetEntityIds } from "../systems/implementation/runtime/roll-context.js";
+import { campaignRollRequirements, findProjectedAction, targetEntityIds } from "../systems/implementation/runtime/roll-context.js";
 import { materializeDefaults, slotsForEntity, templateApplicable, validDefaults } from "../systems/implementation/runtime/effective-entry.js";
 import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
 import {pushEligibility} from "../systems/implementation/rules/push.js";
@@ -586,12 +587,14 @@ export type CharacterExportV1 = {
 // ---------------------------------------------------------------------------
 
 type CharacterAccess = { standaloneOnly?: boolean };
+type CommandAccess = CharacterAccess & { physical?: PhysicalEvidence };
 
 export type ReferenceDataRead =
   | { datasets: Array<{ datasetId: string; label: string; records: number }> }
   | { dataset: { datasetId: string; label: string; records: Array<{ id: string; label: string; values: Record<string, string | number | boolean | null> }> } };
 
 export interface Characters extends CharacterImages, CharacterEntryImages {
+  physicalRolls?: PhysicalRolls;
   rollOptions(ctx: RequestContext, request: { characterId: string; actionId: string; entryId?: string }): Promise<CharacterResult<CampaignRollOptions>>;
   readRoll(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<NormalizedRoll>>;
   pushOptions(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<PushOptions>>;
@@ -608,7 +611,7 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
   duplicate(ctx: RequestContext, input: DuplicateCharacter): Promise<CharacterResult<CharacterView>>;
   open(ctx: RequestContext, characterId: CharacterId, access?: CharacterAccess): Promise<CharacterResult<CharacterView>>;
 
-  apply(ctx: RequestContext, input: CharacterCommand, access?: CharacterAccess): Promise<CharacterResult<CharacterCommandResult>>;
+  apply(ctx: RequestContext, input: CharacterCommand, access?: CommandAccess): Promise<CharacterResult<CharacterCommandResult>>;
   /**
    * Task 7: template catalog for one character's sheet add flow, authorized
    * exactly like `open` (standalone owner, attached campaign-authorized).
@@ -655,6 +658,7 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
 }
 
 export type CreateCharactersModuleInput = {
+  physicalDiceEnabled?: boolean;
   scanImage?: import("../platform/image-processing.js").ImageScanner;
   pool: Pool;
   runtime: SystemRuntime;
@@ -1729,7 +1733,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       ? Number(roll.total) : null;
   }
 
-  return {
+  const characters: Characters = {
     ...createCharacterImages({ pool: input.pool, now, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     ...createCharacterEntryImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     async create(ctx, createInput) {
@@ -2330,6 +2334,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           characterId: command.characterId,
           expectedRevision: command.expectedRevision,
           ...payload,
+          ...(access?.physical && { physicalSettlement: access.physical.identity }),
           ...(command.kind === "executeAction"
             ? { audience: command.audience ?? null, entryId: command.entryId ?? null }
             : {}),
@@ -2490,7 +2495,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         }
         const intent =
           command.kind === "pushRoll"
-            ? ({kind:"push",parent:pushParent!.roll,context:pushParent!.context,executionId} as const)
+            ? ({kind:"push",parent:pushParent!.roll,context:pushParent!.context,executionId,physical:access?.physical?.draws} as const)
           : command.kind === "setField"
             ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
             : command.kind === "bumpResource"
@@ -2503,6 +2508,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               ? ({ kind: "setResource", ...resourceSetPayload(command) } as const)
               : ({
                   kind: "action",
+                  physical: access?.physical?.draws,
                   actionId: command.actionId,
                   inputs: command.inputs,
                   executionId,
@@ -2516,7 +2522,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             }
           : null;
         const contextual = selection !== null;
-        const makeCommit = (resolved: RuntimeResolution): ApplyCommandInput => {
+        const makeCommit = (resolved: RuntimeResolution, context?: CampaignRollContext): ApplyCommandInput => {
           const activityKind =
             command.kind === "setField"
               ? "character_field_set"
@@ -2542,6 +2548,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             characterId: command.characterId,
             actorId: ctx.actorId,
             expectedRevision: command.expectedRevision,
+            ...(access?.physical && { precondition: (client: import("pg").PoolClient) =>
+              access.physical!.checkCommit(client, executionId, context) }),
             nextState: resolved.state,
             stateChanged: changedDefinitionIds.length > 0,
             roll,
@@ -2642,7 +2650,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             resolve: (campaignRoll: CampaignRollContext) => {
               const resolved = prepared.value({ state: resolveSource.state, intent: { ...intent, campaignRoll } });
               return resolved.ok
-                ? { ok: true as const, value: makeCommit(resolved.value) }
+                ? { ok: true as const, value: makeCommit(resolved.value, campaignRoll) }
                 : {
                     ok: false as const,
                     error: mapRuntimeError(resolved.error),
@@ -3311,6 +3319,19 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
   };
+  if (input.physicalDiceEnabled) characters.physicalRolls = createPhysicalRolls({
+    pool: input.pool, runtime: input.runtime, now,
+    scope: async (ctx, characterId) => {
+      const snapshot = await loadAttachedSnapshot(ctx, characterId);
+      if (!snapshot) return null;
+      const { record, membership, campaign } = snapshot.auth;
+      return {record, member:toMembershipRecord(membership!), defaultAudience:campaign!.rollAudienceDefault,
+        active:record.lifecycle === "active" && campaign!.status === "active"};
+    },
+    pushOptions: (ctx, options) => characters.pushOptions(ctx, options),
+    apply: (ctx, command, physical) => characters.apply(ctx, command, {physical}),
+  });
+  return characters;
 }
 
 function encodeActivityCursor(cursor: { occurredAtText: string; id: string }): string {
@@ -3364,11 +3385,7 @@ function redactRollIdForReader(
 // inputs), email, external identity, session, or idempotency keys. Only structural identifiers
 // needed to interpret "what happened" are retained; the underlying write-side payload (in
 // persistence.ts) may include more, but the read-side projection here minimizes it.
-function findProjectedAction(projection: CharacterProjectionV1, actionId: string, entryId: string | undefined) {
-  return projection.sheets.flatMap(sheet => sheet.sections).flatMap(section => section.elements)
-    .find((element): element is Extract<typeof element, { kind: "action" }> =>
-      element.kind === "action" && element.actionId === actionId && element.entryId === entryId);
-}
+
 
 function resourceSetPayload(command: CharacterResourceSetCommand): { resourceId: string; current?: number; max?: number } {
   return {

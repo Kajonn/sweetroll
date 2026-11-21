@@ -502,8 +502,8 @@ type ExecutionRow = {
   expires_at: Date;
 };
 
-async function loadCampaignRollContext(
-  client: PoolClient,
+export async function loadCampaignRollContext(
+  client: Pick<PoolClient, "query">,
   record: CharacterRecord,
   member: MembershipRecord,
   selection: DeferredCampaignRoll["selection"],

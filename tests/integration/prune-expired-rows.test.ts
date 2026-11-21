@@ -182,6 +182,7 @@ describeWithDatabase("expired-row pruning (issue #62)", () => {
       personal_access_tokens: 2,
       campaign_invitations: 1,
       display_codes: 1,
+      physical_roll_attempts: 0,
     });
     expect(result.totalDeleted).toBe(13);
 

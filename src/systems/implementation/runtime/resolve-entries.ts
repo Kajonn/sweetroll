@@ -32,6 +32,7 @@ import { buildFieldBindings } from "./state.js";
 import { describeRoll, mergeBindings } from "../rules/outcomes.js";
 
 export type GrantedActionRequest = {
+  physical?: import("../../physical-dice/resolution.js").PhysicalDraws | undefined;
   packageValue: SystemPackageV1;
   entity: EntityDefinitionV1;
   state: RuntimeStateV1;
@@ -155,11 +156,13 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
   const item = itemRuleBindings(request.packageValue, template, observed.value.state.entries[entry.entryId] ?? entry, buildFieldBindings(request.entity, observed.value.state));
   if (!item.ok) return item;
   bindings.item = item.value;
+  request.physical?.checkExpression(expression.ast);
   const evaluated = evaluate(
     expression,
     bindings,
     createDeterministicRng(request.authoritativeRollSecret, request.executionId),
     request.packageValue.effectiveLimits,
+    request.physical?.draw,
   );
   if (!evaluated.ok) {
     return evaluated.diagnostics.some((diagnostic) => diagnostic.code === "budget_exceeded")

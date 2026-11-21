@@ -88,7 +88,7 @@ function bool(v: BindingValue): boolean | undefined {
   return typeof v === "boolean" ? v : undefined;
 }
 
-export type PoolDraw = (id: string, chainId: string) => number;
+export type PoolDraw = (id: string, chainId: string, sides: number, groupId: string) => number;
 
 function integer(node: ExpressionAstV1, ctx: Ctx, name: string, min: number, max = Number.MAX_SAFE_INTEGER): number | undefined {
   const value = evalNode(node, ctx);
@@ -140,7 +140,7 @@ function drawDie(
 ): DieResult | undefined {
   if (ctx.dice.length >= ctx.limits.dicePerRoll)
     return budgetExceeded(ctx, `dice count ${ctx.dice.length + 1} exceeds the ${ctx.limits.dicePerRoll}-die-per-roll limit`);
-  const index = Math.max(1, Math.ceil(ctx.draw(id, chainId) * sides));
+  const index = Math.max(1, Math.ceil(ctx.draw(id, chainId, sides, groupId) * sides));
   const face = custom?.faces[index - 1];
   const die: DieResult = {
     sides, value: face?.value ?? index, kept: true, id, groupId, ...link,

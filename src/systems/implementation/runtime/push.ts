@@ -125,6 +125,7 @@ export function resolveRuntimePush(input: {
   context: PushContext;
   executionId: string;
   secret: string;
+  physical?: import("../../physical-dice/resolution.js").PhysicalDraws | undefined;
   optionsOnly?: boolean;
 }): RuntimeResult<{ roll: NormalizedRoll; context: PushContext }> {
   const { pkg, entity, state, parent, context } = input;
@@ -151,7 +152,9 @@ export function resolveRuntimePush(input: {
     const scope: EvaluationBindings["fields"] = saved[b.scope];
     scope[b.definitionId] = b.value;
   }
+  input.physical?.checkExpression(expression.ast);
   const result = evaluatePush({
+    ...(input.physical && { draw: input.physical.draw }),
     expression,
     policy: context.policy,
     parent,

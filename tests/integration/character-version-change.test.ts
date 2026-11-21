@@ -152,20 +152,22 @@ async function removeEntry(app: App, user: User, characterId: string, revision: 
   return response.json().result.character.revision as number;
 }
 
+// Design 6.7/6.8: a composition without extensions is a plain version change.
 const options = (app: App, user: User, characterId: string) =>
-  app.app.inject({ method: "GET", url: `/characters/${characterId}/version-options`, headers: headers(user) });
+  app.app.inject({ method: "GET", url: `/characters/${characterId}/composition-options`, headers: headers(user) });
 const check = (app: App, user: User, characterId: string, targetVersionId: string) =>
   app.app.inject({
-    method: "GET",
-    url: `/characters/${characterId}/version-check?targetVersionId=${targetVersionId}`,
+    method: "POST",
+    url: `/characters/${characterId}/composition-check`,
     headers: headers(user),
+    payload: { target: { systemVersionId: targetVersionId, extensions: [] } },
   });
 const change = (app: App, user: User, characterId: string, targetVersionId: string, expectedRevision: number, idempotencyKey = randomUUID()) =>
   app.app.inject({
     method: "POST",
-    url: `/characters/${characterId}/version`,
+    url: `/characters/${characterId}/composition`,
     headers: headers(user),
-    payload: { targetVersionId, expectedRevision, idempotencyKey },
+    payload: { target: { systemVersionId: targetVersionId, extensions: [] }, expectedRevision, idempotencyKey },
   });
 
 describeWithDatabase("character system version upgrade and revert", () => {
@@ -182,9 +184,10 @@ describeWithDatabase("character system version upgrade and revert", () => {
       const before = await options(app, ada, created.characterId);
       expect(before.statusCode, before.body).toBe(200);
       expect(before.json().options).toMatchObject({
-        current: { versionId: v1, semanticVersion: "1.0.0" },
+        current: { systemVersion: { versionId: v1, semanticVersion: "1.0.0" }, extensions: [] },
         revertTo: null,
-        upgrades: [{ versionId: v2, semanticVersion: "1.1.0", releaseNotes: "Release 1.1.0" }],
+        systemUpgrades: [{ versionId: v2, semanticVersion: "1.1.0", releaseNotes: "Release 1.1.0" }],
+        available: [],
       });
 
       const checked = await check(app, ada, created.characterId, v2);
@@ -192,6 +195,7 @@ describeWithDatabase("character system version upgrade and revert", () => {
       expect(checked.json().check).toMatchObject({
         revision,
         direction: "upgrade",
+        change: { kind: "system_upgrade", fromVersionId: v1, toVersionId: v2 },
         report: {
           ok: true,
           blockers: [],
@@ -232,12 +236,17 @@ describeWithDatabase("character system version upgrade and revert", () => {
       });
 
       const after = await options(app, ada, created.characterId);
-      expect(after.json().options).toMatchObject({ current: { versionId: v2 }, revertTo: { versionId: v1 }, upgrades: [] });
+      expect(after.json().options).toMatchObject({
+        current: { systemVersion: { versionId: v2 } },
+        revertTo: { systemVersion: { versionId: v1 }, extensions: [] },
+        systemUpgrades: [],
+      });
 
       revision = await addEntry(app, ada, created.characterId, revision, SHIELD, "shield");
       const blockedCheck = await check(app, ada, created.characterId, v1);
       expect(blockedCheck.json().check).toMatchObject({
         direction: "revert",
+        change: { kind: "revert" },
         report: { ok: false, blockers: [{ code: "entry_template_missing", entryId: SHIELD }] },
       });
       const blocked = await change(app, ada, created.characterId, v1, revision);
@@ -252,7 +261,7 @@ describeWithDatabase("character system version upgrade and revert", () => {
       expect(back.state.entries[SWORD].values).toEqual({ weapon_bonus: 1, weight: 3 });
 
       const final = await options(app, ada, created.characterId);
-      expect(final.json().options).toMatchObject({ current: { versionId: v1 }, revertTo: null, upgrades: [{ versionId: v2 }] });
+      expect(final.json().options).toMatchObject({ current: { systemVersion: { versionId: v1 } }, revertTo: null, systemUpgrades: [{ versionId: v2 }] });
     } finally {
       await app.cleanup();
     }

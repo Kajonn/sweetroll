@@ -15,3 +15,26 @@ export const CharacterDecksSchema = Type.Array(Type.Object({
   total: Type.Integer({ minimum: 1, maximum: 200 }),
   remaining: Type.Integer({ minimum: 0, maximum: 200 }),
 }), { maxItems: 4 });
+
+/** Design 6.1 (SRD gaps S2): the reference tables of a system, readable by everyone who may use it. */
+export const ReferenceDataListSchema = Type.Array(Type.Object({
+  datasetId: Type.String(),
+  label: Type.String(),
+  records: Type.Integer({ minimum: 0, maximum: 1000 }),
+}), { maxItems: 64 });
+export const ReferenceDatasetSchema = Type.Object({
+  datasetId: Type.String(),
+  label: Type.String(),
+  records: Type.Array(Type.Object({
+    id: Type.String(),
+    label: Type.String(),
+    values: Type.Record(Type.String(), Type.Union([Type.String(), Type.Number(), Type.Boolean(), Type.Null()])),
+  }), { maxItems: 1000 }),
+});
+
+/** Design 6.3 (S6): saved rolls the reader may apply to a resource of this character. */
+export const ApplicableRollsSchema = Type.Array(Type.Object({
+  rollId: Type.String(),
+  output: Type.String(),
+  total: Type.Number(),
+}), { maxItems: 20 });

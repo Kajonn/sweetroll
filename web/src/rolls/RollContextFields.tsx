@@ -5,10 +5,10 @@ import type { CampaignRollSelection, RollOptionsResponse } from "../characters/t
 import { t } from "../i18n/index.js";
 import { Button, Select } from "../ui/index.js";
 
-export type RollRequirements = { target?: { entityId: string }; respondsTo?: true };
+export type RollRequirements = { target?: { entityId: string; otherEntityIds?: string[]; optional?: true }; respondsTo?: true };
 
 export function hasRollSelection(requirements: RollRequirements, selection: CampaignRollSelection): boolean {
-  return (!requirements.target || Boolean(selection.targetCharacterId))
+  return (!requirements.target || requirements.target.optional === true || Boolean(selection.targetCharacterId))
     && (!requirements.respondsTo || Boolean(selection.respondsTo));
 }
 
@@ -57,7 +57,8 @@ export function RollContextFields({
       value={selection.targetCharacterId ?? ""}
       disabled={disabled || loading || options.targets.length === 0}
       options={[
-        { value: "", label: t(options.targets.length === 0 ? "character.action.noTargets" : "character.action.selectTarget") },
+        { value: "", label: t(requirements.target.optional ? "character.action.noTargetOptional"
+          : options.targets.length === 0 ? "character.action.noTargets" : "character.action.selectTarget") },
         ...options.targets.map(target => ({ value: target.characterId, label: target.name })),
       ]}
       onChange={event => onChange({ ...selection, targetCharacterId: event.target.value })}

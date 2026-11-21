@@ -115,6 +115,8 @@ const characters = createCharactersModule({
   listAuthorizedVersions: authoring.listAuthorizedVersions,
   listUpgradeTargets: authoring.listUpgradeTargets,
   describeVersionChoices: authoring.describeVersionChoices,
+  listExtensionUpgradeTargets: extensionAuthoring.listUpgradeTargets,
+  describeCompositionChoices: extensionAuthoring.describeCompositionChoices,
 });
 
 // I6 Task 9 (fix): one shared campaign policy/placement implementation. The
@@ -147,6 +149,8 @@ const campaigns = createCampaignsModule({
     authorizeExtensionUse: extensionAuthoring.authorizeExtensionUse,
     listUpgradeTargets: authoring.listUpgradeTargets,
     describeVersionChoices: authoring.describeVersionChoices,
+    listExtensionUpgradeTargets: extensionAuthoring.listUpgradeTargets,
+    describeCompositionChoices: extensionAuthoring.describeCompositionChoices,
 });
 
 const app = buildHttpApp({
@@ -181,7 +185,7 @@ registerApiRoutes(app, [
   buildCharactersRoutes({ characters }),
   buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
 ], serveStatic, { pool });
-void app.register(buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime }), { prefix: publicApiPrefix });
+void app.register(buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime, extensions: extensionAuthoring }), { prefix: publicApiPrefix });
 void app.register(
   buildDevSignInRoutes({
     identity,

@@ -1,3 +1,4 @@
+import { RulesPanel } from "./RulesPanel.js";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { CampaignsApi } from "../campaigns/api.js";
@@ -355,6 +356,16 @@ function CharacterDetailLoaded({
         onBump={session.bumpResource}
         onAdjustResource={session.adjustResource}
         onSetResource={session.setResource}
+        {...(api.applicableRolls && api.applyRoll && online ? {
+          loadApplicableRolls: async () => (await api.applicableRolls!(characterId)).rolls,
+          // Online-only: the server applies a saved roll, then the sheet reads the result.
+          onApplyRoll: async (resourceId: string, rollId: string, direction: "subtract" | "add") => {
+            await api.applyRoll!(characterId, resourceId, {
+              rollId, direction, expectedRevision: snapshot.confirmed!.revision, idempotencyKey: randomUUID(),
+            });
+            await session.refresh();
+          },
+        } : {})}
         onExecuteAction={session.executeAction}
         onAddEntry={(slotId, templateId, values, quantity, source) => session.addEntry(slotId, templateId, values, quantity, source)}
         onRemoveEntry={session.removeEntry}
@@ -376,6 +387,7 @@ function CharacterDetailLoaded({
           {t("character.conflict.title")}
         </button>
       ) : null}
+      <RulesPanel characterId={characterId} api={api} />
       <CharacterTools characterId={characterId} api={api} session={session} />
       {showRecovery ? <RecoveryNav cached={cached} navigation={navigation} /> : null}
     </div>

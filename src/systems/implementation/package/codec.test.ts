@@ -49,7 +49,7 @@ describe("system package codecs", () => {
         {
           code: "document_too_large",
           path: "",
-          message: "Input exceeds 1048576 bytes.",
+          message: `Input exceeds ${PACKAGE_LIMITS.encodedBytes} bytes.`,
         },
       ],
     });

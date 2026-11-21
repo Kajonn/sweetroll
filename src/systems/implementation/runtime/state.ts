@@ -29,7 +29,9 @@ export function initializeState(
       ? values[field.id]
       : field.kind === "image"
         ? null
-        : structuredClone(field.default);
+        : field.kind === "resource" && field.startFull === true
+          ? { current: field.default.max, max: field.default.max }
+          : structuredClone(field.default);
     const decoded = decodeFieldValue(field, value, supplied);
     if (!decoded.ok) return decoded;
     stored[field.id] = decoded.value;

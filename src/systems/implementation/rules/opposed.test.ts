@@ -50,3 +50,41 @@ describe("campaign roll expression scopes", () => {
     expect(check("d20 - target.proficient", { target: { entityId: "character" } }).ok).toBe(false);
   });
 });
+
+describe("several target entities and optional targets (SRD gaps S7)", () => {
+  /** d20 with a second entity that shares `defense` but not `modifier`. */
+  function twoEntities(source: string, target: RollActionV1["target"], outcome?: string) {
+    const document = structuredClone(d20Document);
+    document.entities.push({ id: "beast", label: "Beast", kind: "npc", fields: [
+      { kind: "integer", id: "defense", label: "Defense", default: 10, min: 0, max: 30, step: 1, required: false },
+    ] });
+    const action = document.actions[0]!;
+    if (action.kind !== "roll") throw Error("check must be a roll");
+    action.target = target!;
+    document.expressions.find(expression => expression.id === "check_expr")!.source = source;
+    if (outcome !== undefined) {
+      action.outcomes = [{ id: "hit", label: "Hit", expressionId: "hit_expr" }, { id: "rolled", label: "Rolled", expressionId: "any_expr" }];
+      action.details = [{ id: "defense", label: "Defense", expressionId: "target_defense_expr" }];
+      document.expressions.push(
+        { id: "hit_expr", context: "outcome", resultType: "boolean", source: outcome, fallback: false },
+        { id: "any_expr", context: "outcome", resultType: "boolean", source: "true", fallback: false },
+        { id: "target_defense_expr", context: "outcome", resultType: "number", source: "target.defense", fallback: 0 },
+      );
+    }
+    return compileDocument(document, {
+      systemId: "00000000-0000-4000-8000-000000000000", versionId: "00000000-0000-4000-8000-000000000001", semanticVersion: "1.0.0",
+    });
+  }
+
+  it("reads only the fields every target entity defines", () => {
+    expect(twoEntities("d20 - target.defense", { entityId: "character", otherEntityIds: ["beast"] }).ok).toBe(true);
+    expect(twoEntities("d20 - target.modifier", { entityId: "character", otherEntityIds: ["beast"] }).ok).toBe(false);
+    expect(twoEntities("d20", { entityId: "character", otherEntityIds: ["missing"] }).ok).toBe(false);
+  });
+
+  it("keeps an optional target out of the roll and lets outcomes and details read it", () => {
+    const target = { entityId: "character", otherEntityIds: ["beast"], optional: true as const };
+    expect(twoEntities("d20 - target.defense", target).ok).toBe(false);
+    expect(twoEntities("d20", target, "roll.total >= target.defense").ok).toBe(true);
+  });
+});

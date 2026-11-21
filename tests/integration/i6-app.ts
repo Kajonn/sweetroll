@@ -172,6 +172,8 @@ export async function buildI6Harness(input?: {
     authorizeExtensionUse: extensions.authorizeExtensionUse,
     listUpgradeTargets: authoring.listUpgradeTargets,
     describeVersionChoices: authoring.describeVersionChoices,
+    listExtensionUpgradeTargets: extensions.listUpgradeTargets,
+    describeCompositionChoices: extensions.describeCompositionChoices,
       });
       const browser = buildCampaignsRoutes({ campaigns, characters, runtime, identity });
       if (!input?.publicApi) return browser;
@@ -179,7 +181,7 @@ export async function buildI6Harness(input?: {
         browser,
         buildPersonalTokenRoutes({ identity }),
         (app, _opts, done) => {
-          void app.register(buildPublicApi({ identity, authoring, characters, runtime, campaigns, pool }), { prefix: publicApiPrefix });
+          void app.register(buildPublicApi({ identity, authoring, characters, runtime, campaigns, pool, extensions }), { prefix: publicApiPrefix });
           done();
         },
       ];

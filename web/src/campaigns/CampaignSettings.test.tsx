@@ -31,9 +31,10 @@ describe("CampaignSettingsView", () => {
     const V2 = "11111111-1111-4000-8000-000000000002";
     const options = {
       options: {
-        current: { versionId: "v1", systemId: "s1", semanticVersion: "1.0.0", releaseNotes: "", createdAt: "2026-11-01T00:00:00Z" },
+        current: { systemVersion: { versionId: "v1", systemId: "s1", semanticVersion: "1.0.0", releaseNotes: "", createdAt: "2026-11-01T00:00:00Z" }, extensions: [] },
         revertTo: null,
-        upgrades: [{ versionId: V2, systemId: "s1", semanticVersion: "1.1.0", releaseNotes: "", createdAt: "2026-11-05T00:00:00Z" }],
+        systemUpgrades: [{ versionId: V2, systemId: "s1", semanticVersion: "1.1.0", releaseNotes: "", createdAt: "2026-11-05T00:00:00Z" }],
+        available: [],
       },
       requestId: "r",
     };
@@ -48,7 +49,8 @@ describe("CampaignSettingsView", () => {
         campaignVersionOptions: vi.fn().mockResolvedValue(options),
         campaignVersionCheck: vi.fn().mockResolvedValue({
           check: {
-            revision: 5, direction: "upgrade", fromVersionId: "v1", toVersionId: V2, ok,
+            revision: 5, direction: "upgrade", change: { kind: "system_upgrade", fromVersionId: "v1", toVersionId: V2 },
+            fromVersionId: "v1", toVersionId: V2, from: { systemVersionId: "v1", extensions: [] }, to: { systemVersionId: V2, extensions: [] }, ok,
             characters: [{ characterId: "ch1", name: "Aria", ok, report: report(ok) }],
             templates: [{ templateId: "t1", name: "Captain's sword", ok: true, blockers: [] }],
           },
@@ -64,14 +66,14 @@ describe("CampaignSettingsView", () => {
       const onChanged = vi.fn();
       render(<CampaignSettingsView api={api as never} campaign={campaign as never} isGm onChanged={onChanged} />, { wrapper: wrapper() });
       await user.click(await screen.findByRole("radio", { name: /Upgrade to 1\.1\.0/ }));
-      expect(api.campaignVersionCheck).toHaveBeenCalledWith("c1", V2);
+      expect(api.campaignVersionCheck).toHaveBeenCalledWith("c1", { systemVersionId: V2, extensions: [] });
       expect(await screen.findByText(/1 character\(s\) and 1 campaign item\(s\) can move/)).toBeInTheDocument();
       expect(screen.getByRole("region", { name: "Aria" })).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Upgrade" }));
       const dialog = await screen.findByRole("dialog");
       await user.click(within(dialog).getByRole("button", { name: "Upgrade" }));
       await vi.waitFor(() => expect(api.changeCampaignVersion).toHaveBeenCalledWith("c1", expect.objectContaining({
-        targetVersionId: V2,
+        target: { systemVersionId: V2, extensions: [] },
         expectedCampaignRevision: 5,
       })));
       expect(typeof api.changeCampaignVersion.mock.calls[0]![1].idempotencyKey).toBe("string");

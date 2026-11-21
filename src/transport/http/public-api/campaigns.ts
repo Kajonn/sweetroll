@@ -179,6 +179,7 @@ export function registerCampaignRoutes(route: Route, { campaigns, characters, ru
     const prepared = await prepareCampaignCharacter(runtime, {
       systemVersionId: opened.value.systemVersionId, entityDefinitionId: body.entityDefinitionId,
       ...(body.initialValues === undefined ? {} : { initialValues: body.initialValues }),
+      ...(body.presetId === undefined ? {} : { presetId: body.presetId }),
     });
     if (!prepared.ok) return prepared;
     const placed = await campaigns.createCampaignCharacter(ctx, {

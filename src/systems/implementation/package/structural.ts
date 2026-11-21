@@ -220,7 +220,8 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
 
   const validateFieldData = (field: SystemDocumentV1["entities"][number]["fields"][number], path: string, template: boolean) => {
     if (field.kind === "resource" && field.maxExpressionId !== undefined) {
-      missing(!template && expressionIds.has(field.maxExpressionId), `${path}/maxExpressionId`);
+      // Design 6.4 (SRD gaps S11): a template resource may have a calculated maximum; extension templates may not.
+      missing(!(template && extension) && expressionIds.has(field.maxExpressionId), `${path}/maxExpressionId`);
     }
     if (extension || (field.kind !== "singleChoice" && field.kind !== "multiChoice") || field.optionsFrom === undefined) return;
     const dataset = value.referenceData.find(table => table.id === field.optionsFrom);
@@ -298,6 +299,8 @@ function validateStructure(value: StructuralValue, prefix: string, extension: bo
       missingOutcomeExpressions(action, `/actions/${actionIndex}`);
     } else if (action.kind === "draw" || action.kind === "shuffle") {
       missing(deckIds.has(action.deckId), `/actions/${actionIndex}/deckId`);
+    } else if (action.kind === "resourceBatch") {
+      action.steps.forEach((step, stepIndex) => missing(resourceIds.has(step.resourceId), `/actions/${actionIndex}/steps/${stepIndex}/resourceId`));
     } else {
       missing(resourceIds.has(action.resourceId), `/actions/${actionIndex}/resourceId`);
     }

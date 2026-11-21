@@ -6,7 +6,8 @@ import type { CharactersApi } from "./api.js";
 import { focusFirst, trapTabKey } from "./dialogTrap.js";
 import type { CharacterSession } from "./session.js";
 import type { VersionCheckResponse, VersionOptionsResponse } from "./types.js";
-import { VersionReportSummary, versionLabel } from "./VersionReport.js";
+import { VersionReportSummary } from "./VersionReport.js";
+import { compositionChoices, compositionLabel, confirmLabel, type CompositionChoice } from "./compositionChoices.js";
 import styles from "./characters.module.css";
 
 type Props = {
@@ -19,13 +20,14 @@ type Props = {
 };
 
 /**
- * Design 6.7 character rules-version dialog: list the revert target and
- * later versions, run the server dry run for one choice, and only then
- * offer the change. The change goes through the session (online only).
+ * Design 6.7/6.8 "Rules and extensions" dialog: list the revert target, later
+ * base versions and the extension changes (upgrade, add, remove), run the
+ * server dry run for one choice, and only then offer the change. The change
+ * goes through the session (online only).
  */
 export function VersionDialog({ characterId, api, session, blocked, onClose }: Props) {
   const [options, setOptions] = useState<VersionOptionsResponse["options"] | null>(null);
-  const [target, setTarget] = useState<string | null>(null);
+  const [target, setTarget] = useState<CompositionChoice | null>(null);
   const [check, setCheck] = useState<VersionCheckResponse["check"] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(true);
@@ -50,13 +52,13 @@ export function VersionDialog({ characterId, api, session, blocked, onClose }: P
     if (error !== null) errorRef.current?.focus();
   }, [error]);
 
-  const choose = async (versionId: string) => {
-    setTarget(versionId);
+  const choose = async (choice: CompositionChoice) => {
+    setTarget(choice);
     setCheck(null);
     setError(null);
     setBusy(true);
     try {
-      setCheck((await api.versionCheck(characterId, versionId)).check);
+      setCheck((await api.versionCheck(characterId, choice.target)).check);
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : t("version.checkFailed"));
     } finally {
@@ -69,7 +71,7 @@ export function VersionDialog({ characterId, api, session, blocked, onClose }: P
     setBusy(true);
     setError(null);
     try {
-      await session.changeVersion(target);
+      await session.changeVersion(target.target);
       onClose();
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : t("version.changeFailed"));
@@ -77,10 +79,7 @@ export function VersionDialog({ characterId, api, session, blocked, onClose }: P
     }
   };
 
-  const choices = options === null ? [] : [
-    ...(options.revertTo === null ? [] : [{ choice: options.revertTo, revert: true }]),
-    ...options.upgrades.map((choice) => ({ choice, revert: false })),
-  ];
+  const choices = options === null ? [] : compositionChoices(options);
 
   return (
     <div
@@ -98,22 +97,22 @@ export function VersionDialog({ characterId, api, session, blocked, onClose }: P
       {error !== null ? <p ref={errorRef} tabIndex={-1} role="alert">{error}</p> : null}
       {options === null ? null : (
         <>
-          <p>{t("version.current", { version: versionLabel(options.current) })}</p>
+          <p>{t("version.current", { version: compositionLabel(options.current) })}</p>
           {choices.length === 0 ? <p>{t("version.none")}</p> : (
             <fieldset>
               <legend>{t("version.choose")}</legend>
-              {choices.map(({ choice, revert }) => (
-                <label key={choice.versionId} className={styles.versionChoice}>
+              {choices.map((choice) => (
+                <label key={choice.key} className={styles.versionChoice}>
                   <input
                     type="radio"
                     name="target-version"
-                    value={choice.versionId}
-                    checked={target === choice.versionId}
+                    value={choice.key}
+                    checked={target?.key === choice.key}
                     disabled={busy}
-                    onChange={() => void choose(choice.versionId)}
+                    onChange={() => void choose(choice)}
                   />
-                  {t(revert ? "version.revertTo" : "version.upgradeTo", { version: versionLabel(choice) })}
-                  {choice.releaseNotes.length > 0 ? <span className={styles.versionNotes}>{choice.releaseNotes}</span> : null}
+                  {choice.label}
+                  {choice.notes.length > 0 ? <span className={styles.versionNotes}>{choice.notes}</span> : null}
                 </label>
               ))}
             </fieldset>
@@ -129,7 +128,7 @@ export function VersionDialog({ characterId, api, session, blocked, onClose }: P
           disabled={busy || blocked || check === null || !check.report.ok}
           onClick={() => void confirm()}
         >
-          {t(check?.direction === "revert" ? "version.confirmRevert" : "version.confirmUpgrade")}
+          {confirmLabel(check?.change)}
         </Button>
         <Button type="button" variant="secondary" disabled={busy && check !== null} onClick={onClose}>
           {t("character.tools.close")}

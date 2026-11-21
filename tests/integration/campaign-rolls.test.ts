@@ -814,6 +814,59 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     const published=await h.app.inject({method:"POST",url:`/systems/${w.system.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.0.0",releaseNotes:"",acknowledgeBreaking:true,idempotencyKey:randomUUID()}});expect(published.statusCode,published.body).toBe(200);
     await h.pool.query("UPDATE systems SET access='public' WHERE id=$1",[w.system.systemId]);return setup(published.json().version.versionId);
   }
+  it("commits a personal physical Check once and keeps it private to the owner", async () => {
+    const created = await h.characters.create(ctxFor(h.users.player), {
+      systemVersionId: h.versionId, entityDefinitionId: "character", name: "Personal physical Check",
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw Error(JSON.stringify(created.error));
+    const id = created.value.characterId;
+    const url = `/characters/${id}/physical-rolls`;
+    const post = (path: string, payload: object, actor = h.users.player) =>
+      h.app.inject({ method: "POST", url: path, headers: { cookie: actor.cookie }, payload });
+    const command = { kind: "executeAction", actionId: "check", inputs: { bonus: 2 },
+      expectedRevision: created.value.revision, idempotencyKey: randomUUID() };
+    expect((await post(url, command, h.users.other)).statusCode).toBe(404);
+    expect((await post(url, { ...command, audience: "campaign" })).statusCode).toBe(400);
+    const prepared = await post(url, command);
+    expect(prepared.statusCode, prepared.body).toBe(200);
+    const { attempt } = prepared.json();
+    expect(attempt.audience).toBe("owner_only");
+    expect((await post(url, command)).json().attempt).toEqual(attempt);
+    expect(await rollCount(id)).toBe(0);
+    const settlement = { tick: 100, dice: attempt.dice.map((die: { id: string }) => ({
+      id: die.id, value: 1, position: { x: 0, y: 0, z: 1 },
+      orientation: { x: Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 },
+    })) };
+    const complete = `${url}/${attempt.attemptId}/complete`;
+    expect((await post(complete, settlement, h.users.other)).statusCode).toBe(404);
+    const finished = await post(complete, settlement);
+    expect(finished.statusCode, finished.body).toBe(200);
+    const result = finished.json().result;
+    expect(result.roll).toMatchObject({ audience: "owner_only", dice: [{ value: 1 }] });
+    const replay = await post(complete, settlement);
+    expect(replay.statusCode, replay.body).toBe(200);
+    expect(replay.json().result).toMatchObject({ rollId: result.rollId, roll: result.roll,
+      character: { reconciliation: { replayed: true } } });
+    expect(await rollCount(id)).toBe(1);
+    expect((await h.pool.query("SELECT scope_campaign_id FROM character_rolls WHERE character_id=$1", [id])).rows)
+      .toEqual([{ scope_campaign_id: null }]);
+
+    const pendingResponse = await post(url, { ...command, idempotencyKey: randomUUID() });
+    expect(pendingResponse.statusCode, pendingResponse.body).toBe(200);
+    const pending = pendingResponse.json().attempt;
+    const { campaignId } = await setup();
+    const adoption = await inPlacementTxn(async (client) => h.placement.adopt(client, ctxFor(h.users.player), {
+      campaignId, characterId: id, expectedCharacterRevision: result.character.revision,
+      expectedCampaignRevision: await campaignRevision(campaignId), membershipGeneration: 1, acknowledgedDisclosure: true,
+      idempotencyKey: randomUUID(),
+    }));
+    expect(adoption.ok).toBe(true);
+    expect((await post(`${url}/${pending.attemptId}/complete`, { ...settlement,
+      dice: pending.dice.map((die: { id: string }) => ({ ...settlement.dice[0], id: die.id })) })).statusCode).toBe(404);
+    expect(await rollCount(id)).toBe(1);
+  });
+
   it("streams a private physical roll only to the roller and recovers a pending start on reconnect", async () => {
     const { sharedId, campaignId } = await setup();
     const hub = createSceneEventHub({connection:{connectionString:databaseUrl!}});

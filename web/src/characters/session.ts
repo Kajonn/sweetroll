@@ -181,7 +181,7 @@ export type CreateCharacterSessionInput = {
   coordination: CoordinationPort;
   now: () => string;
   newId: () => string;
-  captureDicePreparation?: () => PrepareDice | undefined;
+  captureDicePreparation?: (campaignId: string | null) => PrepareDice | undefined;
   captureRollPublisher?: () => ((response: CommandResultResponse, startedAt: string) => void) | undefined;
 };
 
@@ -696,7 +696,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function maybePrepareDice(request: FrozenRequest): Promise<FrozenRequest> {
-    const prepare = confirmed?.campaignId ? input.captureDicePreparation?.() : undefined;
+    const prepare = confirmed && input.captureDicePreparation?.(confirmed.campaignId);
     if (!prepare) return request;
     phase = "sending";
     emit();

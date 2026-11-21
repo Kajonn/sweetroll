@@ -1,6 +1,36 @@
 import { expect, test } from "../fixtures/browserTest.js";
 import { json, key, publish, pushDocument, signIn, workspace } from "../fixtures/configurablePush.js";
 
+test("renders Check on a standalone sheet and saves one private result", async ({ page }) => {
+  test.skip(process.env.SWEETROLL_PHYSICAL_DICE !== "true", "Requires physical dice on the server");
+  const versionId = "a0000000-0000-5000-8000-000000000002";
+  await signIn(page, "code-test-b");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const { character } = await json(page.request, "POST", "/api/characters", {
+    systemVersionId: versionId, entityDefinitionId: "character", name: `Personal Check ${key()}`, idempotencyKey: key(),
+  });
+  const path = `/api/characters/${character.characterId}`;
+  const campaignStreams: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().endsWith("/physical-rolls/events")) campaignStreams.push(request.url());
+  });
+  await page.goto(`/characters/${character.characterId}`);
+  const rolled = page.waitForResponse((response) => response.request().method() === "POST" &&
+    (response.url().endsWith("/actions/check") || response.url().endsWith("/complete")));
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  const canvas = page.locator('[data-testid="physical-dice-canvas"][data-dice-ready="true"]');
+  const outcome = await rolled;
+  expect(outcome.url()).toContain("/physical-rolls/");
+  await expect(canvas).toBeVisible();
+  expect(outcome.status()).toBe(200);
+  const { result } = await outcome.json();
+  expect(result.roll.audience).toBe("owner_only");
+  const history = await json(page.request, "GET", `${path}/activity`);
+  expect(history.events.filter((event: { rollId: string }) => event.rollId !== null).map((event: { rollId: string }) => event.rollId))
+    .toEqual([result.rollId]);
+  expect(campaignStreams).toEqual([]);
+});
+
 test("shares a physical throw from a roller who hides the 3D overlay", async ({ page, browser, baseURL }) => {
   test.skip(
     process.env.SWEETROLL_PHYSICAL_DICE !== "true",

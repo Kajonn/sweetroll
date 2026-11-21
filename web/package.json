@@ -10,11 +10,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node scripts/run-e2e.mjs",
+    "test:physics": "playwright test --config playwright.physics.config.ts",
     "test:offline": "playwright test --config playwright.offline.config.ts",
     "test:e2e:update": "playwright test --update-snapshots",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@dimforge/rapier3d-deterministic-compat": "0.21.0",
     "@hookform/resolvers": "3.9.0",
     "@radix-ui/react-dialog": "1.1.2",
     "@radix-ui/react-popover": "1.1.2",

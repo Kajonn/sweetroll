@@ -42087,12 +42087,133 @@
                         {
                           "type": "object",
                           "required": [
+                            "launch",
                             "attemptId",
                             "expiresAt",
                             "audience",
                             "dice"
                           ],
                           "properties": {
+                            "launch": {
+                              "type": "object",
+                              "required": [
+                                "version",
+                                "seed",
+                                "startsAt",
+                                "bodies"
+                              ],
+                              "properties": {
+                                "version": {
+                                  "const": "rapier-v1",
+                                  "type": "string"
+                                },
+                                "seed": {
+                                  "minimum": 0,
+                                  "maximum": 4294967295,
+                                  "type": "integer"
+                                },
+                                "startsAt": {
+                                  "format": "date-time",
+                                  "type": "string"
+                                },
+                                "bodies": {
+                                  "minItems": 1,
+                                  "maxItems": 100,
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "position",
+                                      "orientation",
+                                      "linearVelocity",
+                                      "angularVelocity"
+                                    ],
+                                    "properties": {
+                                      "position": {
+                                        "type": "object",
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      },
+                                      "orientation": {
+                                        "type": "object",
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z",
+                                          "w"
+                                        ],
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          },
+                                          "w": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      },
+                                      "linearVelocity": {
+                                        "type": "object",
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      },
+                                      "angularVelocity": {
+                                        "type": "object",
+                                        "required": [
+                                          "x",
+                                          "y",
+                                          "z"
+                                        ],
+                                        "properties": {
+                                          "x": {
+                                            "type": "number"
+                                          },
+                                          "y": {
+                                            "type": "number"
+                                          },
+                                          "z": {
+                                            "type": "number"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
                             "attemptId": {
                               "format": "uuid",
                               "type": "string"

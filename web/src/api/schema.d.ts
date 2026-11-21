@@ -13132,6 +13132,36 @@ export interface operations {
                 content: {
                     "application/json": {
                         attempt: {
+                            launch: {
+                                /** @constant */
+                                version: "rapier-v1";
+                                seed: number;
+                                /** Format: date-time */
+                                startsAt: string;
+                                bodies: {
+                                    position: {
+                                        x: number;
+                                        y: number;
+                                        z: number;
+                                    };
+                                    orientation: {
+                                        x: number;
+                                        y: number;
+                                        z: number;
+                                        w: number;
+                                    };
+                                    linearVelocity: {
+                                        x: number;
+                                        y: number;
+                                        z: number;
+                                    };
+                                    angularVelocity: {
+                                        x: number;
+                                        y: number;
+                                        z: number;
+                                    };
+                                }[];
+                            };
                             /** Format: uuid */
                             attemptId: string;
                             /** Format: date-time */

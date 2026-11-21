@@ -7,6 +7,7 @@ import {
 } from "../../build/offline-assets.js";
 
 const bundle = {
+  "dice/v1/worker.js": { fileName: "dice/v1/worker.js" },
   "index.html": { fileName: "index.html" },
   "assets/index-abc.js": { fileName: "assets/index-abc.js" },
   "assets/lazy-chunk-def.js": { fileName: "assets/lazy-chunk-def.js" },
@@ -29,6 +30,7 @@ describe("buildOfflineManifest", () => {
   it("excludes sourcemaps and never lists API/export bodies", () => {
     const manifest = buildOfflineManifest(bundle, "build-1");
     expect(manifest.assets.some(asset => asset.endsWith(".map"))).toBe(false);
+    expect(manifest.assets).not.toContain("/dice/v1/worker.js");
     expect(manifest.assets.some(asset => asset.startsWith("/api"))).toBe(false);
     expect(manifest.assets.some(asset => asset.includes("export"))).toBe(false);
   });

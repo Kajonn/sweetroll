@@ -397,10 +397,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   function assertMutationAllowed(options?: { offlineIntent?: boolean }) {
     if (disposed) throw new Error("Session closed.");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
-    // An online protocol stop bars online commands, never offline-capable
-    // field sets and resource bumps: those stay durable, ordered intentions
-    // that still pass every send-time gate.
-    if (error && !(error.kind === "protocol" && options?.offlineIntent === true)) {
+    // Connectivity and protocol pauses stop sends. Offline-capable edits
+    // can still be queued against the cached sheet and pass the send-time
+    // gates on recovery.
+    const canQueue = options?.offlineIntent === true
+      && (error?.kind === "protocol" || error?.kind === "network-unavailable");
+    if (error && !canQueue) {
       throw structuredError(error.message, error.kind, error.details);
     }
     if (!editing.owned || !coordination.isOwner()) throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");

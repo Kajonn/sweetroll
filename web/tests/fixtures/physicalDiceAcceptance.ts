@@ -252,12 +252,15 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
       expect(result.roll?.total).toBe(
         result.roll!.dice.reduce((total, die) => total + die.value, action.id === "mixed" ? 2 : 0),
       );
-      const history = (
-        await json(roller.request, "GET", `/api/characters/${characterIds[0]}/rolls/${result.rollId}`)
-      ).roll;
+      const historyPage = await json(roller.request, "GET", `/api/characters/${characterIds[0]}/activity`);
+      const history = historyPage.events.find(
+        (entry: { rollId: string | null }) => entry.rollId === result.rollId,
+      )?.roll;
+      expect(history).toBeTruthy();
       expect(history.dice).toEqual(result.roll!.dice);
       expect(history.total).toBe(result.roll!.total);
       record(action.id, result);
+      await expect(canvas(other)).toHaveCount(0, { timeout: 5000 });
     }
     await expect(canvas(roller)).toHaveCount(0);
 
@@ -289,10 +292,16 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
     expect(secret.roll?.audience).toBe("owner_only");
     await other.waitForResponse((r) => r.ok() && new URL(r.url()).pathname === `${path}/activity`);
     expect(await streamEvents(other, privateThrow.id)).toEqual([]);
-    for (const viewer of [roller, other]) {
-      const lookup = await viewer.request.get(`/api/characters/${characterIds[0]}/rolls/${secret.rollId}`);
-      expect(lookup.status()).toBe(404);
-    }
+    const lookup = await json(roller.request, "GET", `/api/characters/${characterIds[0]}/activity`);
+    expect(lookup.events.some((event: { rollId: string | null }) => event.rollId === secret.rollId)).toBe(
+      false,
+    );
+    const campaignFeed = await json(other.request, "GET", `${path}/activity`);
+    expect(
+      campaignFeed.events.some(
+        (event: { sourceRollId: string | null }) => event.sourceRollId === secret.rollId,
+      ),
+    ).toBe(false);
 
     await other.goto(`/characters/${characterIds[1]}`);
     const [one, two] = await Promise.all([
@@ -305,6 +314,7 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
 
     await openViewer(other);
     await contexts[1]!.setOffline(true);
+    await expect.poll(() => other.evaluate(() => navigator.onLine)).toBe(false);
     const disconnected = await rolled(roller, () =>
       roller.getByRole("button", { name: "Throw 20 dice", exact: true }).click(),
     );

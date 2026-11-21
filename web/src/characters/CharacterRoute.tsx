@@ -191,7 +191,7 @@ function CharacterDetailLoaded({
     };
     return () => { publisher.current = undefined; };
   }, [campaignId, placement, publish]);
-  const offline = useOfflineAvailability(confirmed);
+  const offline = useOfflineAvailability(snapshot.onlineOnly ? null : confirmed);
 
   // Task 7: template catalog for slot pickers and granted-action buttons.
   // Fetched only when the projected sheet actually contains a slot, so
@@ -288,6 +288,7 @@ function CharacterDetailLoaded({
   // explain why the tab stays read-only instead of offering unsafe editing.
   const locksSupported = locksSupportedProp ?? browserSupportsTakeover();
   const readOnly = session !== null && snapshot.confirmed !== null && !snapshot.editing.owned;
+  const storageUnavailable = snapshot.error?.kind === "storage-error";
   const [takeoverBusy, setTakeoverBusy] = useState(false);
   const [takeoverDenied, setTakeoverDenied] = useState(false);
   const requestTakeover = () => {
@@ -335,8 +336,9 @@ function CharacterDetailLoaded({
       ) : null}
       <PlayEventOverlay events={events} presentation={snapshot.confirmed.projection.presentation} />
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}
-      <p role="status">{snapshot.editing.owned ? t("character.detail.editing") : t("character.detail.readOnly")}</p>
-      {readOnly ? (
+      <p role="status">{snapshot.editing.owned ? t("character.detail.editing")
+        : t(storageUnavailable || !locksSupported ? "character.detail.readOnlyHere" : "character.detail.readOnly")}</p>
+      {readOnly && !storageUnavailable ? (
         <section aria-labelledby="character-takeover-title">
           <h2 id="character-takeover-title">{t("character.detail.takeoverTitle")}</h2>
           {locksSupported ? (

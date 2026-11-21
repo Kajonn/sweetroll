@@ -42,6 +42,7 @@ Use the existing examples for larger flows.
 | Rolls, item proposals, token moves, fog, or activity visibility | [Knave play session](knave.test.ts#L193) |
 | Card decks, concurrent commands on shared campaign state, or a per-character deck | [Ember Road](card-decks.test.ts) |
 | Named dice groups, saved-roll pushes after a sheet edit, or private push visibility | [Dice pool expedition](dice-pool.test.ts) |
+| Shared weapon formulas, rules tables, presets, start-full resources, rest batches, applying a roll, targets of either kind, one class-like entry per path | [Ember Trail](ember-trail.test.ts) |
 
 For an API operation you haven't used, open the [OpenAPI contract](../../../docs/contracts/public-api-v1.json) and look up the path and HTTP method under `paths`. Read `x-required-scopes`, `requestBody`, and `responses` for the token scopes, payload, and expected status. The runner adds `/api/v1` to paths for you. The [API quickstart](../../../docs/api/v1.md#play-campaigns-and-scenes) lists common routes and revision rules.
 

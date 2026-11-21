@@ -3,6 +3,8 @@ import type { ActionV1, RollActionV1, SystemPackageV1 } from "../package/schema/
 import type { EvaluationBindings } from "../rules/evaluate.js";
 import { resolveObservedValues } from "./resolve.js";
 import { decodeRuntimeState, buildFieldBindings } from "./state.js";
+import { targetEntityIds } from "../rules/targets.js";
+export { targetEntityIds };
 
 export function campaignRollRequirements(action: ActionV1): Pick<RollActionV1, "target" | "respondsTo"> {
   return action.kind === "roll" ? {
@@ -22,15 +24,15 @@ export function resolveRollContext(
     ({ ok: false, error: { code: "bad_request", message, definitionId: action.id } });
   const target = context?.target;
   const opposed = context?.opposed;
-  if (action.target && !target) return badRequest("Select a target character for this action.");
+  if (action.target && !action.target.optional && !target) return badRequest("Select a target character for this action.");
   if (!action.target && target) return badRequest("This action does not accept a target character.");
   if (action.respondsTo && !opposed) return badRequest("Select a recorded roll to respond to.");
   if (!action.respondsTo && opposed) return badRequest("This action does not respond to a recorded roll.");
 
   const bindings: RollContextBindings = {};
   if (target) {
-    const entity = pkg.entities.find(candidate => candidate.id === action.target?.entityId);
-    if (!entity || target.entityId !== entity.id) {
+    const entity = pkg.entities.find(candidate => candidate.id === target.entityId);
+    if (!entity || !targetEntityIds(action.target).includes(entity.id)) {
       return { ok: false, error: { code: "not_found", message: "Target character not found." } };
     }
     const decoded = decodeRuntimeState(entity, target.state);

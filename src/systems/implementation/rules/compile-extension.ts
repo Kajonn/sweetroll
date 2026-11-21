@@ -18,6 +18,7 @@ import {
   grantedEntityFieldsForKind,
 } from "./compile-document.js";
 import { entityFieldTypes, type ExpressionCompileEnv } from "./typecheck.js";
+import { targetEntityIds } from "./targets.js";
 
 // System extensions (plan 2026-11-07-system-extensions, stage E1). An
 // extension is compiled and validated against one published base package
@@ -223,7 +224,7 @@ function expressionOwners(
 function validateRollContexts(template: ObjectTemplateV1, base: SystemPackageV1): CompileResult<never> | null {
   for (const action of template.grantedActions) {
     if (action.kind !== "roll") continue;
-    if (action.target && !base.entities.some(entity => entity.id === action.target?.entityId)) {
+    if (action.target && !targetEntityIds(action.target).every(id => base.entities.some(entity => entity.id === id))) {
       return fail("missing_reference", `/templates/${template.id}/grantedActions/${action.id}/target`, "Target entity does not exist in the base system.");
     }
     if ((action.target || action.respondsTo) && action.nominal) {
@@ -239,9 +240,11 @@ function environmentFor(owner: ExpressionOwner | undefined, base: SystemPackageV
   if (owner === undefined) return { fields: {}, inputs: {}, datasets };
   const item = entityFieldTypes(owner.template.fields);
   if (owner.kind === "computed") return { fields: {}, inputs: {}, item, datasets };
-  const target = base.entities.find(entity => entity.id === owner.action.target?.entityId);
+  const targets = targetEntityIds(owner.action.target).map(id => entityFieldTypes(base.entities.find(entity => entity.id === id)?.fields ?? []));
+  const target = targets[0] === undefined ? undefined : Object.fromEntries(Object.entries(targets[0])
+    .filter(([id, type]) => targets.every(fields => fields[id] === type)));
   return {
-    ...(target ? { target: entityFieldTypes(target.fields) } : {}),
+    ...(target && !owner.action.target?.optional ? { target } : {}),
     ...(owner.action.respondsTo ? { opposed: { total: "number" as const } } : {}),
     fields: grantedEntityFieldsForKind(base, owner.template.kind),
     inputs: actionInputTypes(owner.action.inputs), item, datasets, dice,

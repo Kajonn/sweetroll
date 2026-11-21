@@ -796,6 +796,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
     expect(outsider.json().error).not.toHaveProperty("actionDiagnostics");
   });
 
+  // Three systems end to end take about 6 s, over the 5 s default.
   it("serves all three reference systems through the same HTTP surface", async () => {
     const systems: Array<{
       name: string;
@@ -894,7 +895,7 @@ describeWithDatabase("characters HTTP acceptance", () => {
       expect(dice).toHaveLength(s.diceCount);
       for (const d of dice) expect(d.sides).toBe(s.dieSides);
     }
-  });
+  }, 20_000);
   it.each(["entity", "item"])("preserves named %s groups through HTTP, storage, replay and authorized history", async (source) => {
     const app=await makeApp(); apps.push(app); const ada=app.users.ada;
     const document=namedDicePoolDocument();

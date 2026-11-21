@@ -29,6 +29,8 @@ export type SheetEditorProps = {
   allocateElementId?: (() => DefinitionId) | undefined;
   unplacedDefinitions?: ReadonlyArray<UnplacedDefinition> | undefined;
   allDefinitions?: ReadonlyArray<UnplacedDefinition> | undefined;
+  /** True/false fields of the sheet's entity that can show or hide parts of the sheet. */
+  conditions?: ReadonlyArray<{ id: string; label: string }> | undefined;
   entities?: ReadonlyArray<{id: string; label: string}> | undefined;
 };
 
@@ -43,6 +45,7 @@ export function SheetEditor({
   allocateElementId,
   unplacedDefinitions = [],
   allDefinitions = [],
+  conditions = [],
   entities = [],
 }: SheetEditorProps) {
   const [focus, setFocus] = useState<Focus>(null);
@@ -271,6 +274,7 @@ export function SheetEditor({
               onMoveDown={() => moveSection(idx, 1)}
               allocateElementId={allocateElementId}
               definitions={allDefinitions}
+              conditions={conditions}
             />
           ))}
         </ul>

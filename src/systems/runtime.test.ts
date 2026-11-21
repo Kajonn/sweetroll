@@ -12,6 +12,7 @@ import {
 import { validDocument } from "./implementation/package/schema/test-values.js";
 import type { SystemDocumentV1, SystemPackageV1 } from "./implementation/package/schema/index.js";
 import { compileDocument } from "./implementation/rules/compile-document.js";
+import { advancedD20Document } from "./implementation/package/fixtures/advanced-d20.js";
 import {
   PublishedPackageCorruptError,
   createFixturePublishedPackageLoader,
@@ -913,6 +914,19 @@ describe("SystemRuntime.describeVersion", () => {
     ]);
   });
 
+  it("creates an npc entity only for a campaign, not as a standalone character", async () => {
+    const document = validDocument();
+    document.entities.push({ id: "goblin", label: "Goblin", fields: [], kind: "npc" });
+    const packageValue = compileRuntimePackage(document);
+    const runtime = createRuntime(packageValue);
+    const scope = { versionId: packageValue.versionId, entityId: "goblin" };
+    await expect(runtime.resolve({ ...scope, intent: { kind: "initialize", standalone: true } }))
+      .resolves.toMatchObject({ ok: false, error: { code: "bad_request" } });
+    await expect(runtime.resolve({ ...scope, intent: { kind: "initialize" } })).resolves.toMatchObject({ ok: true });
+    await expect(runtime.resolve({ versionId: packageValue.versionId, entityId: "character", intent: { kind: "initialize", standalone: true } }))
+      .resolves.toMatchObject({ ok: true });
+  });
+
   it("shares the package loading and corruption checks with resolve", async () => {
     const runtime = createSystemRuntime({
       loadPackage: async () => d20Package,
@@ -1067,3 +1081,117 @@ function allFieldDocument(): SystemDocumentV1 {
   ];
   return document;
 }
+
+describe("full resources and batch resource actions (SRD gaps S4, S5)", () => {
+  /** Roadwardens with a second, manual resource and a long rest that resets both and spends one luck. */
+  function restDocument(): SystemDocumentV1 {
+    const document = advancedD20Document();
+    const hero = document.entities[0]!;
+    const health = hero.fields.find((field) => field.id === "health");
+    if (health?.kind !== "resource") throw Error("Missing health");
+    health.startFull = true;
+    health.default = { current: 0, max: 0 };
+    hero.fields.push({ kind: "resource", id: "luck", label: "Luck", default: { current: 1, max: 3 }, min: 0, max: 3, step: 1, resetTo: "max", startFull: true });
+    document.actions.push({
+      kind: "resourceBatch", id: "long_rest", label: "Long rest",
+      steps: [{ resourceId: "health", operation: { kind: "reset" } }, { resourceId: "luck", operation: { kind: "delta", amount: -5 } }],
+    });
+    document.sheets[0]!.sections[0]!.elements.push(
+      { kind: "resource", id: "luck_element", resourceId: "luck" },
+      { kind: "action", id: "long_rest_element", actionId: "long_rest" },
+    );
+    return document;
+  }
+
+  it("starts full at creation and fills a calculated maximum that rises from 0, but not later rises", async () => {
+    const document = restDocument();
+    document.referenceData.find((dataset) => dataset.id === "advancement")!.records[0]!.values.health = 0;
+    const packageValue = compileRuntimePackage(document);
+    const runtime = createRuntime(packageValue);
+    const scope = { versionId: packageValue.versionId, entityId: "character" };
+    const created = await runtime.resolve({ ...scope, intent: { kind: "initialize" } });
+    if (!created.ok) throw Error(created.error.message);
+    // Level 1 has a 0 maximum here; the manual resource starts at its default maximum.
+    expect(created.value.state.values).toMatchObject({ health: { current: 0, max: 0 }, luck: { current: 3, max: 3 } });
+    const levelled = await runtime.resolve({ ...scope, state: created.value.state, intent: { kind: "set", fieldId: "level", value: 4 } });
+    if (!levelled.ok) throw Error(levelled.error.message);
+    expect(levelled.value.state.values.health).toEqual({ current: 18, max: 18 });
+    const hurt = await runtime.resolve({ ...scope, state: levelled.value.state, intent: { kind: "adjust", resourceId: "health", delta: -10 } });
+    if (!hurt.ok) throw Error(hurt.error.message);
+    document.referenceData.find((dataset) => dataset.id === "advancement")!.records.push({ id: "hero", label: "Hero", values: { level: 6, bonus: 3, health: 30 } });
+    const next = compileRuntimePackage(document);
+    const higher = await createRuntime(next).resolve({ versionId: next.versionId, entityId: "character", state: hurt.value.state, intent: { kind: "set", fieldId: "level", value: 6 } });
+    if (!higher.ok) throw Error(higher.error.message);
+    expect(higher.value.state.values.health).toEqual({ current: 8, max: 30 });
+  });
+
+  it("keeps supplied starting values and fills a calculated maximum on creation", async () => {
+    const packageValue = compileRuntimePackage(restDocument());
+    const runtime = createRuntime(packageValue);
+    const scope = { versionId: packageValue.versionId, entityId: "character" };
+    const created = await runtime.resolve({ ...scope, intent: { kind: "initialize", values: { level: 4, luck: { current: 2, max: 3 } } } });
+    if (!created.ok) throw Error(created.error.message);
+    expect(created.value.state.values).toMatchObject({ health: { current: 18, max: 18 }, luck: { current: 2, max: 3 } });
+  });
+
+  it("applies every step of a batch in one command and clamps amounts", async () => {
+    const packageValue = compileRuntimePackage(restDocument());
+    const runtime = createRuntime(packageValue);
+    const scope = { versionId: packageValue.versionId, entityId: "character" };
+    const created = await runtime.resolve({ ...scope, intent: { kind: "initialize" } });
+    if (!created.ok) throw Error(created.error.message);
+    const hurt = await runtime.resolve({ ...scope, state: created.value.state, intent: { kind: "adjust", resourceId: "health", delta: -6 } });
+    if (!hurt.ok) throw Error(hurt.error.message);
+    const rested = await runtime.resolve({
+      ...scope, state: hurt.value.state, intent: { kind: "action", actionId: "long_rest", inputs: {}, executionId: "00000000-0000-4000-8000-0000000000aa" },
+    });
+    if (!rested.ok) throw Error(rested.error.message);
+    expect(rested.value.state.values).toMatchObject({ health: { current: 10, max: 10 }, luck: { current: 0, max: 3 } });
+    expect(rested.value.changedDefinitionIds.sort()).toEqual(["health", "luck"]);
+    expect(rested.value.roll).toBeNull();
+    await expect(runtime.resolve({
+      ...scope, state: hurt.value.state, intent: { kind: "action", actionId: "long_rest", inputs: { extra: 1 }, executionId: "00000000-0000-4000-8000-0000000000ab" },
+    })).resolves.toMatchObject({ ok: false, error: { code: "bad_request" } });
+  });
+
+  it("rejects a batch step on a resource of another entity at publication", () => {
+    const document = restDocument();
+    const batch = document.actions.find((action) => action.id === "long_rest");
+    if (batch?.kind !== "resourceBatch") throw Error("Missing batch");
+    batch.steps.push({ resourceId: "stress", operation: { kind: "reset" } });
+    expect(compileDocument(document, { systemId: "00000000-0000-4000-8000-000000000001", versionId: "00000000-0000-4000-8000-000000000002", semanticVersion: "1.0.0" }).ok).toBe(false);
+  });
+});
+
+describe("entity presets (SRD gaps S3)", () => {
+  function presetDocument(): SystemDocumentV1 {
+    const document = advancedD20Document();
+    document.entities[0]!.presetsFrom = "pregens";
+    document.referenceData.push({ id: "pregens", label: "Ready-made heroes", records: [
+      { id: "tarin", label: "Tarin", values: { ability: 14, health: 8, level: 2 } },
+    ] });
+    return document;
+  }
+
+  it("copies a preset's values, lets supplied values win and lists presets in creation options", async () => {
+    const packageValue = compileRuntimePackage(presetDocument());
+    const runtime = createRuntime(packageValue);
+    const scope = { versionId: packageValue.versionId, entityId: "character" };
+    const created = await runtime.resolve({ ...scope, intent: { kind: "initialize", preset: "tarin", values: { level: 3 } } });
+    if (!created.ok) throw Error(created.error.message);
+    expect(created.value.state.values).toMatchObject({ ability: 14, level: 3, health: { current: 8, max: 10 } });
+    await expect(runtime.resolve({ ...scope, intent: { kind: "initialize", preset: "nobody" } }))
+      .resolves.toMatchObject({ ok: false, error: { code: "bad_request" } });
+    const described = await runtime.describeVersion({ versionId: packageValue.versionId });
+    expect(described).toMatchObject({ ok: true, value: { entities: [{ id: "character", presets: [{ id: "tarin", label: "Tarin" }] }] } });
+  });
+
+  it("rejects presets that set unknown, computed or wrongly typed fields at publication", () => {
+    const ids = { systemId: "00000000-0000-4000-8000-000000000001", versionId: "00000000-0000-4000-8000-000000000002", semanticVersion: "1.0.0" };
+    for (const values of [{ nope: 1 }, { carried: 2 }, { ability: "high" }]) {
+      const document = presetDocument();
+      document.referenceData.at(-1)!.records[0]!.values = values;
+      expect(compileDocument(document, ids)).toMatchObject({ ok: false, diagnostics: [{ path: "/entities/0/presetsFrom" }] });
+    }
+  });
+});

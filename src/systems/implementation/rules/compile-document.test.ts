@@ -352,42 +352,30 @@ describe("compileDocument", () => {
     });
   });
 
-  it("rejects one expression id shared by two templates", () => {
+  it("shares one roll formula between templates that read the same fields", () => {
     const document = templateDocument();
-    document.templates!.push({
-      id: "torch",
-      label: "Torch",
-      kind: "item",
-      fields: [{
-        kind: "integer",
-        id: "brand",
-        label: "Brand",
-        default: 0,
-        required: true,
-        min: 0,
-        max: 10,
-        step: 1,
-      }],
-      grantedActions: [{
-        kind: "roll",
-        id: "torch_attack",
-        label: "Torch Attack",
-        expressionId: "longsword_attack_expr",
-        inputs: [],
-        outputTemplate: "Result: {total}",
-      }],
-    });
-
+    const longsword = document.templates![0]!;
+    document.templates!.push({ ...structuredClone(longsword), id: "shortsword", label: "Shortsword" });
     const result = compileDocument(document, opts);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.expressions.filter((expression) => expression.id === "longsword_attack_expr")).toHaveLength(1);
+  });
 
-    expect(result).toEqual({
-      ok: false,
-      diagnostics: [{
-        code: "invalid_expression",
-        path: "longsword_attack_expr",
-        message: "Expression cannot be shared across different owners.",
-      }],
-    });
+  it("rejects a shared formula when a template lacks a field it reads or the actions differ", () => {
+    const document = templateDocument();
+    const longsword = document.templates![0]!;
+    const missingField = structuredClone(document);
+    missingField.templates!.push({ ...structuredClone(longsword), id: "club", label: "Club", fields: [] });
+    expect(compileDocument(missingField, opts)).toMatchObject({ ok: false, diagnostics: [{ code: "missing_reference", path: "longsword_attack_expr" }] });
+    const otherInputs = structuredClone(document);
+    const club = { ...structuredClone(longsword), id: "club", label: "Club" };
+    club.grantedActions = club.grantedActions.map((action) => (action.kind === "roll" ? { ...action, inputs: [] } : action));
+    otherInputs.templates!.push(club);
+    expect(compileDocument(otherInputs, opts)).toEqual({ ok: false, diagnostics: [{
+      code: "invalid_expression", path: "longsword_attack_expr",
+      message: "Actions that share a formula must declare the same inputs, target, outcomes and details.",
+    }] });
   });
 
   it("rejects an expression shared between an entity action and a template action", () => {

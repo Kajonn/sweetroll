@@ -13,7 +13,7 @@ import type { SystemsRouteDefinition } from "./systems.js";
 const UUID = { format: "uuid" } as const;
 const DATE_TIME = { format: "date-time" } as const;
 
-const Diagnostic = Type.Object({ code: Type.String(), path: Type.String(), message: Type.String() });
+export const Diagnostic = Type.Object({ code: Type.String(), path: Type.String(), message: Type.String() });
 const ErrorEnvelope = Type.Object({
   error: Type.Object({
     code: Type.String(),
@@ -36,7 +36,7 @@ const Errors = {
   "500": ErrorEnvelope,
 };
 
-const ExtensionSummaryDto = Type.Object({
+export const ExtensionSummaryDto = Type.Object({
   extensionId: Type.String(UUID),
   baseSystemId: Type.String(UUID),
   name: Type.String(),
@@ -47,7 +47,7 @@ const ExtensionSummaryDto = Type.Object({
   updatedAt: Type.String(DATE_TIME),
 });
 
-const ExtensionVersionDto = Type.Object({
+export const ExtensionVersionDto = Type.Object({
   versionId: Type.String(UUID),
   extensionId: Type.String(UUID),
   semanticVersion: Type.String(),
@@ -58,7 +58,7 @@ const ExtensionVersionDto = Type.Object({
   createdAt: Type.String(DATE_TIME),
 });
 
-const ExtensionWorkspaceDto = Type.Object({
+export const ExtensionWorkspaceDto = Type.Object({
   extension: ExtensionSummaryDto,
   draft: Type.Union([
     Type.Object({

@@ -168,3 +168,31 @@ describe("grammar 0.2 named groups", () => {
     ]);
   });
 });
+
+describe("one group name in each branch of a conditional (SRD gaps S8)", () => {
+  const env = { fields: { mod: "number" }, inputs: { advantage: "boolean", disadvantage: "boolean" } } as const;
+  const d20 = 'if(inputs.disadvantage && !inputs.advantage, keepLowest(group("d20", "d20", dice(2, 20)), 1), '
+    + 'keepHighest(group("d20", "d20", dice(if(inputs.advantage && !inputs.disadvantage, 2, 1), 20)), 1)) + fields.mod';
+  const compile = (source: string) => compileExpression(source, { env, resultType: "number", context: "roll", fallback: 0 });
+
+  it.each([
+    [{ advantage: false, disadvantage: true }, [0.3, 0.9], 2, 7],
+    [{ advantage: true, disadvantage: false }, [0.3, 0.9], 2, 19],
+    [{ advantage: false, disadvantage: false }, [0.3], 1, 7],
+  ])("rolls and keeps the d20 for %o without a zero-weighted term", (inputs, draws, count, total) => {
+    const compiled = compile(d20);
+    if (!compiled.ok) throw Error(JSON.stringify(compiled.diagnostics));
+    let call = 0;
+    const result = evaluate({ id: "check", ...compiled.value }, { fields: { mod: 1 }, inputs }, () => draws[call++]!);
+    expect(result).toMatchObject({ ok: true, result: total });
+    if (!result.ok) return;
+    expect(result.roll?.breakdown.groups).toEqual([expect.objectContaining({ id: "d20", count })]);
+  });
+
+  it("makes a group named on every branch available afterwards, and only then", () => {
+    expect(compile('if(inputs.advantage, group("a", "A", d20), group("a", "A", d6)) + rolled("a")').ok).toBe(true);
+    expect(compile('if(inputs.advantage, group("a", "A", d20), d6) + rolled("a")')).toMatchObject({ ok: false });
+    expect(compile('group("a", "A", d20) + group("a", "A", d6)')).toMatchObject({ ok: false });
+    expect(compile('if(inputs.advantage, group("a", "A", d20), d6) + group("a", "A", d6)')).toMatchObject({ ok: false });
+  });
+});

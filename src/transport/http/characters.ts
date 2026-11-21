@@ -498,7 +498,7 @@ const physicalLaunchDto = Type.Object({
   bodies: Type.Array(Type.Object({position:Type.Object(xyz),orientation:Type.Object({...xyz,w:Type.Number()}),
     linearVelocity:Type.Object(xyz),angularVelocity:Type.Object(xyz)}),{minItems:1,maxItems:100}),
 });
-const physicalAttemptDto = Type.Object({launch:physicalLaunchDto,attemptId:physicalId,expiresAt:Type.String({format:"date-time"}),
+const physicalAttemptDto = Type.Object({launch:physicalLaunchDto,color:Type.String({pattern:"^#[0-9A-Fa-f]{6}$"}),attemptId:physicalId,expiresAt:Type.String({format:"date-time"}),
   audience:RollAudienceDto,dice:Type.Array(Type.Object({id:Type.String(),groupId:Type.String(),sides:Type.Integer()}))});
 const ExecuteActionBody = Type.Object({
   targetCharacterId: Type.Optional(Type.String({ format: "uuid" })),

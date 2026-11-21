@@ -169,6 +169,8 @@ CREATE TRIGGER system_versions_immutable
 CREATE TABLE user_preferences (
   user_id       uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   theme_default text CHECK (theme_default IN ('light', 'dark', 'system')),
+  show_3d_dice  boolean NOT NULL DEFAULT true,
+  dice_color    text NOT NULL DEFAULT '#4c79c9' CHECK (dice_color ~ '^#[0-9A-Fa-f]{6}$'),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
@@ -801,9 +803,24 @@ CREATE TABLE physical_roll_attempts (
   input_hash text NOT NULL,
   preparation jsonb NOT NULL,
   launch jsonb NOT NULL,
+  color text NOT NULL CHECK (color ~ '^#[0-9A-Fa-f]{6}$'),
   expires_at timestamptz NOT NULL,
   settled jsonb,
   execution_id uuid,
   UNIQUE (actor_id, idempotency_key)
 );
 CREATE INDEX physical_roll_attempts_expiry ON physical_roll_attempts (expires_at);
+CREATE INDEX physical_roll_attempts_campaign_expiry ON physical_roll_attempts (campaign_id, expires_at DESC);
+
+-- The notification carries no audience data. Each server reads the current
+-- authorized projection. PostgreSQL delivers it only if the write commits.
+CREATE FUNCTION announce_physical_roll() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  PERFORM pg_notify('sweetroll_scene_events',
+    json_build_object('k', 'physicalRoll', 'c', NEW.campaign_id)::text);
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER physical_roll_changed
+  AFTER INSERT OR UPDATE OF execution_id ON physical_roll_attempts
+  FOR EACH ROW EXECUTE FUNCTION announce_physical_roll();

@@ -1844,6 +1844,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/campaigns/{id}/physical-rolls/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["get_campaigns_id_physical_roll_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/displays/{id}/scenes/{sceneId}/events": {
         parameters: {
             query?: never;
@@ -5692,6 +5708,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         theme_default: ("light" | "dark" | "system") | null;
+                        show_3d_dice?: boolean;
+                        dice_color?: string;
                     };
                 };
             };
@@ -5723,6 +5741,8 @@ export interface operations {
             content: {
                 "application/json": {
                     theme_default?: ("light" | "dark" | "system") | null;
+                    show_3d_dice?: boolean;
+                    dice_color?: string;
                 };
             };
         };
@@ -5734,6 +5754,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         theme_default: ("light" | "dark" | "system") | null;
+                        show_3d_dice?: boolean;
+                        dice_color?: string;
                     };
                 };
             };
@@ -13162,6 +13184,7 @@ export interface operations {
                                     };
                                 }[];
                             };
+                            color: string;
                             /** Format: uuid */
                             attemptId: string;
                             /** Format: date-time */
@@ -34806,6 +34829,102 @@ export interface operations {
                 };
             };
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    get_campaigns_id_physical_roll_events: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            code: string;
+                            message: string;
+                            latestRevision?: number | null;
+                        };
+                        requestId: string;
+                    };
+                };
+            };
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

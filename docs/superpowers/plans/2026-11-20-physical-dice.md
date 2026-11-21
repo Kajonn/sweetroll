@@ -98,6 +98,14 @@ A body must stay slow and aligned for 18 consecutive ticks. A slow, unreadable d
 
 The regression suite covers each of the six shapes, a mixed pool and a 20-die throw. Its checkpoints hash Rapier's serialized world and the settling counters at the start, ticks 12, 30 and 72, and the final tick. The production worker is exercised through desktop Chromium, mobile-emulated Chromium and mobile-emulated WebKit with different frame schedules and a resize. Run `npm run web:build` and `npm --prefix web run test:physics` after installing the Playwright Chromium and WebKit browsers. Physical Android Chrome and iOS Safari measurements remain an open acceptance gate.
 
+### Slice 4 server implementation record
+
+With the server flag enabled, the browser can open `GET /api/campaigns/:id/physical-rolls/events` as a signed-in campaign member. A committed preparation or settlement sends a campaign ID over the existing PostgreSQL listener. Each connection reloads its projection with current session, campaign and roll visibility. The connection emits `roll.started` for a visible pending attempt and `roll.finished` for its visible committed roll. Reconnects recover pending launches and recent settlements from the same rows. Notifications and retry requests do not duplicate events on an open connection.
+
+The stream removes an expired or newly inaccessible attempt with `roll.removed`. Session revocation, member removal or membership generation changes revoke the stream. A five-second check covers policy changes and missed notifications. The server caps open streams per process and ends slow connections so they can reconnect for a fresh snapshot. Roll history remains the durable fallback and no per-tick physics data crosses the network.
+
+The partial account preferences API adds `show_3d_dice` and `dice_color`. With the flag enabled, the default is `true` and `#4c79c9`. Colors use six-digit hex and are snapped at preparation. The browser still needs the preference controls, reduced-motion handling, event consumer, roll submission orchestration and Three.js overlay.
+
 ## Appendix A · Measured normals for the numbered models
 
 These vectors are in the **unmodified OBJ local frame** and point outward from the physical face. They were calculated from the six numbered Vtrpg OBJ meshes at `0050784`. For each model, group near-coplanar convex-hull facets by outward direction, select the large physical faces, and refine their directions with area-weighted coplanar white body triangles. Project the black numeral geometry onto each face to associate that plane with its actual engraving. Vertex shading normals, engravings and bevels do not define separate die faces. Pin the model revision with the table. If the build converts, scales non-uniformly or rotates a model, bake the matching normal transform and collider alignment during import.

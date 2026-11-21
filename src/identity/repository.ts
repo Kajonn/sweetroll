@@ -21,6 +21,9 @@ export type CreateSessionInput = {
 
 /** Account-level theme default. Null means no default is set. */
 export type ThemeDefault = "light" | "dark" | "system";
+export type AccountPreferences = { theme_default: ThemeDefault | null; show_3d_dice: boolean; dice_color: string };
+export const defaultDiceColor = "#4c79c9";
+export const defaultPreferences: AccountPreferences = {theme_default:null,show_3d_dice:true,dice_color:defaultDiceColor};
 
 export type SessionRecord = {
   sessionId: SessionId;
@@ -36,8 +39,8 @@ export interface IdentityRepository {
   findSessionByTokenHash(tokenHash: string): Promise<SessionRecord | null>;
   revokeSessionByTokenHash(tokenHash: string): Promise<void>;
   getDisplayNames(userIds: readonly UserId[]): Promise<Array<{ userId: UserId; displayName: string | null }>>;
-  getThemeDefault(userId: UserId): Promise<ThemeDefault | null>;
-  setThemeDefault(userId: UserId, value: ThemeDefault | null): Promise<ThemeDefault | null>;
+  getPreferences(userId: UserId): Promise<AccountPreferences>;
+  patchPreferences(userId: UserId, patch: Partial<AccountPreferences>): Promise<AccountPreferences>;
 }
 
 export function createIdentityRepository(pool: Pool): IdentityRepository {
@@ -103,32 +106,28 @@ export function createIdentityRepository(pool: Pool): IdentityRepository {
       return result.rows.map((row) => ({ userId: row.id, displayName: row.display_name?.trim() || null }));
     },
 
-    async getThemeDefault(userId) {
-      const result = await pool.query<{ theme_default: ThemeDefault | null }>(
-        "SELECT theme_default FROM user_preferences WHERE user_id = $1",
-        [userId],
+    async getPreferences(userId) {
+      const {rows:[row]} = await pool.query<AccountPreferences>(
+        "SELECT theme_default, show_3d_dice, dice_color FROM user_preferences WHERE user_id=$1", [userId],
       );
-      const row = result.rows[0];
-      if (row === undefined) {
-        return null;
-      }
-      return row.theme_default;
+      return row ?? defaultPreferences;
     },
 
-    async setThemeDefault(userId, value) {
-      const result = await pool.query<{ theme_default: ThemeDefault | null }>(
-        `INSERT INTO user_preferences (user_id, theme_default, updated_at)
-         VALUES ($1, $2, now())
-         ON CONFLICT (user_id)
-         DO UPDATE SET theme_default = EXCLUDED.theme_default, updated_at = now()
-         RETURNING theme_default`,
-        [userId, value],
+    async patchPreferences(userId, patch) {
+      const {rows:[row]} = await pool.query<AccountPreferences>(
+        `INSERT INTO user_preferences (user_id, theme_default, show_3d_dice, dice_color)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (user_id) DO UPDATE SET
+           theme_default = CASE WHEN $5 THEN EXCLUDED.theme_default ELSE user_preferences.theme_default END,
+           show_3d_dice = CASE WHEN $6 THEN EXCLUDED.show_3d_dice ELSE user_preferences.show_3d_dice END,
+           dice_color = CASE WHEN $7 THEN EXCLUDED.dice_color ELSE user_preferences.dice_color END,
+           updated_at = now()
+         RETURNING theme_default, show_3d_dice, dice_color`,
+        [userId,patch.theme_default??null,patch.show_3d_dice??true,patch.dice_color??defaultDiceColor,
+         patch.theme_default!==undefined,patch.show_3d_dice!==undefined,patch.dice_color!==undefined],
       );
-      const row = result.rows[0];
-      if (row === undefined) {
-        throw new Error("setThemeDefault returned no row");
-      }
-      return row.theme_default;
+      if (!row) throw Error("Account preference update returned no row.");
+      return row;
     },
   };
 }

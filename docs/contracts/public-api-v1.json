@@ -1059,7 +1059,7 @@
           "systems:write"
         ],
         "x-rate-bucket": "validate",
-        "x-max-body-bytes": 1052672,
+        "x-max-body-bytes": 5246976,
         "requestBody": {
           "required": true,
           "content": {
@@ -1149,7 +1149,7 @@
             }
           }
         ],
-        "x-max-body-bytes": 1052672,
+        "x-max-body-bytes": 5246976,
         "requestBody": {
           "required": true,
           "content": {
@@ -1753,6 +1753,34 @@
                             }
                           }
                         ]
+                      }
+                    }
+                  },
+                  "presetId": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string",
+                    "description": "A ready-made character of the entity; its values are copied, then initialValues apply."
+                  },
+                  "extensions": {
+                    "maxItems": 16,
+                    "description": "Extension versions of the same system to build the character on; one version per extension (design 6.8).",
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "extensionId",
+                        "versionId"
+                      ],
+                      "properties": {
+                        "extensionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "versionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        }
                       }
                     }
                   },
@@ -2460,6 +2488,139 @@
         }
       }
     },
+    "/characters/{characterId}/resources/{resourceId}/apply-roll": {
+      "post": {
+        "operationId": "applyRollToCharacterResource",
+        "description": "Apply a saved roll's total to a resource of a character the caller may edit: subtract it (damage, spending) or add it (healing). The roll must be one the caller can see, from the character's campaign or, for a standalone character, its own. Rolls never change characters on their own.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:write"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "x-max-body-bytes": 131072,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "rollId",
+                  "direction",
+                  "expectedRevision",
+                  "idempotencyKey"
+                ],
+                "properties": {
+                  "rollId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "direction": {
+                    "description": "subtract for damage or spending, add for healing",
+                    "anyOf": [
+                      {
+                        "const": "subtract",
+                        "type": "string"
+                      },
+                      {
+                        "const": "add",
+                        "type": "string"
+                      }
+                    ]
+                  },
+                  "expectedRevision": {
+                    "minimum": 1,
+                    "maximum": 2147483647,
+                    "type": "integer"
+                  },
+                  "idempotencyKey": {
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "\\S",
+                    "type": "string"
+                  }
+                }
+              },
+              "example": {
+                "rollId": "00000000-0000-4000-8000-000000000001",
+                "direction": "subtract",
+                "expectedRevision": 3,
+                "idempotencyKey": "damage-roll-1"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CharacterMutation"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
     "/characters/{characterId}/resources/{resourceId}": {
       "put": {
         "operationId": "setCharacterResource",
@@ -2707,7 +2868,7 @@
                     "type": "string"
                   },
                   "source": {
-                    "description": "Campaign items: send the source from GET /characters/{characterId}/templates with a null templateId and no values or quantity.",
+                    "description": "Campaign items: send the source from GET /characters/{characterId}/templates with a null templateId and no values or quantity. Extension items: send the template's source and the same extensionId.",
                     "anyOf": [
                       {
                         "additionalProperties": false,
@@ -2778,6 +2939,11 @@
                         }
                       }
                     ]
+                  },
+                  "extensionId": {
+                    "format": "uuid",
+                    "type": "string",
+                    "description": "The extension of the template, for items from an extension of the character's composition (design 6.8)."
                   }
                 }
               }
@@ -4500,6 +4666,378 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/CharacterDecks"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/characters/{characterId}/applicable-rolls": {
+      "get": {
+        "operationId": "listCharacterApplicableRolls",
+        "description": "List up to 20 recent saved rolls with a positive total that the caller can see and may apply to this character's resources.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicableRolls"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/characters/{characterId}/reference-data": {
+      "get": {
+        "operationId": "listCharacterReferenceData",
+        "description": "List the reference tables (rules text, spells, classes) of the system a readable character uses.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceDataList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/characters/{characterId}/reference-data/{datasetId}": {
+      "get": {
+        "operationId": "readCharacterReferenceDataset",
+        "description": "Read one reference table and its records from the system a readable character uses.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "characterId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "datasetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceDataset"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/system-versions/{versionId}/reference-data": {
+      "get": {
+        "operationId": "listVersionReferenceData",
+        "description": "List the reference tables of a published version the account may use, including known link-only versions.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceDataList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/400"
+          },
+          "401": {
+            "$ref": "#/components/responses/401"
+          },
+          "403": {
+            "$ref": "#/components/responses/403"
+          },
+          "404": {
+            "$ref": "#/components/responses/404"
+          },
+          "409": {
+            "$ref": "#/components/responses/409"
+          },
+          "413": {
+            "$ref": "#/components/responses/413"
+          },
+          "415": {
+            "$ref": "#/components/responses/415"
+          },
+          "422": {
+            "$ref": "#/components/responses/422"
+          },
+          "429": {
+            "$ref": "#/components/responses/429"
+          },
+          "500": {
+            "$ref": "#/components/responses/500"
+          },
+          "503": {
+            "$ref": "#/components/responses/503"
+          }
+        }
+      }
+    },
+    "/system-versions/{versionId}/reference-data/{datasetId}": {
+      "get": {
+        "operationId": "readVersionReferenceDataset",
+        "description": "Read one reference table and its records from a published version the account may use.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-required-scopes": [
+          "characters:read"
+        ],
+        "parameters": [
+          {
+            "name": "versionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "datasetId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReferenceDataset"
                 }
               }
             }
@@ -7854,6 +8392,10 @@
                         ]
                       }
                     }
+                  },
+                  "presetId": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
                   },
                   "controllerUserIds": {
                     "maxItems": 100,
@@ -14606,6 +15148,10 @@
                                 "type": "string"
                               }
                             ]
+                          },
+                          "startFull": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       },
@@ -14718,6 +15264,27 @@
                       "type": "string"
                     }
                   ]
+                },
+                "presets": {
+                  "maxItems": 1000,
+                  "type": "array",
+                  "items": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "id",
+                      "label"
+                    ],
+                    "properties": {
+                      "id": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    }
+                  }
                 },
                 "slots": {
                   "type": "array",
@@ -15124,11 +15691,46 @@
                                 "type": "string"
                               }
                             ]
+                          },
+                          "startFull": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       }
                     ]
                   }
+                }
+              }
+            }
+          },
+          "extensions": {
+            "maxItems": 100,
+            "description": "Owned and public extensions of the system, at their latest version, that fit this version (design 6.8).",
+            "type": "array",
+            "items": {
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "extensionId",
+                "name",
+                "versionId",
+                "semanticVersion"
+              ],
+              "properties": {
+                "extensionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "versionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "semanticVersion": {
+                  "type": "string"
                 }
               }
             }
@@ -15334,7 +15936,7 @@
           },
           "extensions": {
             "maxItems": 16,
-            "description": "Extension versions the character is built on, in addition to systemVersionId. Read-only in v1.",
+            "description": "Extension versions the character is built on, in addition to systemVersionId. Change them with the composition routes.",
             "type": "array",
             "items": {
               "additionalProperties": false,
@@ -15488,6 +16090,28 @@
                   "minimum": 1,
                   "maximum": 9007199254740991,
                   "type": "integer"
+                },
+                "derivedValues": {
+                  "description": "Computed template fields of the entry. Read-only; absent when the template has none.",
+                  "type": "object",
+                  "patternProperties": {
+                    "^[a-z][a-z0-9_]{0,63}$": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  }
                 },
                 "extensionId": {
                   "format": "uuid",
@@ -17461,6 +18085,138 @@
           }
         }
       },
+      "ReferenceDataList": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "datasets"
+        ],
+        "properties": {
+          "datasets": {
+            "maxItems": 64,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "datasetId",
+                "label",
+                "records"
+              ],
+              "properties": {
+                "datasetId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "records": {
+                  "minimum": 0,
+                  "maximum": 1000,
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ApplicableRolls": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rolls"
+        ],
+        "properties": {
+          "rolls": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "rollId",
+                "output",
+                "total"
+              ],
+              "properties": {
+                "rollId": {
+                  "type": "string"
+                },
+                "output": {
+                  "type": "string"
+                },
+                "total": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ReferenceDataset": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "dataset"
+        ],
+        "properties": {
+          "dataset": {
+            "type": "object",
+            "required": [
+              "datasetId",
+              "label",
+              "records"
+            ],
+            "properties": {
+              "datasetId": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "records": {
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "label",
+                    "values"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "values": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^(.*)$": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "number"
+                            },
+                            {
+                              "type": "boolean"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "PushOptions": {
         "additionalProperties": false,
         "type": "object",
@@ -17983,6 +18739,10 @@
                                 "type": "string"
                               }
                             ]
+                          },
+                          "startFull": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       },
@@ -18102,6 +18862,18 @@
                           "entityId": {
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
+                          },
+                          "otherEntityIds": {
+                            "maxItems": 8,
+                            "type": "array",
+                            "items": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            }
+                          },
+                          "optional": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       },
@@ -21935,6 +22707,10 @@
                                 "type": "string"
                               }
                             ]
+                          },
+                          "startFull": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       },
@@ -22040,6 +22816,20 @@
                               "entityId": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
+                              },
+                              "otherEntityIds": {
+                                "minItems": 1,
+                                "maxItems": 8,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              },
+                              "optional": {
+                                "const": true,
+                                "type": "boolean"
                               }
                             }
                           },
@@ -23901,6 +24691,1596 @@
           }
         }
       },
+      "ExtensionPage": {
+        "type": "object",
+        "required": [
+          "extensions",
+          "nextCursor"
+        ],
+        "properties": {
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "extensionId",
+                "baseSystemId",
+                "name",
+                "access",
+                "lifecycle",
+                "owned",
+                "createdAt",
+                "updatedAt",
+                "latestVersion"
+              ],
+              "properties": {
+                "extensionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "baseSystemId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "access": {
+                  "type": "string"
+                },
+                "lifecycle": {
+                  "type": "string"
+                },
+                "owned": {
+                  "type": "boolean"
+                },
+                "createdAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "latestVersion": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "required": [
+                        "versionId",
+                        "extensionId",
+                        "semanticVersion",
+                        "checksum",
+                        "releaseNotes",
+                        "lifecycle",
+                        "builtAgainstVersionId",
+                        "createdAt"
+                      ],
+                      "properties": {
+                        "versionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "extensionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "semanticVersion": {
+                          "type": "string"
+                        },
+                        "checksum": {
+                          "type": "string"
+                        },
+                        "releaseNotes": {
+                          "type": "string"
+                        },
+                        "lifecycle": {
+                          "type": "string"
+                        },
+                        "builtAgainstVersionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "format": "date-time",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "nextCursor": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ExtensionWorkspace": {
+        "type": "object",
+        "required": [
+          "extension",
+          "draft",
+          "versions",
+          "assessment"
+        ],
+        "properties": {
+          "extension": {
+            "type": "object",
+            "required": [
+              "extensionId",
+              "baseSystemId",
+              "name",
+              "access",
+              "lifecycle",
+              "owned",
+              "createdAt",
+              "updatedAt"
+            ],
+            "properties": {
+              "extensionId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "baseSystemId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "access": {
+                "type": "string"
+              },
+              "lifecycle": {
+                "type": "string"
+              },
+              "owned": {
+                "type": "boolean"
+              },
+              "createdAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "updatedAt": {
+                "format": "date-time",
+                "type": "string"
+              }
+            }
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "revision",
+                  "document",
+                  "baseVersionId",
+                  "sourceChecksum",
+                  "updatedBy",
+                  "updatedAt"
+                ],
+                "properties": {
+                  "revision": {
+                    "type": "integer"
+                  },
+                  "document": {
+                    "additionalProperties": true,
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "baseVersionId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "sourceChecksum": {
+                    "type": "string"
+                  },
+                  "updatedBy": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "updatedAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "versions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "versionId",
+                "extensionId",
+                "semanticVersion",
+                "checksum",
+                "releaseNotes",
+                "lifecycle",
+                "builtAgainstVersionId",
+                "createdAt"
+              ],
+              "properties": {
+                "versionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "extensionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "semanticVersion": {
+                  "type": "string"
+                },
+                "checksum": {
+                  "type": "string"
+                },
+                "releaseNotes": {
+                  "type": "string"
+                },
+                "lifecycle": {
+                  "type": "string"
+                },
+                "builtAgainstVersionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "createdAt": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "assessment": {
+            "type": "object",
+            "required": [
+              "ok",
+              "diagnostics",
+              "warnings"
+            ],
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              },
+              "diagnostics": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "path",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "path",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "ExtensionPreview": {
+        "type": "object",
+        "required": [
+          "baseVersionId",
+          "package",
+          "warnings"
+        ],
+        "properties": {
+          "baseVersionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "package": {
+            "additionalProperties": true,
+            "type": "object",
+            "properties": {}
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "code",
+                "path",
+                "message"
+              ],
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "ExtensionPublication": {
+        "type": "object",
+        "required": [
+          "versionId",
+          "extensionId",
+          "semanticVersion",
+          "checksum",
+          "releaseNotes",
+          "lifecycle",
+          "builtAgainstVersionId",
+          "createdAt",
+          "package"
+        ],
+        "properties": {
+          "versionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "extensionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "semanticVersion": {
+            "type": "string"
+          },
+          "checksum": {
+            "type": "string"
+          },
+          "releaseNotes": {
+            "type": "string"
+          },
+          "lifecycle": {
+            "type": "string"
+          },
+          "builtAgainstVersionId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "package": {
+            "additionalProperties": true,
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "CompositionOptions": {
+        "type": "object",
+        "required": [
+          "current",
+          "revertTo",
+          "systemUpgrades",
+          "available"
+        ],
+        "properties": {
+          "current": {
+            "type": "object",
+            "required": [
+              "systemVersion",
+              "extensions"
+            ],
+            "properties": {
+              "systemVersion": {
+                "type": "object",
+                "required": [
+                  "versionId",
+                  "systemId",
+                  "semanticVersion",
+                  "releaseNotes",
+                  "createdAt"
+                ],
+                "properties": {
+                  "versionId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "systemId": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "semanticVersion": {
+                    "type": "string"
+                  },
+                  "releaseNotes": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                }
+              },
+              "extensions": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "extensionId",
+                    "name",
+                    "version",
+                    "upgrades"
+                  ],
+                  "properties": {
+                    "extensionId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "object",
+                      "required": [
+                        "versionId",
+                        "systemId",
+                        "semanticVersion",
+                        "releaseNotes",
+                        "createdAt"
+                      ],
+                      "properties": {
+                        "versionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "systemId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "semanticVersion": {
+                          "type": "string"
+                        },
+                        "releaseNotes": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "format": "date-time",
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "upgrades": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "versionId",
+                          "systemId",
+                          "semanticVersion",
+                          "releaseNotes",
+                          "createdAt"
+                        ],
+                        "properties": {
+                          "versionId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "systemId": {
+                            "format": "uuid",
+                            "type": "string"
+                          },
+                          "semanticVersion": {
+                            "type": "string"
+                          },
+                          "releaseNotes": {
+                            "type": "string"
+                          },
+                          "createdAt": {
+                            "format": "date-time",
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "revertTo": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "systemVersion",
+                  "extensions"
+                ],
+                "properties": {
+                  "systemVersion": {
+                    "type": "object",
+                    "required": [
+                      "versionId",
+                      "systemId",
+                      "semanticVersion",
+                      "releaseNotes",
+                      "createdAt"
+                    ],
+                    "properties": {
+                      "versionId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "systemId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "semanticVersion": {
+                        "type": "string"
+                      },
+                      "releaseNotes": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "extensions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "extensionId",
+                        "name",
+                        "version",
+                        "upgrades"
+                      ],
+                      "properties": {
+                        "extensionId": {
+                          "format": "uuid",
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "object",
+                          "required": [
+                            "versionId",
+                            "systemId",
+                            "semanticVersion",
+                            "releaseNotes",
+                            "createdAt"
+                          ],
+                          "properties": {
+                            "versionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "systemId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "semanticVersion": {
+                              "type": "string"
+                            },
+                            "releaseNotes": {
+                              "type": "string"
+                            },
+                            "createdAt": {
+                              "format": "date-time",
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "upgrades": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "versionId",
+                              "systemId",
+                              "semanticVersion",
+                              "releaseNotes",
+                              "createdAt"
+                            ],
+                            "properties": {
+                              "versionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "systemId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "semanticVersion": {
+                                "type": "string"
+                              },
+                              "releaseNotes": {
+                                "type": "string"
+                              },
+                              "createdAt": {
+                                "format": "date-time",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "systemUpgrades": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "versionId",
+                "systemId",
+                "semanticVersion",
+                "releaseNotes",
+                "createdAt"
+              ],
+              "properties": {
+                "versionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "systemId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "semanticVersion": {
+                  "type": "string"
+                },
+                "releaseNotes": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "available": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "extensionId",
+                "name",
+                "version",
+                "upgrades"
+              ],
+              "properties": {
+                "extensionId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "object",
+                  "required": [
+                    "versionId",
+                    "systemId",
+                    "semanticVersion",
+                    "releaseNotes",
+                    "createdAt"
+                  ],
+                  "properties": {
+                    "versionId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "systemId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "semanticVersion": {
+                      "type": "string"
+                    },
+                    "releaseNotes": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  }
+                },
+                "upgrades": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "versionId",
+                      "systemId",
+                      "semanticVersion",
+                      "releaseNotes",
+                      "createdAt"
+                    ],
+                    "properties": {
+                      "versionId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "systemId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "semanticVersion": {
+                        "type": "string"
+                      },
+                      "releaseNotes": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "format": "date-time",
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "CharacterCompositionCheck": {
+        "type": "object",
+        "required": [
+          "revision",
+          "direction",
+          "change",
+          "report"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "const": "upgrade",
+                "type": "string"
+              },
+              {
+                "const": "revert",
+                "type": "string"
+              }
+            ]
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "revert",
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "fromVersionId",
+                  "toVersionId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "system_upgrade",
+                    "type": "string"
+                  },
+                  "fromVersionId": {
+                    "type": "string"
+                  },
+                  "toVersionId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "extensionId",
+                  "versionId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "extension_add",
+                    "type": "string"
+                  },
+                  "extensionId": {
+                    "type": "string"
+                  },
+                  "versionId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "extensionId",
+                  "versionId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "extension_remove",
+                    "type": "string"
+                  },
+                  "extensionId": {
+                    "type": "string"
+                  },
+                  "versionId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "extensionId",
+                  "fromVersionId",
+                  "toVersionId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "extension_upgrade",
+                    "type": "string"
+                  },
+                  "extensionId": {
+                    "type": "string"
+                  },
+                  "fromVersionId": {
+                    "type": "string"
+                  },
+                  "toVersionId": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          },
+          "report": {
+            "type": "object",
+            "required": [
+              "ok",
+              "direction",
+              "fromVersionId",
+              "toVersionId",
+              "packageFindings",
+              "blockers",
+              "addedFields",
+              "droppedFields",
+              "changedEntries",
+              "validations"
+            ],
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              },
+              "direction": {
+                "anyOf": [
+                  {
+                    "const": "upgrade",
+                    "type": "string"
+                  },
+                  {
+                    "const": "revert",
+                    "type": "string"
+                  }
+                ]
+              },
+              "fromVersionId": {
+                "type": "string"
+              },
+              "toVersionId": {
+                "type": "string"
+              },
+              "packageFindings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "path",
+                    "message",
+                    "affectsCharacter"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "affectsCharacter": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "blockers": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "definitionId": {
+                      "type": "string"
+                    },
+                    "entryId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "addedFields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "droppedFields": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "changedEntries": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "entryId",
+                    "templateId",
+                    "updatedFields",
+                    "keptFields",
+                    "addedFields",
+                    "droppedFields",
+                    "imageUpdated"
+                  ],
+                  "properties": {
+                    "entryId": {
+                      "type": "string"
+                    },
+                    "templateId": {
+                      "type": "string"
+                    },
+                    "updatedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "keptFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "addedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "droppedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "imageUpdated": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              },
+              "validations": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "validationId",
+                    "severity",
+                    "message",
+                    "targetDefinitionId"
+                  ],
+                  "properties": {
+                    "validationId": {
+                      "type": "string"
+                    },
+                    "severity": {
+                      "anyOf": [
+                        {
+                          "const": "error",
+                          "type": "string"
+                        },
+                        {
+                          "const": "warning",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "targetDefinitionId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "CampaignCompositionCheck": {
+        "type": "object",
+        "required": [
+          "revision",
+          "direction",
+          "change",
+          "fromVersionId",
+          "toVersionId",
+          "from",
+          "to",
+          "ok",
+          "characters",
+          "templates"
+        ],
+        "properties": {
+          "revision": {
+            "type": "integer"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "const": "upgrade",
+                "type": "string"
+              },
+              {
+                "const": "revert",
+                "type": "string"
+              }
+            ]
+          },
+          "change": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "revert",
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "fromVersionId",
+                  "toVersionId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "system_upgrade",
+                    "type": "string"
+                  },
+                  "fromVersionId": {
+                    "type": "string"
+                  },
+                  "toVersionId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "extensionId",
+                  "versionId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "extension_add",
+                    "type": "string"
+                  },
+                  "extensionId": {
+                    "type": "string"
+                  },
+                  "versionId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "extensionId",
+                  "versionId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "extension_remove",
+                    "type": "string"
+                  },
+                  "extensionId": {
+                    "type": "string"
+                  },
+                  "versionId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "extensionId",
+                  "fromVersionId",
+                  "toVersionId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "extension_upgrade",
+                    "type": "string"
+                  },
+                  "extensionId": {
+                    "type": "string"
+                  },
+                  "fromVersionId": {
+                    "type": "string"
+                  },
+                  "toVersionId": {
+                    "type": "string"
+                  }
+                }
+              }
+            ]
+          },
+          "fromVersionId": {
+            "type": "string"
+          },
+          "toVersionId": {
+            "type": "string"
+          },
+          "from": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "systemVersionId",
+              "extensions"
+            ],
+            "properties": {
+              "systemVersionId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "extensions": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "extensionId",
+                    "versionId"
+                  ],
+                  "properties": {
+                    "extensionId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "versionId": {
+                      "format": "uuid",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "to": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "systemVersionId",
+              "extensions"
+            ],
+            "properties": {
+              "systemVersionId": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "extensions": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "extensionId",
+                    "versionId"
+                  ],
+                  "properties": {
+                    "extensionId": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "versionId": {
+                      "format": "uuid",
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "characters": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "characterId",
+                "name",
+                "ok",
+                "report"
+              ],
+              "properties": {
+                "characterId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "report": {
+                  "type": "object",
+                  "required": [
+                    "ok",
+                    "direction",
+                    "fromVersionId",
+                    "toVersionId",
+                    "packageFindings",
+                    "blockers",
+                    "addedFields",
+                    "droppedFields",
+                    "changedEntries",
+                    "validations"
+                  ],
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "direction": {
+                      "anyOf": [
+                        {
+                          "const": "upgrade",
+                          "type": "string"
+                        },
+                        {
+                          "const": "revert",
+                          "type": "string"
+                        }
+                      ]
+                    },
+                    "fromVersionId": {
+                      "type": "string"
+                    },
+                    "toVersionId": {
+                      "type": "string"
+                    },
+                    "packageFindings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "code",
+                          "path",
+                          "message",
+                          "affectsCharacter"
+                        ],
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "affectsCharacter": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "blockers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "code",
+                          "message"
+                        ],
+                        "properties": {
+                          "code": {
+                            "type": "string"
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "definitionId": {
+                            "type": "string"
+                          },
+                          "entryId": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "addedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "droppedFields": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "changedEntries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "entryId",
+                          "templateId",
+                          "updatedFields",
+                          "keptFields",
+                          "addedFields",
+                          "droppedFields",
+                          "imageUpdated"
+                        ],
+                        "properties": {
+                          "entryId": {
+                            "type": "string"
+                          },
+                          "templateId": {
+                            "type": "string"
+                          },
+                          "updatedFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "keptFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "addedFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "droppedFields": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "imageUpdated": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "validations": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "validationId",
+                          "severity",
+                          "message",
+                          "targetDefinitionId"
+                        ],
+                        "properties": {
+                          "validationId": {
+                            "type": "string"
+                          },
+                          "severity": {
+                            "anyOf": [
+                              {
+                                "const": "error",
+                                "type": "string"
+                              },
+                              {
+                                "const": "warning",
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "message": {
+                            "type": "string"
+                          },
+                          "targetDefinitionId": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "templates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "templateId",
+                "name",
+                "ok",
+                "blockers"
+              ],
+              "properties": {
+                "templateId": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "ok": {
+                  "type": "boolean"
+                },
+                "blockers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "code",
+                      "message"
+                    ],
+                    "properties": {
+                      "code": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "definitionId": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "CampaignCompositionResult": {
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "campaignId",
+          "revision",
+          "systemVersionId"
+        ],
+        "properties": {
+          "campaignId": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "revision": {
+            "minimum": 1,
+            "maximum": 2147483647,
+            "type": "integer"
+          },
+          "systemVersionId": {
+            "format": "uuid",
+            "type": "string"
+          }
+        }
+      },
       "SystemDocument": {
         "additionalProperties": false,
         "type": "object",
@@ -24017,6 +26397,10 @@
                       "type": "string"
                     }
                   ]
+                },
+                "presetsFrom": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
                 },
                 "fields": {
                   "maxItems": 512,
@@ -24372,6 +26756,10 @@
                                 "type": "string"
                               }
                             ]
+                          },
+                          "startFull": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       },
@@ -24680,6 +27068,10 @@
                         "maxLength": 120,
                         "type": "string"
                       },
+                      "visibleWhen": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      },
                       "elements": {
                         "maxItems": 1024,
                         "type": "array",
@@ -24700,6 +27092,10 @@
                                   "type": "string"
                                 },
                                 "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "visibleWhen": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
@@ -24738,6 +27134,10 @@
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
+                                "visibleWhen": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
                                 "fieldId": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
@@ -24758,6 +27158,10 @@
                                   "type": "string"
                                 },
                                 "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "visibleWhen": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
@@ -24784,6 +27188,10 @@
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
+                                "visibleWhen": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
                                 "actionId": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
@@ -24804,6 +27212,10 @@
                                   "type": "string"
                                 },
                                 "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "visibleWhen": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
@@ -24927,6 +27339,20 @@
                         "entityId": {
                           "pattern": "^[a-z][a-z0-9_]{0,63}$",
                           "type": "string"
+                        },
+                        "otherEntityIds": {
+                          "minItems": 1,
+                          "maxItems": 8,
+                          "uniqueItems": true,
+                          "type": "array",
+                          "items": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        },
+                        "optional": {
+                          "const": true,
+                          "type": "boolean"
                         }
                       }
                     },
@@ -25221,6 +27647,83 @@
                           }
                         }
                       ]
+                    }
+                  }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "steps"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "resourceBatch",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "steps": {
+                      "minItems": 1,
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "resourceId",
+                          "operation"
+                        ],
+                        "properties": {
+                          "resourceId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "operation": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "amount"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "delta",
+                                    "type": "string"
+                                  },
+                                  "amount": {
+                                    "type": "number"
+                                  }
+                                }
+                              },
+                              {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "kind"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "reset",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
                     }
                   }
                 },
@@ -25806,6 +28309,10 @@
                                 "type": "string"
                               }
                             ]
+                          },
+                          "startFull": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       },
@@ -25911,6 +28418,20 @@
                               "entityId": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
+                              },
+                              "otherEntityIds": {
+                                "minItems": 1,
+                                "maxItems": 8,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              },
+                              "optional": {
+                                "const": true,
+                                "type": "boolean"
                               }
                             }
                           },
@@ -26400,6 +28921,10 @@
                     }
                   ]
                 },
+                "presetsFrom": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
                 "fields": {
                   "maxItems": 512,
                   "type": "array",
@@ -26754,6 +29279,10 @@
                                 "type": "string"
                               }
                             ]
+                          },
+                          "startFull": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       },
@@ -27062,6 +29591,10 @@
                         "maxLength": 120,
                         "type": "string"
                       },
+                      "visibleWhen": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      },
                       "elements": {
                         "maxItems": 1024,
                         "type": "array",
@@ -27082,6 +29615,10 @@
                                   "type": "string"
                                 },
                                 "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "visibleWhen": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
@@ -27120,6 +29657,10 @@
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
+                                "visibleWhen": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
                                 "fieldId": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
@@ -27140,6 +29681,10 @@
                                   "type": "string"
                                 },
                                 "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "visibleWhen": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
@@ -27166,6 +29711,10 @@
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
+                                "visibleWhen": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
                                 "actionId": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
@@ -27186,6 +29735,10 @@
                                   "type": "string"
                                 },
                                 "id": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                },
+                                "visibleWhen": {
                                   "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                   "type": "string"
                                 },
@@ -27344,6 +29897,20 @@
                         "entityId": {
                           "pattern": "^[a-z][a-z0-9_]{0,63}$",
                           "type": "string"
+                        },
+                        "otherEntityIds": {
+                          "minItems": 1,
+                          "maxItems": 8,
+                          "uniqueItems": true,
+                          "type": "array",
+                          "items": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        },
+                        "optional": {
+                          "const": true,
+                          "type": "boolean"
                         }
                       }
                     },
@@ -27638,6 +30205,83 @@
                           }
                         }
                       ]
+                    }
+                  }
+                },
+                {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "kind",
+                    "id",
+                    "label",
+                    "steps"
+                  ],
+                  "properties": {
+                    "kind": {
+                      "const": "resourceBatch",
+                      "type": "string"
+                    },
+                    "id": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "label": {
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "steps": {
+                      "minItems": 1,
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "additionalProperties": false,
+                        "type": "object",
+                        "required": [
+                          "resourceId",
+                          "operation"
+                        ],
+                        "properties": {
+                          "resourceId": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "operation": {
+                            "anyOf": [
+                              {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "kind",
+                                  "amount"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "delta",
+                                    "type": "string"
+                                  },
+                                  "amount": {
+                                    "type": "number"
+                                  }
+                                }
+                              },
+                              {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "kind"
+                                ],
+                                "properties": {
+                                  "kind": {
+                                    "const": "reset",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      }
                     }
                   }
                 },
@@ -28223,6 +30867,10 @@
                                 "type": "string"
                               }
                             ]
+                          },
+                          "startFull": {
+                            "const": true,
+                            "type": "boolean"
                           }
                         }
                       },
@@ -28328,6 +30976,20 @@
                               "entityId": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
+                              },
+                              "otherEntityIds": {
+                                "minItems": 1,
+                                "maxItems": 8,
+                                "uniqueItems": true,
+                                "type": "array",
+                                "items": {
+                                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                  "type": "string"
+                                }
+                              },
+                              "optional": {
+                                "const": true,
+                                "type": "boolean"
                               }
                             }
                           },

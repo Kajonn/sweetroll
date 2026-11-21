@@ -9,7 +9,7 @@ import type {
   SystemPackageV1,
 } from "../package/schema/index.js";
 import { derivedEntryError, slotsForEntity, templateApplicable, validDefaults } from "./effective-entry.js";
-import { validateEntryForSlot } from "./entries.js";
+import { templateKey, validateEntryForSlot } from "./entries.js";
 import { resolveObservedValues } from "./resolve.js";
 import { decodeRuntimeState, initializeState } from "./state.js";
 
@@ -72,11 +72,14 @@ export type VersionChangeReport = {
 };
 
 export function checkVersionChange(input: {
+  /** Effective packages (design 6.8, E5): extension templates are keyed `<extensionId>:<id>`. */
   from: SystemPackageV1;
   to: SystemPackageV1;
   entityId: string;
   state: unknown;
   direction: VersionChangeDirection;
+  /** Whether both sides name the same composition; defaults to comparing base versions. */
+  sameComposition?: boolean;
 }): VersionChangeReport {
   const { from, to, entityId, direction } = input;
   const report: VersionChangeReport = {
@@ -100,8 +103,8 @@ export function checkVersionChange(input: {
   if (from.systemId !== to.systemId) {
     return block({ code: "different_system", message: "The target version belongs to a different system." });
   }
-  if (from.versionId === to.versionId) {
-    return block({ code: "same_version", message: "The character already uses this version." });
+  if (input.sameComposition ?? from.versionId === to.versionId) {
+    return block({ code: "same_version", message: "The character already uses these rules." });
   }
   const fromEntity = from.entities.find((entity) => entity.id === entityId);
   const toEntity = to.entities.find((entity) => entity.id === entityId);
@@ -124,7 +127,9 @@ export function checkVersionChange(input: {
     }));
     for (const finding of report.packageFindings) {
       if (finding.affectsCharacter) {
-        report.blockers.push({ code: "breaking_change", message: finding.message, definitionId: finding.path });
+        // Extension templates are keyed `<extensionId>:<id>`; people read the plain ID.
+        const message = finding.message.replace(/"[0-9a-f-]{36}:([^"]+)"/gi, '"$1"');
+        report.blockers.push({ code: "breaking_change", message, definitionId: finding.path });
       }
     }
   }
@@ -209,9 +214,8 @@ function characterFootprint(
 ): (path: string) => boolean {
   const entity = pkg.entities.find((candidate) => candidate.id === entityId)!;
   const templateIds = new Set(entries.flatMap((entry) => {
-    const snapshot = entry.snapshot;
-    const id = entry.templateId ?? (snapshot !== undefined && "base" in snapshot ? snapshot.base.templateId : null);
-    return id === null ? [] : [id];
+    const key = templateKey(entry);
+    return key === null ? [] : [key];
   }));
   const slotIds = new Set(entries.map((entry) => entry.slotId));
   const actionIds = new Set(pkg.sheets
@@ -253,10 +257,14 @@ function moveEntry(stored: CharacterEntryV1, from: SystemPackageV1, to: SystemPa
   // Personal and data-only campaign entries carry no rules references.
   if (templateId === null) return { entry, change: null };
 
-  const fromTemplate = from.templates.find((t) => t.id === templateId);
-  const toTemplate = to.templates.find((t) => t.id === templateId);
+  // Extension entries are looked up by their origin-qualified key (E5).
+  const key = templateKey(entry) ?? templateId;
+  const fromTemplate = from.templates.find((t) => t.id === key);
+  const toTemplate = to.templates.find((t) => t.id === key);
   if (toTemplate === undefined) {
-    return { blocker: { code: "entry_template_missing", message: `Template "${templateId}" does not exist in the target version.`, definitionId: templateId } };
+    return { blocker: { code: "entry_template_missing", message: entry.extensionId === undefined
+      ? `Template "${templateId}" does not exist in the target version.`
+      : `Template "${templateId}" comes from an extension that the target rules do not include or no longer define.`, definitionId: templateId } };
   }
 
   const change: EntryVersionChange = {

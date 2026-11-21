@@ -1,4 +1,6 @@
 import type { CompiledExpressionV1 } from "../package/schema/index.js";
+import type { ExpressionAstV1 } from "../package/schema/index.js";
+import { children } from "./groups.js";
 import { evaluate, type BindingValue, type EvaluationBinding, type EvaluationBindings, type EvaluationLimits, type RolledPools } from "./evaluate.js";
 
 /** Design 6.4 (rules coverage R5): what a finished roll means, beyond its number. */
@@ -76,6 +78,8 @@ export function describeRoll(input: {
   const valueOf = (entry: OutcomeEntry) => {
     const expression = input.expression(entry.expressionId);
     if (expression === undefined || expression.context !== "outcome") return undefined;
+    // An action with an optional target ran without one: skip what reads it.
+    if (input.bindings.target === undefined && readsScope(expression.ast, "target")) return undefined;
     const evaluated = evaluate(expression, bindings, undefined, input.limits);
     // A failed condition or value falls back to its declared fallback.
     if (!evaluated.ok) return expression.fallback;
@@ -122,6 +126,10 @@ export function describeRoll(input: {
     bindings: read,
     outputValues,
   };
+}
+
+function readsScope(ast: ExpressionAstV1, scope: string): boolean {
+  return (ast.kind === "reference" && ast.scope === scope) || children(ast).some((child) => readsScope(child, scope));
 }
 
 /** Roll bindings followed by the outcome bindings the roll did not already record. */

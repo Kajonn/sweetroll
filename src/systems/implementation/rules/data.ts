@@ -19,6 +19,8 @@ export type AggregateEntry = {
   quantity: number;
   /** Fields whose value is per unit; sums multiply only these by `quantity`. */
   quantityFields?: ReadonlySet<string>;
+  /** Value of a computed template field of this entry; undefined when it has none or it fails. */
+  computed?: (fieldId: string) => unknown;
 };
 export type AggregateCall = { name: AggregateFunction; slot: string; field?: string; flag?: string };
 export type Call = Extract<ExpressionAstV1, { kind: "call" }>;
@@ -53,13 +55,14 @@ export function aggregateKey(call: AggregateCall): string {
 export function aggregateValue(call: AggregateCall, entries: readonly AggregateEntry[]): number {
   let total = 0;
   let highest: number | undefined;
-  for (const { values, quantity, quantityFields } of entries) {
-    if (call.flag !== undefined && values[call.flag] !== true) continue;
+  for (const { values, quantity, quantityFields, computed } of entries) {
+    const read = (id: string) => Object.hasOwn(values, id) ? values[id] : computed?.(id);
+    if (call.flag !== undefined && read(call.flag) !== true) continue;
     if (call.field === undefined) {
       total += 1;
       continue;
     }
-    const value = Object.hasOwn(values, call.field) ? values[call.field] : undefined;
+    const value = read(call.field);
     if (typeof value !== "number") continue;
     if (call.name === "maxOf") highest = highest === undefined ? value : Math.max(highest, value);
     else total += value * (quantityFields?.has(call.field) ? quantity : 1);
@@ -87,8 +90,18 @@ export function lookupValue(
   return result;
 }
 
-export function dataObservationCost(ast: ExpressionAstV1, capacities: ReadonlyMap<string, number>): number {
+/**
+ * Evaluation steps an expression's aggregates may add: one per entry the slot
+ * can hold, plus the cost of each computed template field it reads per entry.
+ */
+export function dataObservationCost(
+  ast: ExpressionAstV1,
+  capacities: ReadonlyMap<string, number>,
+  computedCost: (slot: string, field: string) => number = () => 0,
+): number {
   const call = ast.kind === "call" ? aggregateCall(ast) : undefined;
-  const own = call === undefined ? 0 : capacities.get(call.slot) ?? 0;
-  return children(ast).reduce((cost, child) => cost + dataObservationCost(child, capacities), own);
+  const perEntry = call === undefined ? 0
+    : 1 + [call.field, call.flag].reduce((cost, field) => cost + (field === undefined ? 0 : computedCost(call.slot, field)), 0);
+  const own = call === undefined ? 0 : (capacities.get(call.slot) ?? 0) * perEntry;
+  return children(ast).reduce((cost, child) => cost + dataObservationCost(child, capacities, computedCost), own);
 }

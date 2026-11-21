@@ -975,6 +975,20 @@ it("persists fetched template choices by actor and purges them without late repo
   await store.close();
 });
 
+it("drops cached template choices when the composed rules change (design 6.8)", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const view = makeView("char", 1);
+  await store.confirmSnapshot("a", "char", view, 0);
+  const guard = await store.read("a", "char");
+  const choices = [{ id: "frost", label: "Frost blade", kind: "item" as const, fields: [], grantedActions: [] }];
+  await store.saveEntryTemplates("a", "char", choices, guard);
+  expect(await store.readEntryTemplates("a", "char")).toEqual(choices);
+  // Same base version, another extension set: the projection checksum changes.
+  await store.confirmSnapshot("a", "char", { ...view, reconciliation: { ...view.reconciliation, revision: 2 }, projection: { ...view.projection, packageChecksum: "composition-2" } }, guard.generation);
+  expect(await store.readEntryTemplates("a", "char")).toEqual([]);
+  await store.close();
+});
+
 const campaignChoices = [{ id: "key", label: "Key", kind: "item" as const, fields: [], grantedActions: [], source: { kind: "campaign" as const, campaignId: "campaign", templateId: "key", templateRevision: 2, contentRevision: 1 } }];
 
 it.each(["confirm", "queue", "online"])("atomically invalidates catalog scope on %s confirmation and preserves unrelated frozen work", async (path) => {

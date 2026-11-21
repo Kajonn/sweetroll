@@ -5,6 +5,7 @@ export type SheetElementKind = "heading" | "field" | "resource" | "action" | "sl
 export type HeadingSheetElementV1 = {
   kind: "heading";
   id: DefinitionId;
+  visibleWhen?: DefinitionId;
   text: string;
   level: 2 | 3;
 };
@@ -12,24 +13,28 @@ export type HeadingSheetElementV1 = {
 export type FieldSheetElementV1 = {
   kind: "field";
   id: DefinitionId;
+  visibleWhen?: DefinitionId;
   fieldId: DefinitionId;
 };
 
 export type ResourceSheetElementV1 = {
   kind: "resource";
   id: DefinitionId;
+  visibleWhen?: DefinitionId;
   resourceId: DefinitionId;
 };
 
 export type ActionSheetElementV1 = {
   kind: "action";
   id: DefinitionId;
+  visibleWhen?: DefinitionId;
   actionId: DefinitionId;
 };
 
 export type SlotSheetElementV1 = {
   kind: "slot";
   id: DefinitionId;
+  visibleWhen?: DefinitionId;
   slotId: DefinitionId;
 };
 
@@ -43,6 +48,8 @@ export type SheetElementV1 =
 export type SheetSectionV1 = {
   id: DefinitionId;
   label: string;
+  /** Design 6.3: shown only while this true/false field of the sheet's entity is true. */
+  visibleWhen?: DefinitionId;
   elements: SheetElementV1[];
 };
 

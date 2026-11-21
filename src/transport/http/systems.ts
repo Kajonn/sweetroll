@@ -3,6 +3,7 @@ import { systemImageHandlers, systemImageRoutes } from "./systemImages.js";
 import { extensionHandlers, extensionRouteDefinitions } from "./extensions.js";
 import type { ExtensionAuthoring } from "../../systems/extensions.js";
 import { strictInputCompiler } from "./strictValidation.js";
+import { PACKAGE_LIMITS } from "../../systems/implementation/package/limits.js";
 import { SystemImageManifestSchema } from "../../systems/implementation/package/schema/export.js";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 
@@ -674,6 +675,8 @@ export const buildSystemsRoutes: (input: BuildSystemsRoutesInput) => FastifyPlug
       const response = toFastifyResponses(route.schema.response);
       const schema = response === undefined ? route.schema : { ...route.schema, response };
       app[route.method](route.path, { schema,
+        // Draft saves and validation carry a whole system document.
+        bodyLimit: PACKAGE_LIMITS.encodedBytes + 4096,
         ...(route.path === "/systems" && route.method === "post" ? { bodyLimit: 18 * 1024 * 1024 } : {}),
         ...(route.path.includes("/image") ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, validatorCompiler: strictInputCompiler,
           ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}) } : {}),

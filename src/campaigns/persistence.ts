@@ -64,6 +64,7 @@ export type ActivityEventKind =
   | "roll_executed"
   | "system_version_upgraded"
   | "system_version_reverted"
+  | "extension_upgraded"
   | "extension_added"
   | "extension_removed";
 
@@ -485,6 +486,7 @@ function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
     case "system_version_reverted":
     case "extension_added":
     case "extension_removed":
+    case "extension_upgraded":
       break;
     default:
       throw new Error(`Unknown activity kind: ${row.kind}`);
@@ -765,15 +767,16 @@ export function createCampaignPersistenceRepository(pool: Pool) {
     /** Design 6.7: move the campaign pin; the caller verified and moved attached characters. */
     async updateCampaignVersion(
       client: PoolClient,
-      input: { campaignId: string; fromVersionId: string; toVersionId: string; previousVersionId: string | null; expectedRevision: number; now: Date },
+      input: { campaignId: string; fromVersionId: string; toVersionId: string; expectedRevision: number; now: Date },
     ): Promise<CampaignRecord | null> {
+      // The previous composition is written by recordPreviousCampaignComposition.
       const result = await client.query<CampaignRow>(
         `UPDATE campaigns
-            SET system_version_id = $2, previous_system_version_id = $3,
-                revision = revision + 1, updated_at = $4::timestamptz
-          WHERE id = $1 AND revision = $5 AND system_version_id = $6
+            SET system_version_id = $2,
+                revision = revision + 1, updated_at = $3::timestamptz
+          WHERE id = $1 AND revision = $4 AND system_version_id = $5
           RETURNING ${CAMPAIGN_COLUMNS}`,
-        [input.campaignId, input.toVersionId, input.previousVersionId, input.now.toISOString(), input.expectedRevision, input.fromVersionId],
+        [input.campaignId, input.toVersionId, input.now.toISOString(), input.expectedRevision, input.fromVersionId],
       );
       const row = result.rows[0];
       return row === undefined ? null : toCampaignRecord(row);

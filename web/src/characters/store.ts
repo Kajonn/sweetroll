@@ -142,18 +142,20 @@ export type CharacterStore = {
 
 const TEMPLATES="entryTemplates";
 
-type CatalogScope = Pick<CharacterView, "ownerId" | "campaignId" | "placementGeneration" | "systemVersionId" | "entityDefinitionId">;
+type CatalogScope = Pick<CharacterView, "ownerId" | "campaignId" | "placementGeneration" | "systemVersionId" | "entityDefinitionId"> & { packageChecksum: string };
 type TemplateCache = { actorId: string; characterId: string; scope: CatalogScope; templates: import("./types.js").EntryTemplate[] };
 
 function catalogScope(character: CharacterView): CatalogScope {
   return { ownerId: character.ownerId, campaignId: character.campaignId, placementGeneration: character.placementGeneration,
-    systemVersionId: character.systemVersionId, entityDefinitionId: character.entityDefinitionId };
+    systemVersionId: character.systemVersionId, entityDefinitionId: character.entityDefinitionId,
+    // Design 6.8 (E6): the composed rules' checksum, so an extension change drops cached templates.
+    packageChecksum: character.projection.packageChecksum };
 }
 
 function sameCatalogScope(left: CatalogScope | null | undefined, right: CatalogScope): boolean {
   return left !== null && left !== undefined && left.ownerId === right.ownerId && left.campaignId === right.campaignId &&
     left.placementGeneration === right.placementGeneration && left.systemVersionId === right.systemVersionId &&
-    left.entityDefinitionId === right.entityDefinitionId;
+    left.entityDefinitionId === right.entityDefinitionId && left.packageChecksum === right.packageChecksum;
 }
 
 async function invalidateCatalogScope(tx: IDBTransaction, actorId: string, characterId: string, previous: CharacterView | null, next: CharacterView) {

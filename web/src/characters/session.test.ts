@@ -1455,11 +1455,11 @@ describe("CharacterSession online operations", () => {
     await session.open();
     api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
     api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { systemVersionId: target })));
-    await session.changeVersion(target);
+    await session.changeVersion({ systemVersionId: target, extensions: [] });
     expect(api.sent).toHaveLength(1);
     expect(api.sent[0]?.method).toBe("POST");
-    expect(api.sent[0]?.path).toBe("/characters/char-1/version");
-    expect(api.sent[0]?.body).toMatchObject({ targetVersionId: target, expectedRevision: 3 });
+    expect(api.sent[0]?.path).toBe("/characters/char-1/composition");
+    expect(api.sent[0]?.body).toMatchObject({ target: { systemVersionId: target, extensions: [] }, expectedRevision: 3 });
     expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
     expect(session.getSnapshot().confirmed?.systemVersionId).toBe(target);
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);

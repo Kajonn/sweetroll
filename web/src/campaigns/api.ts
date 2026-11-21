@@ -124,7 +124,7 @@ export type CampaignsApi = {
   recoverCampaign(campaignId: string, body: CampaignLifecycleBody): Promise<CampaignViewResponse>;
   /** Design 6.7: GM rules-version choices, dry run and change (optional for test seams). */
   campaignVersionOptions?(campaignId: string): Promise<CampaignVersionOptionsResponse>;
-  campaignVersionCheck?(campaignId: string, targetVersionId: string): Promise<CampaignVersionCheckResponse>;
+  campaignVersionCheck?(campaignId: string, target: ChangeCampaignVersionBody["target"]): Promise<CampaignVersionCheckResponse>;
   changeCampaignVersion?(campaignId: string, body: ChangeCampaignVersionBody): Promise<ChangeCampaignVersionResponse>;
   exportCampaign(campaignId: string, body: ExportCampaignBody): Promise<ExportCampaignResponse>;
   listMembers(campaignId: string, input?: CampaignListQuery): Promise<MemberListResponse>;
@@ -244,13 +244,13 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
     recoverCampaign: (campaignId, body) =>
       client.fetch<CampaignViewResponse>("POST", `/campaigns/${campaignId}/recover`, { body }),
     campaignVersionOptions: (campaignId) =>
-      client.fetch<CampaignVersionOptionsResponse>("GET", `/campaigns/${encodeURIComponent(campaignId)}/version-options`),
-    campaignVersionCheck: (campaignId, targetVersionId) =>
-      client.fetch<CampaignVersionCheckResponse>("GET", `/campaigns/${encodeURIComponent(campaignId)}/version-check`, {
-        query: { targetVersionId },
+      client.fetch<CampaignVersionOptionsResponse>("GET", `/campaigns/${encodeURIComponent(campaignId)}/composition-options`),
+    campaignVersionCheck: (campaignId, target) =>
+      client.fetch<CampaignVersionCheckResponse>("POST", `/campaigns/${encodeURIComponent(campaignId)}/composition-check`, {
+        body: { target },
       }),
     changeCampaignVersion: (campaignId, body) =>
-      client.fetch<ChangeCampaignVersionResponse>("POST", `/campaigns/${encodeURIComponent(campaignId)}/version`, { body }),
+      client.fetch<ChangeCampaignVersionResponse>("POST", `/campaigns/${encodeURIComponent(campaignId)}/composition`, { body }),
     exportCampaign: (campaignId, body) =>
       client.fetch<ExportCampaignResponse>("POST", `/campaigns/${campaignId}/exports`, { body }),
     listMembers: (campaignId, input) =>

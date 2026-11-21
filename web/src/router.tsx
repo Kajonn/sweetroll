@@ -27,6 +27,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "./ui/index.js";
 import { t } from "./i18n/index.js";
 import { DocumentEditor } from "./editor/DocumentEditor.js";
+import { ExtensionEditor } from "./extensions/ExtensionEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
 import { SystemLibrary } from "./library/SystemLibrary.js";
 import type { PublishCommand } from "./playEvents/PlayEvents.js";
@@ -116,6 +117,8 @@ const indexRoute = createRoute({
   component: () => <LibraryRoute client={apiClient} />,
 });
 const systemRoute = createRoute({ getParentRoute: () => rootRoute, path: "/systems/$systemId", component: SystemEditorRoute });
+// Design 6.8 (E6): the creator in extension mode.
+const extensionRoute = createRoute({ getParentRoute: () => rootRoute, path: "/extensions/$extensionId", component: ExtensionEditorRoute });
 const charactersNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/characters/new",
@@ -229,6 +232,17 @@ function SystemEditorRoute() {
       generation={generation}
     />
   );
+}
+
+function ExtensionEditorRoute() {
+  const params = useParams({ strict: false });
+  const extensionId = params["extensionId"] ?? "";
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  if (identity === null) return <p role="status">{t("editor.loading")}</p>;
+  const actorId = identity.getActorId();
+  if (actorId === null) return <p role="status">{t("character.detail.signIn")}</p>;
+  return <ExtensionEditor key={`${actorId}:${identity.getGeneration?.() ?? 0}:${extensionId}`} client={apiClient} extensionId={extensionId} />;
 }
 
 function LibraryRoute({ client }: { client: ApiClient }) {
@@ -723,7 +737,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, campaignSceneRoute, displayRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, extensionRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, campaignSceneRoute, displayRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
 export function createAppRouter() {
   const router = createRouter({ routeTree });

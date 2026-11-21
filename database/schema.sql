@@ -179,7 +179,8 @@ CREATE TABLE campaigns (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id          uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   system_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-  -- Design 6.7: the version used before the most recent upgrade; the only revert target.
+  -- Design 6.7/6.8: base version of the composition used before the most recent
+  -- change; with campaign_previous_extensions, the only revert target.
   previous_system_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   title             text NOT NULL,
   description       text NOT NULL DEFAULT '',
@@ -209,6 +210,15 @@ CREATE TABLE campaign_extensions (
   added_by              text NOT NULL CHECK (added_by IN ('campaign', 'character')),
   added_by_character_id uuid, -- informational; the character may later leave or be purged
   added_at              timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (campaign_id, extension_id)
+);
+
+-- Design 6.8 (E5): extensions of the previous campaign composition (revert target).
+CREATE TABLE campaign_previous_extensions (
+  campaign_id          uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  extension_id         uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  added_by             text NOT NULL CHECK (added_by IN ('campaign', 'character')),
   PRIMARY KEY (campaign_id, extension_id)
 );
 
@@ -265,7 +275,8 @@ CREATE TABLE characters (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id             uuid REFERENCES users(id) ON DELETE RESTRICT,
   system_version_id    uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
-  -- Design 6.7: the version used before the most recent upgrade; the only revert target.
+  -- Design 6.7/6.8: base version of the composition used before the most recent
+  -- change; with character_previous_extensions, the only revert target.
   previous_system_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   entity_definition_id text NOT NULL,
   name                 text NOT NULL,
@@ -297,6 +308,14 @@ CREATE TABLE character_extensions (
   PRIMARY KEY (character_id, extension_id)
 );
 CREATE INDEX character_extensions_by_version ON character_extensions (extension_version_id);
+
+-- Design 6.8 (E5): extensions of the previous composition (revert target).
+CREATE TABLE character_previous_extensions (
+  character_id         uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  extension_id         uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (character_id, extension_id)
+);
 
 CREATE TABLE character_image_assets (
   id uuid PRIMARY KEY,
@@ -624,7 +643,8 @@ CREATE TABLE campaign_activity_events (
     'system_version_upgraded',
     'system_version_reverted',
     'extension_added',
-    'extension_removed'
+    'extension_removed',
+    'extension_upgraded'
   ))
 );
 

@@ -57,6 +57,8 @@ export type TemplatesTabProps = {
   document: SystemDocumentV1;
   dispatch: React.Dispatch<DocumentAction>;
   renderArtwork?: (template: ObjectTemplateV1) => ReactNode;
+  /** Design 6.8 (E6): extensions add templates only, so the extension editor hides slots. */
+  showSlots?: boolean;
 };
 
 /**
@@ -70,7 +72,7 @@ export type TemplatesTabProps = {
  * entry including template-owned ones. Resource bumps reuse
  * `ResourceBumpEditor` directly (grammar-free).
  */
-export function TemplatesTab({ client, document, dispatch, renderArtwork }: TemplatesTabProps) {
+export function TemplatesTab({ client, document, dispatch, renderArtwork, showSlots = true }: TemplatesTabProps) {
   const templates = readTemplates(document);
   const slots = readSlots(document);
 
@@ -147,7 +149,7 @@ export function TemplatesTab({ client, document, dispatch, renderArtwork }: Temp
           </ul>
         )}
       </section>
-      <section data-testid="slots-section" data-path="/slots">
+      {showSlots ? <section data-testid="slots-section" data-path="/slots">
         <header className={styles.tabHeader}>
           <h2 className={styles.tabTitle}>{t("editor.slots.title")}</h2>
           <Button variant="secondary" onClick={addSlot} data-testid="slots-add-button">
@@ -171,7 +173,7 @@ export function TemplatesTab({ client, document, dispatch, renderArtwork }: Temp
             ))}
           </ul>
         )}
-      </section>
+      </section> : null}
     </section>
   );
 }
@@ -443,6 +445,18 @@ function TemplateDetail({
                     : undefined
                 }
               />
+              <SharedFormula
+                document={document}
+                template={template}
+                action={action}
+                onShare={(next) => {
+                  replaceGrantedAction(action.id, next);
+                  // The previous formula is dropped once nothing else uses it.
+                  if (!formulaUsedElsewhere(document, template.id, action.id, action.expressionId)) {
+                    dispatch({ type: "removeExpression", expressionId: action.expressionId });
+                  }
+                }}
+              />
               <GrantedNominalToggle
                 action={action}
                 onChange={(nominal) =>
@@ -666,6 +680,56 @@ function templateFieldTypeMap(
   document: SystemDocumentV1,
 ): Record<string, FieldBindingType> {
   return entityFieldTypes(eligibleCharacterFields(template, document));
+}
+
+/**
+ * Design 6.4 (SRD gaps S1): granted rolls of several templates may share one
+ * formula. Lists who else uses this one, and offers another template's formula;
+ * choosing it copies that action's inputs, target and outcomes so they agree.
+ */
+function SharedFormula({ document, template, action, onShare }: {
+  document: SystemDocumentV1;
+  template: ObjectTemplateV1;
+  action: Extract<GrantedActionV1, { kind: "roll" }>;
+  onShare: (next: Extract<GrantedActionV1, { kind: "roll" }>) => void;
+}) {
+  const others = readTemplates(document).flatMap((candidate) => candidate.grantedActions.flatMap((granted) =>
+    granted.kind === "roll" && !(candidate.id === template.id && granted.id === action.id) ? [{ template: candidate, action: granted }] : []));
+  const sharing = others.filter((other) => other.action.expressionId === action.expressionId);
+  const choices = [...new Map(others.map((other) => [other.action.expressionId, other])).values()];
+  if (choices.length === 0) return null;
+  return (
+    <div className={styles.field} data-testid={`template-action-formula-${template.id}-${action.id}`}>
+      <Select
+        label={t("editor.template.sharedFormula")}
+        value={action.expressionId}
+        onChange={(event) => {
+          const source = choices.find((choice) => choice.action.expressionId === event.target.value);
+          if (source === undefined) return;
+          const { inputs, target, respondsTo, outcomes, details } = source.action;
+          const { target: _target, respondsTo: _respondsTo, outcomes: _outcomes, details: _details, ...rest } = action;
+          onShare({
+            ...rest, expressionId: source.action.expressionId, inputs: structuredClone(inputs),
+            ...(target ? { target: structuredClone(target) } : {}), ...(respondsTo ? { respondsTo } : {}),
+            ...(outcomes ? { outcomes: structuredClone(outcomes) } : {}), ...(details ? { details: structuredClone(details) } : {}),
+          });
+        }}
+        options={[
+          ...(choices.some((choice) => choice.action.expressionId === action.expressionId) ? [] : [{ value: action.expressionId, label: t("editor.template.ownFormula") }]),
+          ...choices.map((choice) => ({ value: choice.action.expressionId, label: `${choice.template.label} · ${choice.action.label}` })),
+        ]}
+      />
+      {sharing.length > 0 ? (
+        <p role="note">{t("editor.template.sharedWith", { templates: [...new Set(sharing.map((other) => other.template.label))].join(", ") })}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function formulaUsedElsewhere(document: SystemDocumentV1, templateId: string, actionId: string, expressionId: string): boolean {
+  return readTemplates(document).some((template) => template.grantedActions.some((granted) =>
+    granted.kind === "roll" && granted.expressionId === expressionId && !(template.id === templateId && granted.id === actionId)))
+    || document.actions.some((entry) => entry.kind === "roll" && (entry as { expressionId?: string }).expressionId === expressionId);
 }
 
 function templateFieldLabels(template: ObjectTemplateV1, document: SystemDocumentV1): Record<string, string> {

@@ -162,6 +162,29 @@ describe("CreateCharacter", () => {
     }
   });
 
+  it("sends only the extensions the player ticks (design 6.8)", async () => {
+    const user = userEvent.setup();
+    const api = makeApi();
+    const frost = { extensionId: "eeeeeeee-1111-4111-8111-111111111111", name: "Frost pack", versionId: "eeeeeeee-2222-4222-8222-222222222222", semanticVersion: "1.2.0" };
+    const fire = { extensionId: "ffffffff-1111-4111-8111-111111111111", name: "Fire pack", versionId: "ffffffff-2222-4222-8222-222222222222", semanticVersion: "0.9.0" };
+    const options = metadata();
+    api.creationOptions.mockResolvedValueOnce({ ...options, data: { ...options.data, extensions: [frost, fire] } });
+    api.send.mockResolvedValueOnce({ character: { characterId: "char-1" }, requestId: "req-1" });
+    const store = await openStore();
+    try {
+      renderCreate(<CreateCharacter api={api} store={store} identity={makeIdentity()} onCreated={vi.fn()} />);
+      await fillForm(user);
+      await user.click(screen.getByRole("checkbox", { name: "Frost pack 1.2.0" }));
+      expect(screen.getByRole("checkbox", { name: "Fire pack 0.9.0" })).not.toBeChecked();
+      await user.click(screen.getByRole("button", { name: "Create character" }));
+      await waitFor(() => expect(api.send).toHaveBeenCalledTimes(1));
+      const request = api.send.mock.calls[0]![0] as { body: Record<string, unknown> };
+      expect(request.body["extensions"]).toEqual([{ extensionId: frost.extensionId, versionId: frost.versionId }]);
+    } finally {
+      await store.close();
+    }
+  });
+
   it("shows the same generic message for denied metadata without authorizing creation", async () => {
     const user = userEvent.setup();
     const forbidden = new ApiError({

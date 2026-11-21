@@ -233,8 +233,11 @@ export interface SystemPersistenceRepository {
   loadVersion(versionId: VersionId): Promise<VersionRecord | null>;
   listVersions(systemId: SystemId): Promise<VersionRecord[]>;
   authorizeVersionUse(actorId: UserId, versionId: VersionId): Promise<AuthorizedVersionUse | null>;
-  /** Published versions of the same system created after `fromVersionId` that the actor may use. */
-  listLaterAuthorizedVersions(actorId: UserId, fromVersionId: VersionId): Promise<VersionChoice[]>;
+  /**
+   * Published versions of the same system (or extension, design 6.8) created
+   * after `fromVersionId` that the actor may use.
+   */
+  listLaterAuthorizedVersions(actorId: UserId, fromVersionId: VersionId, kind?: "system" | "extension"): Promise<VersionChoice[]>;
   /** Metadata of versions already pinned by a record; no use authorization. */
   describeVersionChoices(versionIds: VersionId[]): Promise<VersionChoice[]>;
   listAuthorizedVersions(
@@ -406,7 +409,7 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
         : { systemId: row.system_id, versionId: row.version_id, checksum: row.checksum };
     },
 
-    async listLaterAuthorizedVersions(actorId, fromVersionId) {
+    async listLaterAuthorizedVersions(actorId, fromVersionId, kind = "system") {
       const result = await pool.query<VersionChoiceRow>(
         `SELECT v.id, v.system_id, v.semantic_version, v.release_notes, v.created_at
            FROM system_versions current_version
@@ -416,11 +419,11 @@ export function createSystemPersistenceRepository(pool: Pool): SystemPersistence
             AND (v.created_at, v.id) > (current_version.created_at, current_version.id)
             AND v.lifecycle = 'published'
             AND s.lifecycle = 'active'
-            AND s.kind = 'system'
+            AND s.kind = $3
             AND (s.owner_id = $1 OR s.access IN ('public', 'link'))
           ORDER BY v.created_at DESC, v.id DESC
           LIMIT 50`,
-        [actorId, fromVersionId],
+        [actorId, fromVersionId, kind],
       );
       return result.rows.map(toVersionChoice);
     },

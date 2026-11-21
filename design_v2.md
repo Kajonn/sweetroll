@@ -161,6 +161,19 @@ A system version is a validated declarative package with stable identifiers for 
 | Rule             | Validation or simple conditional behavior     | condition, severity, message, targetId                       |
 | Reference data   | Reusable system content                       | skills, items, conditions, lookup tables                     |
 
+**Presets, reference data and non-player entities (2026-11-21, SRD gaps S2, S3, S10).**
+An entity may name a dataset in `presetsFrom`; each row is a ready-made character
+whose values are copied when a character is created with `presetId`, then
+`initialValues` apply. A row value is keyed by field ID; a number fills a
+resource's current value and maximum. The copy is not linked to the row.
+Publishing rejects rows that set unknown, computed, image or multi-choice
+fields or values of the wrong type. Creation options list an entity's presets.
+Every reference table of a version is readable by anyone who may use the
+version (`GET /system-versions/{id}/reference-data`) or read a character pinned
+to it (`GET /characters/{id}/reference-data`); the character sheet has a Rules
+panel over the same read. An entity of kind `npc` is created only inside a
+campaign; standalone creation rejects it.
+
 ## 6.2 Supported field types
 
 | **Category** | **MVP types**                              | **Notes**                                         |
@@ -187,6 +200,15 @@ A sheet is a **single-column linear scroll** (predictable collapse to one column
 **Removed from MVP:** tabs, multi-column grid layouts, drag-drop element palette, manual binding inspector, reusable fragments, conditional display, viewport authoring beyond preview. Keep only a simple section/order editor with move-up/down controls and keyboard authoring.
 
 The basic builder exposes an explicit “not on this character sheet” list for the sheet's target entity and global actions. The creator selects a target section for one-action placement (initially the first section); when none exists, placement creates the first section. Each placed item receives a generated document-wide element ID. Manual target-ID editing remains an advanced repair path, not the expected creation flow. The creator Sheets tab presents entity and element-binding reference IDs as labeled dropdowns sourced from compatible document definitions; sheet, section, and element identity IDs remain automatically assigned and read-only in the basic builder. Unresolved legacy bindings are shown explicitly without silent replacement.
+
+**Applying a roll (owner decision 2026-11-21, G5; SRD gaps S6).** Rolls still
+never change characters on their own. A person who may edit a character can
+apply a saved roll's total to one of its resources, subtracting it (damage,
+spending) or adding it (healing), with a revision-checked, idempotent command.
+The roll must be one that person can see, from the character's campaign, or
+for a standalone character one of its own rolls; only positive totals apply.
+The change is recorded as `character_roll_applied`. The sheet lists up to 20
+applicable rolls per resource; the control is online only.
 
 ## 6.4 Rules and expression engine
 
@@ -318,9 +340,41 @@ The sheet and `/api/v1` return an entry's computed fields with the entry
 
 These two rules make "one entry per class" possible: a class entry computes what
 the class contributes at its level and the character sums the slot. The
-[5e SRD system](docs/systems/dnd5e-srd.md) multiclasses this way. Sharing one
-formula between templates is proposed, not decided, in the
-[entry formulas plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md).
+[5e SRD system](docs/systems/dnd5e-srd.md) multiclasses this way.
+
+**SRD gap stages S1–S11 (owner instruction "Implement plan", 2026-11-21).** The
+[plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md) records
+the decisions; the owner chose to add the apply-roll command (G5), and the other
+decisions take the plan's recommended options.
+
+- *Shared formulas (S1).* Several templates may use one computed or roll
+  expression. It compiles against the fields every owning template defines with
+  the same type. Granted actions that share a roll formula must declare the same
+  inputs, target, outcomes and details; their labels may differ. Entity
+  expressions and extension templates keep one owner.
+- *Template formulas (S11).* Template computed fields and template resource
+  maxima may read the character's stored fields through `fields.` (never its
+  computed values), for fields every entity showing the template's slot defines.
+  A template resource may have a calculated maximum; it is normalized for each
+  entry before the sheet is evaluated.
+- *Start full (S4).* A resource with `startFull` starts at its maximum on a new
+  character, and fills when its calculated maximum first rises from 0. Later
+  rises leave the current value alone.
+- *Batch resource actions (S5).* `resourceBatch` applies ordered resets and
+  amounts to the entity's own resources in one revision; amounts stop at the
+  bounds. Entry resources are not part of a batch.
+- *Branch groups (S8).* Each branch of an `if` may name the same dice group; a
+  group named on every branch can be read afterwards with `rolled`.
+- *Targets (S7).* `target.otherEntityIds` lets a target be a character of
+  several entities (formulas read their common fields); `target.optional` lets
+  the action run without one. The roll formula then cannot read `target.`;
+  outcomes and details that read it are skipped when no target is chosen.
+- *Conditional layout (S9).* Sections and sheet elements take `visibleWhen`, a
+  true/false field of the sheet's entity. Hidden parts are left out of the sheet
+  projection; their values stay in the API.
+
+Section 6.1 has presets (S3), reference data reads (S2) and the `npc` rule (S10);
+Section 6.3 has applying a roll (S6).
 
 ## 6.5 Draft, validation, and publishing
 

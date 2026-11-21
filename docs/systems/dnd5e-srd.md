@@ -1,15 +1,16 @@
 # 5e SRD 5.1 system: what is built and what is missing
 
-**Record · 16 November 2026 (replaces the 15 November record) · API only, local PostgreSQL 16**
+**Record · 21 November 2026 (replaces the 16 November record) · API only, local PostgreSQL 16**
 
 The fifth-edition System Reference Document 5.1 is one Sweetroll system,
 published, imported and played through public API v1. This record lists what the
 system contains, what is still missing and why.
 
-On 2026-11-16 the owner asked for the gaps of the first record to be addressed.
-Four are closed, with three platform changes; the
-[plan](../superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md) proposes
-the rest and a way to share formulas.
+The first record (15 November) listed 14 platform limits. On 16 November the
+size limit, entry formulas and multiclassing were addressed; on 21 November the
+owner asked for the rest of the
+[plan](../superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md) to be
+implemented (stages S1–S11). Every stage is used by this system.
 
 - System document builder: [`tests/integration/fixtures/dnd5e/document.ts`](../../tests/integration/fixtures/dnd5e/document.ts)
 - Rules data: [`srd-5.1.json`](../../tests/integration/fixtures/dnd5e/srd-5.1.json) (1.2 MB) and
@@ -20,155 +21,130 @@ the rest and a way to share formulas.
 
 ## Result
 
-The scenario passes (about 28 s, 177 requests, six accounts). It validates and
-publishes the document, exports it and imports the export, builds four
-characters, checks six single-class and five multiclass tables, imports 19 SRD
-stat blocks as campaign NPCs, runs targeted attacks in both directions, levels a
-fighter up and gives it a level of rogue.
+The scenario passes (about 37 s, 190 requests, six accounts). It publishes the
+document, exports and imports it, builds four characters, checks six
+single-class and five multiclass tables, creates 19 monsters from presets,
+refuses a player's standalone monster, reads rules tables as a player, fights
+with attacks against a monster, a character and no target, applies a damage
+roll to hit points, takes long rests, levels a fighter up and gives it a rogue
+level.
 
-Not done: no browser or GUI run, no hosted run, no load test. The 319-option
-spell picker, the class list and the computed entry text were never opened in
-the web app for this system (the web unit test covers the rendering).
+Not done: no browser or GUI run, no hosted run, no load test. The Rules panel,
+the apply-roll control, the preset picker and the hidden sheet parts are covered
+by web unit tests only.
 
 | Budget | Used | Limit |
 |---|---|---|
-| Document | 1.38 MB | 5.24 MB (5 MiB) |
-| Compiled package | 1.58 MB | 5.24 MB (5 MiB) |
-| Templates | 101 | 128 |
-| Fields (entities and templates) | 394 | 512 |
-| Actions (entity and granted) | 81 | 256 |
-| Expressions | 246 | 1,024 |
-| Datasets | 20 | 64 |
+| Document | 1.98 MB | 5.24 MB (5 MiB) |
+| Compiled package | 2.18 MB | 5.24 MB (5 MiB) |
+| Fields (entities and templates) | 490 | 512 |
+| Templates | 99 | 128 |
+| Actions (entity and granted) | 152 | 256 |
+| Expressions | 239 | 1,024 |
+| Datasets | 21 | 64 |
+
+The field budget is now the binding limit. It is why classes are one template
+and why 40 of the 187 gear items are catalog entries.
 
 ## What the system contains
 
 | SRD content | In the system | How |
 |---|---|---|
-| Six abilities, modifiers, 18 skills, saving throws, passive Perception, initiative | All | Computed fields and d20 rolls with advantage, disadvantage and a situational bonus |
-| 9 races (each SRD subrace merged into its race) | All | `races` dataset: ability increases, speed, size, traits and lore text, Dwarven Toughness |
-| 12 classes, levels 1–20, one SRD subclass each | All | One "Class" entry per class a character has; see Multiclassing |
+| Six abilities, modifiers, 18 skills, saving throws, passive Perception, initiative | All | Computed fields; d20 rolls with advantage, disadvantage and a situational bonus |
+| 9 races (each SRD subrace merged into its race) | All | `races` dataset: ability increases, speed, size, traits and lore |
+| 12 classes, levels 1–20, one SRD subclass each | All | One "Class" entry per class a character has |
 | Multiclassing | Yes | Add a class entry |
-| Spell slots and Pact Magic | All | Nine slot resources and a separate Pact Magic pool |
-| Limited-use class features | 12 | Named resources (Rage, Ki, Sorcery points, Channel Divinity, Lay on Hands and others); a class die on the class entry (Sneak Attack, Martial Arts, Bardic Inspiration, Second Wind) |
-| 243 class features and the Grappler feat | Full text | One generic "feature" entry with a uses counter; 408 source entries with identical text were merged |
-| 319 spells | Full text on the entry | One generic "spell" entry; 76 spells roll damage or healing with upcasting and cantrip scaling |
-| 37 weapons | All | One generic "weapon" entry: attack, attack a monster, damage, two-handed damage |
+| Spell slots and Pact Magic | All | Nine slot resources and a separate Pact Magic pool; empty levels are hidden |
+| Limited-use class features | 12 | Up to three meters on each class entry, named by the class, with use and restore actions |
+| Class dice | 4 | Sneak Attack, Martial Arts, Bardic Inspiration, Second Wind on the class entry |
+| 243 class features and the Grappler feat | Full text | One "feature" entry with a uses counter |
+| 319 spells | Full text on the entry | One "spell" entry; 76 spells roll damage or healing with upcasting and cantrip scaling |
+| 37 weapons | All, as catalog entries | One template each, sharing one attack and two damage formulas |
 | 13 armors and shield | All | Catalog templates; Armor Class is computed from what is worn |
-| 187 gear items, tools, mounts and vehicles | All | 78 catalog templates, 109 through a generic "other gear" entry |
-| Potions of healing (4) | All | Catalog templates with a healing roll |
-| 362 magic items | Full text on the entry | Generic "magic item" entry with attunement and charges |
-| 33 rule sections | Full text | `rules` dataset (39 records; long sections are split). Readable by the author only (gap 5) |
-| 334 monsters | As importable stat blocks | `monster` entity with editable values; not rules data (gap 2) |
-| 15 conditions | Text and a multi-choice field | No effect on rolls |
-| Hit points, hit dice, death saves, temporary hit points, exhaustion, inspiration, coins, carried weight | All | Fields, resources and four warnings |
+| 187 gear items | All | 40 catalog templates, 147 through an "other gear" entry |
+| 4 potions of healing, 362 magic items | All | Potions as catalog entries; magic items with attunement and charges |
+| 33 rule sections, conditions, languages, damage types and other tables | Full text | Readable by players through the Rules panel |
+| 334 monsters | All, as presets | Create a "Monster or NPC" from the bestiary in a campaign |
+| Hit points, hit dice, death saves, temporary hit points, exhaustion, inspiration, coins, carried weight | All | Hit points and slots start full; death saves show at 0 hit points |
+| Long and short rests | Yes | One action each |
 
 ## Multiclassing
 
 A character is created without a class. Each class is an entry in the "Classes"
-list with a class, a level and a "first class" flag. Adding a class is adding an
-entry; gaining a level is editing its level.
+list with a class, a level and a "first class" flag. The entry computes what the
+class gives at that level and the character adds the entries up: level,
+proficiency bonus, hit dice, hit points, saving throws (from the first class),
+spell slots (one class's own table, or the multiclass table), Pact Magic and
+class dice. Class features with limited uses are meters on the entry; Bardic
+Inspiration and Divine Sense read the stored Charisma score.
 
-The entry computes what the class gives at that level and the character adds the
-entries up:
+Checked: fighter 5 / wizard 3, cleric 3 / wizard 2, paladin 4 / sorcerer 3,
+warlock 3 / bard 2, cleric 2 / paladin 3, and a rogue level added in play.
 
-- Character level, proficiency bonus and hit dice come from the sum of the levels.
-- Hit points use the full hit die for the first class's first level and the fixed
-  average for every other level.
-- Saving throw proficiencies come from the class marked first.
-- One spellcasting class uses its own slot table. Two or more add their levels
-  (half for paladin and ranger) and use the full caster table. Pact Magic stays
-  a separate pool.
-- Class resources are summed. Channel Divinity takes the highest value instead.
-- Each class entry has its own class die and "spend hit dice" roll.
+Known limits:
 
-Checked in the scenario: fighter 5 / wizard 3, cleric 3 / wizard 2, paladin 4 /
-sorcerer 3, warlock 3 / bard 2, cleric 2 / paladin 3, and a fighter who takes a
-rogue level during play.
+- Hit points and slots start full only when they rise from 0. Adding a second
+  class raises the maxima and leaves the current values: a fighter 5 / wizard 3
+  built in one go has 44 of 62 hit points until a long rest.
+- Channel Divinity shows on both entries of a cleric/paladin; the SRD gives one use.
+- The sheet's spell save DC and attack bonus use the best casting ability; a spell
+  entry can name another.
+- Prerequisites (ability score 13) and second-class proficiencies are not checked.
 
-Known limits of this model:
-
-- The sheet's spell save DC and attack bonus use the best spellcasting ability
-  among the classes. A spell entry has a "spellcasting ability" choice for the
-  other class.
-- "Spells known or prepared" adds each class's count without the minimum of one
-  per class.
-- Multiclass prerequisites (ability score 13) and the reduced proficiencies of a
-  second class are not checked.
-- A new sheet has 1 hit point until a class is added and "restore hit points" is
-  used (gap 7).
-- The class list holds six entries. Each entry costs sheet budget for about
-  40 computed fields.
-
-## Closed on 2026-11-16
+## Closed
 
 | Gap in the first record | Now |
 |---|---|
-| 1. The SRD does not fit one system | The limit is 5 MiB for a document and for its compiled package. Publishing rejects a larger package. Magic item descriptions, all magic items, the rule sections and race lore are back. |
-| 4. A sheet does not show looked-up text on an entry | The sheet and `/api/v1` return computed entry fields. The "Show spell" workaround actions are removed. |
-| 6. Totals cannot use looked-up values | Slot aggregates read computed number fields. |
-| 12. No multiclassing | See above. |
+| 1. Size | 5 MiB document and package; publishing rejects a larger package |
+| 2. Monsters are not a catalog | The bestiary is the monster entity's presets (S3) |
+| 3. One template per weapon is too large | 37 weapon templates share their formulas (S1) |
+| 4. Looked-up text is not on the sheet | Entries return computed fields |
+| 5. Players cannot read reference data | Rules tables are readable; Rules panel on the sheet (S2) |
+| 6. Totals cannot use looked-up values | Aggregates read computed entry fields |
+| 7. A new character does not start full | Start-full resources (S4) |
+| 8. No rest action | Long rest and short rest batches (S5) |
+| 9. Rolls do not change sheets | A person can apply a saved roll's total to a resource (S6, owner decision G5) |
+| 10. Targets name one entity and are required | One attack with an optional target of either kind (S7) |
+| 11. No advantage without a zero term | One group name per branch (S8) |
+| 12. No multiclassing | One class entry per class |
+| 13. No conditional layout | Empty slot levels, Pact Magic, Spellcasting and death saves hide (S9) |
+| 14. `npc` kind not enforced | Monsters are created by a GM in a campaign (S10) |
 
-## Still missing because of platform limits
+## Still missing
 
-Numbers are those of the first record. Each has a proposed stage in the
-[plan](../superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md).
-
-2. **Monsters are sheet values, not a catalog.** The GM types a stat block or a
-   script posts `srd-5.1-monsters.json` values to `POST /campaigns/{id}/characters`.
-3. **One template per weapon needs shared formulas.** An expression belongs to
-   one template, so weapons, spells, features, other gear and magic items are
-   each one template with a choice from a dataset. The plan proposes letting
-   several templates use one expression.
-5. **Players cannot read reference data.** Condition, skill, language and rule
-   section text is in the system and reachable only by the author. Spell,
-   feature and magic item text is now visible through entries.
-6. (Partly open.) A generic weapon, gear or magic item entry still needs its
-   weight typed, because the weight that counts is a stored per-unit field.
-7. **A new character does not start full.** Resources with a computed maximum
-   start at their default: 1 hit point, no spell slots, no class resource uses.
-8. **No rest action.** A reset action changes one resource. There are restore
-   actions for hit points, nine slot levels and Pact Magic; the twelve class
-   resources are set on their meters.
-9. **Rolls do not change sheets** (owner decision C10). Damage, healing, spent
-   slots, ammunition and death save marks are applied by hand.
-10. **A targeted roll names one entity and always needs a target.** Weapons have
-    "Attack" and "Attack a monster". Monster attacks target player characters only.
-11. **No advantage primitive that keeps the natural die.** Every d20 formula
-    rolls a named pool, multiplies it by 0 and keeps the high or low die.
-13. **No conditional layout.** Every sheet shows nine slot meters, the Pact Magic
-    pool and twelve class resource meters, most of them 0 of 0.
-14. **The `npc` entity kind is not enforced.** Any account with `characters:write`
-    can create a standalone monster sheet.
-
-Already excluded by the [rules coverage plan](../superpowers/plans/2026-11-10-rules-coverage.md):
-initiative order and turns, condition and spell effects, durations, concentration,
-range, cover and areas.
+- **Initiative order, turns, effects with durations, concentration, range and
+  areas.** Excluded by the rules coverage plan; conditions are text.
+- **Rest details.** A long rest restores all hit points and slots but not half
+  the hit dice (a reset restores all; a fixed amount cannot be half). Class
+  features are restored on their class entries, because a batch changes entity
+  resources only (decision G4).
+- **Applying a roll is one roll to one resource.** Halving for a successful save
+  and resistances are applied by hand with the amount control.
+- **Monster stat blocks** have three attacks with one damage expression each;
+  four SRD monsters have a fourth attack, and breath weapons and spellcasting
+  stay in the action text.
+- **Spells and features** are one generic entry each, chosen from a list: 319
+  spell templates would not fit the field budget.
 
 ## Simplified in this system
 
-- Hit points use the fixed value per level. Rolled hit points go into an adjustment field.
+- Hit points use the fixed value per level; rolled hit points go into an adjustment field.
 - The half-elf's two free +1 increases, Dragonborn ancestry, racial and background
-  proficiencies and languages are entered by hand. The Acolyte background is text.
+  proficiencies and languages are entered by hand.
 - Weapon proficiency is a flag on the entry (on by default). Armor proficiency,
   Strength requirements and Stealth disadvantage are text.
 - Finesse weapons use the better of Strength and Dexterity. Monk weapons, two-weapon
   fighting, fighting styles and Rage damage go into the "other bonus" input.
-- Fast Movement applies to a barbarian in any armor. Unarmored Movement stops
-  when a monk wears armor or a shield.
-- A stat block has three attack slots with one damage expression each. Four SRD
-  monsters have a fourth attack; extra damage types, save DCs, breath weapons and
-  monster spellcasting stay in the action text.
-- Spell rolls cover one damage or healing expression per spell. Spells with
-  several parts use "Roll any dice".
+- Spell rolls cover one damage or healing expression per spell.
 
 ## Environment findings
 
 - `.npmrc` requires Node 24. The container default is Node 22; `/opt/node24` was used.
 - Tests under `tests/` are not part of `npm run typecheck`. The new files were
-  checked with a one-off strict `tsc` run and are clean.
+  checked with a one-off strict `tsc` run.
 - `tests/integration/character-http-acceptance.test.ts` "serves all three
   reference systems" times out at its 5 s limit in this container, with and
-  without these changes. The other 452 integration tests pass.
+  without these changes.
 
 ## Licence
 

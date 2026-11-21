@@ -6,7 +6,7 @@ import { characterEntryImageHandlers, characterEntryImageRoutes } from "./charac
 import {DieResultSchema, RollBreakdownSchema, PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
-import { CharacterDecksSchema, RollOptionsQuery, RollOptionsSchema } from "./roll-options.js";
+import { ApplicableRollsSchema, CharacterDecksSchema, ReferenceDataListSchema, ReferenceDatasetSchema, RollOptionsQuery, RollOptionsSchema } from "./roll-options.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
@@ -137,7 +137,7 @@ const TemplateKindDto = Type.Union([
 const ProjectedEntryDefinitionDto=Type.Object({
  id:Type.String(),label:Type.String(),kind:TemplateKindDto,
  fields:Type.Array(Type.Object({...ProjectionFieldConstraintsDto.properties,id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("text"),Type.Literal("integer"),Type.Literal("decimal"),Type.Literal("boolean"),Type.Literal("singleChoice"),Type.Literal("multiChoice"),Type.Literal("resource")]),default:Type.Unknown()}),{maxItems:64}),
- grantedActions:Type.Array(Type.Object({id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("roll"),Type.Literal("resourceBump")]),target:Type.Optional(Type.Object({entityId:Type.String()})),respondsTo:Type.Optional(Type.Literal(true)),inputs:Type.Array(ProjectionActionInputDto)}),{maxItems:16}),
+ grantedActions:Type.Array(Type.Object({id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("roll"),Type.Literal("resourceBump")]),target:Type.Optional(Type.Object({ entityId: Type.String(), otherEntityIds: Type.Optional(Type.Array(Type.String(), { maxItems: 8 })), optional: Type.Optional(Type.Literal(true)) })),respondsTo:Type.Optional(Type.Literal(true)),inputs:Type.Array(ProjectionActionInputDto)}),{maxItems:16}),
 });
 const ProjectionSlotEntryDto = Type.Object({
   definition:Type.Optional(ProjectedEntryDefinitionDto),
@@ -179,13 +179,13 @@ const ProjectionElementDto = Type.Union([
     id: Type.String(),
     actionId: Type.String(),
     label: Type.String(),
-    actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump"), Type.Literal("draw"), Type.Literal("shuffle")]),
+    actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump"), Type.Literal("resourceBatch"), Type.Literal("draw"), Type.Literal("shuffle")]),
     deck: Type.Optional(Type.Object({
       deckId: Type.String(),
       label: Type.String(),
       count: Type.Optional(Type.Integer({ minimum: 1, maximum: 10 })),
     })),
-    target: Type.Optional(Type.Object({ entityId: Type.String() })),
+    target: Type.Optional(Type.Object({ entityId: Type.String(), otherEntityIds: Type.Optional(Type.Array(Type.String(), { maxItems: 8 })), optional: Type.Optional(Type.Literal(true)) })),
     respondsTo: Type.Optional(Type.Literal(true)),
     inputs: Type.Array(ProjectionActionInputDto),
     validations: Type.Array(RuntimeValidationDto),
@@ -283,6 +283,7 @@ const CharacterCreationOptionsDto = Type.Object({
       id: Type.String({ minLength: 1 }),
       label: Type.String({ minLength: 1 }),
       kind: Type.Union([Type.Literal("playable"), Type.Literal("npc")]),
+      presets: Type.Optional(Type.Array(Type.Object({ id: Type.String(), label: Type.String() }), { maxItems: 1000 })),
     }),
   ),
 });
@@ -416,6 +417,7 @@ const CreateCharacterBody = Type.Object({
   entityDefinitionId: Type.String({ minLength: 1 }),
   name: Type.String({ minLength: 1 }),
   initialValues: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  presetId: Type.Optional(Type.String({ minLength: 1 })),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
 
@@ -546,7 +548,7 @@ const EntryTemplateDto = Type.Object({
     id: Type.String(),
     label: Type.String(),
     actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
-    target: Type.Optional(Type.Object({ entityId: Type.String() })),
+    target: Type.Optional(Type.Object({ entityId: Type.String(), otherEntityIds: Type.Optional(Type.Array(Type.String(), { maxItems: 8 })), optional: Type.Optional(Type.Literal(true)) })),
     respondsTo: Type.Optional(Type.Literal(true)),
     inputs: Type.Array(EntryGrantedActionInputDto),
   })),
@@ -776,6 +778,24 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
   },
   {
     method: "post",
+    path: "/characters/:characterId/resources/:resourceId/apply-roll",
+    operationId: "post_characters_characterId_resources_resourceId_apply_roll",
+    schema: {
+      params: ResourceBumpParams,
+      body: Type.Object({
+        rollId: Type.String({ format: UUID_FORMAT }),
+        direction: Type.Union([Type.Literal("subtract"), Type.Literal("add")]),
+        expectedRevision: Type.Integer({ minimum: 1 }),
+        idempotencyKey: Type.String({ minLength: 1 }),
+      }),
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
     path: "/characters/:characterId/resources/:resourceId/set",
     operationId: "post_characters_characterId_resources_resourceId_set",
     schema: {
@@ -785,6 +805,33 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
         "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
         ...ErrorResponses,
       },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/applicable-rolls",
+    operationId: "get_characters_characterId_applicable_rolls",
+    schema: {
+      params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) }),
+      response: { "200": Type.Object({ rolls: ApplicableRollsSchema, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/reference-data",
+    operationId: "get_characters_characterId_reference_data",
+    schema: {
+      params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) }),
+      response: { "200": Type.Object({ datasets: ReferenceDataListSchema, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/reference-data/:datasetId",
+    operationId: "get_characters_characterId_reference_data_datasetId",
+    schema: {
+      params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }), datasetId: Type.String({ minLength: 1, maxLength: 64 }) }),
+      response: { "200": Type.Object({ dataset: ReferenceDatasetSchema, requestId: Type.String() }), ...ErrorResponses },
     },
   },
   {
@@ -1123,9 +1170,11 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           entityDefinitionId: string;
           name: string;
           initialValues?: Record<string, unknown>;
+          presetId?: string;
           idempotencyKey: string;
         };
         const result = await characters.create(ctxOf(request), {
+          ...(body.presetId === undefined ? {} : { presetId: body.presetId }),
           systemVersionId: body.systemVersionId,
           ...(body.extensions === undefined ? {} : { extensions: body.extensions }),
           entityDefinitionId: body.entityDefinitionId,
@@ -1232,6 +1281,17 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },
 
+      post_characters_characterId_resources_resourceId_apply_roll: async (request, reply) => {
+        const params = request.params as { characterId: string; resourceId: string };
+        const body = request.body as { rollId: string; direction: "subtract" | "add"; expectedRevision: number; idempotencyKey: string };
+        const result = await characters.apply(ctxOf(request), {
+          kind: "applyRoll", characterId: params.characterId, resourceId: params.resourceId,
+          rollId: body.rollId, direction: body.direction, expectedRevision: body.expectedRevision, idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
       post_characters_characterId_resources_resourceId_adjust: async (request, reply) => {
         const params = request.params as { characterId: string; resourceId: string };
         const body = request.body as { delta: number; expectedRevision: number; idempotencyKey: string };
@@ -1261,6 +1321,27 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      get_characters_characterId_applicable_rolls: async (request, reply) => {
+        const result = await characters.listApplicableRolls(ctxOf(request), request.params as { characterId: string });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "no-store");
+        return { rolls: result.value, requestId: request.id };
+      },
+
+      get_characters_characterId_reference_data: async (request, reply) => {
+        const result = await characters.readReferenceData(ctxOf(request), request.params as { characterId: string });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { ...result.value, requestId: request.id };
+      },
+
+      get_characters_characterId_reference_data_datasetId: async (request, reply) => {
+        const result = await characters.readReferenceData(ctxOf(request), request.params as { characterId: string; datasetId: string });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { ...result.value, requestId: request.id };
       },
 
       get_characters_characterId_decks: async (request, reply) => {

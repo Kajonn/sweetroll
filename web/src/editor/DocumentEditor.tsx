@@ -13,6 +13,7 @@ import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import { t } from "../i18n/index.js";
 import type { ScalarValue, ValueType } from "../ports/evaluateExpression.js";
 import { ResourceBumpEditor, type ResourceBumpActionV1 } from "./actions/ResourceBumpEditor.js";
+import { ResourceBatchEditor, type ResourceBatchActionV1 } from "./actions/ResourceBatchEditor.js";
 import { GUIDED_DICE_KINDS, RollActionEditor, type RollActionV1 } from "./actions/RollActionEditor.js";
 import { ConflictBanner } from "./ConflictBanner.js";
 import { DiagnosticsDrawer } from "./DiagnosticsDrawer.js";
@@ -799,6 +800,7 @@ function SheetsTab({
                 allocateElementId={() => allocateSheetChildId("element")}
                 unplacedDefinitions={unplacedDefinitionsForSheet(document, sheet)}
                 allDefinitions={availableDefinitionsForSheet(document, sheet)}
+                conditions={visibilityConditionsForSheet(document, sheet)}
                 entities={document.entities.map((entity) => ({ id: entity.id, label: entity.label }))}
               />
               <Button
@@ -819,6 +821,13 @@ function SheetsTab({
 }
 
 type SheetEditorView = SheetEditorV1;
+
+export function visibilityConditionsForSheet(document: SystemDocumentV1, sheet: SheetEditorV1): Array<{ id: string; label: string }> {
+  const entity = document.entities.find((candidate) => candidate.id === sheet.targetEntityId);
+  return ((entity?.fields ?? []) as unknown as Array<{ id: string; kind: string; label: string; valueType?: string }>)
+    .filter((field) => field.kind === "boolean" || (field.kind === "computed" && field.valueType === "boolean"))
+    .map((field) => ({ id: field.id, label: field.label }));
+}
 
 export function availableDefinitionsForSheet(document: SystemDocumentV1, sheet: SheetEditorV1): UnplacedDefinition[] {
   const definitions: UnplacedDefinition[] = [];
@@ -958,7 +967,7 @@ function DiceTab({
   document: SystemDocumentV1;
   dispatch: React.Dispatch<DocumentAction>;
 }) {
-  const actions = (document.actions as unknown as Array<RollActionV1 | ResourceBumpActionV1 | DeckActionV1>) ?? [];
+  const actions = (document.actions as unknown as Array<RollActionV1 | ResourceBumpActionV1 | ResourceBatchActionV1 | DeckActionV1>) ?? [];
   const expressions = (document.expressions as unknown as Array<{
     id: string;
     source: string;
@@ -1016,7 +1025,15 @@ function DiceTab({
       actions: [...actions, next as unknown as SystemDocumentV1["actions"][number]],
     });
   };
-  const replaceAction = (idx: number, action: RollActionV1 | ResourceBumpActionV1 | DeckActionV1) => {
+  const addResourceBatch = () => {
+    const id = nextActionId(actions.map((a) => a.id));
+    const next: ResourceBatchActionV1 = {
+      kind: "resourceBatch", id, label: t("editor.actions.kind.resourceBatch"),
+      steps: [{ resourceId: "", operation: { kind: "reset" } }],
+    };
+    dispatch({ type: "setActions", actions: [...actions, next as unknown as SystemDocumentV1["actions"][number]] });
+  };
+  const replaceAction = (idx: number, action: RollActionV1 | ResourceBumpActionV1 | ResourceBatchActionV1 | DeckActionV1) => {
     const next = actions.map((a, i) => (i === idx ? action : a));
     dispatch({
       type: "setActions",
@@ -1057,6 +1074,9 @@ function DiceTab({
         </Button>
         <Button variant="secondary" onClick={addResourceBump} data-testid="actions-add-resource-bump">
           {t("editor.actions.addResourceBump")}
+        </Button>
+        <Button variant="secondary" onClick={addResourceBatch} data-testid="actions-add-resource-batch">
+          {t("editor.actions.addResourceBatch")}
         </Button>
         {decks.length === 0 ? null : (
           <>
@@ -1105,6 +1125,12 @@ function DiceTab({
                 />
               ) : action.kind === "draw" || action.kind === "shuffle" ? (
                 <DeckActionEditor action={action} decks={decks} onChange={(next) => replaceAction(idx, next)} />
+              ) : action.kind === "resourceBatch" ? (
+                <ResourceBatchEditor
+                  action={action}
+                  onChange={(next) => replaceAction(idx, next)}
+                  availableResources={collectResourceFields(document)}
+                />
               ) : (
                 <ResourceBumpEditor
                   action={action}

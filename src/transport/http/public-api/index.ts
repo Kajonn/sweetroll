@@ -246,6 +246,16 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
     ));
 
     route({
+      method: "POST", path: "/characters/:characterId/resources/:resourceId/apply-roll", id: "applyRollToCharacterResource",
+      description: "Apply a saved roll's total to a resource of a character the caller may edit: subtract it (damage, spending) or add it (healing). The roll must be one the caller can see, from the character's campaign or, for a standalone character, its own. Rolls never change characters on their own.",
+      scope: "characters:write", input: { params: s.resourceId, body: s.applyRoll }, output: "CharacterMutation",
+      example: { rollId: "00000000-0000-4000-8000-000000000001", direction: "subtract", expectedRevision: 3, idempotencyKey: "damage-roll-1" },
+    }, async (ctx, { params, body }) => map(
+      await characters.apply(ctx, { kind: "applyRoll", ...params, ...body }),
+      ({ character }) => characterMutation(character),
+    ));
+
+    route({
       method: "PUT", path: "/characters/:characterId/resources/:resourceId", id: "setCharacterResource",
       description: "Set a character resource's current value, editable maximum, or both. A computed maximum follows the published formula. Lowering a maximum clamps the current value.",
       scope: "characters:write", input: { params: s.resourceId, body: s.setResource }, output: "CharacterMutation",

@@ -1,7 +1,7 @@
 import { createCharacterImages, type CharacterImages } from "./images.js";
 import { createCharacterEntryImages, type CharacterEntryImages } from "./entry-images.js";
 import {canPlaceTemplate} from "../campaigns/templatePolicy.js";
-import { campaignRollRequirements } from "../systems/implementation/runtime/roll-context.js";
+import { campaignRollRequirements, targetEntityIds } from "../systems/implementation/runtime/roll-context.js";
 import { materializeDefaults, slotsForEntity, templateApplicable, validDefaults } from "../systems/implementation/runtime/effective-entry.js";
 import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
 import {pushEligibility} from "../systems/implementation/rules/push.js";
@@ -66,6 +66,7 @@ import {
   type StoredResultScope,
 } from "./persistence.js";
 import { canReadRoll, isActiveMember, isGameMaster, type MembershipRecord } from "../campaigns/policy.js";
+import { ROLL_VISIBILITY_PREDICATE } from "../campaigns/persistence.js";
 import { claimExecution } from "./idempotency.js";
 import { buildAttachedCharacterExportDocument, buildCharacterExportDocument } from "./export.js";
 
@@ -82,6 +83,7 @@ const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
   setField: "character_set_field",
   bumpResource: "character_bump_resource",
   adjustResource: "character_adjust_resource",
+  applyRoll: "character_apply_roll",
   setResource: "character_set_resource",
   executeAction: "character_execute_action",
   pushRoll: "character_push_roll",
@@ -227,6 +229,8 @@ export type CreateCharacter = {
   entityDefinitionId: DefinitionId;
   name: string;
   initialValues?: Record<DefinitionId, unknown>;
+  /** Design 6.1: a row of the entity's preset dataset to copy values from. */
+  presetId?: DefinitionId;
   idempotencyKey: string;
 };
 
@@ -329,6 +333,23 @@ export type CharacterResourceAdjustCommand = {
   idempotencyKey: string;
 };
 
+/**
+ * Design 6.3 (SRD gaps S6, owner decision 2026-11-21, G5): apply a saved
+ * roll's total to a resource, such as damage to hit points. Rolls still never
+ * change characters on their own; a person who may edit this character
+ * chooses to apply a roll they can see, from the same campaign (or, for a
+ * standalone character, one of its own rolls).
+ */
+export type CharacterApplyRollCommand = {
+  kind: "applyRoll";
+  characterId: CharacterId;
+  resourceId: DefinitionId;
+  rollId: string;
+  direction: "subtract" | "add";
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
 /** Design 6.3: direct input of a resource's current value and/or maximum. */
 export type CharacterResourceSetCommand = {
   kind: "setResource";
@@ -343,6 +364,7 @@ export type CharacterResourceSetCommand = {
 export type CharacterCommand =
   | CharacterPushCommand
   | CharacterResourceAdjustCommand
+  | CharacterApplyRollCommand
   | CharacterResourceSetCommand
   | CharacterFieldSetCommand
   | CharacterResourceBumpCommand
@@ -551,6 +573,10 @@ export type CharacterExportV1 = {
 
 type CharacterAccess = { standaloneOnly?: boolean };
 
+export type ReferenceDataRead =
+  | { datasets: Array<{ datasetId: string; label: string; records: number }> }
+  | { dataset: { datasetId: string; label: string; records: Array<{ id: string; label: string; values: Record<string, string | number | boolean | null> }> } };
+
 export interface Characters extends CharacterImages, CharacterEntryImages {
   rollOptions(ctx: RequestContext, request: { characterId: string; actionId: string; entryId?: string }): Promise<CharacterResult<CampaignRollOptions>>;
   readRoll(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<NormalizedRoll>>;
@@ -583,6 +609,17 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
    * its own. Authorized like `open`.
    */
   listDecks(ctx: RequestContext, input: { characterId: CharacterId }): Promise<CharacterResult<CharacterDeck[]>>;
+  /**
+   * Design 6.1 (SRD gaps S2): the reference tables of a system, for anyone
+   * who may use the version or read a character pinned to it. Without
+   * `datasetId` the tables are listed; with it, one table and its records.
+   */
+  /** Design 6.3 (S6): recent saved rolls with a positive total that this character's editor may apply to it. */
+  listApplicableRolls(ctx: RequestContext, input: { characterId: CharacterId }): Promise<CharacterResult<Array<{ rollId: string; output: string; total: number }>>>;
+  readReferenceData(
+    ctx: RequestContext,
+    input: ({ characterId: CharacterId } | { versionId: string }) & { datasetId?: string },
+  ): Promise<CharacterResult<ReferenceDataRead>>;
   manage(
     ctx: RequestContext,
     input: CharacterManagementCommand,
@@ -1627,6 +1664,32 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     return { ok: true, value: { character: deserializeView(stored.value.character), roll: null, nominal: null } };
   }
 
+  /**
+   * Design 6.3 (S6): the total of a saved roll the actor can see and may apply
+   * to this character, or null. A campaign roll must belong to the character's
+   * campaign; a standalone character applies only its own rolls.
+   */
+  async function loadApplicableRollTotal(
+    rollId: string,
+    record: CharacterRecord,
+    actorId: string,
+    membership: MembershipRecord | null,
+  ): Promise<number | null> {
+    if (!/^[0-9a-f-]{36}$/i.test(rollId)) return null;
+    const { rows: [roll] } = await input.pool.query<{ total: number; audience: RollAudience; scope_campaign_id: string | null; character_id: string; principal_id: string }>(
+      `SELECT total, audience, scope_campaign_id, character_id, COALESCE(audience_actor_id, actor_id) AS principal_id
+         FROM character_rolls WHERE id = $1`,
+      [rollId],
+    );
+    if (roll === undefined) return null;
+    if (record.campaignId === null) {
+      return roll.character_id === record.characterId && roll.scope_campaign_id === null && record.ownerId === actorId ? Number(roll.total) : null;
+    }
+    if (roll.scope_campaign_id !== record.campaignId) return null;
+    return canReadRoll({ roll: { campaignId: record.campaignId, actorId: roll.principal_id, audience: roll.audience }, membership })
+      ? Number(roll.total) : null;
+  }
+
   return {
     ...createCharacterImages({ pool: input.pool, now, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     ...createCharacterEntryImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
@@ -1637,6 +1700,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         entityDefinitionId: createInput.entityDefinitionId,
         name: createInput.name,
         initialValues: createInput.initialValues ?? {},
+        ...(createInput.presetId === undefined ? {} : { presetId: createInput.presetId }),
         ...(extensions.length === 0 ? {} : { extensions }),
       });
 
@@ -1671,9 +1735,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           extensions,
           entityId: createInput.entityDefinitionId,
           intent:
-            createInput.initialValues === undefined
-              ? { kind: "initialize" }
-              : { kind: "initialize", values: createInput.initialValues },
+            {
+              kind: "initialize", standalone: true,
+              ...(createInput.initialValues === undefined ? {} : { values: createInput.initialValues }),
+              ...(createInput.presetId === undefined ? {} : { preset: createInput.presetId }),
+            },
         });
         if (!resolved.ok) return { ok: false, error: mapRuntimeError(resolved.error) };
 
@@ -2117,7 +2183,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         }
         const options = await repo.loadCampaignRollOptions({
           source, member: toMembershipRecord(snapshot.auth.membership!), includeRolls: action.respondsTo === true,
-          ...(action.target ? { targetEntityId: action.target.entityId } : {}),
+          ...(action.target ? { targetEntityIds: targetEntityIds(action.target) } : {}),
         });
         return options ? { ok: true, value: options } : { ok: false, error: errors.not_found() };
       } catch {
@@ -2183,6 +2249,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               ? { resourceId: command.resourceId, direction: command.direction }
             : command.kind === "adjustResource"
               ? { resourceId: command.resourceId, delta: command.delta }
+            : command.kind === "applyRoll"
+              ? { resourceId: command.resourceId, rollId: command.rollId, direction: command.direction }
             : command.kind === "setResource"
               ? resourceSetPayload(command)
               : command.kind === "pushRoll"
@@ -2361,6 +2429,17 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             const error=errors.not_found();await repo.finalizeExecutionError({executionId,resultJson:serializeCommandError(error,resultScope),expiresAt:replayExpiresAt});return {ok:false,error};
           }
         }
+        let appliedDelta = 0;
+        if (command.kind === "applyRoll") {
+          const applied = await loadApplicableRollTotal(command.rollId, resolveSource, ctx.actorId, pushMembership);
+          const error = applied === null ? errors.not_found()
+            : applied <= 0 ? errors.invalid_value("Only a roll with a positive total can be applied.") : null;
+          if (error !== null) {
+            await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error, resultScope), expiresAt: replayExpiresAt });
+            return { ok: false, error };
+          }
+          appliedDelta = command.direction === "subtract" ? -applied! : applied!;
+        }
         const intent =
           command.kind === "pushRoll"
             ? ({kind:"push",parent:pushParent!.roll,context:pushParent!.context,executionId} as const)
@@ -2370,6 +2449,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               ? ({ kind: "bump", resourceId: command.resourceId, direction: command.direction } as const)
             : command.kind === "adjustResource"
               ? ({ kind: "adjust", resourceId: command.resourceId, delta: command.delta } as const)
+            : command.kind === "applyRoll"
+              ? ({ kind: "adjust", resourceId: command.resourceId, delta: appliedDelta } as const)
             : command.kind === "setResource"
               ? ({ kind: "setResource", ...resourceSetPayload(command) } as const)
               : ({
@@ -2395,6 +2476,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
                 ? "character_resource_bumped"
               : command.kind === "adjustResource"
                 ? "character_resource_adjusted"
+              : command.kind === "applyRoll"
+                ? "character_roll_applied"
               : command.kind === "setResource"
                 ? "character_resource_set"
                 : command.kind==="pushRoll"?"character_roll_pushed":"character_action_executed";
@@ -2417,7 +2500,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ...(resolved.pushContext?{pushContext:resolved.pushContext,pushResolutionRevision:resolveSource.revision}:{}),
             activity: {
               kind: activityKind,
-              payloadJson: { ...payload, changedDefinitionIds },
+              payloadJson: { ...payload, ...(command.kind === "applyRoll" ? { delta: appliedDelta } : {}), changedDefinitionIds },
               requestId: ctx.requestId,
             },
             resultExpiresAt: replayExpiresAt,
@@ -2490,7 +2573,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           const observed = prepared.value({ state: resolveSource.state, intent: { kind: "observe" } });
           if (!observed.ok) return { ok: false, error: mapRuntimeError(observed.error) };
           const action = findProjectedAction(observed.value.projection, intent.actionId, intent.entryId);
-          if (!action || Boolean(action.target) !== Boolean(selection.targetCharacterId)
+          // An optional target may be left out; a required one may not, and an action without one takes none.
+          if (!action || (action.target === undefined ? Boolean(selection.targetCharacterId) : !action.target.optional && !selection.targetCharacterId)
             || Boolean(action.respondsTo) !== Boolean(selection.respondsTo)) {
             const error = mapRuntimeError({ code: "bad_request", definitionId: intent.actionId, message: "Roll context does not match the action." });
             await repo.finalizeExecutionError({
@@ -2504,7 +2588,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             actorId: ctx.actorId,
             expectedRevision: command.expectedRevision,
             campaign: { campaignId: attachedCampaignId },
-            selection: { ...selection, ...(action.target ? { targetEntityId: action.target.entityId } : {}) },
+            selection: { ...selection, ...(action.target ? { targetEntityIds: targetEntityIds(action.target) } : {}) },
             source: resolveSource,
             membershipGeneration: resultScope.membershipGeneration,
             resolve: (campaignRoll: CampaignRollContext) => {
@@ -2545,6 +2629,71 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           executionId,
           replayExpiresAt,
         });
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+    async listApplicableRolls(ctx, request) {
+      try {
+        let record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        let membership: MembershipRecord | null = null;
+        if (record === null) {
+          const attached = await loadAttachedSnapshot(ctx, request.characterId);
+          if (attached === null) return { ok: false, error: errors.not_found() };
+          record = attached.auth.record;
+          membership = toMembershipRecord(attached.auth.membership!);
+        }
+        const { rows } = record.campaignId === null
+          ? await input.pool.query<{ id: string; rendered_output: string; total: number }>(
+            `SELECT id, rendered_output, total FROM character_rolls
+              WHERE character_id = $1 AND scope_campaign_id IS NULL AND total > 0 AND COALESCE(push_attempt, 0) = 0
+              ORDER BY occurred_at DESC, id DESC LIMIT 20`, [record.characterId])
+          : await input.pool.query<{ id: string; rendered_output: string; total: number }>(
+            `SELECT r.id, r.rendered_output, r.total FROM character_rolls r
+              WHERE r.scope_campaign_id = $3 AND r.total > 0 AND ${ROLL_VISIBILITY_PREDICATE}
+              ORDER BY r.occurred_at DESC, r.id DESC LIMIT 20`,
+            [ctx.actorId, membership !== null && isGameMaster(membership), record.campaignId]);
+        return { ok: true, value: rows.map((row) => ({ rollId: row.id, output: row.rendered_output, total: Number(row.total) })) };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+    async readReferenceData(ctx, request) {
+      try {
+        let versionId: string;
+        let extensions: ExtensionRef[] = [];
+        if ("versionId" in request) {
+          const authorized = await input.authorizeVersionUse(ctx, request.versionId);
+          if (!authorized.ok) return { ok: false, error: errors.not_found() };
+          versionId = authorized.value.versionId;
+        } else {
+          let record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+          if (record === null) {
+            const scope = await repo.loadCharacterScope(request.characterId);
+            if (scope === null || scope.campaignId === null) return { ok: false, error: errors.not_found() };
+            const attached = await loadAttachedSnapshot(ctx, request.characterId);
+            if (attached === null) return { ok: false, error: errors.not_found() };
+            record = attached.auth.record;
+          }
+          versionId = record.systemVersionId;
+          extensions = record.extensions;
+        }
+        const loaded = await loadEffective(versionId, extensions);
+        if (!loaded.ok) {
+          return loaded.error.code === "invalid_package"
+            ? { ok: false, error: mapRuntimeError({ code: "invalid_package", message: "Published package runtime references are invalid." }) }
+            : { ok: false, error: errors.internal() };
+        }
+        const datasets = loaded.value.referenceData;
+        if (request.datasetId === undefined) {
+          return { ok: true, value: { datasets: datasets.map((dataset) => ({ datasetId: dataset.id, label: dataset.label, records: dataset.records.length })) } };
+        }
+        const dataset = datasets.find((candidate) => candidate.id === request.datasetId);
+        if (dataset === undefined) return { ok: false, error: errors.not_found() };
+        return { ok: true, value: { dataset: {
+          datasetId: dataset.id, label: dataset.label,
+          records: dataset.records.map(({ id, label, values }) => ({ id, label, values: structuredClone(values) })),
+        } } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -3168,6 +3317,14 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
     case "character_resource_adjusted":
       return {
         resourceId: record.resourceId,
+        delta: record.delta,
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
+    case "character_roll_applied":
+      return {
+        resourceId: record.resourceId,
+        rollId: record.rollId,
+        direction: record.direction,
         delta: record.delta,
         changedDefinitionIds: record.changedDefinitionIds ?? [],
       };

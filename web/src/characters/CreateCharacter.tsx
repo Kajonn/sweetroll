@@ -700,7 +700,8 @@ export function CreateCharacter({
     }
   };
 
-  const entities: EntityOption[] = metadata?.entities ?? [];
+  // Non-player entities are created by a GM inside a campaign (design 6.1).
+  const entities: EntityOption[] = (metadata?.entities ?? []).filter(entity => (entity.kind ?? "playable") !== "npc");
   const canCreate =
     metadata !== null &&
     expired === null &&

@@ -13,6 +13,7 @@ export type { ExtensionRef } from "./implementation/rules/compose.js";
 import { buildCharacterProjection } from "./implementation/runtime/projection.js";
 import { decodeActionInputs, resolveGrantedAction } from "./implementation/runtime/resolve-entries.js";
 import { resolveObservedValues } from "./implementation/runtime/resolve.js";
+import { presetOptions, presetValues } from "./implementation/runtime/presets.js";
 import { describeRoll, mergeBindings, type RollDetail, type RollOutcome } from "./implementation/rules/outcomes.js";
 import { resolveDeckAction } from "./implementation/runtime/decks.js";
 import { createDeterministicRng } from "./implementation/runtime/deterministic-rng.js";
@@ -64,7 +65,8 @@ export type DeckContext = { state: Pick<DeckState, "shuffleId" | "remaining"> | 
 
 export type RuntimeIntent =
   | {kind:"push";parent:NormalizedRoll;context:PushContext;executionId:string;optionsOnly?:boolean}
-  | { kind: "initialize"; values?: Record<DefinitionId, unknown> }
+  /** `standalone`: a character outside any campaign, which cannot use an `npc` entity (design 6.1). */
+  | { kind: "initialize"; values?: Record<DefinitionId, unknown>; standalone?: boolean; preset?: DefinitionId }
   | { kind: "observe" }
   | { kind: "set"; fieldId: DefinitionId; value: unknown }
   | { kind: "bump"; resourceId: DefinitionId; direction: "up" | "down" }
@@ -217,10 +219,10 @@ export type CharacterProjectionElement =
       id: DefinitionId;
       actionId: DefinitionId;
       label: string;
-      actionKind: "roll" | "resourceBump" | "draw" | "shuffle";
+      actionKind: "roll" | "resourceBump" | "resourceBatch" | "draw" | "shuffle";
       /** Design 6.4 (C13): the deck a draw or shuffle action uses, and how many cards a draw takes. */
       deck?: { deckId: DefinitionId; label: string; count?: number };
-      target?: { entityId: DefinitionId };
+      target?: { entityId: DefinitionId; otherEntityIds?: DefinitionId[]; optional?: true };
       respondsTo?: true;
       inputs: CharacterProjectionActionInput[];
       validations: RuntimeValidation[];
@@ -246,7 +248,7 @@ export type CharacterProjectionSlotEntry = {
     fields:Array<CharacterProjectionFieldConstraints & {id:string;label:string;kind:Exclude<import("./implementation/package/schema/index.js").FieldV1["kind"],"computed"|"image">;default:unknown}>;
     grantedActions: Array<{
       id: string; label: string; kind: "roll" | "resourceBump"; inputs: CharacterProjectionActionInput[];
-      target?: { entityId: DefinitionId }; respondsTo?: true;
+      target?: { entityId: DefinitionId; otherEntityIds?: DefinitionId[]; optional?: true }; respondsTo?: true;
     }>;
   };
   metadata?: {name:string;description?:string;notes?:string};
@@ -340,6 +342,8 @@ export type VersionDescription = {
     id: DefinitionId;
     label: string;
     kind: "playable" | "npc";
+    /** Ready-made characters of this entity (design 6.1, S3). */
+    presets?: Array<{ id: DefinitionId; label: string }>;
     fields?: Exclude<FieldV1, { kind: "computed" | "image" }>[];
     slots?: SlotDefinitionV1[];
   }[];
@@ -417,6 +421,7 @@ export function createSystemRuntime(input: {
             id: entity.id,
             label: entity.label,
             kind: entity.kind ?? "playable",
+            ...(entity.presetsFrom === undefined ? {} : { presets: presetOptions(entity, loaded.value.referenceData) ?? [] }),
             ...(describeInput.includeFields ? {
               fields: entity.fields.filter((field) => field.kind !== "computed" && field.kind !== "image"),
               slots: slotsForEntity(loaded.value, entity.id),
@@ -489,7 +494,16 @@ export function createSystemRuntime(input: {
       if (request.state !== undefined) {
         return { ok: false, error: { code: "bad_request", message: "Initialize does not accept existing state." } };
       }
-      stateResult = initializeState(entity, request.intent.values);
+      if (request.intent.standalone === true && entity.kind === "npc") {
+        return { ok: false, error: { code: "bad_request", message: "A non-player entity is created by a GM inside a campaign." } };
+      }
+      let values = request.intent.values;
+      if (request.intent.preset !== undefined) {
+        const preset = presetValues(entity, packageValue.referenceData, request.intent.preset);
+        if (preset === null) return badRequest("This entity has no such preset.", request.intent.preset);
+        values = { ...preset, ...values };
+      }
+      stateResult = initializeState(entity, values);
     } else if (request.intent.kind === "observe") {
       if (request.state === undefined) {
         return { ok: false, error: { code: "bad_request", message: "Observe requires state." } };
@@ -582,6 +596,27 @@ export function createSystemRuntime(input: {
           if (!decoded.ok) return badRequest("Resource action exceeds its bounds.", resource.id);
           stateResult = decoded;
           changedDefinitionIds = changed ? [resource.id] : [];
+        } else if (action.kind === "resourceBatch") {
+          if (request.intent.campaignRoll) return badRequest("A resource action cannot use a campaign roll context.", action.id);
+          if (Object.keys(request.intent.inputs).length > 0) {
+            return badRequest("Resource actions do not accept inputs.", Object.keys(request.intent.inputs)[0]!);
+          }
+          const nextState = structuredClone(stateResult.value);
+          const changed = new Set<string>();
+          for (const step of action.steps) {
+            const resource = entity.fields.find((field) => field.id === step.resourceId);
+            if (resource?.kind !== "resource") return invalidPackage(step.resourceId);
+            const current = nextState.values[resource.id] as RuntimeResourceValue;
+            const target = step.operation.kind === "reset"
+              ? resource.resetTo === "max" ? current.max : resource.min
+              : Math.max(resource.min, Math.min(current.max, current.current + step.operation.amount));
+            if (target !== current.current) changed.add(resource.id);
+            nextState.values[resource.id] = { current: target, max: current.max };
+          }
+          const decoded = decodeRuntimeState(entity, nextState);
+          if (!decoded.ok) return badRequest("Resource action exceeds its bounds.", action.id);
+          stateResult = decoded;
+          changedDefinitionIds = [...changed].filter((id) => !sameValue(request.state!.values[id]!, decoded.value.values[id]!));
         } else if (action.kind === "draw" || action.kind === "shuffle") {
           if (request.intent.campaignRoll) return badRequest("A deck action cannot use a campaign roll context.", action.id);
           if (Object.keys(request.intent.inputs).length > 0) {
@@ -619,7 +654,13 @@ export function createSystemRuntime(input: {
       const error=derivedEntryError(packageValue,entity,entry,siblings);
       if(error) return {ok:false,error:{code:"invalid_state",message:error}};
     }
-    const observed = resolveObservedValues(packageValue, entity, stateResult.value);
+    const initialValues = request.intent.kind === "initialize"
+      ? { ...(request.intent.preset === undefined ? {} : presetValues(entity, packageValue.referenceData, request.intent.preset)), ...request.intent.values }
+      : undefined;
+    const observed = resolveObservedValues(packageValue, entity, stateResult.value, initialValues === undefined ? {} : {
+      fill: new Set(entity.fields.flatMap((field) => field.kind === "resource" && field.startFull === true
+        && field.maxExpressionId !== undefined && !Object.hasOwn(initialValues, field.id) ? [field.id] : [])),
+    });
     if (!observed.ok) return observed;
     const observedState = observed.value.state;
     for (const field of entity.fields) {

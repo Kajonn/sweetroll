@@ -108,11 +108,9 @@ the record is open for the owner.
 
 Owner instruction 2026-11-16: address the record's gaps, raise the size limit to
 5 MiB, make multiclassing "a way to add new classes to a character" and suggest
-a way to share formulas. Implemented: the 5 MiB document and package limit with a
-publish-time package check, slot aggregates over computed template fields, and
-computed entry fields on the sheet and in `/api/v1` (design Section 6.4). The 5e
-system multiclasses with one class entry per class. The
-[plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md)
-proposes formula sharing (decision F1) and stages S1–S11 for the remaining gaps
-(decisions G1–G10). None of those is approved; do not build them before the
-owner decides.
+a way to share formulas. Owner instruction 2026-11-21: "Implement plan"; the owner
+chose to add the apply-roll command (G5, a narrow reopening of C10: rolls never
+change characters on their own, a person may apply a saved roll). All stages
+S1–S11 of the [plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md)
+are implemented (design Sections 6.1, 6.3 and 6.4); see its implementation record
+for what is not done. The 512-field budget is now the binding limit of the 5e system.

@@ -1,5 +1,5 @@
 import type { CharacterEntryV1, ObjectTemplateV1, SystemPackageV1 } from "../package/schema/index.js";
-import { evaluate, type EvaluationBindings } from "../rules/evaluate.js";
+import { evaluate, type BindingValue, type EvaluationBindings } from "../rules/evaluate.js";
 
 type ItemBindings = EvaluationBindings["fields"];
 
@@ -13,7 +13,15 @@ export function entryItemScope(
   pkg: SystemPackageV1,
   template: ObjectTemplateV1,
   entry: CharacterEntryV1,
-): { item: ItemBindings; derive: (fieldId: string) => boolean; computedIds: string[] } {
+  /** The character's stored fields; template formulas may read them through `fields.` (design 6.4, S11). */
+  fields: Readonly<Record<string, BindingValue>> = {},
+): {
+  item: ItemBindings;
+  derive: (fieldId: string) => boolean;
+  computedIds: string[];
+  /** Value of a template expression against this entry, such as a resource's calculated maximum. */
+  evaluateExpression: (expressionId: string) => BindingValue | undefined;
+} {
   const item: ItemBindings = {};
   const computed = new Map(template.fields.flatMap(field =>
     field.kind === "computed" ? [[field.id, field.expressionId] as const] : [],
@@ -37,13 +45,19 @@ export function entryItemScope(
     visiting.add(id);
     const expression = pkg.expressions.find(candidate => candidate.id === expressionId);
     if (!expression || !expression.dependencies.every(derive)) return false;
-    const result = evaluate(expression, { fields: {}, inputs: {}, item, datasets: pkg.referenceData });
+    const result = evaluate(expression, { fields: { ...fields }, inputs: {}, item, datasets: pkg.referenceData });
     if (!result.ok) return false;
     item[id] = result.result;
     visiting.delete(id);
     return true;
   };
-  return { item, derive, computedIds: [...computed.keys()] };
+  const evaluateExpression = (expressionId: string): BindingValue | undefined => {
+    const expression = pkg.expressions.find(candidate => candidate.id === expressionId);
+    if (!expression || !expression.dependencies.every(derive)) return undefined;
+    const result = evaluate(expression, { fields: { ...fields }, inputs: {}, item, datasets: pkg.referenceData });
+    return result.ok ? result.result : undefined;
+  };
+  return { item, derive, computedIds: [...computed.keys()], evaluateExpression };
 }
 
 export function isResourceValue(value: unknown): value is { current: number; max: number } {

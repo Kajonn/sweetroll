@@ -199,6 +199,12 @@ including resource parts such as `target.health.current`. The roll command
 supplies `targetCharacterId`. For example, `d20 - target.defense` reports an
 attack margin.
 
+`target.otherEntityIds` lists further entities the target may belong to; the
+formulas read the fields all of them define with the same type. With
+`target.optional: true` the action also runs without a target: the roll
+formula cannot read `target.`, and outcome bands and details that read it are
+skipped when no target is chosen.
+
 A roll action declared with `respondsTo: true` can use `opposed.total` in its
 roll and outcome expressions. The command supplies `respondsTo` with the ID
 of a saved campaign roll. For example, `d20 - opposed.total` compares a new
@@ -226,6 +232,23 @@ drawn and its breakdown has a `cards` object with `deckId`, `deckLabel`,
 `remaining` and the `drawn` cards (`id`, `label`, `values`) in order. A
 campaign shares each deck. A character outside a campaign has its own.
 Expressions cannot read drawn cards or the deck.
+
+## Shared formulas and template formulas
+
+Several templates may name the same computed or roll expression. It compiles
+against the `item.` fields every owning template defines with the same type
+(and, for a roll, the character fields every entity showing those templates
+defines). Actions sharing a roll formula declare the same inputs, target,
+outcomes and details. Template computed fields and template resource maxima
+(`maxExpressionId` on a template resource) may read the character's stored
+fields through `fields.`, never its computed values.
+
+## Groups in conditional branches
+
+Each branch of `if` may name the same group, since only one branch runs.
+`if(inputs.disadvantage, keepLowest(group("d20", "d20", dice(2, 20)), 1), keepHighest(group("d20", "d20", dice(1, 20)), 1))`
+needs no unused term; a group named on every branch can be read afterwards with
+`rolled("d20")`. Names stay unique within a branch and outside conditionals.
 
 ## Exclusions
 

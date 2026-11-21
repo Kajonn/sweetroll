@@ -183,3 +183,58 @@ it("rejects a system whose compiled package exceeds the size limit", () => {
   doc.referenceData.at(-1)!.records.length = 100;
   expect(compileDocument(doc, ids).ok).toBe(true);
 });
+
+it("calculates a template resource maximum from the entry and the character's stored fields", () => {
+  const doc = advancedD20Document();
+  const leather = doc.templates[0]!;
+  leather.fields.push({ kind: "resource", id: "charges", label: "Charges", default: { current: 0, max: 0 }, min: 0, max: 20, step: 1, resetTo: "max", maxExpressionId: "charges_max", startFull: true });
+  doc.expressions.push({ id: "charges_max", context: "computed", resultType: "number", fallback: 0, source: "item.armor + fields.level" });
+  const compiled = compileDocument(doc, ids);
+  if (!compiled.ok) throw Error(JSON.stringify(compiled.diagnostics));
+  const entity = compiled.value.entities[0]!;
+  const state = initializeState(entity, { level: 3 });
+  if (!state.ok) throw Error("Roadwardens must initialize");
+  state.value.entries = { a: { entryId: "a", slotId: "equipment", templateId: "leather", values: { armor: 2, weight: 3, equipped: true } } };
+  const first = resolveObservedValues(compiled.value, entity, state.value);
+  if (!first.ok) throw Error(first.error.message);
+  // The maximum rose from 0, so the start-full resource fills.
+  expect(first.value.state.entries.a!.values.charges).toEqual({ current: 5, max: 5 });
+  first.value.state.entries.a!.values.charges = { current: 1, max: 5 };
+  first.value.state.values.level = 1;
+  const lowered = resolveObservedValues(compiled.value, entity, first.value.state);
+  if (!lowered.ok) throw Error(lowered.error.message);
+  expect(lowered.value.state.entries.a!.values.charges).toEqual({ current: 1, max: 3 });
+  // A template formula cannot read the character's computed fields.
+  doc.expressions.find((expression) => expression.id === "charges_max")!.source = "fields.proficiency_bonus";
+  expect(compileDocument(doc, ids)).toMatchObject({ ok: false, diagnostics: [{ code: "missing_reference", path: "charges_max" }] });
+});
+
+it("leaves out sections and elements whose condition is false and rejects a non-boolean condition", () => {
+  const doc = advancedD20Document();
+  doc.entities[0]!.fields.push(
+    { kind: "boolean", id: "caster", label: "Caster", default: false, required: false },
+    { kind: "computed", id: "veteran", label: "Veteran", valueType: "boolean", expressionId: "veteran_expr" },
+  );
+  doc.expressions.push({ id: "veteran_expr", context: "computed", resultType: "boolean", fallback: false, source: "fields.level >= 4" });
+  const sheet = doc.sheets[0]!;
+  sheet.sections.push({ id: "spells_section", label: "Spells", visibleWhen: "caster", elements: [{ kind: "heading", id: "spells_heading", text: "Spells", level: 2 }] });
+  sheet.sections[0]!.elements[0]!.visibleWhen = "veteran";
+  const compiled = compileDocument(doc, ids);
+  if (!compiled.ok) throw Error(JSON.stringify(compiled.diagnostics));
+  const entity = compiled.value.entities[0]!;
+  const project = (values: Record<string, unknown>) => {
+    const state = initializeState(entity, values);
+    if (!state.ok) throw Error("must initialize");
+    const observed = resolveObservedValues(compiled.value, entity, state.value);
+    if (!observed.ok) throw Error(observed.error.message);
+    return buildCharacterProjection({ packageValue: compiled.value, entity, state: observed.value.state, derivedValues: observed.value.derivedValues, validations: [] }).sheets[0]!;
+  };
+  const novice = project({});
+  expect(novice.sections.map((section) => section.id)).not.toContain("spells_section");
+  expect(novice.sections[0]!.elements.map((element) => element.id)).not.toContain(sheet.sections[0]!.elements[0]!.id);
+  const veteran = project({ caster: true, level: 4 });
+  expect(veteran.sections.map((section) => section.id)).toContain("spells_section");
+  expect(veteran.sections[0]!.elements[0]!.id).toBe(sheet.sections[0]!.elements[0]!.id);
+  sheet.sections.at(-1)!.visibleWhen = "level";
+  expect(compileDocument(doc, ids)).toMatchObject({ ok: false, diagnostics: [{ code: "invalid_expression" }] });
+});

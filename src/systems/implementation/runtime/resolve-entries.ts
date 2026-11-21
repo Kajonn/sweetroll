@@ -28,6 +28,7 @@ import { resolveObservedValues } from "./resolve.js";
 import { actionEvaluationFailure } from "./action-evaluation.js";
 import { evaluate } from "../rules/evaluate.js";
 import { entryItemScope, isResourceValue } from "./entry-values.js";
+import { buildFieldBindings } from "./state.js";
 import { describeRoll, mergeBindings } from "../rules/outcomes.js";
 
 export type GrantedActionRequest = {
@@ -151,7 +152,7 @@ export function resolveGrantedAction(request: GrantedActionRequest): RuntimeResu
   const context = resolveRollContext(request.packageValue, action, request.campaignRoll);
   if (!context.ok) return context;
   Object.assign(bindings, context.value);
-  const item = itemRuleBindings(request.packageValue, template, entry);
+  const item = itemRuleBindings(request.packageValue, template, observed.value.state.entries[entry.entryId] ?? entry, buildFieldBindings(request.entity, observed.value.state));
   if (!item.ok) return item;
   bindings.item = item.value;
   const evaluated = evaluate(
@@ -284,8 +285,9 @@ function itemRuleBindings(
   pkg: SystemPackageV1,
   template: ObjectTemplateV1,
   entry: CharacterEntryV1,
+  fields: EvaluationBindings["fields"],
 ): RuntimeResult<EvaluationBindings["fields"]> {
-  const scope = entryItemScope(pkg, template, entry);
+  const scope = entryItemScope(pkg, template, entry, fields);
   return scope.computedIds.every(scope.derive) ? { ok: true, value: scope.item } : invalidPackage(template.id);
 }
 

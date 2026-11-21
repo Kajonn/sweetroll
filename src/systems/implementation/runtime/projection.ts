@@ -1,6 +1,8 @@
 import { campaignRollRequirements } from "./roll-context.js";
 import {effectiveEntryDefinition} from "./effective-entry.js";
 import { entryItemScope } from "./entry-values.js";
+import { buildFieldBindings } from "./state.js";
+import type { BindingValue } from "../rules/evaluate.js";
 import type {
   CharacterProjectionElement,
   CharacterProjectionFieldConstraints,
@@ -35,6 +37,9 @@ export function buildCharacterProjection(input: {
   const validationsFor = (id: string): RuntimeValidation[] =>
     validations.filter((validation) => validation.targetDefinitionId === id);
   const entitySheets = packageValue.sheets.filter((sheet) => sheet.targetEntityId === entity.id);
+  // Hidden sections and elements are left out of the sheet; their values stay in the API (S9).
+  const visible = (fieldId: string | undefined) => fieldId === undefined
+    || (Object.hasOwn(derivedValues, fieldId) ? derivedValues[fieldId] : state.values[fieldId]) === true;
   const bound = new Set(entitySheets.flatMap(sheet => sheet.sections.flatMap(section =>
     section.elements.flatMap(element => element.kind === "field" ? [element.fieldId] : [])
   )));
@@ -56,12 +61,12 @@ export function buildCharacterProjection(input: {
       .map((sheet) => ({
         id: sheet.id,
         label: sheet.label,
-        sections: sheet.sections.map((section) => ({
+        sections: sheet.sections.filter((section) => visible(section.visibleWhen)).map((section) => ({
           id: section.id,
           label: section.label,
-          elements: section.elements.flatMap((element) => projectElement(
+          elements: section.elements.filter((element) => visible(element.visibleWhen)).flatMap((element) => projectElement(
             element,
-            { fields, actions, slots, templates, packageValue },
+            { fields, actions, slots, templates, packageValue, characterFields: buildFieldBindings(entity, state) },
             state,
             derivedValues,
             validationsFor,
@@ -76,6 +81,7 @@ export function buildCharacterProjection(input: {
 function projectElement(
   element: SheetElementV1,
   lookups: {
+    characterFields: Readonly<Record<string, BindingValue>>;
     fields: Map<string, FieldV1>;
     actions: Map<string, SystemPackageV1["actions"][number]>;
     slots: Map<string, SlotDefinitionV1>;
@@ -144,6 +150,7 @@ function projectSlot(
     slots: Map<string, SlotDefinitionV1>;
     templates: Map<string, ObjectTemplateV1>;
     packageValue: SystemPackageV1;
+    characterFields: Readonly<Record<string, BindingValue>>;
   },
   state: RuntimeStateV1,
 ): CharacterProjectionElement[] {
@@ -161,7 +168,7 @@ function projectSlot(
       label: entry.snapshot && "base" in entry.snapshot ? entry.snapshot.values.name : template?.label ?? customEntryLabel(entry.values),
       ...(entry.snapshot && "base" in entry.snapshot && template ? {definition:projectEntryDefinition(template), metadata:structuredClone(entry.snapshot.values)} : {}),
       values: structuredClone(entry.values),
-      ...derivedEntryValues(lookups.packageValue, template, entry),
+      ...derivedEntryValues(lookups.packageValue, template, entry, lookups.characterFields),
       ...(entry.quantity === undefined ? {} : { quantity: entry.quantity }),
     };
   });
@@ -188,9 +195,10 @@ function derivedEntryValues(
   packageValue: SystemPackageV1,
   template: ObjectTemplateV1 | undefined,
   entry: RuntimeStateV1["entries"][string],
+  characterFields: Readonly<Record<string, BindingValue>>,
 ): Pick<CharacterProjectionSlotEntry, "derived"> {
   if (template === undefined || !template.fields.some((field) => field.kind === "computed")) return {};
-  const scope = entryItemScope(packageValue, template, entry);
+  const scope = entryItemScope(packageValue, template, entry, characterFields);
   return {
     derived: template.fields.flatMap((field) => {
       if (field.kind !== "computed" || !scope.derive(field.id)) return [];

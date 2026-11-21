@@ -3,6 +3,12 @@ import { randomUUID } from "node:crypto";
 import { expect } from "vitest";
 
 import { dnd5eBudget, dnd5eDocument, srdMonsters } from "../fixtures/dnd5e/document.js";
+
+// What this scenario covers beyond the first build (SRD gaps plan 2026-11-16, all
+// stages): one template per weapon sharing formulas (S1), rules tables for
+// players (S2), monster presets (S3), characters that start full (S4), rests
+// (S5), applying a roll (S6), attacks on either kind of target (S7), class
+// features on the class entry (S11) and non-player entities in campaigns only (S10).
 import { scenario, type ScenarioActor } from "./runner.js";
 
 /**
@@ -46,7 +52,7 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
   // The whole SRD rules catalog is one document, well inside the 5 MiB limit.
   expect(dnd5eBudget.bytes).toBeGreaterThan(1024 * 1024);
   expect(dnd5eBudget.bytes).toBeLessThan(5 * 1024 * 1024);
-  expect(dnd5eBudget).toMatchObject({ templates: 101, catalogGear: 78 });
+  expect(dnd5eBudget).toMatchObject({ templates: 99, catalogGear: 40 });
   expect(dnd5eBudget.fields).toBeLessThanOrEqual(512);
   expect(dnd5eBudget.actions).toBeLessThanOrEqual(256);
   expect(await author.json("POST /systems/validate", { document: dnd5eDocument })).toEqual({ valid: true, diagnostics: [] });
@@ -105,12 +111,16 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
     level: 1, spell_save_dc: 0, carrying_capacity: 240,
   });
   // The class entry shows what the class contributes; the sheet returns its computed fields.
+  // Its class features are resources of the entry; they start full (S4, S11).
   const fighterClass = (await sheetOf(fighter)).entries.find((entry) => entry.entryId === fighter.classEntries[0])!;
-  expect(fighterClass.values).toEqual({ class: "fighter", level: 1, first: true });
-  expect(fighterClass.derivedValues).toMatchObject({ subclass: "Champion", hit_die: 10, hit_points: 10, save_str: 1, save_dex: 0, second_wind: 1 });
+  expect(fighterClass.values).toMatchObject({
+    class: "fighter", level: 1, first: true, res1: { current: 1, max: 1 }, res2: { current: 0, max: 0 }, res3: { current: 0, max: 0 },
+  });
+  expect(fighterClass.derivedValues).toMatchObject({ subclass: "Champion", hit_die: 10, hit_points: 10, save_str: 1, save_dex: 0, res1_name: "Second Wind", res2_name: "Action Surge" });
   await place(fighter, "equipment", "chain_mail");
   const shield = await place(fighter, "equipment", "shield");
-  const longsword = await place(fighter, "equipment", "weapon", { weapon: "longsword", weight: 3 });
+  // Every weapon is a catalog entry of its own (S1).
+  const longsword = await place(fighter, "equipment", "longsword");
   expect((await sheetOf(fighter)).derivedValues).toMatchObject({ armor_class: 18, carried_weight: 64 });
   ({ revision: fighter.revision } = await bob.command<Command>(`PATCH ${fighter.path}/entries/${shield}`, {
     values: { equipped: false }, expectedRevision: fighter.revision,
@@ -119,9 +129,8 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
   ({ revision: fighter.revision } = await bob.command<Command>(`PATCH ${fighter.path}/entries/${shield}`, {
     values: { equipped: true }, expectedRevision: fighter.revision,
   }));
-  // A new character starts at the default 10 hit points; the rest action fills the computed maximum.
-  await act(fighter, "restore_hp");
-  expect((await sheetOf(fighter)).values).toMatchObject({ hp: { current: 12, max: 12 }, second_wind: { current: 0, max: 1 }, action_surge: { max: 0 } });
+  // The first class gave the sheet its hit points and filled them.
+  expect((await sheetOf(fighter)).values).toMatchObject({ hp: { current: 12, max: 12 }, hit_dice: { current: 1, max: 1 } });
 
   const wizard = await build(dan, "Ilse", { race: "high_elf", int_base: 16, dex_base: 14, con_base: 12, skill_proficiencies: ["arcana"] }, [["wizard", 5]]);
   const wizardSheet = await sheetOf(wizard);
@@ -130,9 +139,11 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
     skill_arcana: 6, save_int: 6, save_wis: 3, armor_class: 13,
   });
   expect(wizardSheet.values).toMatchObject({
-    hp: { current: 1, max: 27 }, slots_1: { current: 0, max: 4 }, slots_2: { current: 0, max: 3 }, slots_3: { current: 0, max: 2 },
-    slots_4: { current: 0, max: 0 }, arcane_recovery: { current: 0, max: 1 }, pact_slots: { current: 0, max: 0 },
+    hp: { current: 27, max: 27 }, slots_1: { current: 4, max: 4 }, slots_2: { current: 3, max: 3 }, slots_3: { current: 2, max: 2 },
+    slots_4: { current: 0, max: 0 }, pact_slots: { current: 0, max: 0 },
   });
+  expect(wizardSheet.entries[0]!.values).toMatchObject({ res1: { current: 1, max: 1 } });
+  expect(wizardSheet.entries[0]!.derivedValues).toMatchObject({ res1_name: "Arcane Recovery" });
   const fireball = await place(wizard, "spell_list", "spell", { spell: "fireball" });
   const fireBolt = await place(wizard, "spell_list", "spell", { spell: "fire_bolt" });
   // Fireball in a level 4 slot rolls 9d6; a level 5 caster's Fire Bolt rolls 2d10.
@@ -153,13 +164,13 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
     race: "lightfoot_halfling", dex_base: 15, skill_proficiencies: ["stealth", "acrobatics"], skill_expertise: ["stealth"],
   }, [["rogue", 3]]);
   await place(rogue, "equipment", "leather_armor");
-  const rapier = await place(rogue, "equipment", "weapon", { weapon: "rapier", weight: 2 });
+  const rapier = await place(rogue, "equipment", "rapier");
   expect((await sheetOf(rogue)).derivedValues).toMatchObject({
     dex: 17, skill_stealth: 7, skill_acrobatics: 5, armor_class: 14, speed: 25,
   });
   expect((await sheetOf(rogue)).entries.find((entry) => entry.entryId === rogue.classEntries[0])!.derivedValues)
     .toMatchObject({ roll_name: "Sneak Attack damage", table: "sneak attack: 2d6" });
-  expect((await sheetOf(rogue)).values.hp).toMatchObject({ max: 18 });
+  expect((await sheetOf(rogue)).values.hp).toEqual({ current: 18, max: 18 });
   const sneakAttack = await act(rogue, "class_roll", { entryId: rogue.classEntries[0] });
   expect(sneakAttack.dice.map((die) => die.sides)).toEqual([6, 6]);
   expect(sneakAttack.output).toBe(`Sneak Attack damage: ${sneakAttack.total}`);
@@ -174,7 +185,7 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
   const cure = await place(cleric, "spell_list", "spell", { spell: "cure_wounds" });
   const clericSheet = await sheetOf(cleric);
   expect(clericSheet.derivedValues).toMatchObject({ wis: 16, con: 15, speed: 25, spell_save_dc: 13, spells_available: 4, save_wis: 5, save_cha: 2 });
-  expect(clericSheet.values).toMatchObject({ hp: { current: 1, max: 11 }, slots_1: { current: 0, max: 2 } });
+  expect(clericSheet.values).toMatchObject({ hp: { current: 11, max: 11 }, slots_1: { current: 2, max: 2 } });
   const healing = await act(cleric, "spell_roll", { entryId: cure, inputs: { slot_level: 2 } });
   expect(healing.dice.map((die) => die.sides)).toEqual([8, 8]);
   expect(healing.total).toBe(healing.dice.reduce((sum, die) => sum + die.value, 0) + 3);
@@ -187,55 +198,72 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
   await phase("Check the other class tables", { resetRateLimits: true });
   const derived = async (owner: ScenarioActor, values: Record<string, unknown>, classLevels: ClassLevels[]) => {
     const sheet = await sheetOf(await build(owner, classLevels.map(([classId, level]) => `${classId} ${level}`).join(" / ") || "No class", { race: "human", ...values }, classLevels));
-    return { ...sheet.derivedValues, ...sheet.values, validations: sheet.validations.map((entry) => entry.validationId) } as Record<string, unknown>;
+    // Entries come back in storage order; list them in the order the classes were given.
+    const classEntries = classLevels.map(([classId]) => sheet.entries.find((entry) => entry.templateId === "class_levels" && entry.values.class === classId))
+      .map((entry) => ({ ...entry?.values, ...entry?.derivedValues }));
+    return { ...sheet.derivedValues, ...sheet.values, classes: classEntries, validations: sheet.validations.map((entry) => entry.validationId) } as Record<string, unknown>;
   };
   expect(await derived(bob, { dex_base: 13, con_base: 15 }, [["barbarian", 1]])).toMatchObject({
-    armor_class: 15, rage: { current: 0, max: 2 }, hp: { current: 1, max: 15 }, ki: { max: 0 },
+    armor_class: 15, hp: { current: 15, max: 15 }, classes: [{ res1_name: "Rage", res1: { current: 2, max: 2 } }],
   });
   expect(await derived(dan, { dex_base: 15, wis_base: 15 }, [["monk", 5]])).toMatchObject({
-    armor_class: 16, speed: 40, ki: { current: 0, max: 5 }, proficiency_bonus: 3,
+    armor_class: 16, speed: 40, proficiency_bonus: 3, classes: [{ res1_name: "Ki points", res1: { current: 5, max: 5 } }],
   });
   // Draconic Resilience: Armor Class 13 + Dexterity and one extra hit point per level.
   expect(await derived(eve, { cha_base: 15, dex_base: 13 }, [["sorcerer", 3]])).toMatchObject({
-    armor_class: 15, sorcery_points: { current: 0, max: 3 }, hp: { current: 1, max: 17 }, slots_2: { current: 0, max: 2 }, spell_mod: 3,
+    armor_class: 15, hp: { current: 17, max: 17 }, slots_2: { current: 2, max: 2 }, spell_mod: 3,
+    classes: [{ res1_name: "Sorcery points", res1: { current: 3, max: 3 } }],
   });
   expect(await derived(finn, { cha_base: 15 }, [["bard", 2]])).toMatchObject({
-    half_proficiency: 1, skill_athletics: 1, initiative: 1, bardic_inspiration: { current: 0, max: 3 },
+    half_proficiency: 1, skill_athletics: 1, initiative: 1,
+    // Bardic Inspiration uses the Charisma modifier, read from the stored score on the class entry.
+    classes: [{ res1_name: "Bardic Inspiration", res1: { current: 3, max: 3 } }],
   });
   expect(await derived(bob, { cha_base: 15 }, [["paladin", 3]])).toMatchObject({
-    lay_on_hands: { current: 0, max: 15 }, channel_divinity: { current: 0, max: 1 }, divine_sense: { current: 0, max: 4 },
-    slots_1: { current: 0, max: 3 }, spells_available: 4,
+    slots_1: { current: 3, max: 3 }, spells_available: 4,
+    classes: [{
+      res1_name: "Channel Divinity", res1: { current: 1, max: 1 }, res2_name: "Lay on Hands (hit points)", res2: { current: 15, max: 15 },
+      res3_name: "Divine Sense", res3: { current: 4, max: 4 },
+    }],
   });
   // Pact Magic is its own pool: a level 5 warlock has two level 3 slots and no Spellcasting slots.
   expect(await derived(dan, {}, [["warlock", 5]])).toMatchObject({
-    slots_1: { current: 0, max: 0 }, slots_3: { current: 0, max: 0 }, pact_slots: { current: 0, max: 2 }, pact_slot_level: 3,
-    spells_available: 6, cantrips_known: 3, validations: [],
+    slots_1: { current: 0, max: 0 }, slots_3: { current: 0, max: 0 }, pact_slots: { current: 2, max: 2 }, pact_slot_level: 3,
+    spells_available: 6, cantrips_known: 3, validations: [], casts_spells: true, has_pact_magic: true, has_slots_1: false,
   });
 
   await phase("Multiclass by adding class entries", { resetRateLimits: true });
   // Fighter 5 / wizard 3: level 8, the fighter's saving throws, the wizard's own slot table.
   expect(await derived(eve, { con_base: 13, int_base: 15 }, [["fighter", 5], ["wizard", 3]])).toMatchObject({
-    level: 8, proficiency_bonus: 3, hp: { current: 1, max: 62 }, hit_dice: { current: 0, max: 8 },
+    // The first class fills hit points (fighter 5: 44); the second raises the maximum only.
+    level: 8, proficiency_bonus: 3, hp: { current: 44, max: 62 }, hit_dice: { current: 5, max: 8 },
     save_str: 3, save_con: 5, save_int: 3, save_wis: 0, caster_classes: 1,
-    slots_1: { current: 0, max: 4 }, slots_2: { current: 0, max: 2 }, slots_3: { current: 0, max: 0 },
-    second_wind: { current: 0, max: 1 }, action_surge: { current: 0, max: 1 }, arcane_recovery: { current: 0, max: 1 },
+    slots_1: { current: 4, max: 4 }, slots_2: { current: 2, max: 2 }, slots_3: { current: 0, max: 0 },
+    classes: [
+      { class: "fighter", res1: { current: 1, max: 1 }, res2: { current: 1, max: 1 }, res3: { current: 0, max: 0 } },
+      { class: "wizard", res1_name: "Arcane Recovery", res1: { current: 1, max: 1 } },
+    ],
     cantrips_known: 3, spells_available: 6, validations: [],
   });
   // Cleric 3 / wizard 2 cast as a level 5 spellcaster; each class prepares with its own ability.
   expect(await derived(finn, { wis_base: 15, int_base: 13 }, [["cleric", 3], ["wizard", 2]])).toMatchObject({
-    level: 5, caster_classes: 2, slots_1: { current: 0, max: 4 }, slots_2: { current: 0, max: 3 }, slots_3: { current: 0, max: 2 },
-    spell_mod: 3, spells_available: 3 + 3 + 2 + 2, channel_divinity: { current: 0, max: 1 },
+    // Cleric 3 filled 4/2 slots; the wizard raises level 2 to 3 without filling it, and level 3 rises from 0 and fills.
+    level: 5, caster_classes: 2, slots_1: { current: 4, max: 4 }, slots_2: { current: 2, max: 3 }, slots_3: { current: 2, max: 2 },
+    spell_mod: 3, spells_available: 3 + 3 + 2 + 2,
   });
   // Paladin 4 / sorcerer 3: half the paladin levels count, so the slots are those of a level 5 caster.
   expect(await derived(bob, { cha_base: 15, dex_base: 13 }, [["paladin", 4], ["sorcerer", 3]])).toMatchObject({
-    slots_3: { current: 0, max: 2 }, slots_4: { current: 0, max: 0 }, armor_class: 15, sorcery_points: { current: 0, max: 3 },
-    lay_on_hands: { current: 0, max: 20 }, save_wis: 3, save_con: 0,
+    slots_3: { current: 2, max: 2 }, slots_4: { current: 0, max: 0 }, armor_class: 15, save_wis: 3, save_con: 0,
+    classes: [{ res2_name: "Lay on Hands (hit points)", res2: { current: 20, max: 20 } }, { res1_name: "Sorcery points", res1: { current: 3, max: 3 } }],
   });
-  // Warlock 3 / bard 2 keeps Pact Magic beside the bard's slots; cleric 2 / paladin 3 has one Channel Divinity, not two.
+  // Warlock 3 / bard 2 keeps Pact Magic beside the bard's slots.
   expect(await derived(dan, { cha_base: 15 }, [["warlock", 3], ["bard", 2]])).toMatchObject({
-    pact_slots: { current: 0, max: 2 }, pact_slot_level: 2, slots_1: { current: 0, max: 3 }, slots_2: { current: 0, max: 0 }, half_proficiency: 1,
+    pact_slots: { current: 2, max: 2 }, pact_slot_level: 2, slots_1: { current: 3, max: 3 }, slots_2: { current: 0, max: 0 }, half_proficiency: 1,
   });
-  expect(await derived(eve, {}, [["cleric", 2], ["paladin", 3]])).toMatchObject({ channel_divinity: { current: 0, max: 1 } });
+  // Known limit: cleric 2 / paladin 3 shows Channel Divinity on both class entries; the SRD gives one use.
+  expect(await derived(eve, {}, [["cleric", 2], ["paladin", 3]])).toMatchObject({
+    classes: [{ res1_name: "Channel Divinity", res1: { max: 1 } }, { res1_name: "Channel Divinity", res1: { max: 1 } }],
+  });
   // A sheet without a class, or with two first classes, carries a warning.
   expect((await derived(finn, {}, [])).validations).toEqual(["first_class"]);
   const twoFirsts = await build(bob, "Two firsts", { race: "human" }, [["fighter", 1]]);
@@ -246,15 +274,16 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
   const { campaignId } = await gm.command<{ campaignId: string }>("POST /campaigns", { systemVersionId: versionId, title: "Cragmaw Road" }, 201);
   const campaign = `/campaigns/${campaignId}` as const;
   const revisionOf = async (who: ScenarioActor = gm) => (await who.json<{ revision: number }>(`GET ${campaign}`)).revision;
+  // Every SRD stat block is a preset of the monster entity (S3): the GM names it.
   const summon = async (id: string): Promise<Hero> => {
     const monster = srdMonsters.find((candidate) => candidate.id === id)!;
     const npc = await gm.command<Sheet>(`POST ${campaign}/characters`, {
-      name: monster.name, entityDefinitionId: "monster", initialValues: monster.values, expectedCampaignRevision: await revisionOf(),
+      name: monster.name, entityDefinitionId: "monster", presetId: id, expectedCampaignRevision: await revisionOf(),
     }, 201);
     return { owner: gm, characterId: npc.characterId, revision: npc.revision, path: `/characters/${npc.characterId}`, classEntries: [] };
   };
   expect(srdMonsters).toHaveLength(334);
-  // Every 20th stat block is accepted as written, from Aboleth to Zombie.
+  // Every 20th preset is created as written, from Aboleth onward.
   for (const monster of srdMonsters.filter((_, index) => index % 20 === 0)) await summon(monster.id);
   const goblin = await summon("goblin");
   const dragon = await summon("adult_red_dragon");
@@ -262,9 +291,18 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
     values: { armor_class: 15, hp: { current: 7, max: 7 }, attack_1_name: "Scimitar", challenge: "1/4" }, derivedValues: { dex_mod: 2 },
   });
   expect((await sheetOf(dragon)).values).toMatchObject({ hp: { current: 256, max: 256 }, legendary_actions: { current: 3, max: 3 }, attack_3_name: "Tail" });
-  // The entity kind is a label for the creation picker; it does not restrict who may create a stat block.
-  const options = await bob.json<{ entities: Array<{ id: string; kind: string }> }>(`GET /characters/creation-options?systemVersionId=${versionId}`);
-  expect(options.entities.map(({ id, kind }) => [id, kind])).toEqual([["character", "playable"], ["monster", "npc"]]);
+  const options = await bob.json<{ entities: Array<{ id: string; kind: string; presets?: unknown[] }> }>(`GET /characters/creation-options?systemVersionId=${versionId}`);
+  expect(options.entities.map(({ id, kind, presets }) => [id, kind, presets?.length])).toEqual([["character", "playable", undefined], ["monster", "npc", 334]]);
+  // A monster is a GM's campaign character; a player cannot create one on their own (S10).
+  await bob.status("POST /characters", 422, {
+    name: "Pet dragon", systemVersionId: versionId, entityDefinitionId: "monster", presetId: "adult_red_dragon", idempotencyKey: randomUUID(),
+  });
+  // Rules tables are readable by everyone who can use the version or read a sheet (S2).
+  const tables = await bob.json<{ datasets: Array<{ datasetId: string; records: number }> }>(`GET ${fighter.path}/reference-data`);
+  expect(tables.datasets).toEqual(expect.arrayContaining([{ datasetId: "conditions", label: "Conditions", records: 15 }, expect.objectContaining({ datasetId: "rules", records: 39 })]));
+  const conditions = await bob.json<{ dataset: { records: Array<{ id: string; values: { description: string } }> } }>(`GET /system-versions/${versionId}/reference-data/conditions`);
+  expect(conditions.dataset.records.find((record) => record.id === "prone")!.values.description).toContain("crawl");
+  await dan.status(`GET ${fighter.path}/reference-data`, 404);
 
   await phase("Invite the fighter and the wizard", { resetRateLimits: true });
   for (const hero of [fighter, wizard]) {
@@ -298,40 +336,58 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
     expect(slash.total).toBe(d20(slash)[0]! + 4);
     expect(slash.details).toEqual([expect.objectContaining({ id: "armor_class", value: 18 })]);
     expect(slash.outcome!.id).toBe(grade(slash, 18));
-    expect(slash.output).toContain(`Scimitar: ${slash.total} to hit against Armor Class 18`);
+    expect(slash.output).toContain(`Scimitar: ${slash.total} to hit`);
     seen.add(slash.outcome!.id);
   }
   expect(seen.size).toBeGreaterThan(0);
   const cut = await act(goblin, "monster_damage_1", table);
   expect(cut.output).toBe(`Scimitar: ${cut.total} slashing damage`);
   expect(cut.total).toBe(cut.dice[0]!.value + 2);
-  // Rolls never change sheets: the GM applies the damage to the fighter.
-  ({ revision: fighter.revision } = await gm.command<Command>(`POST ${fighter.path}/resources/hp/adjust`, { delta: -cut.total, expectedRevision: fighter.revision }));
+  // Rolls never change sheets on their own: the GM applies the damage roll to the fighter (S6).
+  const applicable = await gm.json<{ rolls: Array<{ rollId: string; output: string; total: number }> }>(`GET ${fighter.path}/applicable-rolls`);
+  const damageRoll = applicable.rolls.find((candidate) => candidate.output === cut.output)!;
+  expect(damageRoll.total).toBe(cut.total);
+  ({ revision: fighter.revision } = await gm.command<Command>(`POST ${fighter.path}/resources/hp/apply-roll`, {
+    rollId: damageRoll.rollId, direction: "subtract", expectedRevision: fighter.revision,
+  }));
   expect((await sheetOf(fighter)).values.hp).toEqual({ current: 12 - cut.total, max: 12 });
+  // A roll from outside the campaign, or one the player cannot see, cannot be applied.
+  const privateRoll = await act(goblin, "monster_roll_dice", { audience: "gm_only", inputs: { count: 1, sides: 6, modifier: 0 } });
+  const hidden = (await gm.json<{ rolls: Array<{ rollId: string; output: string }> }>(`GET ${fighter.path}/applicable-rolls`)).rolls
+    .find((candidate) => candidate.output === privateRoll.output)!;
+  await bob.status(`POST ${fighter.path}/resources/hp/apply-roll`, 404, {
+    rollId: hidden.rollId, direction: "add", expectedRevision: fighter.revision, idempotencyKey: randomUUID(),
+  });
+  expect((await bob.json<{ rolls: Array<{ rollId: string }> }>(`GET ${fighter.path}/applicable-rolls`)).rolls.map((roll) => roll.rollId)).not.toContain(hidden.rollId);
 
   // The fighter answers: Strength +3, proficiency +2, against the goblin's Armor Class 15.
-  const swing = await act(fighter, "attack_monster", { ...table, entryId: longsword, targetCharacterId: goblin.characterId });
+  const swing = await act(fighter, "attack", { ...table, entryId: longsword, targetCharacterId: goblin.characterId });
   expect(swing.total).toBe(d20(swing)[0]! + 5);
   expect(swing.outcome!.id).toBe(grade(swing, 15));
-  // A targeted attack needs a monster: another player's character is refused.
-  await bob.status(`POST ${fighter.path}/actions/attack_monster`, 404, {
-    inputs: {}, entryId: longsword, targetCharacterId: wizard.characterId, expectedRevision: fighter.revision, idempotencyKey: randomUUID(),
-  });
+  // One attack action covers either kind of target, or none (S7).
+  const sparring = await act(fighter, "attack", { ...table, entryId: longsword, targetCharacterId: wizard.characterId });
+  expect(sparring.outcome!.id).toBe(grade(sparring, 13));
+  const untargeted = await act(fighter, "attack", { ...table, entryId: longsword });
+  expect(untargeted.details).toBeUndefined();
+  expect(untargeted.outcome!.id).toBe(d20(untargeted)[0] === 20 ? "critical" : d20(untargeted)[0] === 1 ? "fumble" : "compare");
   const versatile = await act(fighter, "damage_two_handed", { ...table, entryId: longsword });
   expect(versatile.dice.map((die) => die.sides)).toEqual([10]);
   expect(versatile.total).toBe(versatile.dice[0]!.value + 3);
   ({ revision: goblin.revision } = await gm.command<Command>(`POST ${goblin.path}/resources/hp/adjust`, { delta: -7, expectedRevision: goblin.revision }));
   expect((await sheetOf(goblin)).values.hp).toEqual({ current: 0, max: 7 });
 
-  // The wizard recovers spell slots, then spends a level 3 slot.
-  await act(wizard, "restore_slots_3");
+  // The wizard spends a level 3 slot; a long rest restores it and the fighter's hit points in one command (S5).
   ({ revision: wizard.revision } = await dan.command<Command>(`POST ${wizard.path}/resources/slots_3/bump`, { direction: "down", expectedRevision: wizard.revision }));
   expect((await sheetOf(wizard)).values.slots_3).toEqual({ current: 1, max: 2 } satisfies Resource);
+  await act(wizard, "long_rest");
+  expect((await sheetOf(wizard)).values.slots_3).toEqual({ current: 2, max: 2 } satisfies Resource);
   // The dragon's Dexterity saving throw adds its +6 proficiency to a +0 modifier.
   const save = await act(dragon, "monster_check_dex", { audience: "gm_only", inputs: { saving_throw: true } });
   expect(save.total).toBe(d20(save)[0]! + 6);
   const deathSave = await act(fighter, "death_save", table);
   expect(deathSave.outcome!.id).toBe(deathSave.total === 20 ? "revive" : deathSave.total === 1 ? "two_failures" : deathSave.total >= 10 ? "success" : "failure");
+  await act(fighter, "long_rest");
+  expect((await sheetOf(fighter)).values.hp).toEqual({ current: 12, max: 12 });
 
   await phase("Level up and multiclass in play", { resetRateLimits: true });
   // A new fighter level is an edit of the class entry.
@@ -340,9 +396,11 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
   }));
   const levelled = await sheetOf(fighter, gm);
   expect(levelled.derivedValues).toMatchObject({ level: 2 });
-  expect(levelled.values).toMatchObject({ hp: { max: 20 }, hit_dice: { max: 2 }, action_surge: { current: 0, max: 1 } });
-  expect(levelled.entries.find((entry) => entry.entryId === fighter.classEntries[0])!.derivedValues)
-    .toMatchObject({ table: "action surges: 1; indomitable uses: 0; extra attacks: 0" });
+  // A higher maximum does not heal; Action Surge appears and starts full.
+  expect(levelled.values).toMatchObject({ hp: { current: 12, max: 20 }, hit_dice: { max: 2 } });
+  const fighterLevels = levelled.entries.find((entry) => entry.entryId === fighter.classEntries[0])!;
+  expect(fighterLevels.derivedValues).toMatchObject({ table: "action surges: 1; indomitable uses: 0; extra attacks: 0" });
+  expect(fighterLevels.values).toMatchObject({ res2: { current: 1, max: 1 } });
   // The third level goes to rogue: one more entry, with its own class die.
   const rogueLevel = await place(fighter, "class_list", "class_levels", { class: "rogue", level: 1, first: false });
   const multiclassed = await sheetOf(fighter);
@@ -352,8 +410,13 @@ scenario("5e SRD: publish the rules, build a party and fight a goblin", async ({
   expect((await act(fighter, "class_roll", { entryId: rogueLevel, audience: "owner_only" })).dice.map((die) => die.sides)).toEqual([6]);
   expect((await act(fighter, "spend_hit_dice", { entryId: rogueLevel, audience: "owner_only", inputs: { count: 1 } })).dice.map((die) => die.sides)).toEqual([8]);
   const rolls = (await gm.json<{ events: Array<{ kind: string }> }>(`GET ${campaign}/activity?limit=100`)).events.filter((event) => event.kind === "roll_executed");
-  // Thirteen rolls reach the table (three initiative, six goblin attacks, four more); the dragon's save stays with the GM.
-  expect(rolls).toHaveLength(14);
+  // Fifteen rolls reach the table: three initiative, six goblin attacks, the damage roll, three longsword
+  // attacks, the two-handed damage and the death save. The GM also sees the two GM-only rolls.
+  expect(rolls).toHaveLength(17);
   // The fighter's player sees the table's rolls and the two private rolls of the new rogue level.
-  expect((await bob.json<{ events: Array<{ kind: string }> }>(`GET ${campaign}/activity?limit=100`)).events.filter((event) => event.kind === "roll_executed")).toHaveLength(15);
+  expect((await bob.json<{ events: Array<{ kind: string }> }>(`GET ${campaign}/activity?limit=100`)).events.filter((event) => event.kind === "roll_executed")).toHaveLength(17);
+  // Applying the damage roll is recorded in the fighter's activity.
+  const applied = (await bob.json<{ events: Array<{ kind: string; payload: Record<string, unknown> }> }>(`GET ${fighter.path}/activity?limit=100`)).events
+    .find((event) => event.kind === "character_roll_applied")!;
+  expect(applied.payload).toMatchObject({ resourceId: "hp", rollId: damageRoll.rollId, direction: "subtract", delta: -cut.total });
 }, 120_000);

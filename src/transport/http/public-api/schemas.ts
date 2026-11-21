@@ -115,6 +115,7 @@ export const creationOptions = object({
   })),
   entities: Type.Array(object({
     id: definitionId, label: text, kind: Type.Union([Type.Literal("playable"), Type.Literal("npc")]),
+    presets: Type.Optional(Type.Array(object({ id: definitionId, label: text }), { maxItems: 1000 })),
     slots: Type.Array(SlotDefinitionV1Schema),
     fields: Type.Array(Type.Union([
       TextFieldV1Schema, IntegerFieldV1Schema, DecimalFieldV1Schema, BooleanFieldV1Schema,
@@ -125,7 +126,9 @@ export const creationOptions = object({
 export const createCharacter = object({
   systemVersionId: uuid, entityDefinitionId: definitionId,
   name: Type.String({ minLength: 1, maxLength: 120, pattern: "\\S" }),
-  initialValues: Type.Optional(values), idempotencyKey: key,
+  initialValues: Type.Optional(values),
+  presetId: Type.Optional({ ...definitionId, description: "A ready-made character of the entity; its values are copied, then initialValues apply." }),
+  idempotencyKey: key,
 });
 export const characterId = object({ characterId: uuid });
 export const fieldId = object({ characterId: uuid, fieldId: definitionId });
@@ -162,6 +165,11 @@ export const bumpResource = object({
 });
 const resourceNumber = Type.Number({ minimum: -1e9, maximum: 1e9 });
 export const adjustResource = object({ delta: resourceNumber, ...revisionCommand });
+export const applyRoll = object({
+  rollId: uuid,
+  direction: Type.Union([Type.Literal("subtract"), Type.Literal("add")], { description: "subtract for damage or spending, add for healing" }),
+  ...revisionCommand,
+});
 export const setResource = object({
   current: Type.Optional(resourceNumber), max: Type.Optional(resourceNumber), ...revisionCommand,
 });

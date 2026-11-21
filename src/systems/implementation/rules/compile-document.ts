@@ -4,6 +4,8 @@ import { sheetActionOwners, validationOwner } from "./owners.js";
 import { computedAggregateCost, slotEnvironment } from "./slots.js";
 import { namedGroups } from "./groups.js";
 import { outputPlaceholders, placeholderProblem } from "./outcomes.js";
+import { targetEntityIds } from "./targets.js";
+import { presetProblem } from "../runtime/presets.js";
 import {validatePushPolicies} from "./push-policy.js";
 import type { ActionV1, SystemDocumentV1, SystemPackageV1, TemplateKind, ValueType } from "../package/schema/index.js";
 import type { UnsignedSystemPackageV1 } from "../package/schema/index.js";
@@ -27,13 +29,16 @@ export type CompileDocumentOpts = {
 export function grantedEntityFieldsForKind(
   rules: Pick<SystemDocumentV1, "entities" | "sheets" | "slots">,
   kind: TemplateKind,
+  /** Template formulas read stored character fields only, so sheet values never depend on themselves (S11). */
+  storedOnly = false,
 ): Record<string, FieldBindingType> {
   const eligibleSlots = new Set(rules.slots
     .filter((slot) => slot.accepts.includes(kind)).map((slot) => slot.id));
   const targets = new Set(rules.sheets.filter((sheet) => sheet.sections.some((section) =>
     section.elements.some((element) => element.kind === "slot" && eligibleSlots.has(element.slotId)),
   )).map((sheet) => sheet.targetEntityId));
-  const environments = [...targets].map((id) => entityFieldTypes(rules.entities.find((entity) => entity.id === id)?.fields ?? []));
+  const environments = [...targets].map((id) => entityFieldTypes((rules.entities.find((entity) => entity.id === id)?.fields ?? [])
+    .filter((field) => !storedOnly || field.kind !== "computed")));
   const common = { ...(environments[0] ?? {}) };
   for (const fields of environments.slice(1)) {
     for (const id of Object.keys(common)) {
@@ -73,6 +78,10 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
       }
     }
   }
+  for (const [entityIndex, entity] of document.entities.entries()) {
+    const problem = presetProblem(entity, document.referenceData);
+    if (problem !== null) return scopeDiagnostic("invalid_expression", `/entities/${entityIndex}/presetsFrom`, problem);
+  }
   const entityFields = new Map(document.entities.map(entity => [entity.id, new Map(entity.fields.map(field => [field.id, field]))]));
   for (const entity of document.entities) {
     entityEnvironments.set(entity.id, { fields: entityFieldTypes(entity.fields), inputs: {}, slots: slotEnvironment(document, entity.id) });
@@ -80,10 +89,22 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
 
   const actionsById = new Map(document.actions.map((action) => [action.id, action]));
   const actionTargets = new Map<string, string>();
+  // Design 6.3 (SRD gaps S9): a section or element shows while a boolean field is true.
+  const isCondition = (entityId: string, fieldId: string | undefined) => {
+    if (fieldId === undefined) return true;
+    const field = entityFields.get(entityId)?.get(fieldId);
+    return field?.kind === "boolean" || (field?.kind === "computed" && field.valueType === "boolean");
+  };
   for (const [sheetIndex, sheet] of document.sheets.entries()) {
     for (const [sectionIndex, section] of sheet.sections.entries()) {
+      if (!isCondition(sheet.targetEntityId, section.visibleWhen)) {
+        return scopeDiagnostic("invalid_expression", `/sheets/${sheetIndex}/sections/${sectionIndex}/visibleWhen`, "Show the section by a true or false field of the sheet's entity.");
+      }
       for (const [elementIndex, element] of section.elements.entries()) {
         const path = `/sheets/${sheetIndex}/sections/${sectionIndex}/elements/${elementIndex}`;
+        if (!isCondition(sheet.targetEntityId, element.visibleWhen)) {
+          return scopeDiagnostic("invalid_expression", `${path}/visibleWhen`, "Show the element by a true or false field of the sheet's entity.");
+        }
         if (element.kind === "field" && !entityFields.get(sheet.targetEntityId)?.has(element.fieldId)) {
           return scopeDiagnostic("missing_reference", `${path}/fieldId`, "Field does not belong to the sheet target entity.");
         }
@@ -92,10 +113,9 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
         }
         if (element.kind === "action") {
           const action = actionsById.get(element.actionId);
-          if (
-            action?.kind === "resourceBump"
-            && entityFields.get(sheet.targetEntityId)?.get(action.resourceId)?.kind !== "resource"
-          ) {
+          const resourceIds = action?.kind === "resourceBump" ? [action.resourceId]
+            : action?.kind === "resourceBatch" ? action.steps.map(step => step.resourceId) : [];
+          if (resourceIds.some(resourceId => entityFields.get(sheet.targetEntityId)?.get(resourceId)?.kind !== "resource")) {
             return scopeDiagnostic("missing_reference", `${path}/actionId`, "Action does not belong to the sheet target entity.");
           }
           const priorTarget = actionTargets.get(element.actionId);
@@ -122,17 +142,25 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     }
   }
   // Dynamic sheet objects: template computed fields and granted roll actions
-  // reference the same global expression pool. Templates own their expressions
-  // exactly like entities — one expression id, one owner — so the shared-id
-  // rejection and env scoping below apply unchanged.
+  // reference the same global expression pool. Several templates may share one
+  // expression (design 6.4, SRD gaps S1): it compiles against the fields every
+  // owning template defines with the same type. Entities keep one owner.
   const templates = document.templates;
   const templateEnvironments = new Map<string, ExpressionCompileEnv>();
   for (const template of templates) {
     templateEnvironments.set(template.id, { fields: {}, item: entityFieldTypes(template.fields), inputs: {} });
     for (const field of template.fields) {
       if (field.kind === "computed") addOwner(computedOwners, field.expressionId, template.id);
+      if (field.kind === "resource" && field.maxExpressionId !== undefined) {
+        const formula = document.expressions.find(expression => expression.id === field.maxExpressionId);
+        if (formula?.context !== "computed" || formula.resultType !== "number") {
+          return scopeDiagnostic("invalid_expression", field.maxExpressionId, "A resource maximum requires a computed numeric expression.");
+        }
+        addOwner(computedOwners, field.maxExpressionId, template.id);
+      }
     }
   }
+  const storedEntityFields = new Map(templates.map(template => [template.id, grantedEntityFieldsForKind(document, template.kind, true)]));
   // A granted roll runs on the character carrying its entry. Only fields
   // present on every entity that can display this template's slot are safe to
   // reference; a template may be used by more than one sheet/entity.
@@ -170,7 +198,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
 
   // Outcome bands and details describe one roll action; they compile after it,
   // with the same fields and inputs plus the finished roll.
-  type OutcomeUse = { action: Extract<ActionV1, { kind: "roll" }>; list: "outcomes" | "details"; path: string };
+  type OutcomeUse = { action: Extract<ActionV1, { kind: "roll" }>; actionPath: string; list: "outcomes" | "details"; path: string };
   const outcomeUses = new Map<string, OutcomeUse[]>();
   const describedActions: Array<{ action: Extract<ActionV1, { kind: "roll" }>; path: string }> = [
     ...document.actions.flatMap((action, index) => action.kind === "roll" ? [{ action, path: `/actions/${index}` }] : []),
@@ -178,7 +206,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
       action.kind === "roll" ? [{ action, path: `/templates/${templateIndex}/grantedActions/${index}` }] : [])),
   ];
   for (const { action, path } of describedActions) {
-    if (action.target && !entityEnvironments.has(action.target.entityId)) {
+    if (action.target && !targetEntityIds(action.target).every(id => entityEnvironments.has(id))) {
       return scopeDiagnostic("missing_reference", `${path}/target/entityId`, "Select an existing target entity.");
     }
     if ((action.target || action.respondsTo) && "nominal" in action && action.nominal === true) {
@@ -187,7 +215,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     for (const list of ["outcomes", "details"] as const) {
       for (const [index, entry] of (action[list] ?? []).entries()) {
         const uses = outcomeUses.get(entry.expressionId) ?? [];
-        uses.push({ action, list, path: `${path}/${list}/${index}/expressionId` });
+        uses.push({ action, actionPath: path, list, path: `${path}/${list}/${index}/expressionId` });
         outcomeUses.set(entry.expressionId, uses);
       }
     }
@@ -217,14 +245,24 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     const actions = expr.context === "roll"
       ? [...(rollActions.get(expr.id) ?? []), ...templateRolls.map((roll) => roll.action)]
       : [];
-    if ((owners?.size ?? 0) > 1 || actions.length > 1) {
+    const ownerIds = [...(owners ?? [])];
+    const sharedByTemplates = ownerIds.length > 0 && ownerIds.every(id => templateEnvironments.has(id))
+      && (rollActions.get(expr.id) ?? []).length === 0;
+    if (!sharedByTemplates && (ownerIds.length > 1 || actions.length > 1)) {
       return scopeDiagnostic("invalid_expression", expr.id, "Expression cannot be shared across different owners.");
     }
-    const owner = owners?.values().next().value as string | undefined;
+    if (actions.length > 1 && actions.some(other => !sameRollContract(actions[0]!, other))) {
+      return scopeDiagnostic("invalid_expression", expr.id, "Actions that share a formula must declare the same inputs, target, outcomes and details.");
+    }
+    const owner = ownerIds[0];
     const entityEnv = owner === undefined ? undefined : entityEnvironments.get(owner);
-    const templateEnv = owner === undefined ? undefined : templateEnvironments.get(owner);
+    const templateOwned = ownerIds.length > 0 && ownerIds.every(id => templateEnvironments.has(id));
+    const templateEnv = templateOwned
+      ? { item: commonFields(ownerIds.map(id => templateEnvironments.get(id)?.item ?? {})) } : undefined;
     const env: ExpressionCompileEnv = {
-      fields: templateRolls.length > 0 ? grantedEntityFields.get(owner ?? "") ?? {} : entityEnv?.fields ?? {},
+      fields: templateRolls.length > 0 ? commonFields(ownerIds.map(id => grantedEntityFields.get(id) ?? {}))
+        : templateEnv !== undefined && expr.context === "computed" ? commonFields(ownerIds.map(id => storedEntityFields.get(id) ?? {}))
+          : entityEnv?.fields ?? {},
       inputs: {},
       dice: document.dice,
       datasets: document.referenceData,
@@ -233,7 +271,8 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     };
     const action = actions[0];
     if (action !== undefined) {
-      if (action.target) env.target = entityEnvironments.get(action.target.entityId)!.fields;
+      // An optional target is read by outcomes and details only (added below).
+      if (action.target && !action.target.optional) env.target = commonTargetFields(action.target, entityEnvironments);
       if (action.respondsTo) env.opposed = { total: "number" };
       for (const actionInput of action.inputs) {
         env.inputs[actionInput.id] = actionInputToValueType(actionInput);
@@ -259,7 +298,10 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
   for (const expressionIndex of deferredOutcomes) {
     const expr = document.expressions[expressionIndex]!;
     const uses = outcomeUses.get(expr.id) ?? [];
-    if (uses.length !== 1) {
+    // Actions that share a roll formula share its outcomes too.
+    const sharedRoll = uses.length > 1 && new Set(uses.map(use => use.actionPath)).size === uses.length
+      && uses.every(use => use.list === uses[0]!.list && use.action.expressionId === uses[0]!.action.expressionId);
+    if (uses.length !== 1 && !sharedRoll) {
       return scopeDiagnostic("invalid_expression", expr.id, uses.length === 0
         ? "An outcome expression must be used by one outcome or detail of a roll action."
         : "Expression cannot be shared across different owners.");
@@ -277,7 +319,7 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
         : "A detail must be a number.");
     }
     const result = compileExpression(expr.source, {
-      env: { ...rollEnv, roll: { total: "number" } },
+      env: { ...rollEnv, roll: { total: "number" }, ...(action.target ? { target: commonTargetFields(action.target, entityEnvironments) } : {}) },
       resultType: expr.resultType,
       context: "outcome",
       rolledGroups: namedGroups(roll.ast),
@@ -369,6 +411,32 @@ export function compileDocument(document: SystemDocumentV1, opts: CompileDocumen
     return scopeDiagnostic("limit_exceeded", "", `The compiled system needs ${packageBytes} bytes; the limit is ${PACKAGE_LIMITS.encodedBytes}.`);
   }
   return { ok: true, value: signed };
+}
+
+/** Fields every set defines with the same type. */
+function commonFields(sets: ReadonlyArray<Record<string, FieldBindingType>>): Record<string, FieldBindingType> {
+  const [first, ...rest] = sets;
+  return Object.fromEntries(Object.entries(first ?? {}).filter(([id, type]) => rest.every(fields => fields[id] === type)));
+}
+
+/** Roll actions that share one formula must agree on everything the formula and its outcomes read. */
+function sameRollContract(left: Extract<ActionV1, { kind: "roll" }>, right: Extract<ActionV1, { kind: "roll" }>): boolean {
+  const contract = (action: Extract<ActionV1, { kind: "roll" }>) => JSON.stringify([
+    action.inputs.map(({ id, valueType }) => [id, valueType]), action.target ?? null, action.respondsTo ?? false,
+    (action.outcomes ?? []).map(entry => entry.expressionId), (action.details ?? []).map(entry => entry.expressionId),
+  ]);
+  return contract(left) === contract(right);
+}
+
+/** Fields every possible target entity defines with the same type. */
+function commonTargetFields(
+  target: { entityId: string; otherEntityIds?: readonly string[] },
+  environments: ReadonlyMap<string, ExpressionCompileEnv>,
+): Record<string, FieldBindingType> {
+  const [first, ...rest] = targetEntityIds(target).map(id => environments.get(id)?.fields ?? {});
+  const common = { ...first };
+  for (const fields of rest) for (const id of Object.keys(common)) if (common[id] !== fields[id]) delete common[id];
+  return common;
 }
 
 function addOwner(owners: Map<string, Set<string>>, expressionId: string, owner: string): void {

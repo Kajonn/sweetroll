@@ -54,7 +54,8 @@ const abilities = [
   ["int", "Intelligence"], ["wis", "Wisdom"], ["cha", "Charisma"],
 ] as const;
 const EQUIPMENT_CAPACITY = 60;
-const GEAR_TEMPLATE_LIMIT = 100;
+// The 512-field budget is shared by every entity and template; weapons and classes use most of it.
+const GEAR_TEMPLATE_LIMIT = 40;
 
 // --- Small builders ---------------------------------------------------------
 const expressions: SourceExpressionV1[] = [];
@@ -89,8 +90,11 @@ const d20Inputs = [
   input("advantage", "Advantage", "boolean", false), input("disadvantage", "Disadvantage", "boolean", false),
   input("bonus", "Other bonus or penalty", "integer", 0),
 ];
-const NATURAL = 'if(inputs.disadvantage && !inputs.advantage, keepLowest(rolled("d20"), 1), keepHighest(rolled("d20"), 1))';
-const D20 = `group("d20", "d20", dice(if(inputs.advantage != inputs.disadvantage, 2, 1), 20)) * 0 + ${NATURAL}`;
+// Each branch names the same group; only one runs (design 6.4, S8).
+const DISADVANTAGE = "inputs.disadvantage && !inputs.advantage";
+const NATURAL = `if(${DISADVANTAGE}, keepLowest(rolled("d20"), 1), keepHighest(rolled("d20"), 1))`;
+const D20 = `if(${DISADVANTAGE}, keepLowest(group("d20", "d20", dice(2, 20)), 1), `
+  + `keepHighest(group("d20", "d20", dice(if(inputs.advantage && !inputs.disadvantage, 2, 1), 20)), 1))`;
 const damageInputs = [input("critical", "Critical hit (roll the dice twice)", "boolean", false), input("bonus", "Other bonus or penalty", "integer", 0)];
 
 type Roll = Extract<ActionV1, { kind: "roll" }>;
@@ -100,28 +104,23 @@ function check(id: string, label: string, modifier: string, outputTemplate = `${
 function outcomes(prefix: string, bands: Array<[id: string, label: string, source: string]>): RollOutcomeV1[] {
   return bands.map(([id, label, source]) => ({ id, label, expressionId: expression(`${prefix}_${id}`, "outcome", source) }));
 }
-/** An attack roll: natural 20 and natural 1 are called out; the table compares the total with Armor Class. */
-function attack(prefix: string, label: string, modifier: string, outputTemplate: string): Roll {
-  return {
-    ...check(prefix, label, modifier, outputTemplate),
-    outcomes: outcomes(prefix, [
-      ["critical", "Critical hit (natural 20)", `${NATURAL} == 20`],
-      ["fumble", "Miss (natural 1)", `${NATURAL} == 1`],
-      ["compare", "Hits if it equals or exceeds the target's Armor Class", "true"],
-    ]),
-  };
-}
-/** The same attack against a chosen campaign character of `entityId`, graded against its Armor Class. */
-function targetedAttack(prefix: string, label: string, entityId: string, modifier: string, outputTemplate: string): Roll {
+/**
+ * An attack roll (design 6.4, S7). With a target, of either kind, the server
+ * grades it against the target's Armor Class; without one it reports the
+ * natural 20 or 1 and the table compares the total.
+ */
+function attack(prefix: string, label: string, modifier: string, outputTemplate: string, targetEntity: "character" | "monster"): Roll {
   const detail = `${prefix}_armor_class`;
   expressions.push({ id: detail, context: "outcome", resultType: "number", source: "target.armor_class", fallback: 0 });
   return {
-    ...check(prefix, label, modifier, outputTemplate), target: { entityId },
+    ...check(prefix, label, modifier, outputTemplate),
+    target: { entityId: targetEntity, otherEntityIds: [targetEntity === "monster" ? "character" : "monster"], optional: true },
     outcomes: outcomes(prefix, [
-      ["critical", "Critical hit", `${NATURAL} == 20`],
+      ["critical", "Critical hit (natural 20)", `${NATURAL} == 20`],
       ["fumble", "Miss (natural 1)", `${NATURAL} == 1`],
       ["hit", "Hit", "roll.total >= target.armor_class"],
-      ["miss", "Miss", "true"],
+      ["miss", "Miss", "roll.total < target.armor_class"],
+      ["compare", "Hits if it equals or exceeds the target's Armor Class", "true"],
     ]),
     details: [{ id: "armor_class", label: "Target Armor Class", expressionId: detail }],
   };
@@ -152,14 +151,22 @@ function slotTableOf(classNumber: number): number {
   return known >= 0 ? known + 1 : slotTables.push(table);
 }
 
-// Limited-use class features. A character's maximum is the sum over its classes,
-// except Channel Divinity, which a second class does not add uses to.
-const CLASS_RESOURCES = [
-  ["rage", "Rage"], ["bardic_inspiration", "Bardic Inspiration"], ["channel_divinity", "Channel Divinity"], ["wild_shape", "Wild Shape"],
-  ["second_wind", "Second Wind"], ["action_surge", "Action Surge"], ["indomitable", "Indomitable"], ["ki", "Ki points"],
-  ["lay_on_hands", "Lay on Hands (hit points)"], ["divine_sense", "Divine Sense"], ["sorcery_points", "Sorcery points"],
-  ["arcane_recovery", "Arcane Recovery"],
-] as const;
+// Limited-use class features, carried by the class entry (design 6.4, S11):
+// each class has up to three, in this order. Bardic Inspiration and Divine
+// Sense add the Charisma modifier (at least 1 use); `offset` is added first.
+const RESOURCE_NAMES: Record<string, string> = {
+  rage: "Rage", bardic_inspiration: "Bardic Inspiration", channel_divinity: "Channel Divinity", wild_shape: "Wild Shape",
+  second_wind: "Second Wind", action_surge: "Action Surge", indomitable: "Indomitable", ki: "Ki points",
+  lay_on_hands: "Lay on Hands (hit points)", divine_sense: "Divine Sense", sorcery_points: "Sorcery points", arcane_recovery: "Arcane Recovery",
+};
+const CHARISMA_RESOURCES: Record<string, number> = { bardic_inspiration: 0, divine_sense: 1 };
+const RESOURCE_SLOTS = [1, 2, 3] as const;
+const classResources = new Map(srd.classes.map((entry) => {
+  const rows = srd.levels.filter((row) => Math.floor(row.key / 100) === entry.number);
+  const used = Object.keys(RESOURCE_NAMES).filter((id) => rows.some((row) => (row.resources[id] ?? 0) > 0));
+  if (used.length > RESOURCE_SLOTS.length) throw Error(`${entry.id} has more than three class resources`);
+  return [entry.number, used];
+}));
 
 // --- Reference data ---------------------------------------------------------
 const rolls = (spell: Srd["spells"][number]): boolean => spell.roll.dice > 0 || spell.roll.flat > 0;
@@ -173,6 +180,9 @@ const referenceData: ReferenceDataV1[] = [
       key: "text", number: "number", slot_table: "number", hit_die: "number", ...Object.fromEntries(abilities.map(([id]) => [`save_${id}`, "boolean" as const])),
       spell_ability: "text", prepares: "text", caster: "text", unarmored: "text", proficiencies: "text", subclass: "text",
       progression: "text", roll_name: "text",
+      ...Object.fromEntries(RESOURCE_SLOTS.flatMap((slot) => [
+        [`res${slot}_name`, "text" as const], [`res${slot}_cha`, "boolean" as const], [`res${slot}_offset`, "number" as const],
+      ])),
     },
     records: srd.classes.map((entry) => ({
       id: entry.id, label: entry.name,
@@ -181,6 +191,11 @@ const referenceData: ReferenceDataV1[] = [
         ...Object.fromEntries(abilities.map(([id]) => [`save_${id}`, entry.saves.includes(id)])),
         spell_ability: entry.spell_ability, prepares: entry.prepares, caster: entry.caster, unarmored: entry.unarmored,
         proficiencies: entry.proficiencies, subclass: entry.subclass, progression: entry.progression, roll_name: entry.roll_name,
+        ...Object.fromEntries(RESOURCE_SLOTS.flatMap((slot) => {
+          const id = classResources.get(entry.number)![slot - 1];
+          return [[`res${slot}_name`, id === undefined ? "" : RESOURCE_NAMES[id]!], [`res${slot}_cha`, id !== undefined && id in CHARISMA_RESOURCES],
+            [`res${slot}_offset`, id === undefined ? 0 : CHARISMA_RESOURCES[id] ?? 0]];
+        })),
       },
     })),
   },
@@ -189,14 +204,18 @@ const referenceData: ReferenceDataV1[] = [
     id: "levels", label: "Class levels", keyColumn: "key",
     columns: {
       key: "number", notes: "text", cantrips: "number", spells_known: "number", pact_slots: "number", pact_slot_level: "number",
-      ...Object.fromEntries(CLASS_RESOURCES.map(([id]) => [id, "number" as const])),
+      ...Object.fromEntries(RESOURCE_SLOTS.map((slot) => [`res${slot}`, "number" as const])),
       roll_dice: "number", roll_die: "number", roll_flat: "number", speed_bonus: "number", speed_bonus_unarmored: "number",
     },
     records: srd.levels.map((row) => ({
       id: `row_${row.key}`, label: `${srd.classes[Math.floor(row.key / 100) - 1]!.name} ${row.key % 100}`,
       values: {
         key: row.key, notes: row.notes, cantrips: row.cantrips, spells_known: row.spells_known,
-        pact_slots: row.pact_slots, pact_slot_level: row.pact_slot_level, ...row.resources,
+        pact_slots: row.pact_slots, pact_slot_level: row.pact_slot_level,
+        ...Object.fromEntries(RESOURCE_SLOTS.map((slot) => {
+          const id = classResources.get(Math.floor(row.key / 100))![slot - 1];
+          return [`res${slot}`, id === undefined ? 0 : row.resources[id] ?? 0];
+        })),
         roll_dice: row.roll[0], roll_die: row.roll[1], roll_flat: row.roll[2],
         speed_bonus: row.speed_bonus, speed_bonus_unarmored: row.speed_bonus_unarmored,
       },
@@ -270,14 +289,14 @@ const referenceData: ReferenceDataV1[] = [
     })),
   },
   {
-    id: "weapons", label: "Weapons", keyColumn: "key",
+    id: "weapons", label: "Weapons", keyColumn: "number",
     columns: {
-      key: "text", ranged: "boolean", finesse: "boolean", dice: "number", die: "number", flat: "number",
+      number: "number", ranged: "boolean", finesse: "boolean", dice: "number", die: "number", flat: "number",
       two_handed_dice: "number", two_handed_die: "number", damage_type: "text", properties: "text", cost: "text", weight: "number",
     },
-    records: srd.weapons.map((weapon) => ({
+    records: srd.weapons.map((weapon, index) => ({
       id: weapon.id, label: weapon.name, values: {
-        key: weapon.id, ranged: weapon.ranged, finesse: weapon.finesse,
+        number: index + 1, ranged: weapon.ranged, finesse: weapon.finesse,
         dice: weapon.damage?.dice ?? 0, die: weapon.damage?.die ?? 4, flat: weapon.damage?.flat ?? 0,
         two_handed_dice: weapon.two_handed?.dice ?? 0, two_handed_die: weapon.two_handed?.die ?? 4,
         damage_type: weapon.damage_type || "no", properties: weapon.properties, cost: weapon.cost, weight: weapon.weight,
@@ -287,6 +306,14 @@ const referenceData: ReferenceDataV1[] = [
   {
     id: "skills", label: "Skills", records: srd.skills.map((skill) => ({
       id: skill.id, label: skill.name, values: { ability: skill.ability, description: skill.description },
+    })),
+  },
+  {
+    // Design 6.1 (S3): every SRD stat block is a ready-made monster.
+    id: "bestiary", label: "Monsters", records: srdMonsters.map((monster) => ({
+      id: monster.id, label: monster.name,
+      values: Object.fromEntries(Object.entries(monster.values).map(([fieldId, value]) => [fieldId,
+        typeof value === "object" && value !== null && "max" in value ? (value as { max: number }).max : value as string | number | boolean])),
     })),
   },
   reference("rules", "Rules", srd.rules),
@@ -312,16 +339,14 @@ const SHIELD = 'sumWhere("equipment", "shield_bonus", "equipped")';
 const halfProficiency = "fields.half_proficiency";
 const skillBonus = (skill: Srd["skills"][number]) => `fields.${skill.ability}_mod + if(has(fields.skill_expertise, "${skill.id}"), 2 * fields.proficiency_bonus, `
   + `if(has(fields.skill_proficiencies, "${skill.id}"), fields.proficiency_bonus, ${halfProficiency}))`;
-function resource(id: string, label: string, maximum: string, initial = 0, resetTo: "min" | "max" = "max"): FieldV1 {
+// Calculated maxima start full and fill when they first rise from 0 (design 6.3, S4).
+function resource(id: string, label: string, maximum: string): FieldV1 {
   expressions.push({ id: `c_${id}_max`, context: "computed", resultType: "number", source: maximum, fallback: 0 });
-  return { kind: "resource", id, label, default: { current: initial, max: initial }, min: 0, max: 999, step: 1, maxExpressionId: `c_${id}_max`, resetTo };
+  return { kind: "resource", id, label, default: { current: 0, max: 0 }, min: 0, max: 999, step: 1, maxExpressionId: `c_${id}_max`, resetTo: "max", startFull: true };
 }
-// Uses of a limited class feature: summed over the character's classes.
-const classResourceMaximum: Record<string, string> = {
-  ...Object.fromEntries(CLASS_RESOURCES.map(([id]) => [id, classes(id)])),
-  channel_divinity: 'maxOf("class_list", "channel_divinity")',
-  bardic_inspiration: `if(${classes("bardic_inspiration")} > 0, max(1, fields.cha_mod), 0)`,
-  divine_sense: `if(${classes("divine_sense")} > 0, max(1, 1 + fields.cha_mod), 0)`,
+const condition = (id: string, label: string, source: string): FieldV1 => {
+  expressions.push({ id: `c_${id}`, context: "computed", resultType: "boolean", source, fallback: false });
+  return { kind: "computed", id, label, valueType: "boolean", expressionId: `c_${id}` };
 };
 // The table of a full caster is also the multiclass spellcaster table.
 const FULL_CASTER_TABLE = slotTableOf(srd.classes.find((entry) => entry.id === "wizard")!.number);
@@ -356,10 +381,11 @@ const characterFields: FieldV1[] = [
   computed("size", "Size", ofRace("size"), "text"),
   integer("hp_adjustment", "Hit point maximum adjustment", 0, -200, 400),
   // Fixed hit points per level, as the SRD allows instead of rolling; rolled totals go into the adjustment.
+  // A sheet without a class has none, so the first class fills them.
   resource("hp", "Hit points",
-    `max(1, ${classes("hit_points")} + fields.level * (fields.con_mod + ${ofRace("hp_per_level")}) + fields.hp_adjustment)`, 10),
+    `if(fields.level == 0, 0, max(1, ${classes("hit_points")} + fields.level * (fields.con_mod + ${ofRace("hp_per_level")}) + fields.hp_adjustment))`),
   integer("temp_hp", "Temporary hit points", 0, 0, 999),
-  resource("hit_dice", "Hit dice", "fields.level", 1),
+  resource("hit_dice", "Hit dice", "fields.level"),
   { kind: "resource", id: "death_successes", label: "Death save successes", default: { current: 0, max: 3 }, min: 0, max: 3, step: 1, resetTo: "min" },
   { kind: "resource", id: "death_failures", label: "Death save failures", default: { current: 0, max: 3 }, min: 0, max: 3, step: 1, resetTo: "min" },
   flag("inspiration", "Inspiration"),
@@ -384,7 +410,11 @@ const characterFields: FieldV1[] = [
     `if(fields.slot_row < 100, 0, lookup("spell_slots", fields.slot_row, "slots_${slot}"))`)),
   resource("pact_slots", "Pact Magic slots", classes("pact_slots")),
   computed("pact_slot_level", "Pact Magic slot level", classes("pact_slot_level")),
-  ...CLASS_RESOURCES.map(([id, label]) => resource(id, label, classResourceMaximum[id]!)),
+  // What the sheet shows (design 6.3, S9).
+  condition("casts_spells", "Casts spells", "fields.caster_classes > 0 || fields.pact_slots.max > 0"),
+  ...SLOT_LEVELS.map((slot) => condition(`has_slots_${slot}`, `Has level ${slot} slots`, `fields.slots_${slot}.max > 0`)),
+  condition("has_pact_magic", "Has Pact Magic", "fields.pact_slots.max > 0"),
+  condition("dying", "At 0 hit points", "fields.level > 0 && fields.hp.current == 0"),
   computed("race_traits", "Racial traits", ofRace("traits"), "text"),
   computed("race_languages", "Languages (race)", ofRace("languages"), "text"),
   longText("proficiencies", "Other proficiencies and languages"),
@@ -416,11 +446,21 @@ const characterActions: ActionV1[] = [
     kind: "roll", id: "roll_dice", label: "Roll any dice", inputs: diceInputs, outputTemplate: "{inputs.count}d{inputs.sides}: {total}",
     expressionId: expression("roll_dice_roll", "roll", "dice(inputs.count, inputs.sides) + inputs.modifier"),
   },
-  reset("restore_hp", "Long rest: restore hit points", "hp"),
-  ...SLOT_LEVELS.map((slot) => reset(`restore_slots_${slot}`, `Restore level ${slot} slots`, `slots_${slot}`)),
-  reset("restore_pact_slots", "Restore Pact Magic slots", "pact_slots"),
-  reset("clear_death_successes", "Clear death save successes", "death_successes"),
-  reset("clear_death_failures", "Clear death save failures", "death_failures"),
+  // Rests in one command each (design 6.4, S5). Hit dice and class features
+  // are restored on their own: half the hit dice is not a fixed amount, and
+  // class features belong to the class entries.
+  {
+    kind: "resourceBatch", id: "long_rest", label: "Long rest",
+    steps: [
+      { resourceId: "hp", operation: { kind: "reset" } },
+      ...SLOT_LEVELS.map((slot) => ({ resourceId: `slots_${slot}`, operation: { kind: "reset" as const } })),
+      { resourceId: "pact_slots", operation: { kind: "reset" } },
+      { resourceId: "death_successes", operation: { kind: "reset" } },
+      { resourceId: "death_failures", operation: { kind: "reset" } },
+    ],
+  },
+  { kind: "resourceBatch", id: "short_rest", label: "Short rest (Pact Magic)", steps: [{ resourceId: "pact_slots", operation: { kind: "reset" } }] },
+  reset("restore_hit_dice", "Restore all hit dice", "hit_dice"),
 ];
 
 const characterSections: SheetSectionV1[] = [
@@ -446,22 +486,22 @@ const characterSections: SheetSectionV1[] = [
   {
     id: "sec_combat", label: "Combat", elements: [
       ...show("pc", ["armor_class", "ac_bonus", "initiative"]), ...use("pc", ["initiative_roll"]), ...show("pc", ["speed"]),
-      ...meter("pc", ["hp"]), ...show("pc", ["temp_hp", "hp_adjustment"]), ...meter("pc", ["hit_dice"]), ...use("pc", ["restore_hp"]),
-      ...meter("pc", ["death_successes", "death_failures"]), ...use("pc", ["death_save", "clear_death_successes", "clear_death_failures"]),
+      ...meter("pc", ["hp"]), ...show("pc", ["temp_hp", "hp_adjustment"]), ...meter("pc", ["hit_dice"]),
+      ...use("pc", ["long_rest", "short_rest", "restore_hit_dice"]),
+      ...[...meter("pc", ["death_successes", "death_failures"]), ...use("pc", ["death_save"])].map((element) => ({ ...element, visibleWhen: "dying" })),
       ...show("pc", ["conditions", "exhaustion"]), ...use("pc", ["roll_dice"]),
     ],
   },
   {
-    id: "sec_class", label: "Class features", elements: [
-      ...meter("pc", CLASS_RESOURCES.map(([id]) => id)),
+    id: "sec_class", label: "Features and feats", elements: [
       { kind: "slot", id: "pc_features", slotId: "feature_list" },
     ],
   },
   {
-    id: "sec_spellcasting", label: "Spellcasting", elements: [
+    id: "sec_spellcasting", label: "Spellcasting", visibleWhen: "casts_spells", elements: [
       ...show("pc", ["spell_mod", "spell_save_dc", "spell_attack_bonus", "cantrips_known", "spells_available"]),
-      ...SLOT_LEVELS.flatMap((slot) => [...meter("pc", [`slots_${slot}`]), ...use("pc", [`restore_slots_${slot}`])]),
-      ...meter("pc", ["pact_slots"]), ...show("pc", ["pact_slot_level"]), ...use("pc", ["restore_pact_slots"]),
+      ...SLOT_LEVELS.flatMap((slot) => meter("pc", [`slots_${slot}`]).map((element) => ({ ...element, visibleWhen: `has_slots_${slot}` }))),
+      ...[...meter("pc", ["pact_slots"]), ...show("pc", ["pact_slot_level"])].map((element) => ({ ...element, visibleWhen: "has_pact_magic" })),
       { kind: "slot", id: "pc_spells", slotId: "spell_list" },
     ],
   },
@@ -526,8 +566,7 @@ const monsterActions: ActionV1[] = [
   }),
   check("monster_initiative", "Initiative", "fields.dex_mod"),
   ...ATTACKS.flatMap((slot): ActionV1[] => [
-    targetedAttack(`monster_attack_${slot}`, `Attack ${slot}`, "character", `fields.attack_${slot}_hit`,
-      `{fields.attack_${slot}_name}: {total} to hit against Armor Class {detail.armor_class}`),
+    attack(`monster_attack_${slot}`, `Attack ${slot}`, `fields.attack_${slot}_hit`, `{fields.attack_${slot}_name}: {total} to hit`, "character"),
     {
       kind: "roll", id: `monster_damage_${slot}`, label: `Attack ${slot} damage`, inputs: damageInputs,
       outputTemplate: `{fields.attack_${slot}_name}: {total} {fields.attack_${slot}_type} damage`,
@@ -572,31 +611,31 @@ const monsterSections: SheetSectionV1[] = [
 // --- Catalog templates ------------------------------------------------------
 const itemText = (id: string, label: string, dataset: string, key: string, column: string, prefix: string): FieldV1 => (
   computed(id, label, `lookup("${dataset}", item.${key}, "${column}")`, "text", prefix));
-// Weapons share one template: every template needs its own copy of each
-// formula, and 37 copies of the attack rolls do not fit the package size limit.
-const weapon = (column: string) => `lookup("weapons", item.weapon, "${column}")`;
+// One template per weapon (design 6.4, S1). The templates share their attack
+// and damage formulas, which read the weapon's row of the `weapons` table.
+const weapon = (column: string) => `lookup("weapons", item.weapon_number, "${column}")`;
 const WEAPON_ABILITY = `if(${weapon("finesse")}, max(fields.str_mod, fields.dex_mod), if(${weapon("ranged")}, fields.dex_mod, fields.str_mod))`;
 const WEAPON_TO_HIT = `${WEAPON_ABILITY} + if(item.proficient, fields.proficiency_bonus, 0) + item.magic_bonus`;
+const weaponAttack: GrantedActionV1 = { ...attack("w_attack", "Attack", WEAPON_TO_HIT, "{total} to hit", "monster"), id: "attack" };
 const weaponDamage = (id: string, label: string, dice: string, die: string, flat: string): GrantedActionV1 => ({
-  kind: "roll", id, label, inputs: damageInputs, outputTemplate: "{total} {item.damage_type} damage",
+  kind: "roll", id, label, inputs: damageInputs, outputTemplate: "{total} damage",
   expressionId: expression(`w_${id}`, "roll", `dice(if(inputs.critical, 2, 1) * ${dice}, ${die}) + ${flat} + ${WEAPON_ABILITY} + item.magic_bonus + inputs.bonus`),
 });
-const weaponTemplate: ObjectTemplateV1 = {
-  kind: "item", id: "weapon", label: "Weapon", quantityFields: ["weight"],
-  description: "Choose the weapon after adding the entry and enter its weight.",
-  fields: [
-    choice("weapon", "Weapon", "weapons", "dagger"), flag("proficient", "Proficient", true), integer("magic_bonus", "Magic bonus", 0, 0, 3),
-    itemText("damage_type", "Damage type", "weapons", "weapon", "damage_type", "w"),
-    itemText("properties", "Properties", "weapons", "weapon", "properties", "w"), itemText("cost", "Cost", "weapons", "weapon", "cost", "w"),
-    computed("listed_weight", "Listed weight (lb.)", weapon("weight"), "number", "w"), weight(0),
-  ],
-  grantedActions: [
-    { ...attack("w_attack", "Attack", WEAPON_TO_HIT, "{total} to hit"), id: "attack" },
-    { ...targetedAttack("w_attack_monster", "Attack a monster", "monster", WEAPON_TO_HIT, "{total} to hit against Armor Class {detail.armor_class}"), id: "attack_monster" },
-    weaponDamage("damage", "Damage", weapon("dice"), weapon("die"), weapon("flat")),
-    weaponDamage("damage_two_handed", "Damage (two hands, versatile weapons)", weapon("two_handed_dice"), weapon("two_handed_die"), "0"),
-  ],
-};
+const oneHanded = weaponDamage("damage", "Damage", weapon("dice"), weapon("die"), weapon("flat"));
+const twoHanded = weaponDamage("damage_two_handed", "Damage (two hands)", weapon("two_handed_dice"), weapon("two_handed_die"), "0");
+function weaponTemplate(entry: Srd["weapons"][number], index: number): ObjectTemplateV1 {
+  const damage = entry.damage ? `${entry.damage.dice}d${entry.damage.die}${entry.damage.flat ? ` + ${entry.damage.flat}` : ""}`.replace("1d1 + ", "") : "";
+  return {
+    kind: "item", id: entry.id, label: entry.name, quantityFields: ["weight"],
+    description: `${entry.properties}${damage ? `\nDamage ${damage} ${entry.damage_type}` : ""}${entry.two_handed ? `, ${entry.two_handed.dice}d${entry.two_handed.die} with two hands` : ""}. Cost ${entry.cost}.`,
+    fields: [fixed("weapon_number", "Weapon", index + 1), flag("proficient", "Proficient", true), integer("magic_bonus", "Magic bonus", 0, 0, 3), weight(entry.weight)],
+    grantedActions: [
+      weaponAttack,
+      ...(entry.damage ? [{ ...oneHanded, label: `Damage (${entry.damage_type})` }] : []),
+      ...(entry.two_handed ? [{ ...twoHanded, label: `Damage with two hands (${entry.damage_type})` }] : []),
+    ],
+  };
+}
 function armorTemplate(entry: Srd["armor"][number]): ObjectTemplateV1 {
   return {
     kind: "item", id: entry.id, label: entry.name, quantityFields: ["weight"], description: `${entry.notes}. Cost ${entry.cost}.`,
@@ -649,6 +688,7 @@ const ofClass = (column: string) => `lookup("classes", item.class, "${column}")`
 const classNumber = (id: string, label: string, source: string): FieldV1 => computed(id, label, source, "number", "k");
 const classText = (id: string, label: string, source: string): FieldV1 => computed(id, label, source, "text", "k");
 const isAbility = (column: string, ability: string) => `${ofClass(column)} == "${ability}"`;
+const STORED_CHA_MOD = 'floor((fields.cha_base + lookup("races", fields.race, "cha") - 10) / 2)';
 const classTemplate: ObjectTemplateV1 = {
   kind: "effect", id: "class_levels", label: "Class",
   description: "Choose the class and its level after adding the entry. Add one entry per class to multiclass.",
@@ -686,7 +726,19 @@ const classTemplate: ObjectTemplateV1 = {
     classNumber("speed_bonus", "Speed bonus", row("speed_bonus")),
     classNumber("speed_bonus_unarmored", "Speed bonus without armor", row("speed_bonus_unarmored")),
     classNumber("jack_of_all_trades", "Jack of All Trades", 'if(item.class == "bard" && item.level >= 2, 1, 0)'),
-    ...CLASS_RESOURCES.map(([id, label]) => classNumber(id, `${label} uses`, row(id))),
+    // Class features with limited uses (S11). A template formula reads the
+    // character's stored fields, so the Charisma modifier is worked out here.
+    ...RESOURCE_SLOTS.flatMap((slot): FieldV1[] => {
+      expressions.push({
+        id: `k_res${slot}_max`, context: "computed", resultType: "number", fallback: 0,
+        source: `if(${ofClass(`res${slot}_cha`)}, if(${row(`res${slot}`)} > 0, max(1, ${ofClass(`res${slot}_offset`)} + ${STORED_CHA_MOD}), 0), ${row(`res${slot}`)})`,
+      });
+      return [
+        classText(`res${slot}_name`, `Class feature ${slot}`, ofClass(`res${slot}_name`)),
+        { kind: "resource", id: `res${slot}`, label: `Class feature ${slot} uses`, default: { current: 0, max: 0 }, min: 0, max: 999, step: 1,
+          resetTo: "max", maxExpressionId: `k_res${slot}_max`, startFull: true },
+      ];
+    }),
   ],
   grantedActions: [
     {
@@ -699,6 +751,10 @@ const classTemplate: ObjectTemplateV1 = {
       outputTemplate: "Regain {total} hit points",
       expressionId: expression("k_spend_hit_dice", "roll", "max(0, dice(inputs.count, item.hit_die) + inputs.count * fields.con_mod)"),
     },
+    ...RESOURCE_SLOTS.flatMap((slot): GrantedActionV1[] => [
+      { kind: "resourceBump", id: `spend_res${slot}`, label: `Use class feature ${slot}`, resourceId: `res${slot}`, operation: { kind: "delta", amount: -1 } },
+      { kind: "resourceBump", id: `restore_res${slot}`, label: `Restore class feature ${slot}`, resourceId: `res${slot}`, operation: { kind: "reset" } },
+    ]),
   ],
 };
 
@@ -718,7 +774,7 @@ const genericTemplates: ObjectTemplateV1[] = [
       itemText("description", "Description", "spells", "spell", "description", "s"),
     ],
     grantedActions: [
-      { ...attack("s_attack", "Spell attack", `fields.proficiency_bonus + ${SPELL_MOD}`, "Spell attack: {total} to hit"), id: "spell_attack" },
+      { ...attack("s_attack", "Spell attack", `fields.proficiency_bonus + ${SPELL_MOD}`, "Spell attack: {total} to hit", "monster"), id: "spell_attack" },
       {
         kind: "roll", id: "spell_roll", label: "Damage or healing",
         inputs: [input("slot_level", "Spell slot level (0 = the spell's own level)", "integer", 0), ...damageInputs],
@@ -777,7 +833,7 @@ export const dnd5eDocument: SystemDocumentV1 = {
   },
   entities: [
     { id: "character", label: "Player character", kind: "playable", fields: characterFields },
-    { id: "monster", label: "Monster or NPC", kind: "npc", fields: monsterFields },
+    { id: "monster", label: "Monster or NPC", kind: "npc", presetsFrom: "bestiary", fields: monsterFields },
   ],
   referenceData,
   sheets: [
@@ -787,7 +843,7 @@ export const dnd5eDocument: SystemDocumentV1 = {
   expressions,
   actions: [...characterActions, ...monsterActions],
   validations,
-  templates: [classTemplate, weaponTemplate, ...srd.armor.map(armorTemplate), ...catalogGear.map(gearTemplate), ...potions, ...genericTemplates],
+  templates: [classTemplate, ...srd.weapons.map(weaponTemplate), ...srd.armor.map(armorTemplate), ...catalogGear.map(gearTemplate), ...potions, ...genericTemplates],
   slots: [
     // Twelve classes exist; a character meets the ability requirements of a few at most.
     { id: "class_list", label: "Classes", accepts: ["effect"], maxEntries: 6 },

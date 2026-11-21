@@ -471,6 +471,7 @@ const CreateCampaignCharacterBody = Type.Object({
   name: Type.String({ minLength: 1 }),
   entityDefinitionId: Type.String({ minLength: 1 }),
   initialValues: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  presetId: Type.Optional(Type.String({ minLength: 1 })),
   controllerUserIds: Type.Optional(Type.Array(Type.String({ format: UUID_FORMAT }))),
   expectedCampaignRevision: Type.Integer({ minimum: 1 }),
   idempotencyKey: Type.String({ minLength: 1 }),
@@ -2227,6 +2228,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           name: string;
           entityDefinitionId: string;
           initialValues?: Record<string, unknown>;
+          presetId?: string;
           controllerUserIds?: string[];
           expectedCampaignRevision: number;
           idempotencyKey: string;
@@ -2242,6 +2244,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           systemVersionId: opened.value.systemVersionId,
           entityDefinitionId: body.entityDefinitionId,
           ...(body.initialValues === undefined ? {} : { initialValues: body.initialValues }),
+          ...(body.presetId === undefined ? {} : { presetId: body.presetId }),
         });
         if (!prepared.ok) {
           return sendError(reply, prepared.error, request.id);

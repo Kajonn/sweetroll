@@ -154,7 +154,7 @@ type CommandTransaction = {
 
 export type DeferredCampaignRoll = CommandTransaction & {
   campaign: { campaignId: string };
-  selection: CampaignRollSelection & { targetEntityId?: string };
+  selection: CampaignRollSelection & { targetEntityIds?: string[] };
   source: CharacterRecord;
   membershipGeneration: number;
   resolve: (context: CampaignRollContext) =>
@@ -404,7 +404,7 @@ export interface CharacterPersistenceRepository {
   ): Promise<Array<CharacterRecord & { updatedAtCursor: string }>>;
 
   loadCampaignRollOptions(input: {
-    source: CharacterRecord; member: MembershipRecord; targetEntityId?: string; includeRolls: boolean;
+    source: CharacterRecord; member: MembershipRecord; targetEntityIds?: string[]; includeRolls: boolean;
   }): Promise<CampaignRollOptions | null>;
   applyCommandTx(input: ApplyCommandInput | DeferredCampaignRoll | DeferredDeckAction): Promise<ApplyCommandOutcome>;
   /** Remaining cards per deck for a campaign or, when `campaignId` is null, a standalone character. */
@@ -525,8 +525,8 @@ async function loadCampaignRollContext(
       `SELECT id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id,
               entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at,
               created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}
-         FROM characters WHERE id = $1 AND campaign_id = $2 AND entity_definition_id = $3 AND lifecycle = 'active' FOR UPDATE`,
-      [selection.targetCharacterId, member.campaignId, selection.targetEntityId],
+         FROM characters WHERE id = $1 AND campaign_id = $2 AND entity_definition_id = ANY($3::text[]) AND lifecycle = 'active' FOR UPDATE`,
+      [selection.targetCharacterId, member.campaignId, selection.targetEntityIds ?? []],
     );
     if (!row || !sameComposition(record, toCharacterRecord(row))) {
       return { ok: false, error: { code: "not_found", message: "Target character not found." } };
@@ -1244,7 +1244,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       return result.rows.map((row) => ({ ...toCharacterRecord(row), updatedAtCursor: row.updated_at_cursor }));
     },
 
-    async loadCampaignRollOptions({ source, member, targetEntityId, includeRolls }) {
+    async loadCampaignRollOptions({ source, member, targetEntityIds, includeRolls }) {
       const { rows: [options] } = await pool.query<CampaignRollOptions>(
         `WITH access AS (
            SELECT c.campaign_id FROM characters c
@@ -1261,7 +1261,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
          SELECT ARRAY(
            SELECT jsonb_build_object('characterId', id, 'name', name)
            FROM characters WHERE campaign_id = access.campaign_id
-             AND lifecycle = 'active' AND system_version_id = $8 AND entity_definition_id = $9
+             AND lifecycle = 'active' AND system_version_id = $8 AND entity_definition_id = ANY($9::text[])
              AND (SELECT ${CHARACTER_EXTENSIONS_COLUMN}) = $10::jsonb
            ORDER BY name, id LIMIT 100
          ) AS targets,
@@ -1276,7 +1276,7 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
            ORDER BY r.occurred_at DESC, r.id DESC LIMIT 50
          ) AS rolls FROM access`,
         [member.userId, isTxManager(member.role), source.characterId, source.campaignId, source.revision,
-          source.placementGeneration, member.generation, source.systemVersionId, targetEntityId ?? null,
+          source.placementGeneration, member.generation, source.systemVersionId, targetEntityIds ?? [],
           JSON.stringify(source.extensions), includeRolls],
       );
       return options ?? null;

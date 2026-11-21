@@ -1,6 +1,6 @@
 # SRD gaps: what was closed, shared formulas and the remaining stages
 
-**Plan · 16 November 2026 · Part 1 implemented on the owner's instruction; parts 2 and 3 await owner decisions**
+**Plan · 16 November 2026 · Part 1 implemented 2026-11-16; parts 2 and 3 implemented 2026-11-21 on the owner's instruction "Implement plan"**
 
 ## Owner request (2026-11-16)
 
@@ -83,3 +83,56 @@ areas. They stay excluded by the rules coverage plan.
 | A 5 MiB package is read for every sheet request | The 1.6 MB SRD package runs the 5e scenario (177 requests) in about 28 s on the test database; no load test was run. Measure before a hosted release. |
 | Aggregates over computed fields multiply sheet cost | Charged per slot capacity at publish and at run time; the 5e sheet stays inside the 8,192-step budget with six class entries. |
 | Option A lets one edit change many templates | That is its purpose; the creator must show which templates use a formula before it is edited. |
+
+## Decisions and implementation record (2026-11-21)
+
+**Owner instruction (2026-11-21):** "Implement plan". Asked about G5, the owner
+chose to add the apply-roll command. The other decisions take the
+recommendations above; where the plan gave none (G6–G8, G10) its proposal is
+taken as written.
+
+| Decision | Taken |
+|---|---|
+| F1 | Option A: one expression, several template owners |
+| G1 | Every dataset of a version is readable by everyone who may use the version, or read a character pinned to it |
+| G2 | Presets are copied once, not linked |
+| G3 | Start full at creation and on the first rise from 0; later rises stay manual |
+| G4 | A batch changes entity resources only |
+| G5 | Owner: add the explicit apply-roll command; rolls still never change characters on their own |
+| G6 | `target.otherEntityIds` and `target.optional` |
+| G7 | One group name per `if` branch |
+| G8 | `visibleWhen` on sections and elements, naming a true/false field |
+| G9 | `npc` entities only in campaigns |
+| G10 | Template resources with a calculated maximum; template formulas read stored character fields |
+
+| Stage | Implemented | Where |
+|---|---|---|
+| S1 | Templates share expressions compiled against common fields; actions sharing a roll must agree on inputs, target, outcomes and details. The template editor offers another template's formula, names who shares it and drops an unused one. | `rules/compile-document.ts`, `web/src/editor/TemplatesTab.tsx` |
+| S2 | `GET /characters/{id}/reference-data[/{datasetId}]` (browser and v1) and `GET /system-versions/{id}/reference-data[/{datasetId}]` (v1); a Rules panel with search on the sheet. | `characters/index.ts`, `transport/http/characters.ts`, `public-api/characters.ts`, `web/src/characters/RulesPanel.tsx` |
+| S3 | `presetsFrom` on entities; `presetId` on standalone and campaign creation (browser and v1); presets in creation options; picker in the campaign create panel. | `runtime/presets.ts`, `systems/runtime.ts`, `characters/campaignPlacement.ts`, `web/src/campaigns/CampaignCharacters.tsx` |
+| S4 | `startFull` on resources, entity and template; creator checkbox. | `runtime/state.ts`, `runtime/resolve.ts`, `ResourceFieldEditor.tsx` |
+| S5 | `resourceBatch` action kind; creator editor. | `systems/runtime.ts`, `structural.ts`, `ResourceBatchEditor.tsx` |
+| S6 | `applyRoll` command, `POST …/resources/{id}/apply-roll` and `GET …/applicable-rolls` (browser and v1); activity `character_roll_applied`; sheet control. | `characters/index.ts`, `CharacterSheet.tsx`, `CharacterRoute.tsx` |
+| S7 | `target.otherEntityIds`, `target.optional`; outcomes and details that read the target are skipped without one; target picker offers "No target". | `rules/targets.ts`, `rules/outcomes.ts`, `runtime/roll-context.ts`, `characters/persistence.ts`, `RollActionEditor.tsx` |
+| S8 | One group name per branch; a group named on every branch is available afterwards. | `rules/groups.ts` |
+| S9 | `visibleWhen` on sections and elements; publish check; projection leaves hidden parts out; "Show only when" pickers in the sheet builder. | `compile-document.ts`, `runtime/projection.ts`, `web/src/editor/sheet/*` |
+| S10 | Standalone creation rejects `npc` entities; the standalone picker hides them. | `systems/runtime.ts`, `CreateCharacter.tsx` |
+| S11 | Template resource maxima and template formulas reading stored character fields; entry resources normalized before the sheet is evaluated. | `runtime/entry-values.ts`, `runtime/resolve.ts`, `rule-bindings.ts`, `projection.ts` |
+
+Tests: runtime, rules and creator unit tests for every stage
+(`runtime.test.ts`, `r3-data.test.ts`, `groups.test.ts`, `opposed.test.ts`,
+`compile-document.test.ts`, `TemplatesTab.test.tsx`, `RulesPanel.test.tsx`), and
+the 5e scenario, which uses every stage through `/api/v1`.
+
+The 5e system uses all of them: 37 weapon templates sharing four formulas, one
+attack with an optional target of either kind, class features on the class
+entry, start-full resources, long and short rests, hidden empty slot levels and
+death saves, the bestiary as presets, and the apply-roll command in play.
+
+**Not done.** No browser journey or hosted run for any stage. Extensions keep
+one owner per expression, cannot carry presets and cannot calculate template
+resource maxima. The apply-roll control and the Rules panel are online only.
+A batch cannot restore entry resources, so class features are restored on their
+class entries. The 512-field budget, not the 5 MiB size, is now the binding limit
+of the 5e system (490 used); it is why classes stay one template.
+

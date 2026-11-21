@@ -3,6 +3,9 @@ import { computedAggregateCost } from "../rules/slots.js";
 import { sheetActionOwners, validationOwner } from "../rules/owners.js";
 import { DEFAULT_SLOT_MAX_ENTRIES } from "./entries.js";
 import { characterRuleBindings } from "./rule-bindings.js";
+import { effectiveEntryDefinition } from "./effective-entry.js";
+import { entryItemScope } from "./entry-values.js";
+import { buildFieldBindings } from "./state.js";
 import type {
   RuntimeResourceValue,
   RuntimeResult,
@@ -27,6 +30,8 @@ export function resolveObservedValues(
   packageValue: SystemPackageV1,
   entity: EntityDefinitionV1,
   state: RuntimeStateV1,
+  /** Resources with a calculated maximum to fill on this observation (new characters). */
+  options: { fill?: ReadonlySet<string> } = {},
 ): RuntimeResult<ObservedRuntimeValues> {
   const expressions = new Map(packageValue.expressions.map((expression) => [expression.id, expression]));
   const computedById = new Map<string, { expressionId: string; resource?: ResourceFieldV1 }>(entity.fields.flatMap(field => {
@@ -36,6 +41,11 @@ export function resolveObservedValues(
     }
     return [];
   }));
+  // Template resources with a calculated maximum (design 6.4, S11) are
+  // normalized first, so aggregates and every later formula see the result.
+  const normalized = normalizeEntryResources(packageValue, entity, state);
+  if (!normalized.ok) return normalized;
+  state = normalized.value;
   const bindings = characterRuleBindings(packageValue, entity, state);
   const capacities = new Map(packageValue.slots.map(slot => [slot.id, slot.maxEntries ?? DEFAULT_SLOT_MAX_ENTRIES]));
   const computedCost = computedAggregateCost(packageValue, expressions);
@@ -78,7 +88,9 @@ export function resolveObservedValues(
       if (typeof result.result !== "number" || !Number.isFinite(result.result)) return invalidPackage(expression.id);
       const stored = resolvedState.values[fieldId] as RuntimeResourceValue;
       const max = boundedMaximum(field.resource, result.result);
-      const current = Math.min(stored.current, max);
+      // startFull (design 6.3): fill at creation and when the maximum first rises from 0.
+      const fills = field.resource.startFull === true && max > 0 && (stored.max <= 0 || options.fill?.has(fieldId) === true);
+      const current = fills ? max : Math.min(stored.current, max);
       if (max !== stored.max || current !== stored.current) {
         if (resolvedState === state) resolvedState = { ...state, values: { ...state.values } };
         resolvedState.values[fieldId] = { current, max };
@@ -128,6 +140,37 @@ export function resolveObservedValues(
   }
 
   return { ok: true, value: { state: resolvedState, derivedValues, validations } };
+}
+
+function normalizeEntryResources(
+  packageValue: SystemPackageV1,
+  entity: EntityDefinitionV1,
+  state: RuntimeStateV1,
+): RuntimeResult<RuntimeStateV1> {
+  let next = state;
+  let stored: ReturnType<typeof buildFieldBindings> | undefined;
+  for (const entry of Object.values(state.entries)) {
+    const template = effectiveEntryDefinition(packageValue, entry);
+    const resources = template?.fields.filter((field): field is ResourceFieldV1 => field.kind === "resource" && field.maxExpressionId !== undefined) ?? [];
+    if (template === undefined || resources.length === 0) continue;
+    stored ??= buildFieldBindings(entity, state);
+    const scope = entryItemScope(packageValue, template, entry, stored);
+    for (const field of resources) {
+      const value = scope.evaluateExpression(field.maxExpressionId!);
+      if (typeof value !== "number" || !Number.isFinite(value)) return invalidPackage(field.maxExpressionId!);
+      const max = boundedMaximum(field, value);
+      const raw = entry.values[field.id];
+      const current = typeof raw === "object" && raw !== null && "current" in raw && typeof raw.current === "number" ? raw.current : field.default.current;
+      const previous = typeof raw === "object" && raw !== null && "max" in raw && typeof raw.max === "number" ? raw.max : field.default.max;
+      const fills = field.startFull === true && max > 0 && previous <= 0;
+      const nextValue = { current: fills ? max : Math.max(field.min, Math.min(current, max)), max };
+      if (nextValue.current === current && nextValue.max === previous && raw !== undefined) continue;
+      if (next === state) next = { ...state, entries: { ...state.entries } };
+      const nextEntry = next.entries[entry.entryId]!;
+      next.entries[entry.entryId] = { ...nextEntry, values: { ...nextEntry.values, [field.id]: nextValue } };
+    }
+  }
+  return { ok: true, value: next };
 }
 
 function boundedMaximum(field: ResourceFieldV1, value: number): number {

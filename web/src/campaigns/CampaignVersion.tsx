@@ -1,5 +1,6 @@
-// Design 6.7: GM rules-version panel. Lists the revert target and later
-// versions, runs the server dry run for every attached character and
+// Design 6.7/6.8: GM "Rules and extensions" panel. Lists the revert target,
+// later base versions and extension changes, runs the server dry run for
+// every attached character and
 // system-based campaign template, and only then offers the change. The
 // campaign moves with all of them or not at all; the server stays
 // authoritative and rechecks under lock.
@@ -7,7 +8,8 @@ import { useEffect, useState } from "react";
 
 import { t } from "../i18n/index.js";
 import { Button, Dialog, Panel } from "../ui/index.js";
-import { VersionReportSummary, versionLabel } from "../characters/VersionReport.js";
+import { VersionReportSummary } from "../characters/VersionReport.js";
+import { compositionChoices, compositionLabel, type CompositionChoice } from "../characters/compositionChoices.js";
 import type { CampaignsApi } from "./api.js";
 import type { CampaignVersionCheck, CampaignVersionOptionsResponse, CampaignView } from "./types.js";
 import { randomUUID } from "../utils/uuid";
@@ -29,7 +31,7 @@ export function CampaignVersionSection(props: {
 }) {
   const { campaignId, revision, status } = props.campaign;
   const [options, setOptions] = useState<CampaignVersionOptionsResponse["options"] | null>(null);
-  const [target, setTarget] = useState<string | null>(null);
+  const [target, setTarget] = useState<CompositionChoice | null>(null);
   const [check, setCheck] = useState<CampaignVersionCheck | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -47,14 +49,14 @@ export function CampaignVersionSection(props: {
     // The campaign revision changes after a version change; reload then.
   }, [props.api, campaignId, revision, props.online]);
 
-  const choose = async (versionId: string) => {
-    setTarget(versionId);
+  const choose = async (choice: CompositionChoice) => {
+    setTarget(choice);
     setCheck(null);
     setError(null);
     setDone(false);
     setBusy(true);
     try {
-      setCheck((await props.api.campaignVersionCheck(campaignId, versionId)).check);
+      setCheck((await props.api.campaignVersionCheck(campaignId, choice.target)).check);
     } catch (cause) {
       setError(message(cause, t("version.checkFailed")));
     } finally {
@@ -68,7 +70,7 @@ export function CampaignVersionSection(props: {
     setError(null);
     try {
       await props.api.changeCampaignVersion(campaignId, {
-        targetVersionId: target,
+        target: target.target,
         expectedCampaignRevision: revision,
         idempotencyKey: randomUUID(),
       });
@@ -86,16 +88,13 @@ export function CampaignVersionSection(props: {
     }
   };
 
-  const choices = options === null ? [] : [
-    ...(options.revertTo === null ? [] : [{ choice: options.revertTo, revert: true }]),
-    ...options.upgrades.map((choice) => ({ choice, revert: false })),
-  ];
+  const choices = options === null ? [] : compositionChoices(options);
   const blockedTemplates = check?.templates.filter((template) => !template.ok) ?? [];
   const disabled = !props.online || status !== "active" || busy;
 
   return (
     <Panel title={t("version.title")}>
-      {options === null ? null : <p>{t("version.current", { version: versionLabel(options.current) })}</p>}
+      {options === null ? null : <p>{t("version.current", { version: compositionLabel(options.current) })}</p>}
       <p>{t("campaign.version.explain")}</p>
       {!props.online ? <p role="status">{t("campaign.version.offline")}</p> : null}
       {status !== "active" ? <p role="status">{t("campaign.version.archived")}</p> : null}
@@ -105,18 +104,18 @@ export function CampaignVersionSection(props: {
       {choices.length > 0 ? (
         <fieldset>
           <legend>{t("version.choose")}</legend>
-          {choices.map(({ choice, revert }) => (
-            <label key={choice.versionId} className={styles.versionChoice}>
+          {choices.map((choice) => (
+            <label key={choice.key} className={styles.versionChoice}>
               <input
                 type="radio"
                 name={`campaign-version-${campaignId}`}
-                value={choice.versionId}
-                checked={target === choice.versionId}
+                value={choice.key}
+                checked={target?.key === choice.key}
                 disabled={disabled}
-                onChange={() => void choose(choice.versionId)}
+                onChange={() => void choose(choice)}
               />
-              {t(revert ? "version.revertTo" : "version.upgradeTo", { version: versionLabel(choice) })}
-              {choice.releaseNotes.length > 0 ? <span className={styles.versionNotes}>{choice.releaseNotes}</span> : null}
+              {choice.label}
+              {choice.notes.length > 0 ? <span className={styles.versionNotes}>{choice.notes}</span> : null}
             </label>
           ))}
         </fieldset>

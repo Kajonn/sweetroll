@@ -25,10 +25,14 @@ import { prepareCampaignCharacter } from "../../characters/campaignPlacement.js"
 import type { SystemRuntime } from "../../systems/runtime.js";
 import {
   CharacterViewDto,
+  CompositionChangeDto,
+  CompositionCheckBody,
+  CompositionDto,
+  CompositionOptionsDto,
   toCharacterViewDto,
+  toCompositionOptionsDto,
   VersionChangeDirectionDto,
   VersionChangeReportDto,
-  VersionChoiceDto,
 } from "./characters.js";
 
 import type { Identity } from "../../identity/index.js";
@@ -268,6 +272,7 @@ const ActivityEventDto = Type.Object({
     Type.Literal("system_version_reverted"),
     Type.Literal("extension_added"),
     Type.Literal("extension_removed"),
+    Type.Literal("extension_upgraded"),
   ]),
   actorId: Type.String({ format: UUID_FORMAT }),
   sourceContentId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
@@ -471,6 +476,7 @@ const CreateCampaignCharacterBody = Type.Object({
   name: Type.String({ minLength: 1 }),
   entityDefinitionId: Type.String({ minLength: 1 }),
   initialValues: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  presetId: Type.Optional(Type.String({ minLength: 1 })),
   controllerUserIds: Type.Optional(Type.Array(Type.String({ format: UUID_FORMAT }))),
   expectedCampaignRevision: Type.Integer({ minimum: 1 }),
   idempotencyKey: Type.String({ minLength: 1 }),
@@ -554,17 +560,15 @@ const ExportCampaignBody = Type.Object({
 });
 
 const CampaignIdParams = Type.Object({ id: Type.String({ format: UUID_FORMAT }) });
-// Design 6.7: campaign rules-version upgrade and revert.
-const CampaignVersionOptionsDto = Type.Object({
-  current: VersionChoiceDto,
-  revertTo: Type.Union([VersionChoiceDto, Type.Null()]),
-  upgrades: Type.Array(VersionChoiceDto),
-});
+// Design 6.7/6.8 (extensions plan E5): campaign composition changes.
 const CampaignVersionCheckDto = Type.Object({
   revision: Type.Integer(),
   direction: VersionChangeDirectionDto,
+  change: CompositionChangeDto,
   fromVersionId: Type.String(),
   toVersionId: Type.String(),
+  from: CompositionDto,
+  to: CompositionDto,
   ok: Type.Boolean(),
   characters: Type.Array(Type.Object({
     characterId: Type.String({ format: UUID_FORMAT }),
@@ -583,10 +587,6 @@ const CampaignVersionCheckDto = Type.Object({
     })),
   })),
 });
-const CampaignVersionCheckQuery = Type.Object(
-  { targetVersionId: Type.String({ format: UUID_FORMAT }) },
-  { additionalProperties: false },
-);
 // Design 6.8 (stage E4): the campaign composition.
 const CampaignExtensionsDto = Type.Object({
   campaignId: Type.String({ format: UUID_FORMAT }),
@@ -620,7 +620,7 @@ const RemoveCampaignExtensionBody = Type.Object(
 
 const ChangeCampaignVersionBody = Type.Object(
   {
-    targetVersionId: Type.String({ format: UUID_FORMAT }),
+    target: CompositionDto,
     expectedCampaignRevision: Type.Integer({ minimum: 1 }),
     idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
   },
@@ -916,23 +916,23 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
   },
   {
     method: "get",
-    path: "/campaigns/:id/version-options",
-    operationId: "get_campaigns_id_version_options",
+    path: "/campaigns/:id/composition-options",
+    operationId: "get_campaigns_id_composition_options",
     schema: {
       params: CampaignIdParams,
       response: {
-        "200": Type.Object({ options: CampaignVersionOptionsDto, requestId: Type.String() }),
+        "200": Type.Object({ options: CompositionOptionsDto, requestId: Type.String() }),
         ...ErrorResponses,
       },
     },
   },
   {
-    method: "get",
-    path: "/campaigns/:id/version-check",
-    operationId: "get_campaigns_id_version_check",
+    method: "post",
+    path: "/campaigns/:id/composition-check",
+    operationId: "post_campaigns_id_composition_check",
     schema: {
       params: CampaignIdParams,
-      querystring: CampaignVersionCheckQuery,
+      body: CompositionCheckBody,
       response: {
         "200": Type.Object({ check: CampaignVersionCheckDto, requestId: Type.String() }),
         ...ErrorResponses,
@@ -941,8 +941,8 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
   },
   {
     method: "post",
-    path: "/campaigns/:id/version",
-    operationId: "post_campaigns_id_version",
+    path: "/campaigns/:id/composition",
+    operationId: "post_campaigns_id_composition",
     schema: {
       params: CampaignIdParams,
       body: ChangeCampaignVersionBody,
@@ -1928,37 +1928,29 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         return { campaign: toCampaignDto(result.value), requestId: request.id };
       },
 
-      get_campaigns_id_version_options: async (request, reply) => {
+      get_campaigns_id_composition_options: async (request, reply) => {
         const params = request.params as { id: string };
         const result = await campaigns.listVersionOptions(ctxOf(request), { campaignId: params.id });
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("cache-control", "private, no-store");
-        const toDto = (choice: { createdAt: Date } & Record<string, unknown>) => ({ ...choice, createdAt: choice.createdAt.toISOString() });
-        return {
-          options: {
-            current: toDto(result.value.current),
-            revertTo: result.value.revertTo === null ? null : toDto(result.value.revertTo),
-            upgrades: result.value.upgrades.map(toDto),
-          },
-          requestId: request.id,
-        };
+        return { options: toCompositionOptionsDto(result.value), requestId: request.id };
       },
 
-      get_campaigns_id_version_check: async (request, reply) => {
+      post_campaigns_id_composition_check: async (request, reply) => {
         const params = request.params as { id: string };
-        const query = request.query as { targetVersionId: string };
-        const result = await campaigns.checkVersionChange(ctxOf(request), { campaignId: params.id, targetVersionId: query.targetVersionId });
+        const body = request.body as { target: unknown };
+        const result = await campaigns.checkVersionChange(ctxOf(request), { campaignId: params.id, target: body.target });
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("cache-control", "private, no-store");
         return { check: result.value, requestId: request.id };
       },
 
-      post_campaigns_id_version: async (request, reply) => {
+      post_campaigns_id_composition: async (request, reply) => {
         const params = request.params as { id: string };
-        const body = request.body as { targetVersionId: string; expectedCampaignRevision: number; idempotencyKey: string };
+        const body = request.body as { target: unknown; expectedCampaignRevision: number; idempotencyKey: string };
         const result = await campaigns.changeVersion(ctxOf(request), {
           campaignId: params.id,
-          targetVersionId: body.targetVersionId,
+          target: body.target,
           expectedCampaignRevision: body.expectedCampaignRevision,
           idempotencyKey: body.idempotencyKey,
         });
@@ -2227,6 +2219,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           name: string;
           entityDefinitionId: string;
           initialValues?: Record<string, unknown>;
+          presetId?: string;
           controllerUserIds?: string[];
           expectedCampaignRevision: number;
           idempotencyKey: string;
@@ -2242,6 +2235,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           systemVersionId: opened.value.systemVersionId,
           entityDefinitionId: body.entityDefinitionId,
           ...(body.initialValues === undefined ? {} : { initialValues: body.initialValues }),
+          ...(body.presetId === undefined ? {} : { presetId: body.presetId }),
         });
         if (!prepared.ok) {
           return sendError(reply, prepared.error, request.id);

@@ -2,6 +2,12 @@
 
 **Implementation plan · 7 November 2026 · Baseline `1475b6a` · Owner-approved 2026-11-07**
 
+> **Superseded routes (2026-11-21):** stage E5 of the
+> [system extensions plan](2026-11-07-system-extensions.md) replaced the
+> `version-options`, `version-check` and `version` routes below with
+> `composition-options`, `composition-check` and `composition`, whose target is
+> a composition (base version plus extensions). The rules in this plan are unchanged.
+
 ## Goal
 
 Let an owner move a character, or a GM move a campaign with its characters, to a

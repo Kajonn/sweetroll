@@ -45,6 +45,8 @@ export function activityKindLabel(kind: CampaignActivityEvent["kind"]): string {
       return t("campaign.activity.extension_added");
     case "extension_removed":
       return t("campaign.activity.extension_removed");
+    case "extension_upgraded":
+      return t("campaign.activity.extension_upgraded");
   }
 }
 

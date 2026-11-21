@@ -19,6 +19,7 @@ import {
   createPostgresPublishedPackageLoader,
 } from "../systems/implementation/runtime/package-loader.js";
 import type { CampaignError, CampaignResult } from "./index.js";
+import { loadCampaignComposition, recordPreviousCampaignComposition } from "./version-change.js";
 import type { createCampaignPersistenceRepository } from "./persistence.js";
 import { canManageCampaign, canReadCampaign } from "./policy.js";
 
@@ -249,6 +250,7 @@ export function createCampaignExtensionCommands(deps: {
         const next = sortExtensionRefs([...current, { extensionId: input.extensionId, versionId: input.versionId }]);
         const problem = await compositionProblem(loadEffective, client, campaign.systemVersionId, next);
         if (problem !== null) return fail("unprocessable", problem);
+        await recordPreviousCampaignComposition(client, campaign.campaignId, await loadCampaignComposition(client, campaign));
         await insertCampaignExtension(client, campaign.campaignId, { extensionId: input.extensionId, versionId: input.versionId }, "campaign", null);
         await syncAttachedCharacterExtensions(client, campaign.campaignId, next, { requestId: ctx.requestId });
         await record(client, ctx, campaign.campaignId, "extension_added", "Campaign extension added");
@@ -268,6 +270,7 @@ export function createCampaignExtensionCommands(deps: {
         if (usage.characterIds.length > 0 || usage.templateIds.length > 0) {
           return fail("conflict", `The extension is still used by ${usage.characterIds.length} character(s) and ${usage.templateIds.length} campaign template(s). Remove those entries first.`, campaign.revision);
         }
+        await recordPreviousCampaignComposition(client, campaign.campaignId, await loadCampaignComposition(client, campaign));
         await client.query("DELETE FROM campaign_extensions WHERE campaign_id = $1 AND extension_id = $2", [campaign.campaignId, input.extensionId]);
         await syncAttachedCharacterExtensions(client, campaign.campaignId, current.filter((extension) => extension.extensionId !== input.extensionId), { requestId: ctx.requestId });
         await record(client, ctx, campaign.campaignId, "extension_removed", "Campaign extension removed");

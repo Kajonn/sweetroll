@@ -161,6 +161,19 @@ A system version is a validated declarative package with stable identifiers for 
 | Rule             | Validation or simple conditional behavior     | condition, severity, message, targetId                       |
 | Reference data   | Reusable system content                       | skills, items, conditions, lookup tables                     |
 
+**Presets, reference data and non-player entities (2026-11-21, SRD gaps S2, S3, S10).**
+An entity may name a dataset in `presetsFrom`; each row is a ready-made character
+whose values are copied when a character is created with `presetId`, then
+`initialValues` apply. A row value is keyed by field ID; a number fills a
+resource's current value and maximum. The copy is not linked to the row.
+Publishing rejects rows that set unknown, computed, image or multi-choice
+fields or values of the wrong type. Creation options list an entity's presets.
+Every reference table of a version is readable by anyone who may use the
+version (`GET /system-versions/{id}/reference-data`) or read a character pinned
+to it (`GET /characters/{id}/reference-data`); the character sheet has a Rules
+panel over the same read. An entity of kind `npc` is created only inside a
+campaign; standalone creation rejects it.
+
 ## 6.2 Supported field types
 
 | **Category** | **MVP types**                              | **Notes**                                         |
@@ -187,6 +200,15 @@ A sheet is a **single-column linear scroll** (predictable collapse to one column
 **Removed from MVP:** tabs, multi-column grid layouts, drag-drop element palette, manual binding inspector, reusable fragments, conditional display, viewport authoring beyond preview. Keep only a simple section/order editor with move-up/down controls and keyboard authoring.
 
 The basic builder exposes an explicit “not on this character sheet” list for the sheet's target entity and global actions. The creator selects a target section for one-action placement (initially the first section); when none exists, placement creates the first section. Each placed item receives a generated document-wide element ID. Manual target-ID editing remains an advanced repair path, not the expected creation flow. The creator Sheets tab presents entity and element-binding reference IDs as labeled dropdowns sourced from compatible document definitions; sheet, section, and element identity IDs remain automatically assigned and read-only in the basic builder. Unresolved legacy bindings are shown explicitly without silent replacement.
+
+**Applying a roll (owner decision 2026-11-21, G5; SRD gaps S6).** Rolls still
+never change characters on their own. A person who may edit a character can
+apply a saved roll's total to one of its resources, subtracting it (damage,
+spending) or adding it (healing), with a revision-checked, idempotent command.
+The roll must be one that person can see, from the character's campaign, or
+for a standalone character one of its own rolls; only positive totals apply.
+The change is recorded as `character_roll_applied`. The sheet lists up to 20
+applicable rolls per resource; the control is online only.
 
 ## 6.4 Rules and expression engine
 
@@ -302,6 +324,60 @@ The sheet permits edits to the current value and clamps it when the maximum
 decreases. Version dry runs evaluate the target version's data and formulas
 before saving the new pin.
 
+**Size and entry formulas (owner decision 2026-11-16).** An encoded system
+document may be 5 MiB (was 1 MiB), and so may the package compiled from it.
+Validation and publishing reject a larger package with `limit_exceeded`, so a
+version that publishes can always be exported and imported again. Draft saves
+in the browser API accept the same body size as the public API.
+
+A computed template field reads its own entry and reference data. Slot
+aggregates may read computed number fields, and computed boolean fields as the
+filter of `sumWhere` and `countWhere`. Each such read is charged to the sheet
+evaluation budget for every entry the slot can hold: the field's formula plus
+the computed fields it depends on. Quantity never multiplies a computed field.
+The sheet and `/api/v1` return an entry's computed fields with the entry
+(`derived` in the projection, `derivedValues` in v1), read-only.
+
+These two rules make "one entry per class" possible: a class entry computes what
+the class contributes at its level and the character sums the slot. The
+Ember Trail test system (`tests/integration/fixtures/ember-trail/`) adds paths
+this way. Third-party rules content such as the 5e SRD system lives outside this
+repository (owner decision 2026-11-21), so no game licence applies to Sweetroll.
+
+**SRD gap stages S1–S11 (owner instruction "Implement plan", 2026-11-21).** The
+[plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md) records
+the decisions; the owner chose to add the apply-roll command (G5), and the other
+decisions take the plan's recommended options.
+
+- *Shared formulas (S1).* Several templates may use one computed or roll
+  expression. It compiles against the fields every owning template defines with
+  the same type. Granted actions that share a roll formula must declare the same
+  inputs, target, outcomes and details; their labels may differ. Entity
+  expressions and extension templates keep one owner.
+- *Template formulas (S11).* Template computed fields and template resource
+  maxima may read the character's stored fields through `fields.` (never its
+  computed values), for fields every entity showing the template's slot defines.
+  A template resource may have a calculated maximum; it is normalized for each
+  entry before the sheet is evaluated.
+- *Start full (S4).* A resource with `startFull` starts at its maximum on a new
+  character, and fills when its calculated maximum first rises from 0. Later
+  rises leave the current value alone.
+- *Batch resource actions (S5).* `resourceBatch` applies ordered resets and
+  amounts to the entity's own resources in one revision; amounts stop at the
+  bounds. Entry resources are not part of a batch.
+- *Branch groups (S8).* Each branch of an `if` may name the same dice group; a
+  group named on every branch can be read afterwards with `rolled`.
+- *Targets (S7).* `target.otherEntityIds` lets a target be a character of
+  several entities (formulas read their common fields); `target.optional` lets
+  the action run without one. The roll formula then cannot read `target.`;
+  outcomes and details that read it are skipped when no target is chosen.
+- *Conditional layout (S9).* Sections and sheet elements take `visibleWhen`, a
+  true/false field of the sheet's entity. Hidden parts are left out of the sheet
+  projection; their values stay in the API.
+
+Section 6.1 has presets (S3), reference data reads (S2) and the `npc` rule (S10);
+Section 6.3 has applying a roll (S6).
+
 ## 6.5 Draft, validation, and publishing
 
 | **State**          | **Mutable?**  | **Use**                                                                 |
@@ -382,8 +458,9 @@ first upgrade it to that version.
 
 **Revert (owner decision 2026-11-07).** A character or campaign can return to
 the version it used before its most recent upgrade. The upgrade stores that
-version as `previous_system_version_id`; a revert clears it, so a second revert is
-not possible until the next upgrade. Revert uses the same dry run and commit as an
+composition (Section 6.8) as `previous_system_version_id` plus the
+`character_previous_extensions` or `campaign_previous_extensions` rows; a revert
+clears it, so a second revert is not possible until the next change. Revert uses the same dry run and commit as an
 upgrade, but against the previous version and without the package-level check,
 because undoing additions always reads as removals. Current values are kept by
 identifier, so play since the upgrade (damage, resources, notes) is not lost.
@@ -398,21 +475,24 @@ version other than the recorded previous one, moving between different systems,
 automatic upgrades on publish and lineage tables. A blocked character stays on its
 version; create a new character to use a breaking version. Version selection lists
 later authorized versions and the revert target; choosing one runs the check for
-this character before anything is saved. Standalone characters use
-`GET /characters/:id/version-options`, `GET /characters/:id/version-check?targetVersionId=`
-and `POST /characters/:id/version` (`{ targetVersionId, expectedRevision, idempotencyKey }`);
+this character before anything is saved. A target is a composition
+`{ systemVersionId, extensions: [{ extensionId, versionId }] }` (Section 6.8).
+Standalone characters use `GET /characters/:id/composition-options`,
+`POST /characters/:id/composition-check` (`{ target }`) and
+`POST /characters/:id/composition` (`{ target, expectedRevision, idempotencyKey }`);
 attached characters move only with their campaign, through the GM/co-GM routes
-`GET /campaigns/:id/version-options`, `GET /campaigns/:id/version-check?targetVersionId=`
-and `POST /campaigns/:id/version` (`{ targetVersionId, expectedCampaignRevision, idempotencyKey }`).
+`GET /campaigns/:id/composition-options`, `POST /campaigns/:id/composition-check`
+and `POST /campaigns/:id/composition` (`{ target, expectedCampaignRevision, idempotencyKey }`).
 The campaign check lists every attached character and every system-based campaign
 template with its blockers; the commit locks the campaign, then its characters and
 templates, re-verifies them and writes the campaign pin, each character and a new
 template content revision with the re-pinned base in one transaction. A campaign
-records `previous_system_version_id` like a character. A blocked change returns 409,
-and activity records `system_version_upgraded` or `system_version_reverted` with
-version and definition identifiers only; the campaign feed shows the same kinds to
-all members. In the GUI, **Rules version** sits in the character tools (standalone
-characters) and in campaign Settings (GM/co-GM). Both run the check before offering
+records its previous composition like a character. A blocked change returns 409,
+and activity records `system_version_upgraded`, `system_version_reverted`,
+`extension_added`, `extension_removed` or `extension_upgraded` with version,
+extension and definition identifiers only; the campaign feed shows the same kinds
+to all members. In the GUI, **Rules and extensions** sits in the character tools
+(standalone characters) and in campaign Settings (GM/co-GM). Both run the check before offering
 **Upgrade** or **Revert**, and the character change uses the session's durable
 online-attempt ordering like archive/recover. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
 defines the delivery stages.
@@ -445,9 +525,32 @@ character whose extension set changes: each gets a new revision and an
 identifiers, so commands prepared against the earlier revision are refused
 with 409 and clients reconciling by revision refetch. The campaign is locked
 before its characters, and an entry naming an extension is rechecked against
-the locked character's composition before commit (X9; issue #60). Until E5, characters and campaigns with extensions
-cannot change rules version; campaign templates based on extension templates
-are a deferred follow-up (E4b).
+the locked character's composition before commit (X9; issue #60). Campaign
+templates based on extension templates are a deferred follow-up (E4b).
+
+**Composition changes (E5, X11).** Section 6.7 applies to whole compositions.
+One change is made at a time: upgrade the base version, add an extension, remove
+one, or upgrade one to a later published version of the same extension; or revert
+to the composition recorded before the most recent change, whatever it changed.
+A request that changes more than one part is refused with 400. An upgrade must
+name a later version the actor may use; an added extension must be usable by the
+actor and extend the same system; removal and revert need no use authorization.
+The dry run compares the effective packages (base plus extensions, extension
+templates keyed by extension), so an entry from a removed extension, or a breaking
+change to an extension template the character uses, blocks the change, and
+unchanged template defaults follow the new extension version. A campaign change
+covers every attached character and blocks on any one; kept and upgraded campaign
+extensions keep their origin (`added_by`), and the GM add and remove extension
+commands also record the previous composition, so a revert undoes the most recent
+GM change. Adoptions that bring extensions do not record one.
+
+**GUI (E6).** The system library shows a system's extensions and creates one
+on a published base version. The creator opens an extension at
+`/extensions/:extensionId` with Overview, Templates and Publish only; formulas
+are written against the base version's character fields. Character creation
+offers the system's extensions that fit the chosen version; campaigns add them
+in Settings. The item picker groups templates by origin (rules, each extension,
+campaign, your own). Cached item templates are keyed by the composed rules.
 
 **Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
 discovering and previewing published extensions. It depends on OD-07 and needs its

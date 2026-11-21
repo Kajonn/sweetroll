@@ -34,7 +34,7 @@ export type RollActionV1 = {
   expressionId: DefinitionId;
   inputs: ActionInputV1[];
   outputTemplate: string;
-  target?: { entityId: string };
+  target?: { entityId: string; otherEntityIds?: string[]; optional?: true };
   respondsTo?: true;
   outcomes?: RollOutcomeEntry[];
   details?: RollOutcomeEntry[];
@@ -216,7 +216,13 @@ export function RollActionEditor({
     updateInputs([...action.inputs, defaultActionInput(action.inputs)]);
   };
 
-  const targetTypes = targetEntities?.find(entity => entity.id === action.target?.entityId)?.fields;
+  // A target may be any of several entities; formulas read the fields they share.
+  const targetTypes = (() => {
+    const ids = action.target ? [action.target.entityId, ...(action.target.otherEntityIds ?? [])] : [];
+    const [first, ...rest] = ids.map(id => targetEntities?.find(entity => entity.id === id)?.fields ?? {});
+    return first === undefined ? undefined
+      : Object.fromEntries(Object.entries(first).filter(([id, type]) => rest.every(fields => fields[id] === type)));
+  })();
   const opposedTypes: Record<string, ValueType> | undefined = action.respondsTo ? { total: "number" } : undefined;
   const contextualTypes = { target: targetTypes, opposed: opposedTypes };
   const types = { fields: fieldTypes, item: itemTypes, ...contextualTypes };
@@ -358,6 +364,32 @@ export function RollActionEditor({
             }}
             disabled={disabled}
           />
+          {action.target ? <>
+            {targetEntities.filter(entity => entity.id !== action.target?.entityId).map(entity => (
+              <Checkbox
+                key={entity.id}
+                label={t("editor.action.roll.targetAlso", { entity: entity.label })}
+                checked={action.target?.otherEntityIds?.includes(entity.id) === true}
+                onChange={(event) => {
+                  const current = action.target!;
+                  const others = (current.otherEntityIds ?? []).filter(id => id !== entity.id);
+                  if (event.target.checked) others.push(entity.id);
+                  const { otherEntityIds: _others, ...base } = current;
+                  onChange({ ...action, target: others.length > 0 ? { ...base, otherEntityIds: others } : base });
+                }}
+                disabled={disabled}
+              />
+            ))}
+            <Checkbox
+              label={t("editor.action.roll.targetOptional")}
+              checked={action.target.optional === true}
+              onChange={(event) => {
+                const { optional: _optional, ...base } = action.target!;
+                onChange({ ...action, target: event.target.checked ? { ...base, optional: true } : base });
+              }}
+              disabled={disabled}
+            />
+          </> : null}
           <Checkbox
             label={t("editor.action.roll.respondsTo")}
             checked={action.respondsTo === true}

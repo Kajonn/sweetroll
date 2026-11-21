@@ -8,7 +8,8 @@ export const PACKAGE_LIMITS = {
   facesPerCustomDie: 20,
   symbolCountPerFace: 100,
   symbolsPerFace: 16,
-  encodedBytes: 1024 * 1024,
+  // Applies to an encoded document and to the package compiled from it.
+  encodedBytes: 5 * 1024 * 1024,
   entities: 32,
   expressionAstDepth: 32,
   expressionAstNodes: 256,

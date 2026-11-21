@@ -95,8 +95,11 @@ extension package checksums. It is stored relationally:
   added_by text NOT NULL /* 'campaign' | 'character' */, added_by_character_id
   uuid NULL, PRIMARY KEY (campaign_id, extension_id))`. `added_by` is shown in
   Settings; it does not change behaviour after the add (X7).
-- `characters.previous_composition_json` and `campaigns.previous_composition_json`
-  replace the single `previous_system_version_id` for revert (X11).
+- The revert target (X11) is the previous composition. **As built (E5):**
+  `previous_system_version_id` stays as its base, and
+  `character_previous_extensions` / `campaign_previous_extensions` (the latter
+  with `added_by`) hold its extensions, instead of a JSON column, so a recorded
+  revert target keeps blocking deletion of the versions it names.
 
 A new `ComposedRules` view replaces direct package access in the runtime:
 `templates(origin)`, `template(origin, templateId)`, `expression(origin, id)`,
@@ -298,37 +301,81 @@ the design document updated (red → green, per existing plans).
   picker, placement, proposals and version re-pinning; removal already
   counts such templates as usage (X9).
 
-### E5 — Composition changes (Section 6.7 extension)
+### E5 — Composition changes (Section 6.7 extension) — done 2026-11-21
 
-- [ ] Generalise `checkVersionChange` to `checkCompositionChange({ from, to,
-  ... })`: base upgrade/revert, extension add, remove, upgrade, and revert to
-  the previous composition. Per-character blocking rules from Section 6.7 apply
-  per origin.
-- [ ] Routes: replace `version-options/version-check/version` with
-  `composition-options`, `composition-check` and `POST .../composition` for
-  characters and campaigns (pre-release, so the old routes are removed rather
-  than kept, Section 17.0). Activity kinds `system_version_upgraded`/`reverted`
-  plus `extension_added`/`removed`/`upgraded`.
-- [ ] Tests: extension upgrade following unchanged template defaults, extension
-  removal blocked by an entry, campaign-wide extension upgrade blocked by one
-  character, revert restores previous composition.
+- [x] `checkVersionChange` works on effective packages: entries are matched by
+  `templateKey`, so extension templates compare by origin (`runtime/version-change.ts`,
+  `systems/runtime.ts` with `fromExtensions`/`toExtensions`). One shared module
+  (`systems/composition-change.ts`) classifies a target as base upgrade,
+  extension add, remove, upgrade, or revert to the previous composition, and
+  authorizes it. **Deviation:** one change per command (a request that changes
+  more than one part is refused with 400); a revert restores the previous
+  composition whatever it changed.
+- [x] Routes: `GET .../composition-options`, `POST .../composition-check`
+  (`{ target }`) and `POST .../composition` for characters and campaigns; the
+  version routes are removed. Options list the current composition with
+  extension names and later usable versions, the revert target, later base
+  versions and the system's addable extensions (owned and public, latest
+  version). Activity kinds `system_version_upgraded`/`reverted` plus
+  `extension_added`/`removed`/`upgraded`, with from/to compositions and the
+  change (identifiers only). The E4 campaign add/remove extension commands also
+  record the previous composition; adoptions do not.
+- [x] Campaign change: every attached character is checked against the target
+  effective package and any blocker blocks the campaign; campaign templates
+  based on a removed extension block (X9); base templates re-pin only when the
+  base version changes. Kept and upgraded extensions keep `added_by`.
+- [x] Tests: `tests/integration/composition-change.test.ts` (extension upgrade
+  following unchanged template defaults, two changes refused, removal blocked by
+  an entry, revert restores the previous composition and default, add then
+  options' revert target, other users refused; campaign-wide extension upgrade
+  blocked by one character only, compatible upgrade moves the campaign and both
+  characters, revert). `character-version-change.test.ts`,
+  `campaign-version-change.test.ts`, the E3/E4 extension tests and the
+  `systemVersionUpgrade.spec.ts` browser journey use the new routes.
+- [x] GUI part of E6: **Rules version** is **Rules and extensions** in the
+  character tools and campaign Settings; it offers each single change and runs
+  the check first (`web/src/characters/compositionChoices.ts`).
 
-### E6 — GUI
+### E6 — GUI — mostly done 2026-11-21
 
 Follow the [GUI integration plan](2026-09-08-gui-integration.md) gates.
 
-- [ ] System library: **Extensions** list per system and **Create extension**.
-- [ ] Creator: extension mode shows Overview, Templates and Publish only, with a
-  base-version selector for preview.
-- [ ] Character creation and campaign creation: optional extension picker with
-  compatible versions.
-- [ ] Item picker groups templates by origin (system name / extension name).
-- [ ] Character tools **Rules version** becomes **Rules and extensions**; campaign
-  Settings likewise. Both run the check before offering a change.
-- [ ] Offline cache stores the composed rules keyed by `compositionChecksum`.
-- [ ] Browser tests at 360/768/1280px, keyboard path, light/dark.
+- [x] System library: **Extensions** per system row lists the owned and public
+  extensions with their latest version, and **Create extension** asks for a
+  name and a published base version (`web/src/extensions/ExtensionsPanel.tsx`).
+- [x] Creator: `/extensions/:extensionId` shows Overview (name, description,
+  base version), Templates and Publish only. The templates editor is the
+  system one without slots; the base version's package (character fields,
+  sheets, slots, reference data) is loaded read-only as formula context, and
+  only metadata, templates and their expressions are saved. Publish shows the
+  server's problems and warnings, the version number, release notes and the
+  breaking acknowledgement (`web/src/extensions/ExtensionEditor.tsx`).
+- [x] Character creation: optional extension checkboxes. The creation options
+  list the system's owned and public extensions at their latest version that
+  validate against the chosen base version (browser route only; `/api/v1`
+  strips them, E7). **Campaign creation** has no picker: since E4 a campaign
+  takes extensions after creation, and campaign Settings → **Rules and
+  extensions** offers **Add** (E5).
+- [x] Item picker groups templates by origin: Rules, each extension by name
+  (`extensionName` on the template list), Campaign, then Your own. Picker keys
+  qualify extension templates, and an extension item is placed with its
+  `extensionId` and source.
+- [x] Character tools **Rules version** becomes **Rules and extensions**; campaign
+  Settings likewise. Both run the check before offering a change (with E5).
+- [x] Offline: cached item templates are keyed by the projection's
+  `packageChecksum`, which is the composition checksum (E3), so an extension
+  change drops them; queued offline edits were already keyed by it.
+- [ ] Browser tests: `tests/e2e/extensionAuthoring.spec.ts` covers the library,
+  creator, publish, creation picker and grouped item picker, with no
+  horizontal scroll at 360/768/1280px. **Not done:** a keyboard-only path and
+  light/dark screenshots; template art in the extension editor (art for
+  extension templates is not uploaded from the GUI).
 
-### E7 — Public API v1 (separate approval)
+### E7 — Public API v1 (owner-approved 2026-11-21)
+
+**Owner instruction (2026-11-21):** "I approve e7". Writing compositions and
+publishing extensions through `/api/v1` is in scope; the approach is recorded
+here before implementation.
 
 - [ ] Read-only: `composition` on v1 character and campaign responses (this
   stage's read part is included in E3/E4).

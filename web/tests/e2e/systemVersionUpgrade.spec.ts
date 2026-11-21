@@ -70,14 +70,14 @@ test("player upgrades and reverts a character; GM upgrades the campaign", async 
     // Player: check, preview and upgrade from the sheet.
     const page = await player.newPage();
     await page.goto(`/characters/${characterId}`);
-    await page.getByRole("button", { name: "Rules version" }).click();
-    const dialog = page.getByRole("dialog", { name: "Rules version" });
+    await page.getByRole("button", { name: "Rules and extensions" }).click();
+    const dialog = page.getByRole("dialog", { name: "Rules and extensions" });
     await expect(dialog.getByText("Sharper swords and new shields.")).toBeVisible();
     await dialog.getByRole("radio", { name: /Upgrade to 1\.1\.0/ }).check();
     await expect(dialog.getByText("Ready: nothing blocks this change.")).toBeVisible();
     await expect(dialog.getByText(/updated to new defaults: damage_bonus/)).toBeVisible();
     await expectNoHorizontalScroll(page);
-    const upgraded = page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith(`/characters/${characterId}/version`));
+    const upgraded = page.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith(`/characters/${characterId}/composition`));
     await dialog.getByRole("button", { name: "Upgrade" }).click();
     expect((await upgraded).status()).toBe(200);
     await expect(dialog).toBeHidden();
@@ -86,7 +86,7 @@ test("player upgrades and reverts a character; GM upgrades the campaign", async 
     expect(afterUpgrade.character.state.entries[entryId].values.damage_bonus).toBe(2);
 
     // Player: revert to the recorded previous version.
-    await page.getByRole("button", { name: "Rules version" }).click();
+    await page.getByRole("button", { name: "Rules and extensions" }).click();
     await dialog.getByRole("radio", { name: /Revert to 1\.0\.0/ }).check();
     await expect(dialog.getByText("Ready: nothing blocks this change.")).toBeVisible();
     await dialog.getByRole("button", { name: "Revert" }).click();
@@ -103,7 +103,7 @@ test("player upgrades and reverts a character; GM upgrades the campaign", async 
     await expect(gmPage.getByText(/can move/)).toBeVisible();
     await expectNoHorizontalScroll(gmPage);
     await gmPage.getByRole("button", { name: "Upgrade", exact: true }).click();
-    const campaignChanged = gmPage.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith(`/campaigns/${campaignId}/version`));
+    const campaignChanged = gmPage.waitForResponse((r) => r.request().method() === "POST" && r.url().endsWith(`/campaigns/${campaignId}/composition`));
     await gmPage.getByRole("dialog").getByRole("button", { name: "Upgrade" }).click();
     expect((await campaignChanged).status()).toBe(200);
     await expect(gmPage.getByText("The rules version was changed.")).toBeVisible();

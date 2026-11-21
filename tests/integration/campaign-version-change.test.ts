@@ -148,9 +148,9 @@ db("campaign system version upgrade and revert", () => {
   const change = async (campaignId: string, targetVersionId: string, expectedCampaignRevision: number) =>
     h.app.inject({
       method: "POST",
-      url: `/campaigns/${campaignId}/version`,
+      url: `/campaigns/${campaignId}/composition`,
       headers: gmHeaders(),
-      payload: { targetVersionId, expectedCampaignRevision, idempotencyKey: randomUUID() },
+      payload: { target: { systemVersionId: targetVersionId, extensions: [] }, expectedCampaignRevision, idempotencyKey: randomUUID() },
     });
 
   it("moves the campaign, its characters and template bases together and reverts them", async () => {
@@ -161,21 +161,21 @@ db("campaign system version upgrade and revert", () => {
     const entryId = randomUUID();
     value(await place(armed, template, entryId));
 
-    expect((await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/version-options`, headers: { cookie: h.users.player.cookie } })).statusCode).toBe(404);
-    const options = await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/version-options`, headers: gmHeaders() });
+    expect((await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/composition-options`, headers: { cookie: h.users.player.cookie } })).statusCode).toBe(404);
+    const options = await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/composition-options`, headers: gmHeaders() });
     expect(options.statusCode, options.body).toBe(200);
-    expect(options.json().options.current.versionId).toBe(h.versionId);
+    expect(options.json().options.current.systemVersion.versionId).toBe(h.versionId);
     expect(options.json().options.revertTo).toBeNull();
-    expect(options.json().options.upgrades.map((u: { versionId: string }) => u.versionId)).toEqual([v3, v2]);
+    expect(options.json().options.systemUpgrades.map((u: { versionId: string }) => u.versionId)).toEqual([v3, v2]);
 
-    const checked = await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/version-check?targetVersionId=${v2}`, headers: gmHeaders() });
+    const checked = await h.app.inject({ method: "POST", url: `/campaigns/${campaignId}/composition-check`, headers: gmHeaders(), payload: { target: { systemVersionId: v2, extensions: [] } } });
     expect(checked.statusCode, checked.body).toBe(200);
     expect(checked.json().check).toMatchObject({ ok: true, direction: "upgrade", fromVersionId: h.versionId, toVersionId: v2 });
     expect(checked.json().check.characters).toHaveLength(2);
     expect(checked.json().check.templates).toEqual([{ templateId: template.templateId, name: "Captain's sword", ok: true, blockers: [] }]);
 
     // Attached characters move only with their campaign.
-    expect((await h.app.inject({ method: "GET", url: `/characters/${armed.characterId}/version-options`, headers: { cookie: h.users.player.cookie } })).statusCode).toBe(404);
+    expect((await h.app.inject({ method: "GET", url: `/characters/${armed.characterId}/composition-options`, headers: { cookie: h.users.player.cookie } })).statusCode).toBe(404);
 
     const before = await revision(campaignId);
     expect((await change(campaignId, v2, before - 1)).statusCode).toBe(409);
@@ -202,8 +202,8 @@ db("campaign system version upgrade and revert", () => {
     const feed = value(await h.campaigns.listActivity(ctxFor(h.users.player), { campaignId }));
     expect(feed.events[0]).toMatchObject({ kind: "system_version_upgraded", actorId: h.users.gm.actorId });
 
-    const afterOptions = await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/version-options`, headers: gmHeaders() });
-    expect(afterOptions.json().options.revertTo.versionId).toBe(h.versionId);
+    const afterOptions = await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/composition-options`, headers: gmHeaders() });
+    expect(afterOptions.json().options.revertTo.systemVersion.versionId).toBe(h.versionId);
     const reverted = await change(campaignId, h.versionId, before + 1);
     expect(reverted.statusCode, reverted.body).toBe(200);
     expect(reverted.json().campaign.systemVersionId).toBe(h.versionId);
@@ -219,7 +219,7 @@ db("campaign system version upgrade and revert", () => {
     value(await place(armed, template));
     const armedBefore = await openCharacter(armed.characterId);
 
-    const checked = await h.app.inject({ method: "GET", url: `/campaigns/${campaignId}/version-check?targetVersionId=${v3}`, headers: gmHeaders() });
+    const checked = await h.app.inject({ method: "POST", url: `/campaigns/${campaignId}/composition-check`, headers: gmHeaders(), payload: { target: { systemVersionId: v3, extensions: [] } } });
     expect(checked.statusCode, checked.body).toBe(200);
     expect(checked.json().check.ok).toBe(false);
     expect(checked.json().check.templates[0]).toMatchObject({ ok: false, blockers: [{ code: "breaking_change" }] });

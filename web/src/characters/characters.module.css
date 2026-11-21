@@ -57,3 +57,17 @@
 .resourceInput { width: 6em; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border-default); border-radius: var(--radius-control); background: var(--surface-panel); color: var(--text-primary); font: inherit; }
 .resourceInput:disabled { background: var(--surface-page); color: var(--text-muted); cursor: not-allowed; }
 .resourceInput:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }
+
+.rulesPanel {
+  display: grid;
+  gap: var(--space-2, 0.5rem);
+  margin-block: var(--space-4, 1rem);
+}
+
+.rulesList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-1, 0.25rem);
+}

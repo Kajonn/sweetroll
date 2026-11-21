@@ -156,8 +156,9 @@ export type CharacterExport = operations["post_characters_characterId_exports"][
 export type PushOptionsResponse=operations["get_characters_characterId_rolls_rollId_push_options"]["responses"]["200"]["content"]["application/json"];
 export type ReadRollResponse=operations["get_characters_characterId_rolls_rollId"]["responses"]["200"]["content"]["application/json"];
 
-// Design 6.7: system version upgrade and revert.
-export type VersionOptionsResponse = operations["get_characters_characterId_version_options"]["responses"]["200"]["content"]["application/json"];
-export type VersionChoice = VersionOptionsResponse["options"]["current"];
-export type VersionCheckResponse = operations["get_characters_characterId_version_check"]["responses"]["200"]["content"]["application/json"];
+// Design 6.7/6.8: composition (rules version and extensions) changes.
+export type VersionOptionsResponse = operations["get_characters_characterId_composition_options"]["responses"]["200"]["content"]["application/json"];
+export type CompositionOptions = VersionOptionsResponse["options"];
+export type VersionChoice = CompositionOptions["systemUpgrades"][number];
+export type VersionCheckResponse = operations["post_characters_characterId_composition_check"]["responses"]["200"]["content"]["application/json"];
 export type VersionChangeReport = VersionCheckResponse["check"]["report"];

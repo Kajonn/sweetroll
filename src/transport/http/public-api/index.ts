@@ -193,7 +193,13 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
       method: "GET", path: "/characters/creation-options", id: "getCharacterCreationOptions",
       description: "Read entity types and writable initial fields for a usable exact version, including known link-only versions.",
       scope: "characters:read", input: { querystring: s.creationOptionsQuery }, output: "CreationOptions",
-    }, (ctx, { query }) => characters.creationOptions(ctx, { ...query, includeFields: true }));
+    }, async (ctx, { query }) => {
+      // The browser's extension picker list is not part of v1 (extensions plan E7).
+      const result = await characters.creationOptions(ctx, { ...query, includeFields: true });
+      if (!result.ok) return result;
+      const { extensions: _extensions, ...options } = result.value;
+      return { ok: true as const, value: options };
+    });
 
     route({
       method: "GET", path: "/characters", id: "listCharacters", description: "List standalone characters owned by the account.",
@@ -242,6 +248,16 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
       example: { delta: -17, expectedRevision: 3, idempotencyKey: "damage-1" },
     }, async (ctx, { params, body }) => map(
       await characters.apply(ctx, { kind: "adjustResource", ...params, ...body }),
+      ({ character }) => characterMutation(character),
+    ));
+
+    route({
+      method: "POST", path: "/characters/:characterId/resources/:resourceId/apply-roll", id: "applyRollToCharacterResource",
+      description: "Apply a saved roll's total to a resource of a character the caller may edit: subtract it (damage, spending) or add it (healing). The roll must be one the caller can see, from the character's campaign or, for a standalone character, its own. Rolls never change characters on their own.",
+      scope: "characters:write", input: { params: s.resourceId, body: s.applyRoll }, output: "CharacterMutation",
+      example: { rollId: "00000000-0000-4000-8000-000000000001", direction: "subtract", expectedRevision: 3, idempotencyKey: "damage-roll-1" },
+    }, async (ctx, { params, body }) => map(
+      await characters.apply(ctx, { kind: "applyRoll", ...params, ...body }),
       ({ character }) => characterMutation(character),
     ));
 

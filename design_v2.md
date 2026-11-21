@@ -547,7 +547,8 @@ GM change. Adoptions that bring extensions do not record one.
 **GUI (E6).** The system library shows a system's extensions and creates one
 on a published base version. The creator opens an extension at
 `/extensions/:extensionId` with Overview, Templates and Publish only; formulas
-are written against the base version's character fields. Character creation
+are written against the base version's character fields, and template art is
+uploaded as for system templates. Character creation
 offers the system's extensions that fit the chosen version; campaigns add them
 in Settings. The item picker groups templates by origin (rules, each extension,
 campaign, your own). Cached item templates are keyed by the composed rules.

@@ -1,3 +1,5 @@
+import sharp from "sharp";
+
 import { expect, test, type Page } from "../fixtures/browserTest";
 
 import { createCatalogCampaign } from "../fixtures/campaignTemplates.js";
@@ -62,6 +64,16 @@ test("author publishes an extension in the GUI; a player uses its item", async (
     await page.locator('[data-testid^="template-label-"]').first().fill("Frost blade");
     await page.getByTestId("extension-save").click();
     await expect(page.getByText("Draft saved.")).toBeVisible();
+    // Template art for the saved draft, through the system art routes (design 6.8).
+    const png = await sharp({ create: { width: 40, height: 24, channels: 3, background: "#3a6f8f" } }).png().toBuffer();
+    await page.getByRole("button", { name: "Edit artwork", exact: true }).click();
+    const art = page.getByRole("dialog", { name: "Item artwork", exact: true });
+    await art.getByLabel("Image file", { exact: true }).setInputFiles({ name: "frost.png", mimeType: "image/png", buffer: png });
+    await art.getByLabel("Image description", { exact: true }).fill("A frosted blade");
+    await art.getByRole("button", { name: /^(Upload|Replace) artwork$/ }).click();
+    await expect(art.getByAltText("A frosted blade", { exact: true })).toBeVisible();
+    await art.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(page.getByAltText("A frosted blade", { exact: true }).first()).toBeVisible();
     await expectNoHorizontalScroll(page);
 
     await tabs.getByRole("tab", { name: "Publish" }).click();
@@ -103,6 +115,13 @@ test("author publishes an extension in the GUI; a player uses its item", async (
       const view = await json(player.request, "GET", `/api/characters/${characterId}`);
       return Object.values(view.character.state.entries as Record<string, { extensionId?: string }>).map((entry) => entry.extensionId ?? null);
     }).toEqual([extensionId]);
+    // The placed item carries the extension's art, served to the player.
+    const placed = Object.values((await json(player.request, "GET", `/api/characters/${characterId}`)).character.state.entries as
+      Record<string, { entryId: string; image?: { fileId: string } }>)[0]!;
+    expect(placed.image?.fileId).toBeTruthy();
+    const bytes = await player.request.get(`/api/characters/${characterId}/entries/${placed.entryId}/image/${placed.image!.fileId}`);
+    expect(bytes.status()).toBe(200);
+    await expect(playerPage.getByAltText("A frosted blade", { exact: true })).toBeVisible();
     await expectNoHorizontalScroll(playerPage);
   } finally {
     await gm.close();

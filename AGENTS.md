@@ -121,8 +121,8 @@ owner-approved X1–X13): stages E1–E5 are implemented. E5 (2026-11-21) replac
 the character and campaign `version-*` routes with `composition-options`,
 `composition-check` and `composition`: one change per command (base upgrade, or
 add/remove/upgrade one extension) or a revert to the previous composition.
-E6 (GUI) is implemented except a keyboard-only path, light/dark checks and
-extension template art (see the plan). E7 (owner-approved 2026-11-21) is
+E6 (GUI) is implemented, including extension template art, except a
+keyboard-only path and light/dark checks (see the plan). E7 (owner-approved 2026-11-21) is
 implemented: extension authoring and composition changes through `/api/v1`.
 E4b is deferred. The E8 local journey passed on 2026-11-21
 ([record](docs/acceptance/extensions-e8-local-2026-11-21.md)); the hosted E8

@@ -5,13 +5,15 @@
 // data are loaded read-only as context for the templates editor. The server
 // assesses every saved draft against that base version.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useState } from "react";
 
 import { ApiError, type ApiClient } from "../api/client.js";
 import { TemplatesTab } from "../editor/TemplatesTab.js";
 import { t } from "../i18n/index.js";
 import { documentReducer, type SystemDocumentV1 } from "../state/documentReducer.js";
 import { Button, Checkbox, FormField, PageHeader, Panel, Select, Tabs } from "../ui/index.js";
+import { createImageEditorApi } from "../ui/imageEditorApi.js";
+import { ItemArtwork } from "../ui/ItemArtwork.js";
 import { randomUUID } from "../utils/uuid";
 import {
   listBaseVersions,
@@ -83,6 +85,10 @@ export function ExtensionEditor({ client, extensionId }: { client: ApiClient; ex
   const [semanticVersion, setSemanticVersion] = useState("");
   const [releaseNotes, setReleaseNotes] = useState("");
   const [acknowledgeBreaking, setAcknowledgeBreaking] = useState(false);
+  // Template art uses the system image routes with the extension's ID (design 6.8).
+  const imageFactory = useMemo(() => (templateId: string) => createImageEditorApi(
+    client, `/systems/${encodeURIComponent(extensionId)}/templates/${encodeURIComponent(templateId)}/image`, "system",
+  ), [client, extensionId]);
 
   const adopt = (next: ExtensionWorkspace) => {
     setWorkspace(next);
@@ -252,7 +258,28 @@ export function ExtensionEditor({ client, extensionId }: { client: ApiClient; ex
           {
             id: "templates",
             label: t("extensions.editor.templates"),
-            content: <TemplatesTab client={client} document={document} dispatch={change} showSlots={false} />,
+            content: (
+              <TemplatesTab
+                client={client}
+                document={document}
+                dispatch={change}
+                showSlots={false}
+                renderArtwork={(template) => (
+                  <>
+                    <ItemArtwork
+                      createApi={imageFactory}
+                      resourceId={template.id}
+                      online
+                      canEdit={editable && !dirty && !busy}
+                      modal
+                      // An art change is a new draft revision: reload it.
+                      onChanged={async () => { await workspaceQuery.refetch(); }}
+                    />
+                    {dirty ? <p>{t("artwork.creatorReady")}</p> : null}
+                  </>
+                )}
+              />
+            ),
             disabled: !editable,
           },
           { id: "publish", label: t("extensions.editor.publish"), content: publishPanel },

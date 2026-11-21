@@ -368,8 +368,14 @@ Follow the [GUI integration plan](2026-09-08-gui-integration.md) gates.
 - [ ] Browser tests: `tests/e2e/extensionAuthoring.spec.ts` covers the library,
   creator, publish, creation picker and grouped item picker, with no
   horizontal scroll at 360/768/1280px. **Not done:** a keyboard-only path and
-  light/dark screenshots; template art in the extension editor (art for
-  extension templates is not uploaded from the GUI).
+  light/dark screenshots.
+- [x] Template art in the extension editor (2026-11-21): the Templates tab
+  offers the item artwork control over the system art routes with the
+  extension's ID, enabled while the draft has no unsaved changes, and reloads
+  the draft after an art change. `system-extensions.test.ts` checks that a
+  character placing the extension item keeps its art and that the owner, not
+  another user, can read it; `extensionAuthoring.spec.ts` uploads the art in the
+  editor and sees it on the player's sheet. No server change was needed.
 
 ### E7 — Public API v1 — done 2026-11-21 (owner-approved 2026-11-21)
 

@@ -1,4 +1,5 @@
 import {namedDicePoolDocument} from "../../src/systems/implementation/package/fixtures/named-dice-pool.js";
+import { bridgeContestDocument } from "../../src/systems/implementation/package/fixtures/opposed.js";
 import { randomUUID } from "node:crypto";
 
 import type { PoolClient } from "pg";
@@ -860,6 +861,26 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     expect(finish.statusCode, finish.body).toBe(200);
     expect(finish.json().result.roll.total).toBe(child.dice.length);
     expect(await rollCount(sharedId)).toBe(2);
+  });
+
+  it("prepares and commits a targeted physical roll against another campaign character", async () => {
+    const headers={cookie:h.users.gm.cookie};
+    const created=await h.app.inject({method:"POST",url:"/systems",headers,payload:{source:{kind:"blank",name:"Physical bridge"},idempotencyKey:randomUUID()}});expect(created.statusCode,created.body).toBe(201);const w=created.json().workspace;
+    const saved=await h.app.inject({method:"PUT",url:`/systems/${w.system.systemId}/draft`,headers,payload:{expectedRevision:w.draft.revision,document:bridgeContestDocument}});expect(saved.statusCode,saved.body).toBe(200);
+    const published=await h.app.inject({method:"POST",url:`/systems/${w.system.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.0.0",releaseNotes:"",acknowledgeBreaking:true,idempotencyKey:randomUUID()}});expect(published.statusCode,published.body).toBe(200);
+    await h.pool.query("UPDATE systems SET access='public' WHERE id=$1",[w.system.systemId]);
+    const {sharedId,adoptedId}=await setup(published.json().version.versionId);
+    const url=`/characters/${sharedId}/physical-rolls`;
+    const prepare=await h.app.inject({method:"POST",url,headers:{cookie:h.users.player.cookie},payload:{kind:"executeAction",actionId:"attack",inputs:{},
+      targetCharacterId:adoptedId,expectedRevision:1,idempotencyKey:randomUUID(),audience:"campaign"}});
+    expect(prepare.statusCode,prepare.body).toBe(200);
+    const attempt=prepare.json().attempt;
+    expect(attempt?.dice).toEqual([expect.objectContaining({sides:20})]);
+    const finish=await h.app.inject({method:"POST",url:`${url}/${attempt.attemptId}/complete`,headers:{cookie:h.users.player.cookie},payload:{tick:90,
+      dice:[{id:attempt.dice[0].id,value:1,position:{x:0,y:0,z:1},orientation:{x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2}}]}});
+    expect(finish.statusCode,finish.body).toBe(200);
+    expect(finish.json().result.roll).toMatchObject({targetCharacterId:adoptedId,dice:[expect.objectContaining({value:1})],
+      bindings:[expect.objectContaining({scope:"target",definitionId:"defense"})]});
   });
 
   it.each(["expired", "revision", "membership"] as const)("rejects a physical settlement after %s changes", async (change) => {

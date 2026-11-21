@@ -493,7 +493,12 @@ const physicalSettlementBody = Type.Object({
   dice:Type.Array(Type.Object({id:Type.String({minLength:1,maxLength:256}), value:Type.Integer({minimum:1,maximum:20}),
     position:Type.Object(xyz,strict), orientation:Type.Object({...xyz,w:Type.Number()},strict)},strict),{minItems:1,maxItems:100}),
 },strict);
-const physicalAttemptDto = Type.Object({attemptId:physicalId,expiresAt:Type.String({format:"date-time"}),
+const physicalLaunchDto = Type.Object({
+  version: Type.Literal("rapier-v1"), seed: Type.Integer({minimum:0,maximum:4294967295}), startsAt: Type.String({format:"date-time"}),
+  bodies: Type.Array(Type.Object({position:Type.Object(xyz),orientation:Type.Object({...xyz,w:Type.Number()}),
+    linearVelocity:Type.Object(xyz),angularVelocity:Type.Object(xyz)}),{minItems:1,maxItems:100}),
+});
+const physicalAttemptDto = Type.Object({launch:physicalLaunchDto,attemptId:physicalId,expiresAt:Type.String({format:"date-time"}),
   audience:RollAudienceDto,dice:Type.Array(Type.Object({id:Type.String(),groupId:Type.String(),sides:Type.Integer()}))});
 const ExecuteActionBody = Type.Object({
   targetCharacterId: Type.Optional(Type.String({ format: "uuid" })),

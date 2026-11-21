@@ -5,6 +5,7 @@ import react from "@vitejs/plugin-react";
 
 import { offlineAssetsPlugin } from "./build/offline-assets.js";
 
+const diceWorker = resolve(__dirname, "src/physicalDice/worker.ts");
 const backendTarget = process.env.SWEETROLL_BACKEND_TARGET ?? "http://localhost:3000";
 const devPort = Number(process.env.WEB_PORT ?? "5173");
 const previewPort = Number(process.env.PREVIEW_PORT ?? "4173");
@@ -13,6 +14,7 @@ export default defineConfig({
   plugins: [react(), offlineAssetsPlugin()],
   resolve: {
     alias: {
+      "/dice/v1/worker.js": diceWorker,
       "@sweetroll/rules": resolve(__dirname, "../src/systems/implementation/rules/index.ts"),
     },
   },
@@ -44,11 +46,17 @@ export default defineConfig({
       "/health": { target: backendTarget },
     },
   },
-  build: { outDir: "dist", sourcemap: true },
+  build: {
+    outDir: "dist", sourcemap: true,
+    rollupOptions: {
+      input: {index:resolve(__dirname, "index.html"), diceWorker},
+      output: {entryFileNames: chunk => chunk.name === "diceWorker" ? "dice/v1/worker.js" : "assets/[name]-[hash].js"},
+    },
+  },
   test: {
     environment: "jsdom",
     setupFiles: ["./src/testing/setup.ts"],
     globals: true,
-    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**", "tests/offline/**", "tests/hosted/**"],
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**", "tests/offline/**", "tests/hosted/**", "tests/physical-dice/**"],
   },
 });

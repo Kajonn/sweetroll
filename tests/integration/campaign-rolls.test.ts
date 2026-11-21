@@ -822,6 +822,9 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     const prepare = await post(url, command);
     expect(prepare.statusCode, prepare.body).toBe(200);
     const attempt = prepare.json().attempt;
+    expect(attempt.launch).toMatchObject({ version: "rapier-v1", seed: expect.any(Number), startsAt: expect.any(String) });
+    expect(attempt.launch.bodies).toHaveLength(attempt.dice.length);
+    expect(Date.parse(attempt.launch.startsAt)).toBeLessThan(Date.parse(attempt.expiresAt));
     expect((await post(url, command)).json().attempt).toEqual(attempt);
     expect(await rollCount(sharedId)).toBe(0);
     const poses = attempt.dice.map((die: { id: string; sides: number }) => ({

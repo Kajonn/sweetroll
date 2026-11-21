@@ -60,6 +60,13 @@ jobs:
       - run: npm run build
         working-directory: web
 
+      - name: Bound physics browser dependency downloads
+        run: sudo bash scripts/ci-browser-deps.sh
+      - run: npx playwright install --with-deps chromium webkit
+        working-directory: web
+      - run: npm run test:physics
+        working-directory: web
+
   web-e2e:
     name: web-e2e (${{ matrix.name }})
     runs-on: ubuntu-latest

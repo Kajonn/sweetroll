@@ -14763,6 +14763,8 @@ export interface operations {
                                 sides: number;
                             }[];
                         } | null;
+                        /** Format: date-time */
+                        serverTime: string;
                         requestId: string;
                     };
                 };

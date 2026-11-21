@@ -33,7 +33,7 @@ export function collectOfflineAssets(bundle: OfflineBundleInput): string[] {
   for (const entry of Object.values(bundle)) {
     const fileName = entry?.fileName;
     if (typeof fileName !== "string" || fileName === "") continue;
-    if (fileName.endsWith(".map") || fileName.startsWith("dice/")) continue;
+    if (fileName.endsWith(".map") || fileName.startsWith("dice/") || fileName.startsWith("assets/DiceCanvas-")) continue;
     if (GENERATED_FILES.has(fileName)) continue;
     if (fileName.endsWith(".html")) continue;
     const extension = fileName.split(".").pop()?.toLowerCase() ?? "";

@@ -125,6 +125,12 @@ jobs:
         working-directory: web
       - run: npm run test:e2e -- --suite=${{ matrix.suite }} ${{ matrix.shard }}
         working-directory: web
+      - name: Verify shared physical dice in a live campaign
+        if: matrix.suite == 'visual'
+        run: npm run test:e2e -- --suite=journeys physicalDice.spec.ts
+        working-directory: web
+        env:
+          SWEETROLL_PHYSICAL_DICE: "true"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

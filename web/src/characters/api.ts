@@ -179,7 +179,9 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       }),
     send: async (request) =>
       expectJsonObject<CommandResultResponse>(
-        await client.fetch(request.method, request.path, { body: request.body }),
+        await client.fetch(request.method, request.physical?.path ?? request.path, {
+          body: request.physical?.settlement ?? request.body,
+        }),
       ),
     export: (characterId) =>
       client.fetch<CharacterExport>("POST", `/characters/${characterId}/exports`),

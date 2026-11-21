@@ -1,3 +1,4 @@
+import { DicePreferencesPanel } from "../physicalDice/preferences.js";
 import { PersonalTokens } from "./PersonalTokens.js";
 import { DebugOnly, DebugSettings } from "../ui/debugMode.js";
 import { Disclosure } from "../ui/Disclosure.js";
@@ -259,7 +260,10 @@ export function Account({ client, identity, storageUnavailable }: AccountProps) 
             <p>{online ? t("status.online") : t("status.offline")}</p>
             <p>{offline.available ? t("character.offline.available") : t("character.offline.unavailable")}</p>
           </Panel></Disclosure>
-          <Panel title={t("disclosure.appearance")}><AccountThemeSection client={client} /></Panel>
+          <Panel title={t("disclosure.appearance")}>
+            <AccountThemeSection client={client} />
+            {me.data.physicalDiceEnabled && online ? <DicePreferencesPanel client={client} actor={me.data.userId} online={online} /> : null}
+          </Panel>
           <Disclosure label={t("debug.tools")}><DebugSettings /></Disclosure>
         </>
       )}

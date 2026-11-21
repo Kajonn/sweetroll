@@ -1,3 +1,5 @@
+import { useMe } from "./api/hooks.js";
+import { canSimulateDice, preparePhysicalRequest, type PrepareDice } from "./physicalDice/commands.js";
 import {createCharacterSession} from "./characters/session.js";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, useParams, useRouter } from "@tanstack/react-router";
@@ -540,15 +542,37 @@ function CampaignDetailRouteView() {
   const identity = useIdentity();
   useIdentityTick(identity);
   const api = useCampaignsApi();
-  const charactersApi = useCharactersApi();
+  const baseCharactersApi = useCharactersApi();
+  const me = useMe(apiClient).data;
+  const enabled = me?.state === "authenticated" && me.userId === identity?.getActorId() && me.physicalDiceEnabled;
+  const prepare = useMemo<PrepareDice | undefined>(()=>enabled && canSimulateDice()
+    ? (request,signal)=>preparePhysicalRequest(apiClient,request,signal)
+    : undefined,[enabled]);
+  const diceLifetime = useRef<AbortController>();
+  useEffect(()=>{
+    const life = new AbortController();
+    diceLifetime.current=life;
+    return ()=>life.abort();
+  },[campaignId,identity,prepare]);
+  const charactersApi = useMemo(()=>prepare ? {
+    ...baseCharactersApi,
+    executeCharacterAction: async (characterId,actionId,body) => {
+      const signal=diceLifetime.current?.signal;
+      if(!signal) throw Error("The campaign route is closed.");
+      const frozen = await prepare({method:"POST",path:`/characters/${characterId}/actions/${encodeURIComponent(actionId)}`,
+        body,firstAttemptAt:new Date().toISOString()},signal);
+      signal.throwIfAborted();
+      return baseCharactersApi.send(frozen);
+    },
+  } satisfies ReturnType<typeof useCharactersApi> : baseCharactersApi,[baseCharactersApi,prepare]);
   const navigate = useNavigate();
   const store=useSharedCharacterStore();
   const createSession=useMemo(()=>identity&&store?((characterId:string, publishRoll?: PublishCommand)=>{
     const actorId=identity.getActorId();if(!actorId)throw new Error("Sign in to manage this character.");
     const coordination=createCoordination({actorId,characterId});
-    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID(),captureRollPublisher:()=>publishRoll});
+    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID(),captureRollPublisher:()=>publishRoll,captureDicePreparation:()=>prepare});
     return {...session,dispose(){session.dispose();coordination.dispose();}};
-  }):undefined,[identity,store,charactersApi]);
+  }):undefined,[identity,store,charactersApi,prepare]);
   if (identity === null) {
     return <p role="status">{t("character.loading")}</p>;
   }
@@ -579,6 +603,7 @@ function CampaignDetailRouteView() {
           void navigate({ to: "/characters/$characterId", params: { characterId } });
         },
       }}
+      physicalDiceClient={enabled ? apiClient : undefined}
       metadataApi={charactersApi}
       charactersApi={charactersApi}
       createSession={createSession}
@@ -668,6 +693,8 @@ function CharacterDetailRouteView() {
   const campaignEventsApi = useCampaignsApi();
   const navigate = useNavigate();
   const actorId = identity?.getActorId() ?? null;
+  const me = useMe(apiClient).data;
+  const enabled = me?.state === "authenticated" && me.userId === actorId && me.physicalDiceEnabled;
   // Coordination ownership: each effect setup owns a fresh handle (see
   // useCharacterCoordination); cleanup releases it. A disposed handle is
   // never reused, so StrictMode setup/cleanup/setup cannot wedge the lock.
@@ -689,6 +716,7 @@ function CharacterDetailRouteView() {
   return (
     <CharacterDetail
       campaignEventsApi={campaignEventsApi}
+      physicalDiceClient={enabled ? apiClient : undefined}
       characterId={characterId}
       api={api}
       store={store}

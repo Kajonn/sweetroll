@@ -1,3 +1,4 @@
+import type { PrepareDice } from "../physicalDice/commands.js";
 import { ApiError } from "../api/client.js";
 import type { CampaignRollSelection } from "./types.js";
 import type { Composition } from "./compositionChoices.js";
@@ -182,6 +183,7 @@ export type CreateCharacterSessionInput = {
   coordination: CoordinationPort;
   now: () => string;
   newId: () => string;
+  captureDicePreparation?: () => PrepareDice | undefined;
   captureRollPublisher?: () => ((response: CommandResultResponse, startedAt: string) => void) | undefined;
 };
 
@@ -272,6 +274,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   const identityGeneration = identity.getGeneration();
   const listeners = new Set<(snapshot: CharacterSnapshot) => void>();
+  const diceLifetime = new AbortController();
   const freezeWaiters = new Map<string, { resolve: () => void; reject: (err: unknown) => void }>();
   const entryWrites = new Map<string, Promise<void>>();
 
@@ -694,6 +697,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return "retry";
   }
 
+  async function maybePrepareDice(request: FrozenRequest): Promise<FrozenRequest> {
+    const prepare = confirmed?.campaignId ? input.captureDicePreparation?.() : undefined;
+    if (!prepare) return request;
+    phase = "sending";
+    emit();
+    return prepare(request, diceLifetime.signal);
+  }
+
   async function processEntry(entry: QueueEntry): Promise<SendOutcome> {
     const pendingWrite = entryWrites.get(entry.id);
     if (pendingWrite) {
@@ -720,7 +731,22 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
         return "blocked";
       }
-      const frozen = buildFrozenRequest(current);
+      let frozen = buildFrozenRequest(current);
+      if (current.intent.kind === "executeAction") {
+        try {
+          frozen = await maybePrepareDice(frozen);
+        } catch (err) {
+          if (!await identityIsCurrent() || disposed) return "blocked";
+          // Preparation has not committed a roll. Retry the exact frozen
+          // completion only after it has been recorded below.
+          if (!(err instanceof ApiError) || err.status === 404 || err.status >= 500) {
+            setBlocked("invalid", err instanceof Error ? err.message : "Could not prepare this roll.");
+            return "blocked";
+          }
+          return await handleSendError(err);
+        }
+        if (!await identityIsCurrent() || disposed || !editing.owned || !coordination.isOwner()) return "blocked";
+      }
       try {
         await store.freeze(actorId, characterId, current.id, frozen);
       } catch {
@@ -754,7 +780,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     } catch (err) {
       if (!await identityIsCurrent()) return "blocked";
       if (err instanceof ApiError && err.status === 404) {
-        await handleNotFound(err);
+        if (attempt.physical && err.cacheDisposition !== "purge") {
+          setBlocked("invalid", err.message);
+        } else await handleNotFound(err);
         return "blocked";
       }
       return await handleSendError(err);
@@ -1577,7 +1605,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (entries.length > 0 || !confirmed) {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
     }
-    const request = buildOnlineRequest(op, confirmed.reconciliation.revision);
+    let request = buildOnlineRequest(op, confirmed.reconciliation.revision);
+    if (op.operation === "push") {
+      try {
+        request = await maybePrepareDice(request);
+        assertOnlineOperationAllowed();
+      } catch (err) {
+        refreshPhase();
+        emit();
+        throw err;
+      }
+    }
     const attempt: OnlineAttempt = {
       id: newId(),
       actorId,
@@ -1875,6 +1913,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   function dispose() {
     if (disposed) return;
     disposed = true;
+    diceLifetime.abort();
     if (retryTimer !== null) {
       clearTimeout(retryTimer);
       retryTimer = null;

@@ -104,7 +104,13 @@ With the server flag enabled, the browser can open `GET /api/campaigns/:id/physi
 
 The stream removes an expired or newly inaccessible attempt with `roll.removed`. Session revocation, member removal or membership generation changes revoke the stream. A five-second check covers policy changes and missed notifications. The server caps open streams per process and ends slow connections so they can reconnect for a fresh snapshot. Roll history remains the durable fallback and no per-tick physics data crosses the network.
 
-The partial account preferences API adds `show_3d_dice` and `dice_color`. With the flag enabled, the default is `true` and `#4c79c9`. Colors use six-digit hex and are snapped at preparation. The browser still needs the preference controls, reduced-motion handling, event consumer, roll submission orchestration and Three.js overlay.
+The partial account preferences API adds `show_3d_dice` and `dice_color`. With the flag enabled, the default is `true` and `#4c79c9`. Colors use six-digit hex and are snapped at preparation. ### Slice 4 browser implementation record
+
+Campaign sheet roll and push buttons and the GM Session board use the physical flow when the server advertises the feature and the browser supports workers and WASM. Unsupported expressions use the existing roll command when preparation returns a null attempt. Character sessions persist the settled poses and attempt URL together before sending completion. A retry uses that exact settlement with the same attempt ID.
+
+Account appearance settings control animation and dice color. Spectators use the campaign stream when animations are enabled and reduced motion is off. The roller simulates headlessly when 3D is hidden. The transparent canvas fits the fixed tray, accepts no input and displays the server’s accepted settled poses briefly. At most two throws are rendered at once and completed roll cards follow the existing activity and command paths. The production physics worker and dice renderer are loaded on demand.
+
+The browser journey runs with physical dice explicitly enabled. It uses separate browser contexts to verify the account controls, a hidden-animation roller, a spectator’s responsive WebGL canvas and one result card per client. The hosted acceptance journey and testing on physical mobile devices remain separate.
 
 ## Appendix A · Measured normals for the numbered models
 

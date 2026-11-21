@@ -10,6 +10,9 @@ export type FrozenRequest = {
   path: string;
   body: Record<string, unknown> & { idempotencyKey: string };
   firstAttemptAt: string;
+  /** Complete this exact physical throw on every retry. The ordinary path
+   * and body still identify the underlying action to the character queue. */
+  physical?: {path:string; settlement:import("../../../src/characters/physical-rolls.js").Settlement};
 };
 
 export type EntrySource = NonNullable<AddCharacterEntryBody["entry"]["source"]>;

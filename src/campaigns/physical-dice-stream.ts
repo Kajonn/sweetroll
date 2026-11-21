@@ -7,6 +7,7 @@ import type { PhysicalDie } from "../systems/physical-dice/resolution.js";
 import type { DiceLaunch } from "../systems/physical-dice/launch.js";
 
 export type RollStarted = {
+  serverTime: string;
   attemptId: string;
   actorId: string;
   characterId: string;
@@ -178,6 +179,7 @@ export function createPhysicalDiceStreams({
             const { id: attemptId, actorId, characterId, expiresAt, launch, color, dice } = roll;
             write(
               event("roll.started", {
+                serverTime: new Date().toISOString(),
                 attemptId,
                 actorId,
                 characterId,

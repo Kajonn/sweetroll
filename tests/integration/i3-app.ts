@@ -158,7 +158,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     authHook,
   });
 
-  void app.register(buildIdentityRoutes({ identity, cookieName: "session", secure: false }));
+  void app.register(buildIdentityRoutes({ identity, physicalDiceEnabled: input.physicalDiceEnabled ?? false, cookieName: "session", secure: false }));
   void app.register(buildSystemsRoutes({ authoring, extensions }));
   void app.register(buildCharactersRoutes({ characters }));
   void app.register(

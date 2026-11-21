@@ -10655,6 +10655,13 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "show_3d_dice": {
+                      "type": "boolean"
+                    },
+                    "dice_color": {
+                      "pattern": "^#[0-9A-Fa-f]{6}$",
+                      "type": "string"
                     }
                   }
                 }
@@ -10727,6 +10734,13 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "show_3d_dice": {
+                    "type": "boolean"
+                  },
+                  "dice_color": {
+                    "pattern": "^#[0-9A-Fa-f]{6}$",
+                    "type": "string"
                   }
                 }
               }
@@ -10766,6 +10780,13 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "show_3d_dice": {
+                      "type": "boolean"
+                    },
+                    "dice_color": {
+                      "pattern": "^#[0-9A-Fa-f]{6}$",
+                      "type": "string"
                     }
                   }
                 }
@@ -49012,6 +49033,7 @@
                           "type": "object",
                           "required": [
                             "launch",
+                            "color",
                             "attemptId",
                             "expiresAt",
                             "audience",
@@ -49137,6 +49159,10 @@
                                   }
                                 }
                               }
+                            },
+                            "color": {
+                              "pattern": "^#[0-9A-Fa-f]{6}$",
+                              "type": "string"
                             },
                             "attemptId": {
                               "format": "uuid",
@@ -134717,6 +134743,249 @@
             }
           },
           "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaigns/{id}/physical-rolls/events": {
+      "get": {
+        "operationId": "get_campaigns_id_physical_roll_events",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "description": "Campaign member SSE. roll.started carries the attempt ID, actor, ordered dice and launch state. roll.finished carries the attempt ID, committed roll ID and final poses. roll.removed clears an expired or inaccessible attempt. revoked closes the stream.",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "error",
+                    "requestId"
+                  ],
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "required": [
+                        "code",
+                        "message"
+                      ],
+                      "properties": {
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "latestRevision": {
+                          "anyOf": [
+                            {
+                              "type": "integer"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "requestId": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
             "content": {
               "application/json": {
                 "schema": {

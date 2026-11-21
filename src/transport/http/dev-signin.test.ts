@@ -1,3 +1,4 @@
+import { defaultPreferences } from "../../identity/repository.js";
 import cookie from "@fastify/cookie";
 import Fastify from "fastify";
 import { describe, expect, it } from "vitest";
@@ -14,8 +15,8 @@ const buildIdentity = (): Identity => ({
   resolveSession: async () => ({ state: "anonymous" }),
   signOut: async () => ({ ok: true, value: undefined }),
   getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: null }),
-  setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    getPreferences: async () => ({ ok: true, value: defaultPreferences }),
+  patchPreferences: async (_actorId, patch) => ({ ok: true, value: { ...defaultPreferences, ...patch } }),
 });
 
 async function buildApp(nodeEnv: "development" | "production" | "test") {

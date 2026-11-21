@@ -72,6 +72,9 @@ export async function campaignTemplateReviewJourney(
     await page.getByRole("checkbox", { name: /Campaign item/ }).check();
     await page.getByRole("button", { name: "Discard", exact: true }).click();
     await page.getByRole("button", { name: "Confirm discard", exact: true }).click();
+    // The discard persists asynchronously. Reloading first can restore the
+    // old conflict and leave the template picker disabled.
+    await expect(page.getByText(/campaign template has changed/)).toHaveCount(0);
     const recovered = (await post(gm.request, `/api/campaigns/${campaignId}/item-templates/${template.templateId}/recover`, { expectedTemplateRevision: 2, idempotencyKey: uid() })).template;
     await page.reload();
     await page.getByTestId("slot-add-inventory").click();

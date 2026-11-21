@@ -1,4 +1,6 @@
 import {namedDicePoolDocument} from "../../src/systems/implementation/package/fixtures/named-dice-pool.js";
+import { createPhysicalDiceStreams } from "../../src/campaigns/physical-dice-stream.js";
+import { createSceneEventHub, notifySceneEvent } from "../../src/campaigns/scene-events.js";
 import { bridgeContestDocument } from "../../src/systems/implementation/package/fixtures/opposed.js";
 import { randomUUID } from "node:crypto";
 
@@ -813,6 +815,62 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
     const published=await h.app.inject({method:"POST",url:`/systems/${w.system.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.0.0",releaseNotes:"",acknowledgeBreaking:true,idempotencyKey:randomUUID()}});expect(published.statusCode,published.body).toBe(200);
     await h.pool.query("UPDATE systems SET access='public' WHERE id=$1",[w.system.systemId]);return setup(published.json().version.versionId);
   }
+  it("streams a private physical roll only to the roller and recovers a pending start on reconnect", async () => {
+    const { sharedId, campaignId } = await setup();
+    const hub = createSceneEventHub({connection:{connectionString:databaseUrl!}});
+    const live = createPhysicalDiceStreams({pool:h.pool,hub,refreshMs:60000});
+    try {
+      await hub.start();
+      const sessionFor = async (actor:TestActor) => (await h.pool.query<{id:string}>(
+        "SELECT id FROM sessions WHERE user_id=$1 AND revoked_at IS NULL",[actor.actorId])).rows[0]!.id;
+      const playerSession = await sessionFor(h.users.player);
+      const roller = await live.open(campaignId,h.users.player.actorId,playerSession);
+      const observer = await live.open(campaignId,h.users.gm.actorId,await sessionFor(h.users.gm));
+      expect(await live.open(campaignId,h.users.outsider.actorId,await sessionFor(h.users.outsider)))
+        .toMatchObject({ok:false,status:404});
+      if (!roller.ok || !observer.ok) throw Error("failed to open campaign streams");
+      const events:string[] = [];
+      const unseen:string[] = [];
+      let drain = () => { throw Error("The stream did not apply backpressure."); };
+      roller.value.attach({
+        write:chunk=>{events.push(chunk);return !chunk.startsWith("event: roll.started");},
+        onDrain(callback){drain=callback;},
+        end(){},
+      });
+      observer.value.attach({write:chunk=>{unseen.push(chunk);return true;},onDrain(){},end(){}});
+      const headers = {cookie:h.users.player.cookie};
+      const url = `/characters/${sharedId}/physical-rolls`;
+      const state = {kind:"executeAction",actionId:"check",inputs:{bonus:2},expectedRevision:1,
+        audience:"owner_only",idempotencyKey:randomUUID()};
+      const updateColor = (dice_color:string) => h.app.inject({method:"PATCH",url:"/me/preferences",headers,payload:{dice_color}});
+      expect((await updateColor("#f26849")).statusCode).toBe(200);
+      const prepared = await h.app.inject({method:"POST",url,headers,payload:state});
+      expect(prepared.statusCode,prepared.body).toBe(200);
+      const {attempt} = prepared.json();
+      expect(attempt.color).toBe("#f26849");
+      expect((await updateColor("#335599")).statusCode).toBe(200);
+      await expect.poll(()=>events.filter(line=>line.startsWith("event: roll.started")).length).toBe(1);
+      const again = await live.open(campaignId,h.users.player.actorId,playerSession);
+      if (!again.ok) throw Error("failed to reopen campaign stream");
+      const recovered:string[]=[];
+      again.value.attach({write:chunk=>{recovered.push(chunk);return true;},onDrain(){},end(){}});
+      expect(recovered.join("")).toContain(attempt.attemptId);
+      expect(recovered.join("")).toContain("#f26849");
+      const settle = {tick:100,dice:attempt.dice.map((die:{id:string})=>({id:die.id,value:1,
+        position:{x:1,y:0,z:1},orientation:{x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2}}))};
+      const finish = await h.app.inject({method:"POST",url:`${url}/${attempt.attemptId}/complete`,headers,payload:settle});
+      expect(finish.statusCode,finish.body).toBe(200);
+      drain();
+      await expect.poll(()=>events.filter(line=>line.startsWith("event: roll.finished")).length).toBe(1);
+      expect(events.join("")).toContain(finish.json().result.rollId);
+      expect(unseen.join("")).not.toContain(attempt.attemptId);
+      expect(events.filter(line=>line.startsWith("event: roll.started"))).toHaveLength(1);
+      await h.pool.query("UPDATE campaign_members SET status='removed' WHERE campaign_id=$1 AND user_id=$2",[campaignId,h.users.player.actorId]);
+      await notifySceneEvent(h.pool,{kind:"campaign",campaignId});
+      await expect.poll(()=>events.some(line=>line.startsWith("event: revoked"))).toBe(true);
+    } finally { live.close(); await hub.close(); }
+  });
+
   it("commits a physical campaign pool once and pushes only eligible dice", async () => {
     const { sharedId } = await setupPushCampaign();
     const url = `/characters/${sharedId}/physical-rolls`;

@@ -1,3 +1,4 @@
+import { defaultPreferences } from "../../identity/repository.js";
 import { describe, expect, it } from "vitest";
 import Fastify from "fastify";
 
@@ -20,8 +21,8 @@ const testIdentity: Identity = {
   resolveSession: async () => ({ state: "anonymous" }),
   signOut: async () => ({ ok: true, value: undefined }),
   getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: null }),
-  setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    getPreferences: async () => ({ ok: true, value: defaultPreferences }),
+  patchPreferences: async (_actorId, patch) => ({ ok: true, value: { ...defaultPreferences, ...patch } }),
 };
 
 describe("buildOpenApiDocument", () => {
@@ -88,6 +89,7 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/item-templates/{templateId}/sharing",
       "/campaigns/{id}/members",
       "/campaigns/{id}/members/{userId}",
+      "/campaigns/{id}/physical-rolls/events",
       "/campaigns/{id}/recover",
       "/campaigns/{id}/scenes",
       "/characters",

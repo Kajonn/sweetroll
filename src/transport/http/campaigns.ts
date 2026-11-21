@@ -1,3 +1,4 @@
+import type { PhysicalDiceStreams } from "../../campaigns/physical-dice-stream.js";
 import { PassThrough } from "node:stream";
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
 import { campaignItemImageHandlers, campaignItemImageRoutes } from "./campaignItemImages.js";
@@ -38,6 +39,7 @@ import {
 import type { Identity } from "../../identity/index.js";
 
 export type BuildCampaignsRoutesInput = {
+  physicalDiceStreams?: PhysicalDiceStreams;
   identity: Pick<Identity, "getDisplayNames">;
   campaigns: Campaigns;
   /** Full-sheet composer for post-commit placement reads (same projection as standalone reads). */
@@ -1581,6 +1583,25 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
   },
   {
     method: "get",
+    path: "/campaigns/:id/physical-rolls/events",
+    operationId: "get_campaigns_id_physical_roll_events",
+    schema: {
+      params: CampaignIdParams,
+      response: {
+        "200": {
+          schema: Type.String({description: "Campaign member SSE. roll.started carries the attempt ID, actor, ordered dice and launch state. roll.finished carries the attempt ID, committed roll ID and final poses. roll.removed clears an expired or inaccessible attempt. revoked closes the stream."}),
+          mediaType: "text/event-stream",
+        },
+        "400": CampaignErrorEnvelope,
+        "401": CampaignErrorEnvelope,
+        "404": CampaignErrorEnvelope,
+        "429": CampaignErrorEnvelope,
+        "503": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "get",
     path: "/displays/:id/scenes/:sceneId/events",
     operationId: "get_displays_id_scenes_sceneId_events",
     schema: {
@@ -1651,7 +1672,7 @@ function toFastifyResponses(response: Record<string, RouteResponse> | undefined)
 }
 
 export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => FastifyPluginCallback =
-  ({ campaigns, characters, runtime, identity }) =>
+  ({ campaigns, characters, runtime, identity, physicalDiceStreams }) =>
   async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
@@ -1669,6 +1690,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
     // Long-lived display streams would otherwise hold server.close() open.
     app.addHook("preClose", async () => {
       // Contract generation builds routes over a stub module.
+      physicalDiceStreams?.close();
       if (typeof campaigns.closeDisplayStreams === "function") campaigns.closeDisplayStreams();
     });
 
@@ -2789,6 +2811,34 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         const result = await campaigns.redeemDisplayCode({ code: body.code });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return { display: result.value, requestId: request.id };
+      },
+
+      get_campaigns_id_physical_roll_events: async (request, reply) => {
+        const { id } = request.params as {id:string};
+        const opened = request.auth.state === "authenticated"
+          ? await physicalDiceStreams?.open(id, request.auth.actorId, request.auth.sessionId)
+          : undefined;
+        if (!opened || !opened.ok) {
+          const status = opened?.status ?? 404;
+          const error = status === 429 ? {code:"rate_limited",message:"Too many open dice streams."}
+            : status === 503 ? {code:"temporarily_unavailable",message:"Live dice events are unavailable."}
+            : {code:"not_found",message:"Campaign dice stream not found."};
+          if (status !== 404) reply.header("retry-after","2");
+          return reply.code(status).send({error,requestId:request.id});
+        }
+        if (reply.raw.destroyed) {
+          opened.value.close();
+          return reply;
+        }
+        const body = new PassThrough();
+        reply.raw.once("close",opened.value.close);
+        body.once("close",opened.value.close);
+        body.once("error",opened.value.close);
+        reply.type("text/event-stream; charset=utf-8")
+          .header("x-accel-buffering","no").header("x-content-type-options","nosniff");
+        body.write(": open\n\n");
+        opened.value.attach({write:chunk=>body.write(chunk),onDrain:callback=>{body.once("drain",callback);},end:()=>body.end()});
+        return reply.send(body);
       },
 
       get_displays_id_scenes_sceneId_events: async (request, reply) => {

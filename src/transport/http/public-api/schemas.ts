@@ -122,12 +122,20 @@ export const creationOptions = object({
       SingleChoiceFieldV1Schema, MultiChoiceFieldV1Schema, ResourceFieldV1Schema,
     ])),
   })),
+  extensions: Type.Optional(Type.Array(object({ extensionId: uuid, name: text, versionId: uuid, semanticVersion: text }), {
+    maxItems: 100,
+    description: "Owned and public extensions of the system, at their latest version, that fit this version (design 6.8).",
+  })),
 });
 export const createCharacter = object({
   systemVersionId: uuid, entityDefinitionId: definitionId,
   name: Type.String({ minLength: 1, maxLength: 120, pattern: "\\S" }),
   initialValues: Type.Optional(values),
   presetId: Type.Optional({ ...definitionId, description: "A ready-made character of the entity; its values are copied, then initialValues apply." }),
+  extensions: Type.Optional(Type.Array(object({ extensionId: uuid, versionId: uuid }), {
+    maxItems: 16,
+    description: "Extension versions of the same system to build the character on; one version per extension (design 6.8).",
+  })),
   idempotencyKey: key,
 });
 export const characterId = object({ characterId: uuid });
@@ -151,8 +159,10 @@ export const entryId = object({ characterId: uuid, entryId: uuid });
 export const addEntry = object({
   ...entryProperties, values: Type.Optional(values), ...revisionCommand,
   source: Type.Optional(Type.Union(EntrySourceSchema.anyOf, {
-    description: "Campaign items: send the source from GET /characters/{characterId}/templates with a null templateId and no values or quantity.",
+    description: "Campaign items: send the source from GET /characters/{characterId}/templates with a null templateId and no values or quantity. "
+      + "Extension items: send the template's source and the same extensionId.",
   })),
+  extensionId: Type.Optional({ ...uuid, description: "The extension of the template, for items from an extension of the character's composition (design 6.8)." }),
 });
 export const updateEntry = object({
   slotId: Type.Optional(definitionId), values: Type.Optional(values), quantity: Type.Optional(quantity),
@@ -214,7 +224,7 @@ export const characterSheet = object({
   campaign: Type.Union([characterPlacement, Type.Null()], { description: "Campaign placement; null for standalone characters." }),
   extensions: Type.Array(object({ extensionId: uuid, versionId: uuid }), {
     maxItems: 16,
-    description: "Extension versions the character is built on, in addition to systemVersionId. Read-only in v1.",
+    description: "Extension versions the character is built on, in addition to systemVersionId. Change them with the composition routes.",
   }),
   values,
   entries: Type.Array(entry),

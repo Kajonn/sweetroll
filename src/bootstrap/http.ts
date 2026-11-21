@@ -185,7 +185,7 @@ registerApiRoutes(app, [
   buildCharactersRoutes({ characters }),
   buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
 ], serveStatic, { pool });
-void app.register(buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime }), { prefix: publicApiPrefix });
+void app.register(buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime, extensions: extensionAuthoring }), { prefix: publicApiPrefix });
 void app.register(
   buildDevSignInRoutes({
     identity,

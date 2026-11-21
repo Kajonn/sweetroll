@@ -371,16 +371,33 @@ Follow the [GUI integration plan](2026-09-08-gui-integration.md) gates.
   light/dark screenshots; template art in the extension editor (art for
   extension templates is not uploaded from the GUI).
 
-### E7 — Public API v1 (owner-approved 2026-11-21)
+### E7 — Public API v1 — done 2026-11-21 (owner-approved 2026-11-21)
 
 **Owner instruction (2026-11-21):** "I approve e7". Writing compositions and
-publishing extensions through `/api/v1` is in scope; the approach is recorded
-here before implementation.
+publishing extensions through `/api/v1` is in scope.
 
-- [ ] Read-only: `composition` on v1 character and campaign responses (this
-  stage's read part is included in E3/E4).
-- [ ] Not in this plan: creating/upgrading compositions or publishing extensions
-  through `/api/v1`.
+- [x] Read: `extensions` on v1 character sheets (E3); creation options list the
+  extensions that fit the version.
+- [x] Authoring (`systems:read`/`systems:write`): `GET`/`POST
+  /systems/{systemId}/extensions`, `GET /extensions/{extensionId}`, `PUT …/draft`,
+  `POST …/preview`, `POST …/publish`. Sharing, archive and deletion use the
+  system routes with the extension ID (as in the browser API).
+- [x] Characters (`characters:read`/`characters:write`): `extensions` on
+  `POST /characters`; `extensionId` and `source` on `POST …/entries`;
+  `GET …/composition-options`, `POST …/composition-check`,
+  `POST …/composition` (returns the character ID and revision).
+- [x] Campaigns (`campaigns:read`/`campaigns:write`, GM and co-GM):
+  `GET /campaigns/{campaignId}/composition-options`, `POST …/composition-check`,
+  `POST …/composition` (returns the campaign ID, revision and base version).
+  No separate add/remove extension routes: the composition command adds and
+  removes one extension at a time.
+- [x] Contract `docs/contracts/public-api-v1.json`, API guide section
+  "Extensions and rules changes", scenario `tests/integration/scenarios/extensions.test.ts`
+  (author with an invalid then valid draft, preview, publish, share; another
+  account cannot open or publish it; a hero built on the extension places and
+  rolls its item; extension upgrade following the changed default, removal
+  blocked by the item, revert; a GM adds the extension to a campaign; a token
+  without campaign scopes is refused).
 
 ### E8 — Acceptance
 

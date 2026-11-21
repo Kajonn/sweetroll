@@ -19,6 +19,8 @@ import { createRouter, errorStatuses, failure, imageBodyLimit, map, packageDiagn
 import { registerSceneRoutes } from "./scenes.js";
 import * as s from "./schemas.js";
 import { registerSystemRoutes } from "./systems.js";
+import { extensionSchemas, registerExtensionRoutes } from "./extensions.js";
+import type { ExtensionAuthoring } from "../../../systems/extensions.js";
 import { characterMutation, characterSheet } from "./views.js";
 
 export const publicApiPrefix = "/api/v1";
@@ -47,6 +49,7 @@ const outputSchemas = {
   CharacterPage: s.characterPage, CharacterSheet: s.characterSheet, CharacterMutation: s.characterMutation,
   ImageState: s.imageState, PortraitState: s.portraitState, SystemExport: SystemExportV1Schema, Preview: s.preview,
   ...cs.outputSchemas,
+  ...extensionSchemas,
 };
 export type OutputName = keyof typeof outputSchemas;
 
@@ -64,6 +67,8 @@ const openApiPackageSchemas = {
 type Dependencies = {
   identity: Identity; authoring: SystemAuthoring; characters: Characters; pool: Pool;
   campaigns: Campaigns; runtime: SystemRuntime;
+  /** Design 6.8 (E7): extension authoring; the extension routes are absent without it. */
+  extensions?: ExtensionAuthoring;
 };
 
 function assessment({ ok, diagnostics }: ReturnType<SystemAuthoring["validateDocument"]>) {
@@ -85,7 +90,7 @@ function workspace(value: AuthoringWorkspace) {
   };
 }
 
-export function buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime }: Dependencies): FastifyPluginAsync {
+export function buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime, extensions }: Dependencies): FastifyPluginAsync {
   return async (app) => {
     app.addHook("onRequest", async (_request, reply) => {
       reply.header("cache-control", "no-store");
@@ -193,13 +198,7 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
       method: "GET", path: "/characters/creation-options", id: "getCharacterCreationOptions",
       description: "Read entity types and writable initial fields for a usable exact version, including known link-only versions.",
       scope: "characters:read", input: { querystring: s.creationOptionsQuery }, output: "CreationOptions",
-    }, async (ctx, { query }) => {
-      // The browser's extension picker list is not part of v1 (extensions plan E7).
-      const result = await characters.creationOptions(ctx, { ...query, includeFields: true });
-      if (!result.ok) return result;
-      const { extensions: _extensions, ...options } = result.value;
-      return { ok: true as const, value: options };
-    });
+    }, (ctx, { query }) => characters.creationOptions(ctx, { ...query, includeFields: true }));
 
     route({
       method: "GET", path: "/characters", id: "listCharacters", description: "List standalone characters owned by the account.",
@@ -345,6 +344,7 @@ export function buildPublicApi({ identity, authoring, characters, pool, campaign
     registerCharacterRoutes(route, { characters });
     registerCampaignRoutes(route, { campaigns, characters, runtime, identity });
     registerSceneRoutes(route, { campaigns });
+    if (extensions !== undefined) registerExtensionRoutes(route, { extensions, characters, campaigns });
 
     paths["/openapi.json"] = { get: {
       operationId: "getOpenApiDocument", description: "Download the public API contract.",

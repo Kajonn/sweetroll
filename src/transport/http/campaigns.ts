@@ -561,7 +561,7 @@ const ExportCampaignBody = Type.Object({
 
 const CampaignIdParams = Type.Object({ id: Type.String({ format: UUID_FORMAT }) });
 // Design 6.7/6.8 (extensions plan E5): campaign composition changes.
-const CampaignVersionCheckDto = Type.Object({
+export const CampaignVersionCheckDto = Type.Object({
   revision: Type.Integer(),
   direction: VersionChangeDirectionDto,
   change: CompositionChangeDto,

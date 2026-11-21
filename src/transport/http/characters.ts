@@ -699,7 +699,7 @@ export const VersionChangeReportDto = Type.Object({
   })),
   validations: Type.Array(RuntimeValidationDto),
 });
-const CharacterVersionCheckDto = Type.Object({
+export const CharacterVersionCheckDto = Type.Object({
   revision: Type.Integer(),
   direction: VersionChangeDirectionDto,
   change: CompositionChangeDto,

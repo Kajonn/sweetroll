@@ -181,7 +181,7 @@ export async function buildI6Harness(input?: {
         browser,
         buildPersonalTokenRoutes({ identity }),
         (app, _opts, done) => {
-          void app.register(buildPublicApi({ identity, authoring, characters, runtime, campaigns, pool }), { prefix: publicApiPrefix });
+          void app.register(buildPublicApi({ identity, authoring, characters, runtime, campaigns, pool, extensions }), { prefix: publicApiPrefix });
           done();
         },
       ];

@@ -552,6 +552,11 @@ offers the system's extensions that fit the chosen version; campaigns add them
 in Settings. The item picker groups templates by origin (rules, each extension,
 campaign, your own). Cached item templates are keyed by the composed rules.
 
+**Public API (E7, owner-approved 2026-11-21).** `/api/v1` offers the same
+extension authoring, creation with extensions, extension items and composition
+options, check and change for characters and campaigns, under the systems,
+characters and campaigns scopes (docs/api/v1.md).
+
 **Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
 discovering and previewing published extensions. It depends on OD-07 and needs its
 own plan and approval.

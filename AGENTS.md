@@ -122,6 +122,6 @@ the character and campaign `version-*` routes with `composition-options`,
 `composition-check` and `composition`: one change per command (base upgrade, or
 add/remove/upgrade one extension) or a revert to the previous composition.
 E6 (GUI) is implemented except a keyboard-only path, light/dark checks and
-extension template art (see the plan). E4b is deferred. The owner approved E7
-(extensions and compositions through `/api/v1`) on 2026-11-21; it is not built
-yet. The E8 journeys are open.
+extension template art (see the plan). E7 (owner-approved 2026-11-21) is
+implemented: extension authoring and composition changes through `/api/v1`.
+E4b is deferred. The E8 journeys are open.

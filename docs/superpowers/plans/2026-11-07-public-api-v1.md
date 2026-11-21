@@ -322,3 +322,16 @@ with `--no-scene` because no image scanner was available locally.
 - [Personal access tokens](https://github.com/Kajonn/sweetroll/blob/main/src/identity/personal-tokens.ts)
 - [OpenAPI and client type generation](https://github.com/Kajonn/sweetroll/blob/main/scripts/generate-system-contracts.ts)
 - [Application and database release policy](https://github.com/Kajonn/sweetroll/blob/main/docs/superpowers/plans/2026-10-27-application-migration-policy.md)
+
+### Later additions (2026-11-21)
+
+These came from other approved plans and use the scopes above unchanged:
+
+- SRD gaps plan (S2, S3, S6): reference-data reads, `presetId` on creation,
+  `apply-roll` and `applicable-rolls`.
+- System extensions plan, stage E7 (owner-approved 2026-11-21): extension
+  authoring under `/systems/{systemId}/extensions` and `/extensions/{extensionId}`;
+  `extensions` on character creation and creation options; `extensionId` on
+  entries; `composition-options`, `composition-check` and `composition` for
+  characters and campaigns. See the API guide section "Extensions and rules
+  changes" and `tests/integration/scenarios/extensions.test.ts`.

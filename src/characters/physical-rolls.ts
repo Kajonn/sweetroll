@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { createDiceLaunch, type DiceLaunch } from "../systems/physical-dice/launch.js";
+import { randomBytes, randomUUID } from "node:crypto";
 import type { Pool, PoolClient } from "pg";
 import type {
   CharacterActionCommand,
@@ -40,6 +41,7 @@ type Scope = {
   defaultAudience: RollAudience;
 };
 type Attempt = {
+  launch: DiceLaunch;
   attemptId: string;
   expiresAt: string;
   dice: PhysicalDie[];
@@ -55,6 +57,7 @@ type Preparation = {
   defaultAudience: RollAudience;
 };
 type Row = {
+  launch: DiceLaunch;
   id: string;
   campaign_id: string;
   preparation: Preparation;
@@ -231,10 +234,12 @@ export function createPhysicalRolls({
         contextHash: hashInput(context ?? null),
       };
       const hash = hashInput(command);
+      const preparedAt = now().getTime();
+      const launch = createDiceLaunch(draws.dice.length, randomBytes(4).readUInt32LE(), new Date(preparedAt + 200));
       await pool.query(
         `INSERT INTO physical_roll_attempts
-         (id, actor_id, character_id, campaign_id, idempotency_key, input_hash, preparation, expires_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT (actor_id,idempotency_key) DO NOTHING`,
+         (id, actor_id, character_id, campaign_id, idempotency_key, input_hash, preparation, expires_at, launch)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (actor_id,idempotency_key) DO NOTHING`,
         [
           attemptId,
           ctx.actorId,
@@ -243,7 +248,8 @@ export function createPhysicalRolls({
           command.idempotencyKey,
           hash,
           preparation,
-          new Date(now().getTime() + 60_000),
+          new Date(preparedAt + 60_000),
+          launch,
         ],
       );
       const {
@@ -283,6 +289,7 @@ export function createPhysicalRolls({
         ok: true,
         value: {
           attemptId: row.id,
+          launch: row.launch,
           expiresAt: row.expires_at.toISOString(),
           dice: row.preparation.dice,
           audience,

@@ -988,6 +988,30 @@ describe("CharacterSession", () => {
     await store.close();
   });
 
+  it("queues an offline item edit while a failed refresh pauses synchronization", async () => {
+    const { api, identity, store, session } = await makeHarness();
+    try {
+      await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+      api.scriptOpenError(new TypeError("Connectivity dropped during refresh"));
+      await session.open();
+      expect(session.getSnapshot().error?.kind).toBe("network-unavailable");
+      identity.online = false;
+      identity.signal();
+      await session.updateEntryValues("entry-9", { name: "Stone" });
+      await session.whenIdle();
+      expect((await store.read(ARM,"char-1")).entries).toHaveLength(1);
+      expect(api.sent).toEqual([]);
+
+      api.scriptOpenView(viewFor("char-1", 1));
+      api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+      identity.online = true;
+      identity.signal();
+      await session.whenIdle();
+      expect(api.sent).toHaveLength(1);
+      expect((await store.read(ARM,"char-1")).entries).toHaveLength(0);
+    } finally { session.dispose(); await store.close(); }
+  });
+
   it("queues entry intents offline and drains them to the entry routes on reconnect", async () => {
     const { api, identity, store, session } = await makeHarness();
     await seedConfirmed(store, "char-1", viewFor("char-1", 1));

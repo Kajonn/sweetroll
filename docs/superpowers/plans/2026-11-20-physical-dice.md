@@ -86,6 +86,18 @@ Only the initiating actor can post `{tick, dice}` to `/characters/:characterId/p
 
 The mixed-pose regression uses a d6 showing 3 and a d8 showing 7 for a total of 12 with a +2 modifier. Integration tests exercise actor binding, idempotency, concurrent completion, group success counts, a push, expiry, stale revisions and membership changes. Slice 3 supplies the versioned launch state and deterministic physics worker. Slice 4 connects it to event delivery, preferences and rendering.
 
+### Slice 3 implementation record
+
+Preparation stores a server-generated 32-bit seed, scheduled start time and ordered float32 body states in the same row as the attempt. A retry returns the saved launch. Each body corresponds by index to one prepared die. The server runs no physics ticks.
+
+The gated module worker at `/dice/v1/worker.js` pins `@dimforge/rapier3d-deterministic-compat@0.21.0`, the v1 assets and the `rapier-v1` simulation settings. Its Z-up tray spans 24 by 18 world units. Apply a uniform 0.6 scale to the original models to match the colliders. Any change affecting the replay must update the simulation version and checkpoint fixtures together.
+
+Start one worker per attempt with `{type:"start", dice:attempt.dice, launch:attempt.launch}`. On its initial frame, advance it with `{type:"advance", tick}`. A viewer can derive its target tick from elapsed time since `launch.startsAt` at 60 Hz. Each response advances up to 120 ticks toward that target. The `frame` contains the actual tick and ordered poses. The `settled` frame contains all readings for completion. An `unsettled` frame or a worker error ends the attempt without supplying a result. Terminate the worker on cancellation or after the final frame. Screen size and inter-frame time never enter the physics calculation.
+
+A body must stay slow and aligned for 18 consecutive ticks. A slow, unreadable die gets a deterministic rethrow after 30 ticks, up to three retries. The hard limit is 1,200 ticks. Only the roller submits; camera fitting, visual interpolation and audience delivery belong to slice 4.
+
+The regression suite covers each of the six shapes, a mixed pool and a 20-die throw. Its checkpoints hash Rapier's serialized world and the settling counters at the start, ticks 12, 30 and 72, and the final tick. The production worker is exercised through desktop Chromium, mobile-emulated Chromium and mobile-emulated WebKit with different frame schedules and a resize. Run `npm run web:build` and `npm --prefix web run test:physics` after installing the Playwright Chromium and WebKit browsers. Physical Android Chrome and iOS Safari measurements remain an open acceptance gate.
+
 ## Appendix A · Measured normals for the numbered models
 
 These vectors are in the **unmodified OBJ local frame** and point outward from the physical face. They were calculated from the six numbered Vtrpg OBJ meshes at `0050784`. For each model, group near-coplanar convex-hull facets by outward direction, select the large physical faces, and refine their directions with area-weighted coplanar white body triangles. Project the black numeral geometry onto each face to associate that plane with its actual engraving. Vertex shading normals, engravings and bevels do not define separate die faces. Pin the model revision with the table. If the build converts, scales non-uniformly or rotates a model, bake the matching normal transform and collider alignment during import.

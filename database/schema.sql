@@ -820,6 +820,7 @@ CREATE TABLE physical_roll_attempts (
   idempotency_key text NOT NULL,
   input_hash text NOT NULL,
   preparation jsonb NOT NULL,
+  launch jsonb NOT NULL,
   expires_at timestamptz NOT NULL,
   settled jsonb,
   execution_id uuid,

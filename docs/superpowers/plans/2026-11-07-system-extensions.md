@@ -371,7 +371,11 @@ Follow the [GUI integration plan](2026-09-08-gui-integration.md) gates.
   light/dark screenshots; template art in the extension editor (art for
   extension templates is not uploaded from the GUI).
 
-### E7 — Public API v1 (separate approval)
+### E7 — Public API v1 (owner-approved 2026-11-21)
+
+**Owner instruction (2026-11-21):** "I approve e7". Writing compositions and
+publishing extensions through `/api/v1` is in scope; the approach is recorded
+here before implementation.
 
 - [ ] Read-only: `composition` on v1 character and campaign responses (this
   stage's read part is included in E3/E4).

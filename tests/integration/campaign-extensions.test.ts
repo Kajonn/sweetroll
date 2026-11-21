@@ -183,8 +183,11 @@ describeWithDatabase("Campaigns built with extensions (E4)", () => {
       .map((template: { id: string }) => template.id).sort();
     expect(templates).toEqual(["gm_blade", "player_blade"]);
 
-    // Campaign rules-version changes wait for E5 once extensions are in use.
-    expect((await call("GET", `/campaigns/${campaignId}/version-check?targetVersionId=${h.versionId}`, gm)).statusCode).toBe(409);
+    // E5: the composition before the GM's add is the revert target, although
+    // an adoption has added a second extension since.
+    const revert = await call("POST", `/campaigns/${campaignId}/composition-check`, gm, { target: { systemVersionId: h.versionId, extensions: [] } });
+    expect(revert.statusCode, revert.body).toBe(200);
+    expect(revert.json().check).toMatchObject({ direction: "revert", change: { kind: "revert" } });
   });
 
   it("blocks a different version of an extension the campaign already uses (X8), also concurrently", async () => {

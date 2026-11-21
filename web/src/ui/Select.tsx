@@ -7,7 +7,17 @@ export type SelectOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  /** Options sharing a group are rendered in one labelled `<optgroup>`, in first-seen order. */
+  group?: string;
 };
+
+function renderOption(option: SelectOption) {
+  return (
+    <option key={option.value} value={option.value} disabled={option.disabled}>
+      {option.label}
+    </option>
+  );
+}
 
 export type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> & {
   label: string;
@@ -56,12 +66,23 @@ export function Select({
             {placeholder}
           </option>
         ) : null}
-        {options.map((option) => (
-          <option key={option.value} value={option.value} disabled={option.disabled}>
-            {option.label}
-          </option>
-        ))}
+        {options.some((option) => option.group !== undefined)
+          ? groupOptions(options).map(({ group, items }, index) => group === undefined
+            ? items.map(renderOption)
+            : <optgroup key={`${group}-${index}`} label={group}>{items.map(renderOption)}</optgroup>)
+          : options.map(renderOption)}
       </select>
     </FormField>
   );
+}
+
+/** Consecutive runs of options with the same group (ungrouped options stay where they are). */
+function groupOptions(options: ReadonlyArray<SelectOption>): Array<{ group: string | undefined; items: SelectOption[] }> {
+  const runs: Array<{ group: string | undefined; items: SelectOption[] }> = [];
+  for (const option of options) {
+    const last = runs[runs.length - 1];
+    if (last !== undefined && last.group === option.group) last.items.push(option);
+    else runs.push({ group: option.group, items: [option] });
+  }
+  return runs;
 }

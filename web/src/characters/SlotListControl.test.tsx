@@ -58,6 +58,22 @@ function renderControl(overrides: Partial<Parameters<typeof SlotListControl>[0]>
 }
 
 describe("SlotListControl", () => {
+  it("shows computed template fields read-only and folds long text", () => {
+    renderControl({ entries: [{
+      ...entries[0]!,
+      derived: [
+        { id: "level", label: "Spell level", value: 3 },
+        { id: "description", label: "Description", value: "A bright streak flashes. ".repeat(10) },
+        { id: "empty", label: "Empty", value: "" },
+      ],
+    }] });
+    expect(screen.getByTestId(`slot-entry-derived-${SWORD_ENTRY_ID}-level`)).toHaveTextContent("Spell level: 3");
+    const description = screen.getByTestId(`slot-entry-derived-${SWORD_ENTRY_ID}-description`);
+    expect(description.tagName).toBe("DETAILS");
+    expect(description).toHaveTextContent("A bright streak flashes.");
+    expect(screen.queryByTestId(`slot-entry-derived-${SWORD_ENTRY_ID}-empty`)).not.toBeInTheDocument();
+  });
+
   it("lists entries with their values and shows an empty state when bare", () => {
     renderControl();
     expect(screen.getByTestId("slot-list-inventory")).toBeVisible();
@@ -83,6 +99,28 @@ describe("SlotListControl", () => {
     await user.selectOptions(picker as unknown as HTMLElement, "torch");
     await user.click(screen.getByTestId("slot-add-confirm-inventory"));
     expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", "torch", {});
+  });
+
+  it("groups templates by origin and adds an extension item with its source (design 6.8)", async () => {
+    const user = userEvent.setup();
+    const EXT = "eeeeeeee-1111-4111-8111-111111111111";
+    const frost: SlotTemplate = {
+      id: "longsword", label: "Frost longsword", kind: "item", grantedActions: [],
+      extensionId: EXT, extensionName: "Frost pack",
+      source: { kind: "system", templateId: "longsword", extensionId: EXT },
+    };
+    const handlers = renderControl({ templates: [frost, ...templates] });
+    await user.click(screen.getByTestId("slot-add-inventory"));
+    const picker = screen.getByTestId("slot-template-picker-inventory") as unknown as HTMLElement;
+    const groups = Array.from(picker.querySelectorAll("optgroup")).map((group) => [group.label, Array.from(group.querySelectorAll("option")).map((option) => option.textContent)]);
+    expect(groups).toEqual([
+      ["Rules", ["Longsword", "Torch"]],
+      ["Frost pack", ["Frost longsword"]],
+      ["Your own", ["Custom entry"]],
+    ]);
+    await user.selectOptions(picker, `${EXT}:longsword`);
+    await user.click(screen.getByTestId("slot-add-confirm-inventory"));
+    expect(handlers.onAddEntry).toHaveBeenCalledWith("inventory", "longsword", {}, undefined, frost.source);
   });
 
   it("adds a custom entry through the labeled fallback", async () => {

@@ -97,6 +97,26 @@ describe("TemplatesTab", () => {
     expect(doc.expressions.some((entry) => entry.id === expressionId)).toBe(true);
   });
 
+  it("lets a template use another template's formula, lists who shares it and drops the unused one", async () => {
+    const user = userEvent.setup();
+    const base = blankDocument();
+    base.expressions = [
+      { id: "sword_expr", context: "roll", resultType: "number", source: "d20 + item.bonus", fallback: 0 },
+      { id: "axe_expr", context: "roll", resultType: "number", source: "d6", fallback: 0 },
+    ];
+    const roll = (id: string, expressionId: string, inputs: unknown[]) => ({ kind: "roll" as const, id, label: id, expressionId, inputs, outputTemplate: "{total}" });
+    renderTab(withTemplates(base, [
+      { id: "sword", label: "Sword", kind: "item", fields: [], grantedActions: [roll("hit", "sword_expr", [{ id: "edge", label: "Edge", valueType: "integer", required: false, default: 0 }])] },
+      { id: "axe", label: "Axe", kind: "item", fields: [], grantedActions: [roll("chop", "axe_expr", [])] },
+    ] as never));
+    const picker = screen.getByTestId("template-action-formula-axe-chop").querySelector("select")!;
+    await user.selectOptions(picker, "sword_expr");
+    const axe = readTemplates(latest!).find((template) => template.id === "axe")!;
+    expect(axe.grantedActions[0]).toMatchObject({ expressionId: "sword_expr", inputs: [{ id: "edge" }] });
+    expect(latest!.expressions.map((entry) => entry.id)).toEqual(["sword_expr"]);
+    expect(screen.getByTestId("template-action-formula-sword-hit")).toHaveTextContent("This formula is shared with Axe");
+  });
+
   it("offers an eligible character attribute as the Longsword roll modifier", async () => {
     const user = userEvent.setup();
     const base = blankDocument();

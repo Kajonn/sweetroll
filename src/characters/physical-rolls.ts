@@ -23,7 +23,7 @@ import {
   type PhysicalDie,
   type SettledDie,
 } from "../systems/physical-dice/resolution.js";
-import { findProjectedAction } from "../systems/implementation/runtime/roll-context.js";
+import { findProjectedAction, targetEntityIds } from "../systems/implementation/runtime/roll-context.js";
 import { mapRuntimeError } from "./runtime-errors.js";
 import { mayReadPush, narrowerAudience, readPushRoll } from "./push.js";
 import {
@@ -197,7 +197,7 @@ export function createPhysicalRolls({
               error: invalid("Roll context does not match the action."),
             };
           const selected = await loadCampaignRollContext(pool, record, member, {
-            ...(action.target && { targetEntityId: action.target.entityId }),
+            ...(action.target && { targetEntityIds: targetEntityIds(action.target) }),
             ...(command.targetCharacterId && {
               targetCharacterId: command.targetCharacterId,
             }),

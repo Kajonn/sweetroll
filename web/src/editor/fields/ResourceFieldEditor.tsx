@@ -170,6 +170,19 @@ export function ResourceFieldEditor({
           ))}
         </fieldset>
       </div>
+      <label className={styles.checkbox}>
+        <input
+          type="checkbox"
+          checked={field.startFull === true}
+          onChange={(e) => {
+            const { startFull: _omit, ...rest } = field;
+            onChange(e.target.checked ? { ...rest, startFull: true } : rest);
+          }}
+          data-testid={`resource-field-start-full-${field.id}`}
+          disabled={disabled}
+        />
+        {t("editor.fields.resource.startFull")}
+      </label>
       <p className={styles.placeholder} data-testid={`resource-field-reset-hint-${field.id}`}>
         {t("editor.fields.resource.resetRuleHint")}
       </p>

@@ -19,6 +19,7 @@ import type {
   SystemPersistenceRepository,
   SystemRecord,
   UserId,
+  VersionChoice,
   VersionId,
   VersionRecord,
 } from "./implementation/persistence/index.js";
@@ -126,7 +127,27 @@ export interface ExtensionAuthoring {
   publish(ctx: RequestContext, input: PublishExtensionInput): Promise<Result<PublishedExtensionVersion>>;
   /** A published version of an active extension the actor may use (owner, public or link). */
   authorizeExtensionUse(ctx: RequestContext, versionId: VersionId): Promise<Result<AuthorizedExtensionUse>>;
+  /** Design 6.7/6.8 (E5): later published versions of the same extension the actor may use. */
+  listUpgradeTargets(ctx: RequestContext, fromVersionId: VersionId): Promise<Result<VersionChoice[]>>;
+  /**
+   * Design 6.8 (E5): names and versions for a composition dialog. `pinned`
+   * extensions are described without use authorization (a record already
+   * pins them); `available` lists the owned and public extensions of the
+   * system at their latest version, excluding `pinned` ones.
+   */
+  describeCompositionChoices(
+    ctx: RequestContext,
+    input: { systemId: SystemId; pinned: readonly { extensionId: SystemId; versionId: VersionId }[] },
+  ): Promise<Result<{ pinned: ExtensionChoice[]; available: ExtensionChoice[] }>>;
 }
+
+/** Design 6.8 (E5): one extension at one version, with its later usable versions. */
+export type ExtensionChoice = {
+  extensionId: SystemId;
+  name: string;
+  version: VersionChoice;
+  upgrades: VersionChoice[];
+};
 
 export type CreateExtensionAuthoringInput = {
   pool: Pool;
@@ -480,6 +501,46 @@ export function createExtensionAuthoringModule(input: CreateExtensionAuthoringIn
       try {
         const use = await repo.authorizeExtensionUse(ctx.actorId, versionId);
         return use === null ? { ok: false, error: errors.notFound() } : { ok: true, value: use };
+      } catch (cause) {
+        return failure(cause);
+      }
+    },
+
+    async listUpgradeTargets(ctx, fromVersionId) {
+      try {
+        return { ok: true, value: await repo.listLaterAuthorizedVersions(ctx.actorId, fromVersionId, "extension") };
+      } catch (cause) {
+        return failure(cause);
+      }
+    },
+
+    async describeCompositionChoices(ctx, input) {
+      try {
+        const versions = await repo.describeVersionChoices(input.pinned.map((ref) => ref.versionId));
+        const pinned: ExtensionChoice[] = [];
+        for (const ref of input.pinned) {
+          const version = versions.find((choice) => choice.versionId === ref.versionId);
+          const extension = await repo.openSystem(ref.extensionId);
+          if (version === undefined || extension === null) continue;
+          pinned.push({
+            extensionId: ref.extensionId,
+            name: extension.name,
+            version,
+            upgrades: await repo.listLaterAuthorizedVersions(ctx.actorId, ref.versionId, "extension"),
+          });
+        }
+        const available: ExtensionChoice[] = [];
+        const pinnedIds = new Set(input.pinned.map((ref) => ref.extensionId));
+        const page = await repo.listExtensionsPage(ctx.actorId, input.systemId, { limit: MAX_PAGE_LIMIT, cursor: null });
+        for (const extension of page.extensions) {
+          if (pinnedIds.has(extension.systemId) || extension.lifecycle !== "active") continue;
+          const latest = (await repo.listPublishedVersions(extension.systemId)).find((version) => version.lifecycle === "published");
+          if (latest === undefined) continue;
+          const [version] = await repo.describeVersionChoices([latest.versionId]);
+          if (version === undefined) continue;
+          available.push({ extensionId: extension.systemId, name: extension.name, version, upgrades: [] });
+        }
+        return { ok: true, value: { pinned, available } };
       } catch (cause) {
         return failure(cause);
       }

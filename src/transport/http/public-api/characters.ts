@@ -5,7 +5,7 @@ import { EntrySourceSchema } from "../../../systems/implementation/package/schem
 import { FieldV1Schema, TemplateKindSchema } from "../../../systems/implementation/package/schema/document.js";
 import { BindingValueSchema, DieResultSchema, PushResultSchema, RollBreakdownSchema } from "../../../systems/implementation/rules/result.js";
 import { map, wire, type Route } from "./router.js";
-import { CharacterDecksSchema, RollOptionsQuery, RollOptionsSchema } from "../roll-options.js";
+import { ApplicableRollsSchema, CharacterDecksSchema, ReferenceDataListSchema, ReferenceDatasetSchema, RollOptionsQuery, RollOptionsSchema } from "../roll-options.js";
 import * as s from "./schemas.js";
 
 const audience = Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]);
@@ -46,6 +46,9 @@ export const characterSchemas = {
   Roll: roll,
   RollOptions: RollOptionsSchema,
   CharacterDecks: s.object({ decks: CharacterDecksSchema }),
+  ReferenceDataList: s.object({ datasets: ReferenceDataListSchema }),
+  ApplicableRolls: s.object({ rolls: ApplicableRollsSchema }),
+  ReferenceDataset: s.object({ dataset: ReferenceDatasetSchema }),
   PushOptions: s.object({
     canPush: Type.Boolean(),
     reason: Type.Union([s.text, Type.Null()]),
@@ -66,7 +69,11 @@ export const characterSchemas = {
         id: s.definitionId,
         label: s.text,
         actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
-        target: Type.Optional(s.object({ entityId: s.definitionId })),
+        target: Type.Optional(s.object({
+          entityId: s.definitionId,
+          otherEntityIds: Type.Optional(Type.Array(s.definitionId, { maxItems: 8 })),
+          optional: Type.Optional(Type.Literal(true)),
+        })),
         respondsTo: Type.Optional(Type.Literal(true)),
         inputs: Type.Array(s.object({
           id: s.definitionId,
@@ -167,6 +174,33 @@ export function registerCharacterRoutes(route: Route, { characters }: { characte
     description: "List the card decks of the character's system with the cards left. A campaign character reads the campaign's shared decks.",
     scope: "characters:read", input: { params: s.characterId }, output: "CharacterDecks",
   }, async (ctx, { params }) => map(await characters.listDecks(ctx, params), (decks) => ({ decks: wire(decks) })));
+
+  route({
+    method: "GET", path: "/characters/:characterId/applicable-rolls", id: "listCharacterApplicableRolls",
+    description: "List up to 20 recent saved rolls with a positive total that the caller can see and may apply to this character's resources.",
+    scope: "characters:read", input: { params: s.characterId }, output: "ApplicableRolls",
+  }, async (ctx, { params }) => map(await characters.listApplicableRolls(ctx, params), (rolls) => ({ rolls: wire(rolls) })));
+  const datasetParam = { datasetId: Type.String({ minLength: 1, maxLength: 64, pattern: "^[a-z][a-z0-9_]{0,63}$" }) };
+  route({
+    method: "GET", path: "/characters/:characterId/reference-data", id: "listCharacterReferenceData",
+    description: "List the reference tables (rules text, spells, classes) of the system a readable character uses.",
+    scope: "characters:read", input: { params: s.characterId }, output: "ReferenceDataList",
+  }, async (ctx, { params }) => map(await characters.readReferenceData(ctx, params), wire));
+  route({
+    method: "GET", path: "/characters/:characterId/reference-data/:datasetId", id: "readCharacterReferenceDataset",
+    description: "Read one reference table and its records from the system a readable character uses.",
+    scope: "characters:read", input: { params: Type.Object({ ...s.characterId.properties, ...datasetParam }, { additionalProperties: false }) }, output: "ReferenceDataset",
+  }, async (ctx, { params }) => map(await characters.readReferenceData(ctx, params), wire));
+  route({
+    method: "GET", path: "/system-versions/:versionId/reference-data", id: "listVersionReferenceData",
+    description: "List the reference tables of a published version the account may use, including known link-only versions.",
+    scope: "characters:read", input: { params: s.object({ versionId: s.uuid }) }, output: "ReferenceDataList",
+  }, async (ctx, { params }) => map(await characters.readReferenceData(ctx, params), wire));
+  route({
+    method: "GET", path: "/system-versions/:versionId/reference-data/:datasetId", id: "readVersionReferenceDataset",
+    description: "Read one reference table and its records from a published version the account may use.",
+    scope: "characters:read", input: { params: s.object({ versionId: s.uuid, ...datasetParam }) }, output: "ReferenceDataset",
+  }, async (ctx, { params }) => map(await characters.readReferenceData(ctx, params), wire));
 
   route({
     method: "GET", path: "/characters/:characterId/actions/:actionId/roll-options", id: "listCharacterRollOptions",

@@ -78,6 +78,7 @@ export const createCampaignCharacter = object({
   name: Type.String({ minLength: 1, maxLength: 120, pattern: "\\S" }),
   entityDefinitionId: s.definitionId,
   initialValues: Type.Optional(s.values),
+  presetId: Type.Optional(s.definitionId),
   controllerUserIds: Type.Optional(userIds),
   ...campaignRevision,
 });

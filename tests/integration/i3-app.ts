@@ -137,6 +137,8 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     listAuthorizedVersions: authoring.listAuthorizedVersions,
     listUpgradeTargets: authoring.listUpgradeTargets,
     describeVersionChoices: authoring.describeVersionChoices,
+    listExtensionUpgradeTargets: extensions.listUpgradeTargets,
+    describeCompositionChoices: extensions.describeCompositionChoices,
   });
 
   const authHook = fp(async (app) => {

@@ -115,6 +115,10 @@
               }
             ]
           },
+          "presetsFrom": {
+            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+            "type": "string"
+          },
           "fields": {
             "maxItems": 512,
             "type": "array",
@@ -469,6 +473,10 @@
                           "type": "string"
                         }
                       ]
+                    },
+                    "startFull": {
+                      "const": true,
+                      "type": "boolean"
                     }
                   }
                 },
@@ -777,6 +785,10 @@
                   "maxLength": 120,
                   "type": "string"
                 },
+                "visibleWhen": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                },
                 "elements": {
                   "maxItems": 1024,
                   "type": "array",
@@ -797,6 +809,10 @@
                             "type": "string"
                           },
                           "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "visibleWhen": {
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
                           },
@@ -835,6 +851,10 @@
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
                           },
+                          "visibleWhen": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
                           "fieldId": {
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
@@ -855,6 +875,10 @@
                             "type": "string"
                           },
                           "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "visibleWhen": {
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
                           },
@@ -881,6 +905,10 @@
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
                           },
+                          "visibleWhen": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
                           "actionId": {
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
@@ -901,6 +929,10 @@
                             "type": "string"
                           },
                           "id": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          },
+                          "visibleWhen": {
                             "pattern": "^[a-z][a-z0-9_]{0,63}$",
                             "type": "string"
                           },
@@ -1024,6 +1056,20 @@
                   "entityId": {
                     "pattern": "^[a-z][a-z0-9_]{0,63}$",
                     "type": "string"
+                  },
+                  "otherEntityIds": {
+                    "minItems": 1,
+                    "maxItems": 8,
+                    "uniqueItems": true,
+                    "type": "array",
+                    "items": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    }
+                  },
+                  "optional": {
+                    "const": true,
+                    "type": "boolean"
                   }
                 }
               },
@@ -1318,6 +1364,83 @@
                     }
                   }
                 ]
+              }
+            }
+          },
+          {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "kind",
+              "id",
+              "label",
+              "steps"
+            ],
+            "properties": {
+              "kind": {
+                "const": "resourceBatch",
+                "type": "string"
+              },
+              "id": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              "label": {
+                "maxLength": 120,
+                "type": "string"
+              },
+              "steps": {
+                "minItems": 1,
+                "maxItems": 32,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "resourceId",
+                    "operation"
+                  ],
+                  "properties": {
+                    "resourceId": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
+                    "operation": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "kind",
+                            "amount"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "const": "delta",
+                              "type": "string"
+                            },
+                            "amount": {
+                              "type": "number"
+                            }
+                          }
+                        },
+                        {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "kind"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "const": "reset",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                }
               }
             }
           },
@@ -1903,6 +2026,10 @@
                           "type": "string"
                         }
                       ]
+                    },
+                    "startFull": {
+                      "const": true,
+                      "type": "boolean"
                     }
                   }
                 },
@@ -2008,6 +2135,20 @@
                         "entityId": {
                           "pattern": "^[a-z][a-z0-9_]{0,63}$",
                           "type": "string"
+                        },
+                        "otherEntityIds": {
+                          "minItems": 1,
+                          "maxItems": 8,
+                          "uniqueItems": true,
+                          "type": "array",
+                          "items": {
+                            "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                            "type": "string"
+                          }
+                        },
+                        "optional": {
+                          "const": true,
+                          "type": "boolean"
                         }
                       }
                     },

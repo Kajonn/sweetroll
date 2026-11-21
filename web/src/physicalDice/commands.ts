@@ -1,0 +1,55 @@
+import type { DiceLaunch } from "../../../src/systems/physical-dice/launch.js";
+import type { PhysicalDie } from "../../../src/systems/physical-dice/resolution.js";
+import { ApiError, type ApiClient } from "../api/client.js";
+import type { FrozenRequest } from "../characters/types.js";
+import { t } from "../i18n/index.js";
+import { playThrow, serverClock } from "./playback.js";
+
+export type PrepareDice = (request: FrozenRequest, signal: AbortSignal) => Promise<FrozenRequest>;
+type PreparedThrow = { attemptId: string; expiresAt: string; launch: DiceLaunch; dice: PhysicalDie[] };
+
+export async function preparePhysicalRequest(
+  client: ApiClient,
+  request: FrozenRequest,
+  signal: AbortSignal,
+  simulate = playThrow,
+): Promise<FrozenRequest> {
+  if (request.physical || request.method !== "POST") return request;
+  const action = /^\/characters\/([^/]+)\/actions\/([^/]+)$/.exec(request.path);
+  const push = /^\/characters\/([^/]+)\/rolls\/([^/]+)\/push$/.exec(request.path);
+  if (!action && !push) return request;
+  const url = `/characters/${(action ?? push)![1]}/physical-rolls`;
+  const body = action
+    ? {
+        ...request.body,
+        kind: "executeAction",
+        actionId: decodeURIComponent(action[2]!),
+        inputs: request.body.inputs ?? {},
+      }
+    : { ...request.body, kind: "pushRoll", parentRollId: decodeURIComponent(push![2]!) };
+  const { attempt, serverTime } = await client.fetch<{ attempt: PreparedThrow | null; serverTime: string }>(
+    "POST",
+    url,
+    { body, signal },
+  );
+  if (!attempt) return request;
+  try {
+    const settlement = await simulate(attempt, serverClock(serverTime), signal);
+    signal.throwIfAborted();
+    return { ...request, physical: { path: `${url}/${attempt.attemptId}/complete`, settlement } };
+  } catch (error) {
+    if (signal.aborted) throw error;
+    throw new ApiError({
+      status: 422,
+      code: "physical_dice_unsettled",
+      message: t("physicalDice.unsettled"),
+      requestId: "",
+      latestRevision: null,
+      diagnostics: [],
+    });
+  }
+}
+
+export function canSimulateDice() {
+  return typeof Worker !== "undefined" && typeof WebAssembly !== "undefined";
+}

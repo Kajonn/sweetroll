@@ -42100,6 +42100,7 @@
                   "type": "object",
                   "required": [
                     "attempt",
+                    "serverTime",
                     "requestId"
                   ],
                   "properties": {
@@ -42292,6 +42293,10 @@
                           "type": "null"
                         }
                       ]
+                    },
+                    "serverTime": {
+                      "format": "date-time",
+                      "type": "string"
                     },
                     "requestId": {
                       "type": "string"

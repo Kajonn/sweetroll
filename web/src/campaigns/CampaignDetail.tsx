@@ -1,3 +1,5 @@
+import type { ApiClient } from "../api/client.js";
+import { DiceOverlay } from "../physicalDice/DiceOverlay.js";
 import { campaignPlayFeedKey, useCampaignPlayFeed } from "../playEvents/CampaignPlayFeed.js";
 import { commandEvent, PlayEventOverlay, usePlayEvents, type PublishCommand } from "../playEvents/PlayEvents.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
@@ -99,6 +101,7 @@ export function CampaignDetail(props: {
   actorId: string;
   onLeft: () => void;
   navigation?: { onOpenCharacter: (characterId: string) => void };
+  physicalDiceClient?: ApiClient | undefined;
   metadataApi?: CampaignCharacterMetadataApi;
   charactersApi?: SessionBoardProps["charactersApi"];
   createSession?: SessionBoardProps["createSession"];
@@ -285,6 +288,9 @@ export function CampaignDetail(props: {
     });
   return (
     <SystemPresentationScope as="section" aria-label={campaign.title} presentation={campaign.presentation}>
+      {props.physicalDiceClient && online && activeCampaignId ? (
+        <DiceOverlay key={activeCampaignId} client={props.physicalDiceClient} actor={props.actorId} campaignId={activeCampaignId} />
+      ) : null}
       <PlayEventOverlay events={events} presentation={campaign.presentation} />
       <PageHeader
         title={campaign.title}

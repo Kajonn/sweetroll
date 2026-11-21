@@ -826,7 +826,7 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
   }},
   {method:"post",path:"/characters/:characterId/physical-rolls",operationId:"prepare_character_physical_roll",
     schema:{params:CharacterIdParams,body:physicalPrepareBody,
-      response:{"200":Type.Object({attempt:Type.Union([physicalAttemptDto,Type.Null()]),requestId:Type.String()}),...ErrorResponses}}},
+      response:{"200":Type.Object({attempt:Type.Union([physicalAttemptDto,Type.Null()]),serverTime:Type.String({format:"date-time"}),requestId:Type.String()}),...ErrorResponses}}},
   {method:"post",path:"/characters/:characterId/physical-rolls/:attemptId/complete",operationId:"complete_character_physical_roll",
     schema:{params:Type.Object({characterId:physicalId,attemptId:physicalId}),body:physicalSettlementBody,
       response:{"200":Type.Object({result:CharacterCommandResultDto,requestId:Type.String()}),...ErrorResponses}}},
@@ -1313,7 +1313,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const command = {...request.body as PhysicalCommand, characterId};
         const result = await characters.physicalRolls.prepare(ctxOf(request), command);
         if (!result.ok) return sendError(reply,result.error,request.id);
-        return {attempt:result.value,requestId:request.id};
+        return {attempt:result.value,serverTime:new Date().toISOString(),requestId:request.id};
       },
       complete_character_physical_roll: async (request, reply) => {
         if (!characters.physicalRolls) return sendError(reply, {code:"not_found",message:"Physical dice are disabled."}, request.id);

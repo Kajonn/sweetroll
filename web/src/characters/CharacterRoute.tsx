@@ -1,3 +1,6 @@
+import type { ApiClient } from "../api/client.js";
+import { canSimulateDice, preparePhysicalRequest, type PrepareDice } from "../physicalDice/commands.js";
+import { DiceOverlay } from "../physicalDice/DiceOverlay.js";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { CampaignsApi } from "../campaigns/api.js";
@@ -31,6 +34,7 @@ export type CharacterDetailNavigation = {
 };
 
 export type CharacterDetailProps = {
+  physicalDiceClient?: ApiClient | undefined;
   characterId: string;
   api: CharactersApi;
   store: CharacterStore;
@@ -62,7 +66,7 @@ function browserSupportsTakeover(): boolean {
  * character session, so no session is ever opened or sent with an empty
  * identity.
  */
-export function CharacterDetail({ characterId, api, store, identity, coordination, navigation, locksSupported, campaignEventsApi }: CharacterDetailProps) {
+export function CharacterDetail({ characterId, api, store, identity, coordination, navigation, locksSupported, campaignEventsApi, physicalDiceClient }: CharacterDetailProps) {
   const actorId = identity.getActorId();
   if (actorId === null) {
     return (
@@ -76,6 +80,7 @@ export function CharacterDetail({ characterId, api, store, identity, coordinatio
     <CharacterDetailLoaded
       key={`${actorId}:${identity.getGeneration()}:${characterId}`}
       campaignEventsApi={campaignEventsApi}
+      physicalDiceClient={physicalDiceClient}
       characterId={characterId}
       api={api}
       store={store}
@@ -142,9 +147,16 @@ function CharacterDetailLoaded({
   navigation,
   locksSupported: locksSupportedProp,
   campaignEventsApi,
+  physicalDiceClient,
 }: CharacterDetailProps & { actorId: string }) {
   const online = identity.isOnline();
   const publisher = useRef<PublishCommand>();
+  const prepareDice = useRef<PrepareDice>();
+  useLayoutEffect(()=>{
+    prepareDice.current = physicalDiceClient && canSimulateDice()
+      ? (request,signal)=>preparePhysicalRequest(physicalDiceClient,request,signal)
+      : undefined;
+  },[physicalDiceClient]);
   const createSession = useMemo(
     () => () =>
       createCharacterSession({
@@ -157,6 +169,7 @@ function CharacterDetailLoaded({
         now: () => new Date().toISOString(),
         newId: () => randomUUID(),
         captureRollPublisher: () => publisher.current,
+        captureDicePreparation: () => prepareDice.current,
       }),
     [actorId, characterId, api, store, identity, coordination],
   );
@@ -316,6 +329,9 @@ function CharacterDetailLoaded({
       {campaignEventsApi && campaignId !== null && events.target ? (
         <CampaignPlayListener api={campaignEventsApi} campaignId={campaignId} actorId={actorId}
           generation={identity.getGeneration()} online={online} events={events} />
+      ) : null}
+      {physicalDiceClient && online && campaignId ? (
+        <DiceOverlay key={campaignId} client={physicalDiceClient} actor={actorId} campaignId={campaignId} />
       ) : null}
       <PlayEventOverlay events={events} presentation={snapshot.confirmed.projection.presentation} />
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}

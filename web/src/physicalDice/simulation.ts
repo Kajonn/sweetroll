@@ -7,6 +7,7 @@ import {
 import {
   randomSequence,
   simulationVersion,
+  tray,
   type DiceLaunch,
   type Vector3,
 } from "../../../src/systems/physical-dice/launch.js";
@@ -23,7 +24,6 @@ type SimulatedDie = Die & {
   cockedTicks: number;
   retries: number;
 };
-export const tray = { halfWidth: 12, halfHeight: 9, modelScale: 0.6, ticksPerSecond: 60 } as const;
 const maxTicks = 1200;
 const maxRetries = 3;
 let ready: Promise<void> | undefined;

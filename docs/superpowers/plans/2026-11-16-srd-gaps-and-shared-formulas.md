@@ -1,5 +1,12 @@
 # SRD gaps: what was closed, shared formulas and the remaining stages
 
+> **Moved (owner decision 2026-11-21):** the 5e SRD system, its record, data and
+> scenario left this repository so that the SRD licence stays out of Sweetroll
+> core; it is published to a server through `/api/v1` from its own repository.
+> Paths below that name `tests/integration/fixtures/dnd5e/`, `docs/systems/` or
+> the 5e scenario are historical. The stages S1–S11 are covered here by the
+> original Ember Trail test system (`tests/integration/scenarios/ember-trail.test.ts`).
+
 **Plan · 16 November 2026 · Part 1 implemented 2026-11-16; parts 2 and 3 implemented 2026-11-21 on the owner's instruction "Implement plan"**
 
 ## Owner request (2026-11-16)
@@ -9,7 +16,7 @@
 > a way to add new classes to a character.
 
 The "missing features" are the 14 platform limits in the
-[5e SRD system record](../../systems/dnd5e-srd.md). This plan covers all of them.
+5e SRD system record (moved; see the note above). This plan covers all of them.
 Four are closed (part 1). Formula sharing is proposed (part 2). The other nine
 need a design decision each before they are built (part 3).
 

@@ -340,7 +340,9 @@ The sheet and `/api/v1` return an entry's computed fields with the entry
 
 These two rules make "one entry per class" possible: a class entry computes what
 the class contributes at its level and the character sums the slot. The
-[5e SRD system](docs/systems/dnd5e-srd.md) multiclasses this way.
+Ember Trail test system (`tests/integration/fixtures/ember-trail/`) adds paths
+this way. Third-party rules content such as the 5e SRD system lives outside this
+repository (owner decision 2026-11-21), so no game licence applies to Sweetroll.
 
 **SRD gap stages S1–S11 (owner instruction "Implement plan", 2026-11-21).** The
 [plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md) records

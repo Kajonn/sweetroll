@@ -25,14 +25,17 @@ test("author publishes an extension in the GUI; a player uses its item", async (
   const co = await browser.newContext({ baseURL });
   const player = await browser.newContext({ baseURL });
   try {
-    const { systemId, versionId } = await createCatalogCampaign(
+    // A unique system name: other journeys leave systems named alike in the author's library.
+    const systemName = `Extension base ${key().slice(0, 8)}`;
+    const { versionId } = await createCatalogCampaign(
       gm.request,
       co.request,
       player.request,
-      (document) => Object.assign(document, derivedTemplateDocument()),
+      (document) => {
+        Object.assign(document, derivedTemplateDocument());
+        (document.metadata as { name: string }).name = systemName;
+      },
     );
-    const system = await json(gm.request, "GET", `/api/systems/${systemId}`);
-    const systemName = system.workspace.system.name as string;
     const extensionName = `Frost pack ${key().slice(0, 6)}`;
 
     // Author: library → Extensions → Create extension.

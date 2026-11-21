@@ -6,7 +6,7 @@ import {makePushContext,resolveRuntimePush} from "./implementation/runtime/push.
 import type {PushContext} from "./implementation/runtime/push-context.js";
 export type {PushContext} from "./implementation/runtime/push-context.js";
 import type { DieResult, RollBreakdown } from "./implementation/rules/result.js";
-import { PublishedPackageCorruptError, type PublishedExtensionLoader, type PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
+import type { PublishedExtensionLoader, PublishedPackageLoader } from "./implementation/runtime/package-loader.js";
 import { createEffectivePackageLoader, type EffectivePackageLoader } from "./implementation/runtime/composition-loader.js";
 import { unqualifiedId, type ExtensionRef } from "./implementation/rules/compose.js";
 export type { ExtensionRef } from "./implementation/rules/compose.js";
@@ -368,9 +368,15 @@ export interface SystemRuntime {
     includeFields?: boolean;
   }): Promise<RuntimeResult<VersionDescription>>;
   /** Design 6.7 dry run: verify a stored state against another version of its system. */
+  /**
+   * Design 6.7/6.8 (E5): dry run of moving a character from one composition
+   * (base version plus extensions) to another. Omitted extensions mean none.
+   */
   checkVersionChange(input: {
     fromVersionId: VersionId;
     toVersionId: VersionId;
+    fromExtensions?: readonly ExtensionRef[];
+    toExtensions?: readonly ExtensionRef[];
     entityId: DefinitionId;
     state: unknown;
     direction: VersionChangeDirection;
@@ -393,9 +399,9 @@ export function createSystemRuntime(input: {
 
   const runtime: SystemRuntime = {
     async checkVersionChange(checkInput) {
-      const from = await loadPublishedPackage(input.loadPackage, checkInput.fromVersionId);
+      const from = await loadEffectivePackage(loadEffective, checkInput.fromVersionId, checkInput.fromExtensions);
       if (!from.ok) return from;
-      const to = await loadPublishedPackage(input.loadPackage, checkInput.toVersionId);
+      const to = await loadEffectivePackage(loadEffective, checkInput.toVersionId, checkInput.toExtensions);
       if (!to.ok) return to;
       return {
         ok: true,
@@ -405,6 +411,10 @@ export function createSystemRuntime(input: {
           entityId: checkInput.entityId,
           state: checkInput.state,
           direction: checkInput.direction,
+          sameComposition: sameComposition(
+            { systemVersionId: checkInput.fromVersionId, extensions: checkInput.fromExtensions ?? [] },
+            { systemVersionId: checkInput.toVersionId, extensions: checkInput.toExtensions ?? [] },
+          ),
         }),
       };
     },
@@ -741,6 +751,21 @@ export function createSystemRuntime(input: {
   }
 }
 
+/** Design 6.8 (E5): a base version plus extension versions, compared as a set. */
+export type Composition = { systemVersionId: VersionId; extensions: readonly ExtensionRef[] };
+
+export function canonicalComposition(composition: Composition): { systemVersionId: VersionId; extensions: ExtensionRef[] } {
+  return {
+    systemVersionId: composition.systemVersionId,
+    extensions: [...composition.extensions].map(({ extensionId, versionId }) => ({ extensionId, versionId }))
+      .sort((a, b) => a.extensionId.localeCompare(b.extensionId)),
+  };
+}
+
+export function sameComposition(left: Composition, right: Composition): boolean {
+  return JSON.stringify(canonicalComposition(left)) === JSON.stringify(canonicalComposition(right));
+}
+
 async function loadEffectivePackage(
   loadEffective: EffectivePackageLoader,
   versionId: VersionId,
@@ -750,33 +775,6 @@ async function loadEffectivePackage(
   return loaded.ok ? loaded : { ok: false, error: { code: loaded.error.code, message: loaded.error.message } };
 }
 
-async function loadPublishedPackage(
-  loadPackage: PublishedPackageLoader,
-  versionId: VersionId,
-): Promise<RuntimeResult<SystemPackageV1>> {
-  let packageValue;
-  try {
-    packageValue = await loadPackage(versionId);
-  } catch (error) {
-    if (error instanceof PublishedPackageCorruptError) {
-      return {
-        ok: false,
-        error: { code: "invalid_package", message: "Published package is corrupt." },
-      };
-    }
-    return { ok: false, error: { code: "internal", message: "Package loading failed." } };
-  }
-  if (packageValue === null) {
-    return { ok: false, error: { code: "not_found", message: "Published version not found." } };
-  }
-  if (packageValue.versionId !== versionId) {
-    return {
-      ok: false,
-      error: { code: "invalid_package", message: "Published package version differs from the request." },
-    };
-  }
-  return { ok: true, value: packageValue };
-}
 
 function changeResource(
   entity: EntityDefinitionV1,

@@ -189,6 +189,7 @@ function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:
     "character_controllers_assigned", "character_claimed", "character_ownership_transferred",
     "entry_added", "entry_removed", "entry_updated",
     "system_version_upgraded", "system_version_reverted", "extensions_changed",
+    "extension_added", "extension_removed", "extension_upgraded",
   ]);
   const label = knownKinds.has(event.kind)
     ? t(`character.activity.${event.kind}`)

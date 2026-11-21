@@ -25,7 +25,17 @@ import type { ExtensionAuthoring } from "../systems/extensions.js";
 import type { ExtensionRef } from "../systems/runtime.js";
 import { sortExtensionRefs } from "./persistence.js";
 import type { VersionChoice } from "../systems/implementation/persistence/index.js";
-import type { VersionChangeDirection, VersionChangeReport } from "../systems/runtime.js";
+import type { Composition, VersionChangeDirection, VersionChangeReport } from "../systems/runtime.js";
+import {
+  authorizeCompositionChange,
+  classifyCompositionChange,
+  compositionActivityKind,
+  compositionActivitySummary,
+  parseComposition,
+  type CompositionChange,
+  type CompositionError,
+  type CompositionOptions,
+} from "../systems/composition-change.js";
 import { hashInput } from "../systems/implementation/authoring/assess.js";
 import { templateKey, validateEntryForSlot } from "../systems/implementation/runtime/entries.js";
 import { createEffectivePackageLoader } from "../systems/implementation/runtime/composition-loader.js";
@@ -119,7 +129,6 @@ const MANAGEMENT_AUDIT_SUMMARY: Record<CharacterManagementCommand["kind"], strin
   recover: "Character recovered",
   changeVersion: "System version upgraded",
 };
-const VERSION_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LEASE_MS = 60 * 1000;
 const REPLAY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const MAX_PAGE_LIMIT = 100;
@@ -485,30 +494,27 @@ export type CharacterManagementCommand =
   | CharacterVersionChangeCommand;
 
 /**
- * Design 6.7: move a standalone character to a later non-breaking version of
- * its system, or back to the version recorded before its most recent upgrade.
+ * Design 6.7/6.8 (extensions plan E5): move a standalone character to another
+ * composition of its system — one base upgrade, or one extension added,
+ * removed or upgraded — or back to the composition recorded before its most
+ * recent change.
  */
 export type CharacterVersionChangeCommand = {
   kind: "changeVersion";
   characterId: CharacterId;
-  targetVersionId: VersionId;
+  target: Composition;
   expectedRevision: number;
   idempotencyKey: string;
 };
 
 export type { VersionChoice } from "../systems/implementation/persistence/index.js";
 
-export type CharacterVersionOptions = {
-  current: VersionChoice;
-  /** The version recorded before the most recent upgrade, if any. */
-  revertTo: VersionChoice | null;
-  /** Later published versions of the same system the actor may use, newest first. */
-  upgrades: VersionChoice[];
-};
+export type CharacterVersionOptions = CompositionOptions;
 
 export type CharacterVersionCheck = {
   revision: number;
   direction: VersionChangeDirection;
+  change: CompositionChange;
   report: Omit<VersionChangeReport, "nextState">;
 };
 
@@ -630,7 +636,7 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
   ): Promise<CharacterResult<CharacterVersionOptions>>;
   checkVersionChange(
     ctx: RequestContext,
-    input: { characterId: CharacterId; targetVersionId: VersionId },
+    input: { characterId: CharacterId; target: unknown },
   ): Promise<CharacterResult<CharacterVersionCheck>>;
 
   listActivity(
@@ -651,6 +657,9 @@ export type CreateCharactersModuleInput = {
   /** Design 6.7 version choices; version-change operations are unavailable without them. */
   listUpgradeTargets?: SystemAuthoring["listUpgradeTargets"];
   describeVersionChoices?: SystemAuthoring["describeVersionChoices"];
+  /** Design 6.8 (E5): extension upgrades and names for composition changes. */
+  listExtensionUpgradeTargets?: ExtensionAuthoring["listUpgradeTargets"];
+  describeCompositionChoices?: ExtensionAuthoring["describeCompositionChoices"];
   campaignTemplates?: ReturnType<typeof createTemplateRepository>;
   now?: () => Date;
   newId?: () => string;
@@ -1475,42 +1484,60 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   }
 
   /**
-   * Design 6.7: decide direction and run the dry run for a standalone record.
-   * The revert target is only the recorded previous version; any other
-   * target must be a later authorized version of the same system.
+   * Design 6.7/6.8: classify the change, authorize it and run the dry run for
+   * a standalone record. The revert target is only the recorded previous
+   * composition; any other target makes exactly one authorized change.
    */
   async function planVersionChange(
     ctx: RequestContext,
     record: CharacterRecord,
-    targetVersionId: VersionId,
-  ): Promise<CharacterResult<{ direction: VersionChangeDirection; report: VersionChangeReport }>> {
-    if (input.listUpgradeTargets === undefined) return { ok: false, error: errors.internal() };
-    // Design 6.8: composition changes (stage E5) will cover characters with
-    // extensions; until then their rules version cannot change.
-    if (record.extensions.length > 0) {
-      return { ok: false, error: { code: "conflict", message: "Characters built with extensions cannot change rules version yet." } };
+    target: Composition,
+  ): Promise<CharacterResult<{ direction: VersionChangeDirection; change: CompositionChange; report: VersionChangeReport }>> {
+    if (input.listUpgradeTargets === undefined || input.describeVersionChoices === undefined) {
+      return { ok: false, error: errors.internal() };
     }
-    if (targetVersionId === record.systemVersionId) {
-      return { ok: false, error: errors.invalid_value("The character already uses this version.") };
-    }
-    const previous = await repo.loadPreviousSystemVersionId(record.characterId);
-    const direction: VersionChangeDirection = targetVersionId === previous ? "revert" : "upgrade";
-    if (direction === "upgrade") {
-      const targets = await input.listUpgradeTargets(ctx, record.systemVersionId);
-      if (!targets.ok) return { ok: false, error: errors.internal() };
-      if (!targets.value.some((choice) => choice.versionId === targetVersionId)) {
-        return { ok: false, error: errors.not_found("The target version is not an available upgrade for this character.") };
-      }
-    }
+    const current: Composition = { systemVersionId: record.systemVersionId, extensions: record.extensions };
+    const previous = await repo.loadPreviousComposition(record.characterId);
+    const classified = classifyCompositionChange(current, target, previous);
+    if (!classified.ok) return { ok: false, error: compositionError(classified.error) };
+    const change = classified.value;
+    const [described] = await describeOrEmpty(record.systemVersionId);
+    if (described === undefined) return { ok: false, error: errors.internal() };
+    const listSystemUpgrades = input.listUpgradeTargets;
+    const listExtensionUpgrades = input.listExtensionUpgradeTargets;
+    const authorizeUse = input.authorizeExtensionUse;
+    const allowed = await authorizeCompositionChange(ctx, change, described.systemId, {
+      listSystemUpgrades,
+      listExtensionUpgrades: listExtensionUpgrades ?? (async () => ({ ok: true, value: [] })),
+      authorizeExtensionUse: authorizeUse ?? (async () => ({ ok: false, error: { code: "not_found", message: "" } })),
+    });
+    if (!allowed.ok) return { ok: false, error: compositionError(allowed.error) };
+    const direction: VersionChangeDirection = change.kind === "revert" ? "revert" : "upgrade";
     const checked = await input.runtime.checkVersionChange({
       fromVersionId: record.systemVersionId,
-      toVersionId: targetVersionId,
+      fromExtensions: record.extensions,
+      toVersionId: target.systemVersionId,
+      toExtensions: target.extensions,
       entityId: record.entityDefinitionId,
       state: record.state,
       direction,
     });
     if (!checked.ok) return { ok: false, error: mapRuntimeError(checked.error) };
-    return { ok: true, value: { direction, report: checked.value } };
+    return { ok: true, value: { direction, change, report: checked.value } };
+  }
+
+  async function describeOrEmpty(versionId: VersionId): Promise<VersionChoice[]> {
+    const described = await input.describeVersionChoices!([versionId]);
+    return described.ok ? described.value : [];
+  }
+
+  function compositionError(error: CompositionError): CharacterError {
+    switch (error.code) {
+      case "invalid_value": return errors.invalid_value(error.message);
+      case "bad_request": return errors.bad_request(error.message);
+      case "not_found": return errors.not_found(error.message);
+      case "internal": return errors.internal();
+    }
   }
 
   function withoutNextState(report: VersionChangeReport): Omit<VersionChangeReport, "nextState"> {
@@ -1525,15 +1552,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
       return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
     }
-    if (typeof command.targetVersionId !== "string" || !VERSION_ID_PATTERN.test(command.targetVersionId)) {
-      return { ok: false, error: errors.bad_request("targetVersionId must be a version UUID.") };
-    }
+    const target = parseComposition(command.target);
+    if (typeof target === "string") return { ok: false, error: errors.bad_request(target) };
     const commandKind = MANAGEMENT_COMMAND_KIND.changeVersion;
     const inputHash = hashInput({
       commandKind,
       characterId: command.characterId,
       expectedRevision: command.expectedRevision,
-      targetVersionId: command.targetVersionId,
+      target,
     });
     const claimStartedAt = now();
     const claimed = await claimExecution(input.pool, {
@@ -1570,7 +1596,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       const cursor = changed.latestActivity === null ? null : encodeActivityCursor(changed.latestActivity);
       return finish(errors.conflict(record.revision, changed.changedDefinitionIds, cursor));
     }
-    const planned = await planVersionChange(ctx, record, command.targetVersionId);
+    const planned = await planVersionChange(ctx, record, target);
     if (!planned.ok) {
       if (planned.error.code === "internal") return planned;
       // A command must not read as "character not found" to the client
@@ -1580,19 +1606,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
       return finish(planned.error);
     }
-    const { direction, report } = planned.value;
+    const { direction, change, report } = planned.value;
     if (!report.ok || report.nextState === null) {
       const first = report.blockers[0];
       return finish({
         code: "conflict",
-        message: `This character cannot move to that version${first === undefined ? "." : `: ${first.message}`} Check the version first for every blocker.`,
+        message: `This character cannot move to these rules${first === undefined ? "." : `: ${first.message}`} Check the version first for every blocker.`,
         latestRevision: record.revision,
         cacheDisposition: "retain",
       });
     }
     const nextState = report.nextState;
     const resolved = await input.runtime.resolve({
-      versionId: command.targetVersionId,
+      versionId: target.systemVersionId,
+      extensions: target.extensions,
       entityId: record.entityDefinitionId,
       state: nextState,
       intent: { kind: "observe" },
@@ -1602,10 +1629,14 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       if (isFinalizableRuntimeError(resolved.error.code)) return finish(error);
       return { ok: false, error };
     }
-    const activityKind = direction === "upgrade" ? "system_version_upgraded" : "system_version_reverted";
+    const activityKind = compositionActivityKind(change);
+    const from: Composition = { systemVersionId: record.systemVersionId, extensions: sortExtensionRefs(record.extensions) };
     const payload = {
       fromVersionId: record.systemVersionId,
-      toVersionId: command.targetVersionId,
+      toVersionId: target.systemVersionId,
+      from,
+      to: target,
+      change,
       direction,
       updatedEntries: report.changedEntries.length,
       addedFields: report.addedFields,
@@ -1618,16 +1649,16 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       expectedRevision: command.expectedRevision,
       mutation: {
         kind: "changeVersion",
-        fromVersionId: record.systemVersionId,
-        toVersionId: command.targetVersionId,
-        previousVersionId: direction === "upgrade" ? record.systemVersionId : null,
+        from,
+        to: target,
+        previous: direction === "upgrade" ? from : null,
         nextState,
         repinEntryIds: report.changedEntries.filter((entry) => entry.imageUpdated).map((entry) => entry.entryId),
       },
       activity: { kind: activityKind, payloadJson: payload, requestId: ctx.requestId },
       audit: {
         kind: activityKind,
-        summary: direction === "upgrade" ? "System version upgraded" : "System version reverted",
+        summary: compositionActivitySummary(change),
         requestId: ctx.requestId,
       },
       resultExpiresAt: replayExpiresAt,
@@ -2814,20 +2845,36 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         }
         const record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
         if (record === null) return { ok: false, error: errors.not_found() };
-        const previous = await repo.loadPreviousSystemVersionId(record.characterId);
+        const previous = await repo.loadPreviousComposition(record.characterId);
         const described = await input.describeVersionChoices(
-          previous === null ? [record.systemVersionId] : [record.systemVersionId, previous],
+          previous === null ? [record.systemVersionId] : [record.systemVersionId, previous.systemVersionId],
         );
         const upgrades = await input.listUpgradeTargets(ctx, record.systemVersionId);
         if (!described.ok || !upgrades.ok) return { ok: false, error: errors.internal() };
-        const current = described.value.find((choice) => choice.versionId === record.systemVersionId);
-        if (current === undefined) return { ok: false, error: errors.internal() };
+        const currentVersion = described.value.find((choice) => choice.versionId === record.systemVersionId);
+        if (currentVersion === undefined) return { ok: false, error: errors.internal() };
+        const pinned = [...record.extensions, ...(previous?.extensions ?? [])]
+          .filter((ref, index, all) => all.findIndex((other) => other.versionId === ref.versionId) === index);
+        const choices = input.describeCompositionChoices === undefined
+          ? { ok: true as const, value: { pinned: [], available: [] } }
+          : await input.describeCompositionChoices(ctx, { systemId: currentVersion.systemId, pinned });
+        if (!choices.ok) return { ok: false, error: errors.internal() };
+        const extensionsOf = (refs: readonly ExtensionRef[]) => refs.flatMap((ref) => {
+          const choice = choices.value.pinned.find((candidate) => candidate.version.versionId === ref.versionId);
+          return choice === undefined ? [] : [choice];
+        });
+        const previousVersion = previous === null
+          ? undefined
+          : described.value.find((choice) => choice.versionId === previous.systemVersionId);
         return {
           ok: true,
           value: {
-            current,
-            revertTo: previous === null ? null : described.value.find((choice) => choice.versionId === previous) ?? null,
-            upgrades: upgrades.value,
+            current: { systemVersion: currentVersion, extensions: extensionsOf(sortExtensionRefs(record.extensions)) },
+            revertTo: previous === null || previousVersion === undefined
+              ? null
+              : { systemVersion: previousVersion, extensions: extensionsOf(previous.extensions).map((choice) => ({ ...choice, upgrades: [] })) },
+            systemUpgrades: upgrades.value,
+            available: choices.value.available.filter((choice) => !record.extensions.some((ref) => ref.extensionId === choice.extensionId)),
           },
         };
       } catch {
@@ -2837,16 +2884,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
     async checkVersionChange(ctx, request) {
       try {
-        if (typeof request.targetVersionId !== "string" || !VERSION_ID_PATTERN.test(request.targetVersionId)) {
-          return { ok: false, error: errors.bad_request("targetVersionId must be a version UUID.") };
-        }
+        const target = parseComposition(request.target);
+        if (typeof target === "string") return { ok: false, error: errors.bad_request(target) };
         const record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
         if (record === null) return { ok: false, error: errors.not_found() };
-        const planned = await planVersionChange(ctx, record, request.targetVersionId);
+        const planned = await planVersionChange(ctx, record, target);
         if (!planned.ok) return planned;
         return {
           ok: true,
-          value: { revision: record.revision, direction: planned.value.direction, report: withoutNextState(planned.value.report) },
+          value: {
+            revision: record.revision,
+            direction: planned.value.direction,
+            change: planned.value.change,
+            report: withoutNextState(planned.value.report),
+          },
         };
       } catch {
         return { ok: false, error: errors.internal() };
@@ -3346,10 +3397,16 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
       return {};
     case "system_version_upgraded":
     case "system_version_reverted":
-      // Version and definition identifiers only; no stored values.
+    case "extension_added":
+    case "extension_removed":
+    case "extension_upgraded":
+      // Version, extension and definition identifiers only; no stored values.
       return {
         fromVersionId: record.fromVersionId,
         toVersionId: record.toVersionId,
+        ...(record.from === undefined ? {} : { from: compositionRefsOnly(record.from) }),
+        ...(record.to === undefined ? {} : { to: compositionRefsOnly(record.to) }),
+        ...(record.change === undefined ? {} : { change: record.change }),
         direction: record.direction,
         updatedEntries: record.updatedEntries,
         addedFields: record.addedFields ?? [],
@@ -3361,6 +3418,11 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
     default:
       return {};
   }
+}
+
+function compositionRefsOnly(value: unknown): { systemVersionId: unknown; extensions: Array<{ extensionId: unknown; versionId: unknown }> } {
+  const composition = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
+  return { systemVersionId: composition.systemVersionId, extensions: extensionRefsOnly(composition.extensions) };
 }
 
 function extensionRefsOnly(value: unknown): Array<{ extensionId: unknown; versionId: unknown }> {

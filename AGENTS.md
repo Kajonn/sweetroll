@@ -114,3 +114,11 @@ change characters on their own, a person may apply a saved roll). All stages
 S1–S11 of the [plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md)
 are implemented (design Sections 6.1, 6.3 and 6.4); see its implementation record
 for what is not done. The 512-field budget is now the binding limit of the 5e system.
+
+System extensions ([plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
+owner-approved X1–X13): stages E1–E5 are implemented. E5 (2026-11-21) replaced
+the character and campaign `version-*` routes with `composition-options`,
+`composition-check` and `composition`: one change per command (base upgrade, or
+add/remove/upgrade one extension) or a revert to the previous composition.
+E4b is deferred, E7 needs separate approval, and the remaining E6 GUI items and
+the E8 journeys are open.

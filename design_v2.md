@@ -456,8 +456,9 @@ first upgrade it to that version.
 
 **Revert (owner decision 2026-11-07).** A character or campaign can return to
 the version it used before its most recent upgrade. The upgrade stores that
-version as `previous_system_version_id`; a revert clears it, so a second revert is
-not possible until the next upgrade. Revert uses the same dry run and commit as an
+composition (Section 6.8) as `previous_system_version_id` plus the
+`character_previous_extensions` or `campaign_previous_extensions` rows; a revert
+clears it, so a second revert is not possible until the next change. Revert uses the same dry run and commit as an
 upgrade, but against the previous version and without the package-level check,
 because undoing additions always reads as removals. Current values are kept by
 identifier, so play since the upgrade (damage, resources, notes) is not lost.
@@ -472,21 +473,24 @@ version other than the recorded previous one, moving between different systems,
 automatic upgrades on publish and lineage tables. A blocked character stays on its
 version; create a new character to use a breaking version. Version selection lists
 later authorized versions and the revert target; choosing one runs the check for
-this character before anything is saved. Standalone characters use
-`GET /characters/:id/version-options`, `GET /characters/:id/version-check?targetVersionId=`
-and `POST /characters/:id/version` (`{ targetVersionId, expectedRevision, idempotencyKey }`);
+this character before anything is saved. A target is a composition
+`{ systemVersionId, extensions: [{ extensionId, versionId }] }` (Section 6.8).
+Standalone characters use `GET /characters/:id/composition-options`,
+`POST /characters/:id/composition-check` (`{ target }`) and
+`POST /characters/:id/composition` (`{ target, expectedRevision, idempotencyKey }`);
 attached characters move only with their campaign, through the GM/co-GM routes
-`GET /campaigns/:id/version-options`, `GET /campaigns/:id/version-check?targetVersionId=`
-and `POST /campaigns/:id/version` (`{ targetVersionId, expectedCampaignRevision, idempotencyKey }`).
+`GET /campaigns/:id/composition-options`, `POST /campaigns/:id/composition-check`
+and `POST /campaigns/:id/composition` (`{ target, expectedCampaignRevision, idempotencyKey }`).
 The campaign check lists every attached character and every system-based campaign
 template with its blockers; the commit locks the campaign, then its characters and
 templates, re-verifies them and writes the campaign pin, each character and a new
 template content revision with the re-pinned base in one transaction. A campaign
-records `previous_system_version_id` like a character. A blocked change returns 409,
-and activity records `system_version_upgraded` or `system_version_reverted` with
-version and definition identifiers only; the campaign feed shows the same kinds to
-all members. In the GUI, **Rules version** sits in the character tools (standalone
-characters) and in campaign Settings (GM/co-GM). Both run the check before offering
+records its previous composition like a character. A blocked change returns 409,
+and activity records `system_version_upgraded`, `system_version_reverted`,
+`extension_added`, `extension_removed` or `extension_upgraded` with version,
+extension and definition identifiers only; the campaign feed shows the same kinds
+to all members. In the GUI, **Rules and extensions** sits in the character tools
+(standalone characters) and in campaign Settings (GM/co-GM). Both run the check before offering
 **Upgrade** or **Revert**, and the character change uses the session's durable
 online-attempt ordering like archive/recover. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
 defines the delivery stages.
@@ -519,9 +523,24 @@ character whose extension set changes: each gets a new revision and an
 identifiers, so commands prepared against the earlier revision are refused
 with 409 and clients reconciling by revision refetch. The campaign is locked
 before its characters, and an entry naming an extension is rechecked against
-the locked character's composition before commit (X9; issue #60). Until E5, characters and campaigns with extensions
-cannot change rules version; campaign templates based on extension templates
-are a deferred follow-up (E4b).
+the locked character's composition before commit (X9; issue #60). Campaign
+templates based on extension templates are a deferred follow-up (E4b).
+
+**Composition changes (E5, X11).** Section 6.7 applies to whole compositions.
+One change is made at a time: upgrade the base version, add an extension, remove
+one, or upgrade one to a later published version of the same extension; or revert
+to the composition recorded before the most recent change, whatever it changed.
+A request that changes more than one part is refused with 400. An upgrade must
+name a later version the actor may use; an added extension must be usable by the
+actor and extend the same system; removal and revert need no use authorization.
+The dry run compares the effective packages (base plus extensions, extension
+templates keyed by extension), so an entry from a removed extension, or a breaking
+change to an extension template the character uses, blocks the change, and
+unchanged template defaults follow the new extension version. A campaign change
+covers every attached character and blocks on any one; kept and upgraded campaign
+extensions keep their origin (`added_by`), and the GM add and remove extension
+commands also record the previous composition, so a revert undoes the most recent
+GM change. Adoptions that bring extensions do not record one.
 
 **Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
 discovering and previewing published extensions. It depends on OD-07 and needs its

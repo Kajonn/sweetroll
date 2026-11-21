@@ -1,6 +1,7 @@
 import { createImageEditorApi, type ImageEditorApi } from "../ui/imageEditorApi.js";
 import { ApiError, type ApiClient } from "../api/client.js";
 import { createCharacterImagesApi, type CharacterImagesApi } from "./imageApi.js";
+import type { Composition } from "./compositionChoices.js";
 import type {
   CharacterDecksResponse,PushOptionsResponse,ReadRollResponse,RollOptionsResponse,
   ActivityResponse,
@@ -86,7 +87,7 @@ export type CharactersApi = {
   export(characterId: string): Promise<CharacterExport>;
   /** Design 6.7 read-only version choices and dry run; the change itself goes through the session. */
   versionOptions?(characterId: string): Promise<VersionOptionsResponse>;
-  versionCheck?(characterId: string, targetVersionId: string): Promise<VersionCheckResponse>;
+  versionCheck?(characterId: string, target: Composition): Promise<VersionCheckResponse>;
 };
 
 export function createCharactersApi(client: ApiClient): CharactersApi {
@@ -183,10 +184,10 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
     export: (characterId) =>
       client.fetch<CharacterExport>("POST", `/characters/${characterId}/exports`),
     versionOptions: (characterId) =>
-      client.fetch<VersionOptionsResponse>("GET", `/characters/${encodeURIComponent(characterId)}/version-options`),
-    versionCheck: (characterId, targetVersionId) =>
-      client.fetch<VersionCheckResponse>("GET", `/characters/${encodeURIComponent(characterId)}/version-check`, {
-        query: { targetVersionId },
+      client.fetch<VersionOptionsResponse>("GET", `/characters/${encodeURIComponent(characterId)}/composition-options`),
+    versionCheck: (characterId, target) =>
+      client.fetch<VersionCheckResponse>("POST", `/characters/${encodeURIComponent(characterId)}/composition-check`, {
+        body: { target },
       }),
   };
 }

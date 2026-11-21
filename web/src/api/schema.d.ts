@@ -836,14 +836,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/characters/{characterId}/version-options": {
+    "/characters/{characterId}/composition-options": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["get_characters_characterId_version_options"];
+        get: operations["get_characters_characterId_composition_options"];
         put?: never;
         post?: never;
         delete?: never;
@@ -852,23 +852,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/characters/{characterId}/version-check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_characters_characterId_version_check"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/characters/{characterId}/version": {
+    "/characters/{characterId}/composition-check": {
         parameters: {
             query?: never;
             header?: never;
@@ -877,7 +861,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["post_characters_characterId_version"];
+        post: operations["post_characters_characterId_composition_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/characters/{characterId}/composition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_characters_characterId_composition"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1252,14 +1252,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/campaigns/{id}/version-options": {
+    "/campaigns/{id}/composition-options": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["get_campaigns_id_version_options"];
+        get: operations["get_campaigns_id_composition_options"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1268,23 +1268,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/campaigns/{id}/version-check": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["get_campaigns_id_version_check"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/campaigns/{id}/version": {
+    "/campaigns/{id}/composition-check": {
         parameters: {
             query?: never;
             header?: never;
@@ -1293,7 +1277,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["post_campaigns_id_version"];
+        post: operations["post_campaigns_id_composition_check"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/campaigns/{id}/composition": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["post_campaigns_id_composition"];
         delete?: never;
         options?: never;
         head?: never;
@@ -19716,7 +19716,7 @@ export interface operations {
             };
         };
     };
-    get_characters_characterId_version_options: {
+    get_characters_characterId_composition_options: {
         parameters: {
             query?: never;
             header?: never;
@@ -19735,26 +19735,80 @@ export interface operations {
                     "application/json": {
                         options: {
                             current: {
-                                /** Format: uuid */
-                                versionId: string;
-                                /** Format: uuid */
-                                systemId: string;
-                                semanticVersion: string;
-                                releaseNotes: string;
-                                /** Format: date-time */
-                                createdAt: string;
+                                systemVersion: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    name: string;
+                                    version: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    };
+                                    upgrades: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    }[];
+                                }[];
                             };
                             revertTo: {
-                                /** Format: uuid */
-                                versionId: string;
-                                /** Format: uuid */
-                                systemId: string;
-                                semanticVersion: string;
-                                releaseNotes: string;
-                                /** Format: date-time */
-                                createdAt: string;
+                                systemVersion: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    name: string;
+                                    version: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    };
+                                    upgrades: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    }[];
+                                }[];
                             } | null;
-                            upgrades: {
+                            systemUpgrades: {
                                 /** Format: uuid */
                                 versionId: string;
                                 /** Format: uuid */
@@ -19763,6 +19817,31 @@ export interface operations {
                                 releaseNotes: string;
                                 /** Format: date-time */
                                 createdAt: string;
+                            }[];
+                            available: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                name: string;
+                                version: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                upgrades: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                }[];
                             }[];
                         };
                         requestId: string;
@@ -19978,18 +20057,31 @@ export interface operations {
             };
         };
     };
-    get_characters_characterId_version_check: {
+    post_characters_characterId_composition_check: {
         parameters: {
-            query: {
-                targetVersionId: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 characterId: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    target: {
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
+                    };
+                };
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -20000,6 +20092,31 @@ export interface operations {
                         check: {
                             revision: number;
                             direction: "upgrade" | "revert";
+                            change: {
+                                /** @constant */
+                                kind: "revert";
+                            } | {
+                                /** @constant */
+                                kind: "system_upgrade";
+                                fromVersionId: string;
+                                toVersionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_add";
+                                extensionId: string;
+                                versionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_remove";
+                                extensionId: string;
+                                versionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_upgrade";
+                                extensionId: string;
+                                fromVersionId: string;
+                                toVersionId: string;
+                            };
                             report: {
                                 ok: boolean;
                                 direction: "upgrade" | "revert";
@@ -20249,7 +20366,7 @@ export interface operations {
             };
         };
     };
-    post_characters_characterId_version: {
+    post_characters_characterId_composition: {
         parameters: {
             query?: never;
             header?: never;
@@ -20261,8 +20378,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    targetVersionId: string;
+                    target: {
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
+                    };
                     expectedRevision: number;
                     idempotencyKey: string;
                 };
@@ -26756,7 +26881,7 @@ export interface operations {
             };
         };
     };
-    get_campaigns_id_version_options: {
+    get_campaigns_id_composition_options: {
         parameters: {
             query?: never;
             header?: never;
@@ -26775,26 +26900,80 @@ export interface operations {
                     "application/json": {
                         options: {
                             current: {
-                                /** Format: uuid */
-                                versionId: string;
-                                /** Format: uuid */
-                                systemId: string;
-                                semanticVersion: string;
-                                releaseNotes: string;
-                                /** Format: date-time */
-                                createdAt: string;
+                                systemVersion: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    name: string;
+                                    version: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    };
+                                    upgrades: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    }[];
+                                }[];
                             };
                             revertTo: {
-                                /** Format: uuid */
-                                versionId: string;
-                                /** Format: uuid */
-                                systemId: string;
-                                semanticVersion: string;
-                                releaseNotes: string;
-                                /** Format: date-time */
-                                createdAt: string;
+                                systemVersion: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    name: string;
+                                    version: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    };
+                                    upgrades: {
+                                        /** Format: uuid */
+                                        versionId: string;
+                                        /** Format: uuid */
+                                        systemId: string;
+                                        semanticVersion: string;
+                                        releaseNotes: string;
+                                        /** Format: date-time */
+                                        createdAt: string;
+                                    }[];
+                                }[];
                             } | null;
-                            upgrades: {
+                            systemUpgrades: {
                                 /** Format: uuid */
                                 versionId: string;
                                 /** Format: uuid */
@@ -26803,6 +26982,31 @@ export interface operations {
                                 releaseNotes: string;
                                 /** Format: date-time */
                                 createdAt: string;
+                            }[];
+                            available: {
+                                /** Format: uuid */
+                                extensionId: string;
+                                name: string;
+                                version: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                };
+                                upgrades: {
+                                    /** Format: uuid */
+                                    versionId: string;
+                                    /** Format: uuid */
+                                    systemId: string;
+                                    semanticVersion: string;
+                                    releaseNotes: string;
+                                    /** Format: date-time */
+                                    createdAt: string;
+                                }[];
                             }[];
                         };
                         requestId: string;
@@ -26916,18 +27120,31 @@ export interface operations {
             };
         };
     };
-    get_campaigns_id_version_check: {
+    post_campaigns_id_composition_check: {
         parameters: {
-            query: {
-                targetVersionId: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 id: string;
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": {
+                    target: {
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
+                    };
+                };
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -26938,8 +27155,53 @@ export interface operations {
                         check: {
                             revision: number;
                             direction: "upgrade" | "revert";
+                            change: {
+                                /** @constant */
+                                kind: "revert";
+                            } | {
+                                /** @constant */
+                                kind: "system_upgrade";
+                                fromVersionId: string;
+                                toVersionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_add";
+                                extensionId: string;
+                                versionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_remove";
+                                extensionId: string;
+                                versionId: string;
+                            } | {
+                                /** @constant */
+                                kind: "extension_upgrade";
+                                extensionId: string;
+                                fromVersionId: string;
+                                toVersionId: string;
+                            };
                             fromVersionId: string;
                             toVersionId: string;
+                            from: {
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
+                            };
+                            to: {
+                                /** Format: uuid */
+                                systemVersionId: string;
+                                extensions: {
+                                    /** Format: uuid */
+                                    extensionId: string;
+                                    /** Format: uuid */
+                                    versionId: string;
+                                }[];
+                            };
                             ok: boolean;
                             characters: {
                                 /** Format: uuid */
@@ -27105,7 +27367,7 @@ export interface operations {
             };
         };
     };
-    post_campaigns_id_version: {
+    post_campaigns_id_composition: {
         parameters: {
             query?: never;
             header?: never;
@@ -27117,8 +27379,16 @@ export interface operations {
         requestBody?: {
             content: {
                 "application/json": {
-                    /** Format: uuid */
-                    targetVersionId: string;
+                    target: {
+                        /** Format: uuid */
+                        systemVersionId: string;
+                        extensions: {
+                            /** Format: uuid */
+                            extensionId: string;
+                            /** Format: uuid */
+                            versionId: string;
+                        }[];
+                    };
                     expectedCampaignRevision: number;
                     idempotencyKey: string;
                 };
@@ -32698,7 +32968,7 @@ export interface operations {
                         events: {
                             /** Format: uuid */
                             eventId: string;
-                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed";
+                            kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed" | "extension_upgraded";
                             /** Format: uuid */
                             actorId: string;
                             sourceContentId: string | null;
@@ -32938,7 +33208,7 @@ export interface operations {
                             activity: {
                                 /** Format: uuid */
                                 eventId: string;
-                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed";
+                                kind: "template_create" | "template_update" | "template_archive" | "template_recover" | "content_created" | "content_updated" | "content_deleted" | "content_recovered" | "content_grants_replaced" | "roll_executed" | "system_version_upgraded" | "system_version_reverted" | "extension_added" | "extension_removed" | "extension_upgraded";
                                 /** Format: uuid */
                                 actorId: string;
                                 sourceContentId: string | null;

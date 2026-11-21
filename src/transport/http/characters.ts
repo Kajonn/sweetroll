@@ -11,6 +11,7 @@ import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
 
+import type { Composition } from "../../systems/runtime.js";
 import type {
   CharacterCommand,
   CharacterError,
@@ -584,11 +585,82 @@ export const VersionChoiceDto = Type.Object({
   releaseNotes: Type.String(),
   createdAt: Type.String({ format: DATE_TIME_FORMAT }),
 });
-const CharacterVersionOptionsDto = Type.Object({
-  current: VersionChoiceDto,
-  revertTo: Type.Union([VersionChoiceDto, Type.Null()]),
+// Design 6.8 (extensions plan E5): compositions are a base version plus extensions.
+export const CompositionDto = Type.Object(
+  {
+    systemVersionId: Type.String({ format: UUID_FORMAT }),
+    extensions: Type.Array(
+      Type.Object(
+        { extensionId: Type.String({ format: UUID_FORMAT }), versionId: Type.String({ format: UUID_FORMAT }) },
+        { additionalProperties: false },
+      ),
+      { maxItems: 16 },
+    ),
+  },
+  { additionalProperties: false },
+);
+export const ExtensionChoiceDto = Type.Object({
+  extensionId: Type.String({ format: UUID_FORMAT }),
+  name: Type.String(),
+  version: VersionChoiceDto,
   upgrades: Type.Array(VersionChoiceDto),
 });
+export const CompositionDescriptionDto = Type.Object({
+  systemVersion: VersionChoiceDto,
+  extensions: Type.Array(ExtensionChoiceDto),
+});
+export const CompositionOptionsDto = Type.Object({
+  current: CompositionDescriptionDto,
+  revertTo: Type.Union([CompositionDescriptionDto, Type.Null()]),
+  systemUpgrades: Type.Array(VersionChoiceDto),
+  available: Type.Array(ExtensionChoiceDto),
+});
+export const CompositionChangeDto = Type.Union([
+  Type.Object({ kind: Type.Literal("revert") }),
+  Type.Object({ kind: Type.Literal("system_upgrade"), fromVersionId: Type.String(), toVersionId: Type.String() }),
+  Type.Object({ kind: Type.Literal("extension_add"), extensionId: Type.String(), versionId: Type.String() }),
+  Type.Object({ kind: Type.Literal("extension_remove"), extensionId: Type.String(), versionId: Type.String() }),
+  Type.Object({
+    kind: Type.Literal("extension_upgrade"),
+    extensionId: Type.String(),
+    fromVersionId: Type.String(),
+    toVersionId: Type.String(),
+  }),
+]);
+export const CompositionCheckBody = Type.Object({ target: CompositionDto }, { additionalProperties: false });
+export const ChangeCompositionBody = Type.Object(
+  {
+    target: CompositionDto,
+    expectedRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
+
+type CompositionOptionsValue = import("../../systems/composition-change.js").CompositionOptions;
+type ExtensionChoiceValue = import("../../systems/extensions.js").ExtensionChoice;
+
+export function toVersionChoiceDto(choice: VersionChoice) {
+  return { ...choice, createdAt: choice.createdAt.toISOString() };
+}
+
+export function toCompositionOptionsDto(options: CompositionOptionsValue) {
+  const extension = (choice: ExtensionChoiceValue) => ({
+    ...choice,
+    version: toVersionChoiceDto(choice.version),
+    upgrades: choice.upgrades.map(toVersionChoiceDto),
+  });
+  const description = (value: CompositionOptionsValue["current"]) => ({
+    systemVersion: toVersionChoiceDto(value.systemVersion),
+    extensions: value.extensions.map(extension),
+  });
+  return {
+    current: description(options.current),
+    revertTo: options.revertTo === null ? null : description(options.revertTo),
+    systemUpgrades: options.systemUpgrades.map(toVersionChoiceDto),
+    available: options.available.map(extension),
+  };
+}
 export const VersionChangeDirectionDto = Type.Union([Type.Literal("upgrade"), Type.Literal("revert")]);
 export const VersionChangeReportDto = Type.Object({
   ok: Type.Boolean(),
@@ -623,20 +695,9 @@ export const VersionChangeReportDto = Type.Object({
 const CharacterVersionCheckDto = Type.Object({
   revision: Type.Integer(),
   direction: VersionChangeDirectionDto,
+  change: CompositionChangeDto,
   report: VersionChangeReportDto,
 });
-const VersionCheckQuery = Type.Object(
-  { targetVersionId: Type.String({ format: UUID_FORMAT }) },
-  { additionalProperties: false },
-);
-const ChangeVersionBody = Type.Object(
-  {
-    targetVersionId: Type.String({ format: UUID_FORMAT }),
-    expectedRevision: Type.Integer({ minimum: 1 }),
-    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
-  },
-  { additionalProperties: false },
-);
 const DuplicateCharacterBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
 });
@@ -950,23 +1011,23 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
   },
   {
     method: "get",
-    path: "/characters/:characterId/version-options",
-    operationId: "get_characters_characterId_version_options",
+    path: "/characters/:characterId/composition-options",
+    operationId: "get_characters_characterId_composition_options",
     schema: {
       params: CharacterIdParams,
       response: {
-        "200": Type.Object({ options: CharacterVersionOptionsDto, requestId: Type.String() }),
+        "200": Type.Object({ options: CompositionOptionsDto, requestId: Type.String() }),
         ...ErrorResponses,
       },
     },
   },
   {
-    method: "get",
-    path: "/characters/:characterId/version-check",
-    operationId: "get_characters_characterId_version_check",
+    method: "post",
+    path: "/characters/:characterId/composition-check",
+    operationId: "post_characters_characterId_composition_check",
     schema: {
       params: CharacterIdParams,
-      querystring: VersionCheckQuery,
+      body: CompositionCheckBody,
       response: {
         "200": Type.Object({ check: CharacterVersionCheckDto, requestId: Type.String() }),
         ...ErrorResponses,
@@ -975,11 +1036,11 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
   },
   {
     method: "post",
-    path: "/characters/:characterId/version",
-    operationId: "post_characters_characterId_version",
+    path: "/characters/:characterId/composition",
+    operationId: "post_characters_characterId_composition",
     schema: {
       params: CharacterIdParams,
-      body: ChangeVersionBody,
+      body: ChangeCompositionBody,
       response: {
         "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
         ...ErrorResponses,
@@ -1532,41 +1593,33 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },
 
-      get_characters_characterId_version_options: async (request, reply) => {
+      get_characters_characterId_composition_options: async (request, reply) => {
         const params = request.params as { characterId: string };
         const result = await characters.listVersionOptions(ctxOf(request), { characterId: params.characterId });
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("cache-control", "private, no-store");
-        const toDto = (choice: VersionChoice) => ({ ...choice, createdAt: choice.createdAt.toISOString() });
-        return {
-          options: {
-            current: toDto(result.value.current),
-            revertTo: result.value.revertTo === null ? null : toDto(result.value.revertTo),
-            upgrades: result.value.upgrades.map(toDto),
-          },
-          requestId: request.id,
-        };
+        return { options: toCompositionOptionsDto(result.value), requestId: request.id };
       },
 
-      get_characters_characterId_version_check: async (request, reply) => {
+      post_characters_characterId_composition_check: async (request, reply) => {
         const params = request.params as { characterId: string };
-        const query = request.query as { targetVersionId: string };
+        const body = request.body as { target: unknown };
         const result = await characters.checkVersionChange(ctxOf(request), {
           characterId: params.characterId,
-          targetVersionId: query.targetVersionId,
+          target: body.target,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("cache-control", "private, no-store");
         return { check: result.value, requestId: request.id };
       },
 
-      post_characters_characterId_version: async (request, reply) => {
+      post_characters_characterId_composition: async (request, reply) => {
         const params = request.params as { characterId: string };
-        const body = request.body as { targetVersionId: string; expectedRevision: number; idempotencyKey: string };
+        const body = request.body as { target: Composition; expectedRevision: number; idempotencyKey: string };
         const result = await characters.manage(ctxOf(request), {
           kind: "changeVersion",
           characterId: params.characterId,
-          targetVersionId: body.targetVersionId,
+          target: body.target,
           expectedRevision: body.expectedRevision,
           idempotencyKey: body.idempotencyKey,
         });

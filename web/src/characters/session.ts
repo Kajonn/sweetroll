@@ -1,5 +1,6 @@
 import { ApiError } from "../api/client.js";
 import type { CampaignRollSelection } from "./types.js";
+import type { Composition } from "./compositionChoices.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt, WriteGuard } from "./store.js";
 import { validPushResponse } from "./push-response.js";
@@ -139,7 +140,8 @@ export type CharacterSession = {
    * system (a checked upgrade or the recorded revert target). Online only,
    * through the same durable attempt ordering as archive/recover.
    */
-  changeVersion(targetVersionId: string): Promise<void>;
+  /** Design 6.7/6.8: move to another composition (online only). */
+  changeVersion(target: Composition): Promise<void>;
   /**
    * Explicit unknown-outcome review for one retained expired online attempt.
    * Never retries the stored request and never mints a replacement: it
@@ -1164,7 +1166,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   type OnlineOperation =
     | {kind:"push";operation:"push";parentRollId:string}
     | { kind: "archive" | "recover"; operation: "archive" | "recover" }
-    | { kind: "version"; operation: "version"; targetVersionId: string };
+    | { kind: "version"; operation: "version"; target: Composition };
 
   function onlineAttemptMatches(attempt: OnlineAttempt, op: OnlineOperation): boolean {
     if (attempt.characterId !== characterId) return false;
@@ -1263,8 +1265,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (op.operation === "version") {
       return {
         method: "POST",
-        path: `/characters/${characterId}/version`,
-        body: { targetVersionId: op.targetVersionId, expectedRevision, idempotencyKey: key },
+        path: `/characters/${characterId}/composition`,
+        body: { target: op.target, expectedRevision, idempotencyKey: key },
         firstAttemptAt,
       };
     }
@@ -2070,8 +2072,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     async recover(): Promise<void> {
       await runOnlineOperation({ kind: "recover", operation: "recover" });
     },
-    async changeVersion(targetVersionId: string): Promise<void> {
-      await runOnlineOperation({ kind: "version", operation: "version", targetVersionId });
+    async changeVersion(target: Composition): Promise<void> {
+      await runOnlineOperation({ kind: "version", operation: "version", target });
     },
     reviewExpiredAttempt(input) {
       return trackOnline(reviewExpiredAttemptInner(input));

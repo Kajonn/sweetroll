@@ -172,6 +172,8 @@ export async function buildI6Harness(input?: {
     authorizeExtensionUse: extensions.authorizeExtensionUse,
     listUpgradeTargets: authoring.listUpgradeTargets,
     describeVersionChoices: authoring.describeVersionChoices,
+    listExtensionUpgradeTargets: extensions.listUpgradeTargets,
+    describeCompositionChoices: extensions.describeCompositionChoices,
       });
       const browser = buildCampaignsRoutes({ campaigns, characters, runtime, identity });
       if (!input?.publicApi) return browser;

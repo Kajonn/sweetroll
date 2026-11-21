@@ -74108,9 +74108,9 @@
         }
       }
     },
-    "/characters/{characterId}/version-options": {
+    "/characters/{characterId}/composition-options": {
       "get": {
-        "operationId": "get_characters_characterId_version_options",
+        "operationId": "get_characters_characterId_composition_options",
         "parameters": [
           {
             "name": "characterId",
@@ -74138,42 +74138,18 @@
                       "required": [
                         "current",
                         "revertTo",
-                        "upgrades"
+                        "systemUpgrades",
+                        "available"
                       ],
                       "properties": {
                         "current": {
                           "type": "object",
                           "required": [
-                            "versionId",
-                            "systemId",
-                            "semanticVersion",
-                            "releaseNotes",
-                            "createdAt"
+                            "systemVersion",
+                            "extensions"
                           ],
                           "properties": {
-                            "versionId": {
-                              "format": "uuid",
-                              "type": "string"
-                            },
-                            "systemId": {
-                              "format": "uuid",
-                              "type": "string"
-                            },
-                            "semanticVersion": {
-                              "type": "string"
-                            },
-                            "releaseNotes": {
-                              "type": "string"
-                            },
-                            "createdAt": {
-                              "format": "date-time",
-                              "type": "string"
-                            }
-                          }
-                        },
-                        "revertTo": {
-                          "anyOf": [
-                            {
+                            "systemVersion": {
                               "type": "object",
                               "required": [
                                 "versionId",
@@ -74203,12 +74179,223 @@
                                 }
                               }
                             },
+                            "extensions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "name",
+                                  "version",
+                                  "upgrades"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "type": "object",
+                                    "required": [
+                                      "versionId",
+                                      "systemId",
+                                      "semanticVersion",
+                                      "releaseNotes",
+                                      "createdAt"
+                                    ],
+                                    "properties": {
+                                      "versionId": {
+                                        "format": "uuid",
+                                        "type": "string"
+                                      },
+                                      "systemId": {
+                                        "format": "uuid",
+                                        "type": "string"
+                                      },
+                                      "semanticVersion": {
+                                        "type": "string"
+                                      },
+                                      "releaseNotes": {
+                                        "type": "string"
+                                      },
+                                      "createdAt": {
+                                        "format": "date-time",
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "upgrades": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "versionId",
+                                        "systemId",
+                                        "semanticVersion",
+                                        "releaseNotes",
+                                        "createdAt"
+                                      ],
+                                      "properties": {
+                                        "versionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
+                                        "systemId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
+                                        "semanticVersion": {
+                                          "type": "string"
+                                        },
+                                        "releaseNotes": {
+                                          "type": "string"
+                                        },
+                                        "createdAt": {
+                                          "format": "date-time",
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "revertTo": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "systemVersion",
+                                "extensions"
+                              ],
+                              "properties": {
+                                "systemVersion": {
+                                  "type": "object",
+                                  "required": [
+                                    "versionId",
+                                    "systemId",
+                                    "semanticVersion",
+                                    "releaseNotes",
+                                    "createdAt"
+                                  ],
+                                  "properties": {
+                                    "versionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "systemId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "semanticVersion": {
+                                      "type": "string"
+                                    },
+                                    "releaseNotes": {
+                                      "type": "string"
+                                    },
+                                    "createdAt": {
+                                      "format": "date-time",
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "extensions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "extensionId",
+                                      "name",
+                                      "version",
+                                      "upgrades"
+                                    ],
+                                    "properties": {
+                                      "extensionId": {
+                                        "format": "uuid",
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "version": {
+                                        "type": "object",
+                                        "required": [
+                                          "versionId",
+                                          "systemId",
+                                          "semanticVersion",
+                                          "releaseNotes",
+                                          "createdAt"
+                                        ],
+                                        "properties": {
+                                          "versionId": {
+                                            "format": "uuid",
+                                            "type": "string"
+                                          },
+                                          "systemId": {
+                                            "format": "uuid",
+                                            "type": "string"
+                                          },
+                                          "semanticVersion": {
+                                            "type": "string"
+                                          },
+                                          "releaseNotes": {
+                                            "type": "string"
+                                          },
+                                          "createdAt": {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          }
+                                        }
+                                      },
+                                      "upgrades": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "versionId",
+                                            "systemId",
+                                            "semanticVersion",
+                                            "releaseNotes",
+                                            "createdAt"
+                                          ],
+                                          "properties": {
+                                            "versionId": {
+                                              "format": "uuid",
+                                              "type": "string"
+                                            },
+                                            "systemId": {
+                                              "format": "uuid",
+                                              "type": "string"
+                                            },
+                                            "semanticVersion": {
+                                              "type": "string"
+                                            },
+                                            "releaseNotes": {
+                                              "type": "string"
+                                            },
+                                            "createdAt": {
+                                              "format": "date-time",
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
                             {
                               "type": "null"
                             }
                           ]
                         },
-                        "upgrades": {
+                        "systemUpgrades": {
                           "type": "array",
                           "items": {
                             "type": "object",
@@ -74237,6 +74424,90 @@
                               "createdAt": {
                                 "format": "date-time",
                                 "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "available": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "name",
+                              "version",
+                              "upgrades"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "object",
+                                "required": [
+                                  "versionId",
+                                  "systemId",
+                                  "semanticVersion",
+                                  "releaseNotes",
+                                  "createdAt"
+                                ],
+                                "properties": {
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "systemId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "semanticVersion": {
+                                    "type": "string"
+                                  },
+                                  "releaseNotes": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "format": "date-time",
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "upgrades": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "versionId",
+                                    "systemId",
+                                    "semanticVersion",
+                                    "releaseNotes",
+                                    "createdAt"
+                                  ],
+                                  "properties": {
+                                    "versionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "systemId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "semanticVersion": {
+                                      "type": "string"
+                                    },
+                                    "releaseNotes": {
+                                      "type": "string"
+                                    },
+                                    "createdAt": {
+                                      "format": "date-time",
+                                      "type": "string"
+                                    }
+                                  }
+                                }
                               }
                             }
                           }
@@ -75146,22 +75417,64 @@
         }
       }
     },
-    "/characters/{characterId}/version-check": {
-      "get": {
-        "operationId": "get_characters_characterId_version_check",
+    "/characters/{characterId}/composition-check": {
+      "post": {
+        "operationId": "post_characters_characterId_composition_check",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "systemVersionId",
+                      "extensions"
+                    ],
+                    "properties": {
+                      "systemVersionId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "extensions": {
+                        "maxItems": 16,
+                        "type": "array",
+                        "items": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "extensionId",
+                            "versionId"
+                          ],
+                          "properties": {
+                            "extensionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "versionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "name": "characterId",
             "in": "path",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "targetVersionId",
-            "in": "query",
             "required": true,
             "schema": {
               "format": "uuid",
@@ -75185,6 +75498,7 @@
                       "required": [
                         "revision",
                         "direction",
+                        "change",
                         "report"
                       ],
                       "properties": {
@@ -75200,6 +75514,106 @@
                             {
                               "const": "revert",
                               "type": "string"
+                            }
+                          ]
+                        },
+                        "change": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "revert",
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "fromVersionId",
+                                "toVersionId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "system_upgrade",
+                                  "type": "string"
+                                },
+                                "fromVersionId": {
+                                  "type": "string"
+                                },
+                                "toVersionId": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "extensionId",
+                                "versionId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "extension_add",
+                                  "type": "string"
+                                },
+                                "extensionId": {
+                                  "type": "string"
+                                },
+                                "versionId": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "extensionId",
+                                "versionId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "extension_remove",
+                                  "type": "string"
+                                },
+                                "extensionId": {
+                                  "type": "string"
+                                },
+                                "versionId": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "extensionId",
+                                "fromVersionId",
+                                "toVersionId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "extension_upgrade",
+                                  "type": "string"
+                                },
+                                "extensionId": {
+                                  "type": "string"
+                                },
+                                "fromVersionId": {
+                                  "type": "string"
+                                },
+                                "toVersionId": {
+                                  "type": "string"
+                                }
+                              }
                             }
                           ]
                         },
@@ -76293,9 +76707,9 @@
         }
       }
     },
-    "/characters/{characterId}/version": {
+    "/characters/{characterId}/composition": {
       "post": {
-        "operationId": "post_characters_characterId_version",
+        "operationId": "post_characters_characterId_composition",
         "requestBody": {
           "content": {
             "application/json": {
@@ -76303,14 +76717,46 @@
                 "additionalProperties": false,
                 "type": "object",
                 "required": [
-                  "targetVersionId",
+                  "target",
                   "expectedRevision",
                   "idempotencyKey"
                 ],
                 "properties": {
-                  "targetVersionId": {
-                    "format": "uuid",
-                    "type": "string"
+                  "target": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "systemVersionId",
+                      "extensions"
+                    ],
+                    "properties": {
+                      "systemVersionId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "extensions": {
+                        "maxItems": 16,
+                        "type": "array",
+                        "items": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "extensionId",
+                            "versionId"
+                          ],
+                          "properties": {
+                            "extensionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "versionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
                   },
                   "expectedRevision": {
                     "minimum": 1,
@@ -99333,9 +99779,9 @@
         }
       }
     },
-    "/campaigns/{id}/version-options": {
+    "/campaigns/{id}/composition-options": {
       "get": {
-        "operationId": "get_campaigns_id_version_options",
+        "operationId": "get_campaigns_id_composition_options",
         "parameters": [
           {
             "name": "id",
@@ -99363,42 +99809,18 @@
                       "required": [
                         "current",
                         "revertTo",
-                        "upgrades"
+                        "systemUpgrades",
+                        "available"
                       ],
                       "properties": {
                         "current": {
                           "type": "object",
                           "required": [
-                            "versionId",
-                            "systemId",
-                            "semanticVersion",
-                            "releaseNotes",
-                            "createdAt"
+                            "systemVersion",
+                            "extensions"
                           ],
                           "properties": {
-                            "versionId": {
-                              "format": "uuid",
-                              "type": "string"
-                            },
-                            "systemId": {
-                              "format": "uuid",
-                              "type": "string"
-                            },
-                            "semanticVersion": {
-                              "type": "string"
-                            },
-                            "releaseNotes": {
-                              "type": "string"
-                            },
-                            "createdAt": {
-                              "format": "date-time",
-                              "type": "string"
-                            }
-                          }
-                        },
-                        "revertTo": {
-                          "anyOf": [
-                            {
+                            "systemVersion": {
                               "type": "object",
                               "required": [
                                 "versionId",
@@ -99428,12 +99850,223 @@
                                 }
                               }
                             },
+                            "extensions": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "name",
+                                  "version",
+                                  "upgrades"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "version": {
+                                    "type": "object",
+                                    "required": [
+                                      "versionId",
+                                      "systemId",
+                                      "semanticVersion",
+                                      "releaseNotes",
+                                      "createdAt"
+                                    ],
+                                    "properties": {
+                                      "versionId": {
+                                        "format": "uuid",
+                                        "type": "string"
+                                      },
+                                      "systemId": {
+                                        "format": "uuid",
+                                        "type": "string"
+                                      },
+                                      "semanticVersion": {
+                                        "type": "string"
+                                      },
+                                      "releaseNotes": {
+                                        "type": "string"
+                                      },
+                                      "createdAt": {
+                                        "format": "date-time",
+                                        "type": "string"
+                                      }
+                                    }
+                                  },
+                                  "upgrades": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "required": [
+                                        "versionId",
+                                        "systemId",
+                                        "semanticVersion",
+                                        "releaseNotes",
+                                        "createdAt"
+                                      ],
+                                      "properties": {
+                                        "versionId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
+                                        "systemId": {
+                                          "format": "uuid",
+                                          "type": "string"
+                                        },
+                                        "semanticVersion": {
+                                          "type": "string"
+                                        },
+                                        "releaseNotes": {
+                                          "type": "string"
+                                        },
+                                        "createdAt": {
+                                          "format": "date-time",
+                                          "type": "string"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "revertTo": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "systemVersion",
+                                "extensions"
+                              ],
+                              "properties": {
+                                "systemVersion": {
+                                  "type": "object",
+                                  "required": [
+                                    "versionId",
+                                    "systemId",
+                                    "semanticVersion",
+                                    "releaseNotes",
+                                    "createdAt"
+                                  ],
+                                  "properties": {
+                                    "versionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "systemId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "semanticVersion": {
+                                      "type": "string"
+                                    },
+                                    "releaseNotes": {
+                                      "type": "string"
+                                    },
+                                    "createdAt": {
+                                      "format": "date-time",
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "extensions": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "required": [
+                                      "extensionId",
+                                      "name",
+                                      "version",
+                                      "upgrades"
+                                    ],
+                                    "properties": {
+                                      "extensionId": {
+                                        "format": "uuid",
+                                        "type": "string"
+                                      },
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "version": {
+                                        "type": "object",
+                                        "required": [
+                                          "versionId",
+                                          "systemId",
+                                          "semanticVersion",
+                                          "releaseNotes",
+                                          "createdAt"
+                                        ],
+                                        "properties": {
+                                          "versionId": {
+                                            "format": "uuid",
+                                            "type": "string"
+                                          },
+                                          "systemId": {
+                                            "format": "uuid",
+                                            "type": "string"
+                                          },
+                                          "semanticVersion": {
+                                            "type": "string"
+                                          },
+                                          "releaseNotes": {
+                                            "type": "string"
+                                          },
+                                          "createdAt": {
+                                            "format": "date-time",
+                                            "type": "string"
+                                          }
+                                        }
+                                      },
+                                      "upgrades": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "required": [
+                                            "versionId",
+                                            "systemId",
+                                            "semanticVersion",
+                                            "releaseNotes",
+                                            "createdAt"
+                                          ],
+                                          "properties": {
+                                            "versionId": {
+                                              "format": "uuid",
+                                              "type": "string"
+                                            },
+                                            "systemId": {
+                                              "format": "uuid",
+                                              "type": "string"
+                                            },
+                                            "semanticVersion": {
+                                              "type": "string"
+                                            },
+                                            "releaseNotes": {
+                                              "type": "string"
+                                            },
+                                            "createdAt": {
+                                              "format": "date-time",
+                                              "type": "string"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            },
                             {
                               "type": "null"
                             }
                           ]
                         },
-                        "upgrades": {
+                        "systemUpgrades": {
                           "type": "array",
                           "items": {
                             "type": "object",
@@ -99462,6 +100095,90 @@
                               "createdAt": {
                                 "format": "date-time",
                                 "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "available": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "required": [
+                              "extensionId",
+                              "name",
+                              "version",
+                              "upgrades"
+                            ],
+                            "properties": {
+                              "extensionId": {
+                                "format": "uuid",
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "version": {
+                                "type": "object",
+                                "required": [
+                                  "versionId",
+                                  "systemId",
+                                  "semanticVersion",
+                                  "releaseNotes",
+                                  "createdAt"
+                                ],
+                                "properties": {
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "systemId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "semanticVersion": {
+                                    "type": "string"
+                                  },
+                                  "releaseNotes": {
+                                    "type": "string"
+                                  },
+                                  "createdAt": {
+                                    "format": "date-time",
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "upgrades": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "required": [
+                                    "versionId",
+                                    "systemId",
+                                    "semanticVersion",
+                                    "releaseNotes",
+                                    "createdAt"
+                                  ],
+                                  "properties": {
+                                    "versionId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "systemId": {
+                                      "format": "uuid",
+                                      "type": "string"
+                                    },
+                                    "semanticVersion": {
+                                      "type": "string"
+                                    },
+                                    "releaseNotes": {
+                                      "type": "string"
+                                    },
+                                    "createdAt": {
+                                      "format": "date-time",
+                                      "type": "string"
+                                    }
+                                  }
+                                }
                               }
                             }
                           }
@@ -99771,22 +100488,64 @@
         }
       }
     },
-    "/campaigns/{id}/version-check": {
-      "get": {
-        "operationId": "get_campaigns_id_version_check",
+    "/campaigns/{id}/composition-check": {
+      "post": {
+        "operationId": "post_campaigns_id_composition_check",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "target"
+                ],
+                "properties": {
+                  "target": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "systemVersionId",
+                      "extensions"
+                    ],
+                    "properties": {
+                      "systemVersionId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "extensions": {
+                        "maxItems": 16,
+                        "type": "array",
+                        "items": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "extensionId",
+                            "versionId"
+                          ],
+                          "properties": {
+                            "extensionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "versionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "name": "id",
             "in": "path",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "type": "string"
-            }
-          },
-          {
-            "name": "targetVersionId",
-            "in": "query",
             "required": true,
             "schema": {
               "format": "uuid",
@@ -99810,8 +100569,11 @@
                       "required": [
                         "revision",
                         "direction",
+                        "change",
                         "fromVersionId",
                         "toVersionId",
+                        "from",
+                        "to",
                         "ok",
                         "characters",
                         "templates"
@@ -99832,11 +100594,183 @@
                             }
                           ]
                         },
+                        "change": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "revert",
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "fromVersionId",
+                                "toVersionId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "system_upgrade",
+                                  "type": "string"
+                                },
+                                "fromVersionId": {
+                                  "type": "string"
+                                },
+                                "toVersionId": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "extensionId",
+                                "versionId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "extension_add",
+                                  "type": "string"
+                                },
+                                "extensionId": {
+                                  "type": "string"
+                                },
+                                "versionId": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "extensionId",
+                                "versionId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "extension_remove",
+                                  "type": "string"
+                                },
+                                "extensionId": {
+                                  "type": "string"
+                                },
+                                "versionId": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            {
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "extensionId",
+                                "fromVersionId",
+                                "toVersionId"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "extension_upgrade",
+                                  "type": "string"
+                                },
+                                "extensionId": {
+                                  "type": "string"
+                                },
+                                "fromVersionId": {
+                                  "type": "string"
+                                },
+                                "toVersionId": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        },
                         "fromVersionId": {
                           "type": "string"
                         },
                         "toVersionId": {
                           "type": "string"
+                        },
+                        "from": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "systemVersionId",
+                            "extensions"
+                          ],
+                          "properties": {
+                            "systemVersionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "to": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "systemVersionId",
+                            "extensions"
+                          ],
+                          "properties": {
+                            "systemVersionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "extensions": {
+                              "maxItems": 16,
+                              "type": "array",
+                              "items": {
+                                "additionalProperties": false,
+                                "type": "object",
+                                "required": [
+                                  "extensionId",
+                                  "versionId"
+                                ],
+                                "properties": {
+                                  "extensionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "versionId": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
                         },
                         "ok": {
                           "type": "boolean"
@@ -100400,9 +101334,9 @@
         }
       }
     },
-    "/campaigns/{id}/version": {
+    "/campaigns/{id}/composition": {
       "post": {
-        "operationId": "post_campaigns_id_version",
+        "operationId": "post_campaigns_id_composition",
         "requestBody": {
           "content": {
             "application/json": {
@@ -100410,14 +101344,46 @@
                 "additionalProperties": false,
                 "type": "object",
                 "required": [
-                  "targetVersionId",
+                  "target",
                   "expectedCampaignRevision",
                   "idempotencyKey"
                 ],
                 "properties": {
-                  "targetVersionId": {
-                    "format": "uuid",
-                    "type": "string"
+                  "target": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "systemVersionId",
+                      "extensions"
+                    ],
+                    "properties": {
+                      "systemVersionId": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "extensions": {
+                        "maxItems": 16,
+                        "type": "array",
+                        "items": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "extensionId",
+                            "versionId"
+                          ],
+                          "properties": {
+                            "extensionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            },
+                            "versionId": {
+                              "format": "uuid",
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
                   },
                   "expectedCampaignRevision": {
                     "minimum": 1,
@@ -120192,6 +121158,10 @@
                               {
                                 "const": "extension_removed",
                                 "type": "string"
+                              },
+                              {
+                                "const": "extension_upgraded",
+                                "type": "string"
                               }
                             ]
                           },
@@ -121304,6 +122274,10 @@
                                   },
                                   {
                                     "const": "extension_removed",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "extension_upgraded",
                                     "type": "string"
                                   }
                                 ]

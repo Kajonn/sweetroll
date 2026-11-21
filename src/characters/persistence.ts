@@ -1,6 +1,6 @@
 import { ROLL_VISIBILITY_PREDICATE } from "../campaigns/persistence.js";
 import { canReadRoll, type MembershipRecord } from "../campaigns/policy.js";
-import type { CampaignRollContext, DeckContext, DeckState } from "../systems/runtime.js";
+import { sameComposition, type CampaignRollContext, type Composition, type DeckContext, type DeckState } from "../systems/runtime.js";
 import {preparePushCommit,insertPushRoll,narrowerAudience} from "./push.js";
 import type {PushContext, ExtensionRef} from "../systems/runtime.js";
 import type { Pool, PoolClient } from "pg";
@@ -230,15 +230,16 @@ export type ManagementMutation =
   | { kind: "archive" }
   | { kind: "recover" }
   /**
-   * Design 6.7: move to another version of the same system. Standalone only;
-   * the module verified `nextState` against the target at `expectedRevision`.
-   * `previousVersionId` is stored as the revert target (null after a revert).
+   * Design 6.7/6.8: move to another composition of the same system (base
+   * version plus extensions). Standalone only; the module verified
+   * `nextState` against the target at `expectedRevision`. `previous` is
+   * stored as the revert target (null after a revert).
    */
   | {
       kind: "changeVersion";
-      fromVersionId: VersionId;
-      toVersionId: VersionId;
-      previousVersionId: VersionId | null;
+      from: Composition;
+      to: Composition;
+      previous: Composition | null;
       nextState: RuntimeStateV1;
       /** Entries whose template art changed; their image pins move with the state. */
       repinEntryIds: string[];
@@ -385,7 +386,8 @@ export interface CharacterPersistenceRepository {
    * authorize owner-only paths; standalone receipts must never replay them.
    */
   /** Design 6.7 revert target; null when there is none or the row is missing. */
-  loadPreviousSystemVersionId(characterId: CharacterId): Promise<VersionId | null>;
+  /** Design 6.7/6.8: the composition recorded before the most recent change. */
+  loadPreviousComposition(characterId: CharacterId): Promise<Composition | null>;
 
   loadCharacterScope(characterId: CharacterId): Promise<{
     characterId: CharacterId;
@@ -499,15 +501,6 @@ type ExecutionRow = {
   created_at: Date;
   expires_at: Date;
 };
-
-function sameComposition(left: CharacterRecord, right: CharacterRecord): boolean {
-  return left.systemVersionId === right.systemVersionId
-    && left.extensions.length === right.extensions.length
-    && left.extensions.every((extension, index) => {
-      const other = right.extensions[index];
-      return other?.extensionId === extension.extensionId && other.versionId === extension.versionId;
-    });
-}
 
 async function loadCampaignRollContext(
   client: PoolClient,
@@ -1122,12 +1115,17 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
       return row === undefined ? null : toCharacterRecord(row);
     },
 
-    async loadPreviousSystemVersionId(characterId) {
-      const result = await pool.query<{ previous_system_version_id: string | null }>(
-        `SELECT previous_system_version_id FROM characters WHERE id = $1`,
+    async loadPreviousComposition(characterId) {
+      const result = await pool.query<{ previous_system_version_id: string | null; extensions_json: ExtensionRef[] }>(
+        `SELECT previous_system_version_id,
+                COALESCE((SELECT jsonb_agg(jsonb_build_object('extensionId', pe.extension_id, 'versionId', pe.extension_version_id) ORDER BY pe.extension_id)
+                  FROM character_previous_extensions pe WHERE pe.character_id = characters.id), '[]'::jsonb) AS extensions_json
+           FROM characters WHERE id = $1`,
         [characterId],
       );
-      return result.rows[0]?.previous_system_version_id ?? null;
+      const row = result.rows[0];
+      if (row === undefined || row.previous_system_version_id === null) return null;
+      return { systemVersionId: row.previous_system_version_id, extensions: sortExtensionRefs(row.extensions_json) };
     },
 
     async loadCharacterScope(characterId) {
@@ -1517,10 +1515,20 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
               [input.characterId],
             );
             break;
-          case "changeVersion":
-            if (charRow.system_version_id !== input.mutation.fromVersionId || charRow.campaign_id !== null) {
+          case "changeVersion": {
+            const mutation = input.mutation;
+            const stored = { systemVersionId: charRow.system_version_id, extensions: charRow.extensions_json ?? [] };
+            if (!sameComposition(stored, mutation.from) || charRow.campaign_id !== null) {
               await client.query("ROLLBACK");
               return { kind: "conflict", latestRevision: charRow.revision };
+            }
+            await writeCharacterExtensions(client, input.characterId, sortExtensionRefs(mutation.to.extensions));
+            await client.query("DELETE FROM character_previous_extensions WHERE character_id = $1", [input.characterId]);
+            for (const ref of mutation.previous?.extensions ?? []) {
+              await client.query(
+                "INSERT INTO character_previous_extensions (character_id, extension_id, extension_version_id) VALUES ($1, $2, $3)",
+                [input.characterId, ref.extensionId, ref.versionId],
+              );
             }
             updated = await client.query<CharacterRow>(
               `UPDATE characters
@@ -1528,10 +1536,11 @@ export function createCharacterPersistenceRepository(pool: Pool): CharacterPersi
                       revision = revision + 1, updated_at = now()
                 WHERE id = $4
               RETURNING id, owner_id, campaign_id, placement_generation, return_owner_id, system_version_id, entity_definition_id, name, revision, state_json, visibility, lifecycle, archived_at, created_at, updated_at, ${CHARACTER_EXTENSIONS_COLUMN}`,
-              [input.mutation.toVersionId, input.mutation.previousVersionId, JSON.stringify(input.mutation.nextState), input.characterId],
+              [mutation.to.systemVersionId, mutation.previous?.systemVersionId ?? null, JSON.stringify(mutation.nextState), input.characterId],
             );
-            await repinEntryImages(client, input.characterId, input.mutation.nextState.entries, input.mutation.repinEntryIds);
+            await repinEntryImages(client, input.characterId, mutation.nextState.entries, mutation.repinEntryIds);
             break;
+          }
         }
         const updatedRow = requireRow(updated.rows[0], "applyManagementCommandTx.update");
 

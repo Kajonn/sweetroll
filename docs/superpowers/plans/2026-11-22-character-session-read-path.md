@@ -77,3 +77,24 @@ Update `design_v2.md` Sections 8 and 10.2 and the GUI integration plan with S2 a
 ## Implementation record
 
 Stages are implemented in order on `claude/vibrant-hopper-xoftei` (PR #96). Each stage adds its entry below.
+
+### S1. One read path (2026-11-22)
+
+**Change.** `web/src/characters/session.ts` has one `refreshView(trigger)` read path. `openReadOnly`/`fetchReadOnly` are removed and `reconcileFresh` became `storeFresh`, the owner's guarded write branch of `refreshView`.
+
+- Triggers (D1): open, reconnect (a disconnected → connected change, or a missing live view), `visibilitychange` to visible, a 30-second `setInterval` (`LIVE_REFRESH_MS`) that runs only while a `live` view is shown and the page is visible, and commands. For commands the authoritative command response is the refreshed view; `session.refresh()` (called by the route after the apply-roll, portrait and push commands) and online operations use the `command` trigger. No extra GET follows each queued command.
+- An owner tab with a healthy write path (lock held, not blocked) refreshes through the serialized drain (`needsFresh` plus a drain pass, or a pass after the running one), so the queue, ordering and conflict rules are unchanged.
+- Every other tab (D2: no lock, no Lock API, or blocked, for example by a storage failure) fetches the server view. A `live` view replaces `onlinePreview`. A `stored` view in a tab without the lock adopts a newer server view in memory only. Non-owner tabs never write the store, so the owner's queue is never rebased underneath it. A blocked owner keeps its stored view and review state, and its refresh only acts on a purge.
+- A 404 with `cacheDisposition: "purge"` calls `purgeAccess()` for both sources. A `live` view also reports a non-purge 404 or a 401 at any refresh. Other failures keep the current view, except on open and reconnect of a `live` view, which report them as before.
+- Fetches outside the drain are coalesced, with one follow-up fetch if a trigger arrives during a fetch. The timer is cleared when the view stops being `live`, when the page is hidden, on purge, on sign-out and on dispose. The `visibilitychange` listener is removed on dispose.
+- The snapshot shape (`confirmed`, `onlinePreview`, `onlineOnly`) is unchanged for S2. The queue, idempotency, conflict review and server API are unchanged.
+- `design_v2.md` Sections 8 and 10.2 describe the refresh triggers.
+
+**First failing tests (written first, all failed before the change):**
+
+- `CharacterRoute.test.tsx`: "shows another device's edit in an open online sheet after no editing lock / snapshot write failure without a reload" (2 cases; the edited heading never appeared), and "hides an open online sheet when a refresh reports the access was revoked" (the sheet stayed visible).
+- `session.test.ts`, "CharacterSession read path": "refreshes a live view every 30 seconds while visible and stops on dispose" (revision stayed 1), "does not poll while the page is hidden and refreshes when it becomes visible" (revision stayed 1), "hides a live view and purges at the next refresh after access is revoked" (phase stayed `storage-error`), and "refreshes a stored view in a tab without the editing lock without writing the store" (revision stayed 1). The timer tests use fake `setInterval` and check that no timer is left after dispose or purge.
+
+**Results after the change:** `npm run -s web:typecheck` passed. `web/src/characters/session.test.ts` and `CharacterRoute.test.tsx` 153/153, including both PR #93 cases. `npm run -s web:test` 143 files, 1345 tests passed. Offline browser suite (`playwright.offline.config.ts`, fresh `sweetroll_offline` database, after `npm run -s web:build`) 32/32 passed.
+
+**Not done in S1.** A tab that holds the lock but cannot save does not retry `confirmSnapshot` on refresh and keeps the lock; D3 and the storage retry belong to S3. A stored view's in-memory refresh in a tab without the lock can still be replaced by an older stored copy on an `invalidate` broadcast that carries no newer store generation, until its next refresh.

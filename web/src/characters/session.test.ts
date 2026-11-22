@@ -2891,3 +2891,94 @@ describe("durable online push recovery",()=>{
  });
  it("never creates a new push while offline",async()=>{const h=await makeHarness();h.api.scriptOpenView(viewFor("char-1",1));await h.session.open();h.identity.online=false;h.identity.signal();await expect(h.session.pushRoll("root")).rejects.toThrow(/connectivity|offline/);expect(await h.store.readOnlineAttempts(ARM)).toEqual([]);expect(h.api.sent).toEqual([]);h.session.dispose();await h.store.close();});
 });
+
+describe("CharacterSession read path", () => {
+  const purgeError = () => new ApiError({ status: 404, code: "not_found", message: "Not found",
+    cacheDisposition: "purge", requestId: "r", latestRevision: null, diagnostics: [] });
+
+  async function openLive(h: Harness) {
+    vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+    h.api.scriptOpenView(viewFor("char-1", 1));
+    await h.session.open();
+    await h.session.whenIdle();
+    expect(h.session.getSnapshot().onlineOnly).toBe(true);
+    expect(h.session.getSnapshot().confirmed?.revision).toBe(1);
+  }
+
+  it("refreshes a live view every 30 seconds while visible and stops on dispose", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const h = await makeHarness();
+    try {
+      await openLive(h);
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2, { name: "Edited elsewhere" }), requestId: "r" }));
+      await vi.advanceTimersByTimeAsync(29_000);
+      expect(h.session.getSnapshot().confirmed?.revision).toBe(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.waitFor(() => expect(h.session.getSnapshot().confirmed?.revision).toBe(2));
+      expect(h.session.getSnapshot().confirmed?.name).toBe("Edited elsewhere");
+      expect(h.session.getSnapshot().onlineOnly).toBe(true);
+      expect((await h.store.read(ARM, "char-1")).confirmed).toBeNull();
+      h.session.dispose();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(h.api.sent).toEqual([]);
+    } finally {
+      vi.useRealTimers(); h.session.dispose(); await h.store.close();
+    }
+  });
+
+  it("does not poll while the page is hidden and refreshes when it becomes visible", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const h = await makeHarness();
+    try {
+      await openLive(h);
+      let opens = 0;
+      h.api.setOpenFallback(async () => { opens += 1; return { character: viewFor("char-1", 3), requestId: "r" }; });
+      await vi.advanceTimersByTimeAsync(90_000);
+      expect(opens).toBe(0);
+      visibility.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().confirmed?.revision).toBe(3));
+      expect(opens).toBe(1);
+    } finally {
+      visibility.mockRestore(); vi.useRealTimers(); h.session.dispose(); await h.store.close();
+    }
+  });
+
+  it("hides a live view and purges at the next refresh after access is revoked", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const h = await makeHarness();
+    try {
+      await openLive(h);
+      h.api.setOpenFallback(async () => { throw purgeError(); });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.waitFor(() => expect(h.session.getSnapshot().phase).toBe("purged"));
+      const snap = h.session.getSnapshot();
+      expect(snap.confirmed).toBeNull();
+      expect(snap.onlineOnly).toBeUndefined();
+      expect(snap.error?.kind).toBe("purged");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers(); h.session.dispose(); await h.store.close();
+    }
+  });
+
+  it("refreshes a stored view in a tab without the editing lock without writing the store", async () => {
+    const h = await makeHarness("char-1", false);
+    h.coordination.requestEditing = async () => false;
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      await h.session.open();
+      expect(h.session.getSnapshot().confirmed?.revision).toBe(1);
+      expect(h.session.getSnapshot().onlineOnly).toBeUndefined();
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2, { name: "Other device" }), requestId: "r" }));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().confirmed?.revision).toBe(2));
+      expect(h.session.getSnapshot().editing.owned).toBe(false);
+      expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(1);
+      expect(h.api.sent).toEqual([]);
+    } finally {
+      h.session.dispose(); await h.store.close();
+    }
+  });
+});

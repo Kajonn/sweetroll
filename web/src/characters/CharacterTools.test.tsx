@@ -12,7 +12,7 @@ import type { CharacterExport } from "./types.js";
 function readySnapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot {
   return {
     phase: "ready",
-    confirmed: makeView({ characterId: "char-1", revision: 3 }),
+    storage: "available", view: { source: "stored" as const, character: makeView({ characterId: "char-1", revision: 3 }) },
     tentative: null,
     entries: [],
     editing: { owned: true },
@@ -158,7 +158,7 @@ describe("CharacterTools", () => {
   it("marks an archived character read-only until recovered", async () => {
     const user = userEvent.setup();
     const archived = readySnapshot({
-      confirmed: makeView({ characterId: "char-1", revision: 4, lifecycle: "archived" }),
+      view: { source: "stored" as const, character: makeView({ characterId: "char-1", revision: 4, lifecycle: "archived" }) },
     });
     const session = makeSession(archived);
     render(<CharacterTools characterId="char-1" api={makeApi()} session={session} />);

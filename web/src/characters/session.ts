@@ -78,14 +78,25 @@ export type CoordinationPort = {
   requestTakeover?(): Promise<boolean>;
 };
 
+/**
+ * What the session shows. `stored` is the copy this browser keeps (it may
+ * have been refreshed in memory from the server in a tab without the lock);
+ * `live` is an authorized server view that is not saved locally and is
+ * shown only while online.
+ */
+export type CharacterViewState = { source: "stored" | "live"; character: CharacterView };
+
+/** Why a tab with a view cannot edit: local storage failed, no Web Locks, or another tab holds the lock. */
+export type EditingBlockedBy = "storage" | "locks" | "other-tab";
+
 export type CharacterSnapshot = {
   phase: SessionPhase;
-  confirmed: CharacterView | null;
-  /** An authorized online view that has not been saved to the local store. */
-  onlineOnly?: true;
+  view: CharacterViewState | null;
+  /** Whether this browser can keep a local copy; "unavailable" after a local storage failure. */
+  storage: "available" | "unavailable";
   tentative: Record<string, unknown> | null;
   entries: QueueEntry[];
-  editing: { owned: boolean; owner?: string | null };
+  editing: { owned: boolean; owner?: string | null; blockedBy?: EditingBlockedBy };
   error: BlockingError | null;
   /** True while this session's actor is authenticated online. Read-only panels gate on this. */
   connected: boolean;
@@ -100,6 +111,15 @@ export type CharacterSnapshot = {
    */
   pendingOnlineAttempts: OnlineAttempt[];
 };
+
+/**
+ * Design Section 8: a tab edits only while it holds the editing lock and
+ * shows a stored view. The session's commands and the UI use this same
+ * predicate, so a `live` view or a tab without the lock stays read-only.
+ */
+export function canEdit(snapshot: Pick<CharacterSnapshot, "editing" | "view">): boolean {
+  return snapshot.editing.owned && snapshot.view?.source === "stored";
+}
 
 /** Key of a resource's pending maximum in `snapshot.tentative`. */
 export function resourceMaxKey(resourceId: string): string {
@@ -187,9 +207,21 @@ export type CreateCharacterSessionInput = {
   newId: () => string;
   captureDicePreparation?: (campaignId: string | null) => PrepareDice | undefined;
   captureRollPublisher?: () => ((response: CommandResultResponse, startedAt: string) => void) | undefined;
+  /** False when the browser has no Web Locks, so no tab can ever edit. Defaults to true. */
+  locksSupported?: boolean;
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** D1: a live (unsaved) view is fetched again this often while the page is visible. */
+export const LIVE_REFRESH_MS = 30_000;
+
+/**
+ * Why the view is refreshed. "sync" (the drain) and "command" (an explicit
+ * refresh or an online operation) run the owner's guarded write path
+ * directly; the other triggers come from outside the drain.
+ */
+type RefreshTrigger = "open" | "reconnect" | "visible" | "timer" | "sync" | "command";
 
 /** Backend-declared idempotency replay-window expiry for one exact key. */
 const REPLAY_EXPIRED_RE = /replay window/i;
@@ -253,11 +285,16 @@ function entryMatchesBase(entry: QueueEntry, base: CharacterView): boolean {
 export function createCharacterSession(input: CreateCharacterSessionInput): CharacterSession {
   const { actorId, characterId, api, store, identity, coordination, now, newId } = input;
 
+  /** The stored view: written only by the write path (owner) or read from the store. */
   let confirmed: CharacterView | null = null;
-  let onlinePreview: CharacterView | null = null;
-  /** True once this session has shown an online-only view; reconnecting reopens it. */
-  let previewShown = false;
-  let previewOpening: Promise<void> | null = null;
+  /** An authorized server view that is not saved locally (`view.source === "live"`). */
+  let liveView: CharacterView | null = null;
+  /** True once this session has shown a live view; reconnecting reopens it. */
+  let liveShown = false;
+  let viewFetch: Promise<void> | null = null;
+  let viewFetchAgain = false;
+  let liveTimer: ReturnType<typeof setInterval> | null = null;
+  let refreshAfterDrain = false;
   let entries: QueueEntry[] = [];
   let pendingOnline: OnlineAttempt[] = [];
   let generation = 0;
@@ -302,6 +339,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   const emit = () => {
     cachedSnapshot = null;
+    syncLiveTimer();
     const snapshot = getSnapshot();
     for (const listener of [...listeners]) listener(snapshot);
   };
@@ -313,16 +351,37 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function identityIsCurrent(): Promise<boolean> {
     return identityMatches() && await identity.isCurrent() && identityMatches();
   }
-  function getSnapshot(): CharacterSnapshot {
+  /** The shown view and whether this tab reports editing, computed from current state. */
+  function deriveView(): { visible: boolean; view: CharacterViewState | null; owned: boolean } {
     const visible = identityMatches();
-    const preview = visible && confirmed === null && isConnected() ? onlinePreview : null;
-    return cachedSnapshot ??= {
+    const live = visible && confirmed === null && isConnected() ? liveView : null;
+    const view: CharacterViewState | null = !visible ? null
+      : confirmed !== null ? { source: "stored", character: confirmed }
+      : live !== null ? { source: "live", character: live } : null;
+    return { visible, view, owned: visible && editing.owned && live === null };
+  }
+  /**
+   * The command gate: the same `canEdit` predicate the UI reads, plus the
+   * coordination port's own answer, so nothing is queued, saved or sent
+   * without a stored view and the editing lock.
+   */
+  function editAllowed(): boolean {
+    const { view, owned } = deriveView();
+    return canEdit({ editing: { owned }, view }) && coordination.isOwner();
+  }
+  function getSnapshot(): CharacterSnapshot {
+    if (cachedSnapshot !== null) return cachedSnapshot;
+    const { visible, view, owned } = deriveView();
+    const storage = visible && error?.kind === "storage-error" ? "unavailable" : "available";
+    const blockedBy: EditingBlockedBy | undefined = owned || view === null ? undefined
+      : storage === "unavailable" ? "storage" : input.locksSupported === false ? "locks" : "other-tab";
+    return cachedSnapshot = {
       phase,
-      confirmed: visible ? confirmed ?? preview : null,
-      ...(preview !== null && { onlineOnly: true as const }),
+      view,
+      storage,
       tentative: visible ? computeTentative() : null,
       entries: visible ? entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })) : [],
-      editing: { ...editing, owned: visible && editing.owned && preview === null },
+      editing: { ...editing, owned, ...(blockedBy !== undefined && { blockedBy }) },
       error: visible && error ? { ...error } : null,
       connected: isConnected(),
       lastRoll: visible ? lastRoll : null,
@@ -405,6 +464,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     error = { kind, message };
     if (details !== undefined) error.details = details;
     phase = KIND_TO_PHASE[kind];
+    // D3: a tab that cannot save gives up the editing lock, so a tab or
+    // browser profile that can save is able to take over. This tab edits
+    // again only through requestEditing (the takeover flow).
+    if (kind === "storage-error" && (editing.owned || coordination.isOwner())) {
+      editing = { owned: false, owner: null };
+      coordination.letGo();
+    }
   }
 
   function assertMutationAllowed(options?: { offlineIntent?: boolean }) {
@@ -418,8 +484,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (error && !canQueue) {
       throw structuredError(error.message, error.kind, error.details);
     }
-    if (!editing.owned || !coordination.isOwner()) throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");
-    if (!confirmed) throw new Error("Cannot edit until the character is loaded.");
+    if (!editAllowed()) {
+      if (editing.owned && coordination.isOwner() && !confirmed) throw new Error("Cannot edit until the character is loaded.");
+      throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");
+    }
   }
 
   function baseForNewEntry(): number {
@@ -581,7 +649,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) return "blocked";
     confirmed = null;
-    onlinePreview = null;
+    liveView = null;
     entries = [];
     pendingOnline = [];
     lastRoll = null;
@@ -725,7 +793,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       }
     }
     let current = entry;
-    if (!isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
+    if (!isConnected() || !editAllowed() || disposed) {
       refreshPhase();
       return "blocked";
     }
@@ -754,7 +822,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           }
           return await handleSendError(err);
         }
-        if (!await identityIsCurrent() || disposed || !editing.owned || !coordination.isOwner()) return "blocked";
+        if (!await identityIsCurrent() || disposed || !editAllowed()) return "blocked";
       }
       try {
         await store.freeze(actorId, characterId, current.id, frozen);
@@ -773,7 +841,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
       return "blocked";
     }
-    if (!await identityIsCurrent() || !isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
+    if (!await identityIsCurrent() || !isConnected() || !editAllowed() || disposed) {
       refreshPhase();
       emit();
       return "blocked";
@@ -884,7 +952,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const front = entries[0];
       // Replay uncertain attempts first; check drift before freezing any unsent work.
       if (needsFresh && isConnected() && !front?.attempt) {
-        await reconcileFresh();
+        await refreshView("sync");
         if (isBlocked()) return "blocked";
         needsFresh = false;
         continue;
@@ -915,10 +983,16 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (outcome !== "retry") refreshPhase();
         resolveIdle();
         emit();
+        // A refresh requested while this pass was finishing runs in a new pass.
+        if (refreshAfterDrain) {
+          refreshAfterDrain = false;
+          if (needsFresh && outcome === "idle") scheduleDrain();
+        }
       });
   }
 
-  async function reconcileFresh() {
+  /** The owner's write path: fetch and persist the server view under the cache guard. */
+  async function storeFresh() {
     if (!await identityIsCurrent() || !isConnected() || isBlocked() || disposed || !coordination.isOwner()) return;
     let server: CharacterView;
     try {
@@ -933,24 +1007,95 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     await reconcile(server);
   }
 
-  function openReadOnly(): Promise<void> {
-    return previewOpening ??= fetchReadOnly().finally(() => { previewOpening = null; });
+  function pageVisible(): boolean {
+    return typeof document === "undefined" || document.visibilityState !== "hidden";
   }
 
-  async function fetchReadOnly() {
+  /** D1: poll only a shown live view, and only while the page is visible. */
+  function syncLiveTimer() {
+    const live = !disposed && confirmed === null && liveView !== null && identityMatches() && isConnected();
+    if (live && pageVisible()) {
+      liveTimer ??= setInterval(() => { void refreshView("timer"); }, LIVE_REFRESH_MS);
+    } else if (liveTimer !== null) {
+      clearInterval(liveTimer);
+      liveTimer = null;
+    }
+  }
+
+  /**
+   * The single read path (design Section 8). An owner tab with a healthy
+   * write path refreshes through the serialized drain, which persists the
+   * view. Every other tab (no lock, no Lock API, or blocked, for example by
+   * a storage failure) fetches the server view and shows it without writing
+   * the store. A 404 with `cacheDisposition: "purge"` purges either way.
+   */
+  function refreshView(trigger: RefreshTrigger): Promise<void> {
+    if (trigger === "sync" || trigger === "command") return storeFresh();
+    if (disposed || !identityMatches() || !isConnected() || error?.kind === "purged" || error?.kind === "not-found") {
+      return Promise.resolve();
+    }
+    if (editing.owned && coordination.isOwner() && !isBlocked()) {
+      needsFresh = true;
+      if (draining) refreshAfterDrain = true;
+      else scheduleDrain();
+      return Promise.resolve();
+    }
+    if (viewFetch !== null) {
+      viewFetchAgain = true;
+      return viewFetch;
+    }
+    return viewFetch = (async () => {
+      try {
+        do {
+          viewFetchAgain = false;
+          await fetchView(trigger);
+        } while (viewFetchAgain && !disposed);
+      } finally {
+        viewFetch = null;
+      }
+    })();
+  }
+
+  async function fetchView(trigger: RefreshTrigger) {
     if (!isConnected() || !await identityIsCurrent()) return;
     const guard = { generation, accountGeneration };
+    let character: CharacterView;
     try {
-      const { character } = await api.open(characterId);
-      if (!await identityIsCurrent() || !isConnected() || confirmed !== null ||
-          error?.kind === "purged" || generation !== guard.generation || accountGeneration !== guard.accountGeneration) return;
-      onlinePreview = character;
-      previewShown = true;
-      emit();
+      character = (await api.open(characterId)).character;
     } catch (err) {
-      if (await identityIsCurrent()) await handleOpenError(err);
+      if (!await identityIsCurrent() || disposed) return;
+      if (err instanceof ApiError && err.status === 404 && err.cacheDisposition === "purge") {
+        await purgeAccess();
+        return;
+      }
+      // A live view reports failures on open and reconnect as before, and a
+      // lost or expired access at any refresh. A transient failure of a timer
+      // or visibility refresh keeps the current view. A stored view keeps its
+      // own state: only a purge changes it here.
+      const denied = err instanceof ApiError && (err.status === 404 || err.status === 401);
+      if (confirmed === null && (trigger === "open" || trigger === "reconnect" || denied)) {
+        if (err instanceof ApiError && err.status === 404) liveView = null;
+        await handleOpenError(err);
+      }
       emit();
+      return;
     }
+    if (!await identityIsCurrent() || !isConnected() || disposed || error?.kind === "purged" ||
+        generation !== guard.generation || accountGeneration !== guard.accountGeneration) return;
+    if (confirmed === null) {
+      liveView = character;
+      liveShown = true;
+    } else if (!editing.owned && (character.reconciliation.revision > confirmed.reconciliation.revision ||
+        (character.reconciliation.revision === confirmed.reconciliation.revision &&
+         (!sameRollScope(confirmed, character) || !projectionsEqual(character.projection, confirmed.projection))))) {
+      // D2: a tab without the lock shows the newer server view. Only the
+      // owner persists views, so the store and its queue stay untouched.
+      if (!sameRollScope(confirmed, character)) lastRoll = null;
+      confirmed = character;
+    } else {
+      return;
+    }
+    emit();
   }
 
   /**
@@ -1044,7 +1189,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         coordination.invalidate?.();
         if (!sameRollScope(confirmed, server)) lastRoll = null;
         confirmed = server;
-        onlinePreview = null;
+        liveView = null;
         generation += 1;
       } catch (err) {
         if (!await identityIsCurrent()) return;
@@ -1056,8 +1201,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         // still needs a snapshot persisted against the current cache guard.
         if (local === null && confirmed === null && error?.kind === "storage-error" &&
             identityMatches() && isConnected()) {
-          onlinePreview = server;
-          previewShown = true;
+          liveView = server;
+          liveShown = true;
         }
         return;
       }
@@ -1088,6 +1233,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function resolveConflict(input: ResolveConflictInput): Promise<void> {
     if (disposed) return;
     if (!identityMatches() || !editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
+    if (confirmed !== null && !editAllowed()) throw new Error("Editing ownership required.");
     // Ordinary conflict recovery never retires online attempts: an uncertain
     // online outcome blocks it until replay or explicit expired-outcome
     // review resolves the local decision.
@@ -1353,6 +1499,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     if (!editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
     if (!confirmed) throw new Error("Cannot manage until the character is loaded.");
+    if (!editAllowed()) throw new Error("Editing ownership required.");
     if (!isConnected()) {
       throw structuredError(
         "Lifecycle and export operations require connectivity and cannot be initiated offline.",
@@ -1435,6 +1582,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function sendOnlineAttemptInner(attempt: OnlineAttempt): Promise<void> {
+    if (!editAllowed() || !isConnected()) throw new Error("Editing ownership required.");
     const generationAtSend = generation;
     const guard = { generation: generationAtSend, accountGeneration };
     const publishRoll = input.captureRollPublisher?.();
@@ -1636,12 +1784,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (entries.length > 0 || phase !== "ready") {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
     }
-    await reconcileFresh();
+    await refreshView("command");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     if (isBlocked()) throw structuredError(error!.message, error!.kind, error!.details);
     if (entries.length > 0 || !confirmed) {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
     }
+    // The refresh awaited the server: the lock or the stored view may be gone.
+    assertOnlineOperationAllowed();
     let request = buildOnlineRequest(op, confirmed.reconciliation.revision);
     if (op.operation === "push") {
       try {
@@ -1716,7 +1866,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (input.acknowledgeUnknownOutcome !== true) {
       throw new Error("Acknowledge the unknown outcome before retiring this attempt.");
     }
-    if (!await identityIsCurrent() || !isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
+    if (!await identityIsCurrent() || !isConnected() || !editAllowed() || disposed) {
       throw new Error("Account changed. Reopen this character.");
     }
     // Fetch current authorized state first. A failed refresh never retires:
@@ -1903,7 +2053,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await requestEditing();
       }
     }
-    if (!editing.owned && confirmed === null) await openReadOnly();
+    if (!editing.owned) await refreshView("open");
     initialized = true;
     scheduleDrain();
     if (draining) await new Promise<void>(resolve => idleWaiters.push(resolve));
@@ -1925,7 +2075,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const loaded = await store.read(actorId, characterId);
       if (!identityMatches() || !coordination.isOwner()) return;
       confirmed = loaded.confirmed;
-      onlinePreview = null;
+      liveView = null;
       lastRoll = loaded.lastRoll ?? null;
       entries = loaded.entries; generation = loaded.generation;
       accountGeneration = loaded.accountGeneration;
@@ -1934,6 +2084,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await refreshPendingOnline();
       if (!identityMatches() || !coordination.isOwner()) return;
       editing = { owned: true, owner: null }; needsFresh = true;
+      // D3: the lock is granted again only through requestEditing. The store
+      // read succeeded, so try saving again; a new failure releases the lock.
+      if (error?.kind === "storage-error") { error = null; refreshPhase(); }
       emit(); scheduleDrain();
     })().catch(() => {
       if (!identityMatches()) return;
@@ -1959,6 +2112,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     unsubscribeIdentity?.();
     unsubscribeCoordination?.();
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
     // Release the lock but never dispose the coordination handle: its
     // lifetime belongs to the route, which outlives StrictMode session
     // turnover. Disposing here would poison the handle for the remount's
@@ -1970,14 +2124,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     emit();
   }
 
+  let wasConnected = isConnected();
   const unsubscribeIdentity = identity.subscribe(() => {
     if (disposed) return;
+    const reconnected = isConnected() && !wasConnected;
+    wasConnected = isConnected();
     if (!identityMatches()) {
       confirmed = null; lastRoll = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
       coordination.letGo();
     }
     if (!isConnected()) {
-      onlinePreview = null;
+      liveView = null;
       needsFresh = true;
     }
     if (isConnected() && (error?.kind === "reauthenticate" || error?.kind === "network-unavailable")) {
@@ -1988,14 +2145,22 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     } else {
       refreshPhase();
     }
-    // The online-only view is not stored, so a reconnect must fetch it again.
-    // Neither a blocked session nor a tab without the editing lock drains.
-    if (initialized && previewShown && isConnected() && identityMatches() && confirmed === null &&
-        onlinePreview === null && error?.kind !== "purged" && error?.kind !== "not-found") {
-      void openReadOnly();
+    // A live view is not stored, so a reconnect must fetch it again.
+    // Neither a blocked session nor a tab without the editing lock drains,
+    // so both refresh through the read path.
+    if (initialized && identityMatches() && isConnected() &&
+        (reconnected || (liveShown && confirmed === null && liveView === null))) {
+      void refreshView("reconnect");
     }
     emit();
   });
+
+  const onVisibility = () => {
+    if (disposed) return;
+    syncLiveTimer();
+    if (pageVisible()) void refreshView("visible");
+  };
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisibility);
 
   const unsubscribeCoordination = coordination.subscribe((event) => {
     if (disposed) return;
@@ -2014,7 +2179,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (loaded.accountGeneration === accountGeneration &&
             (loaded.generation < generation || (editing.owned && loaded.generation === generation))) return;
         confirmed = loaded.confirmed;
-        onlinePreview = null;
+        liveView = null;
         lastRoll = loaded.lastRoll ?? null;
         entries = loaded.entries;
         generation = loaded.generation;
@@ -2156,7 +2321,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await persistEntry(newEntry({ kind: "updateEntryValues", entryId, values,
         ...(quantity === undefined ? {} : { quantity }) }));
     },
-    async refresh():Promise<void>{assertOnlineOperationAllowed();if(entries.length||pendingOnline.length||isBlocked())throw new Error("Resolve pending changes before refreshing.");await reconcileFresh();emit();},
+    async refresh():Promise<void>{assertOnlineOperationAllowed();if(entries.length||pendingOnline.length||isBlocked())throw new Error("Resolve pending changes before refreshing.");await refreshView("command");emit();},
     async pushRoll(parentRollId:string):Promise<void>{await runOnlineOperation({kind:"push",operation:"push",parentRollId});},
     async archive(): Promise<void> {
       await runOnlineOperation({ kind: "archive", operation: "archive" });

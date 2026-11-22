@@ -19,7 +19,7 @@ const F1 = "44444444-4444-4000-8000-000000000011";
 function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot {
   return {
     phase: "ready",
-    confirmed: makeView({ characterId: "char-1", revision: 3 }),
+    storage: "available", view: { source: "stored" as const, character: makeView({ characterId: "char-1", revision: 3 }) },
     tentative: null,
     entries: [],
     editing: { owned: true },
@@ -121,7 +121,7 @@ describe("character rules version", () => {
 
   it("is not offered for campaign characters or readers without editing ownership", () => {
     const attached = makeView({ characterId: "char-1", revision: 3, campaignId: "22222222-2222-4000-8000-000000000000" } as Parameters<typeof makeView>[0]);
-    const { unmount } = render(<CharacterTools characterId="char-1" api={api(report())} session={session(snapshot({ confirmed: attached }))} />);
+    const { unmount } = render(<CharacterTools characterId="char-1" api={api(report())} session={session(snapshot({ view: { source: "stored" as const, character: attached } }))} />);
     expect(screen.queryByRole("button", { name: "Rules and extensions" })).not.toBeInTheDocument();
     unmount();
     render(<CharacterTools characterId="char-1" api={api(report())} session={session(snapshot({ editing: { owned: false } }))} />);

@@ -15,7 +15,8 @@ import { CharacterTools } from "./CharacterTools.js";
 import { ConflictReview } from "./ConflictReview.js";
 import type { SlotTemplate } from "./SlotListControl.js";
 import { CreateCharacter, type CreateCharacterIdentity } from "./CreateCharacter.js";
-import { createCharacterSession, type CoordinationPort, type IdentityPort } from "./session.js";
+import { browserSupportsLocks } from "./coordination.js";
+import { canEdit, createCharacterSession, type CoordinationPort, type IdentityPort } from "./session.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import { useCharacterSession } from "./useCharacterSession.js";
 import { useOfflineAvailability } from "../offline/useOfflineAvailability.js";
@@ -50,11 +51,6 @@ export type CharacterDetailProps = {
   locksSupported?: boolean | undefined;
 };
 
-function browserSupportsTakeover(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const locks = (navigator as unknown as { locks?: LockManager | null }).locks;
-  return locks !== undefined && locks !== null;
-}
 
 /**
  * Standalone character route. Composes the shipped identity gate, durable
@@ -92,6 +88,18 @@ export function CharacterDetail({ characterId, api, store, identity, coordinatio
       locksSupported={locksSupported}
     />
   );
+}
+
+/** The read-only status names why this tab cannot edit (S4). */
+function readOnlyMessage(blockedBy: "storage" | "locks" | "other-tab" | undefined): string {
+  switch (blockedBy) {
+    case "storage":
+      return "character.detail.storageUnavailable";
+    case "other-tab":
+      return "character.detail.readOnly";
+    default:
+      return "character.detail.readOnlyHere";
+  }
 }
 
 function RecoveryNav({
@@ -151,6 +159,7 @@ function CharacterDetailLoaded({
   physicalDiceClient,
 }: CharacterDetailProps & { actorId: string }) {
   const online = identity.isOnline();
+  const locksSupported = locksSupportedProp ?? browserSupportsLocks();
   const publisher = useRef<PublishCommand>();
   const prepareDice = useRef<(campaignId: string | null) => PrepareDice>();
   const localSimulation = useRef<SimulateDice>();
@@ -174,14 +183,15 @@ function CharacterDetailLoaded({
         newId: () => randomUUID(),
         captureRollPublisher: () => publisher.current,
         captureDicePreparation: (campaignId) => prepareDice.current?.(campaignId),
+        locksSupported,
       }),
-    [actorId, characterId, api, store, identity, coordination],
+    [actorId, characterId, api, store, identity, coordination, locksSupported],
   );
   const { session, snapshot } = useCharacterSession(createSession);
-  const confirmed = snapshot.confirmed;
-  const campaignId = confirmed?.campaignId ?? null;
-  const placement = confirmed?.placementGeneration ?? null;
-  const events = usePlayEvents(confirmed ? `${characterId}:${campaignId ?? ""}:${placement}` : null);
+  const character = snapshot.view?.character ?? null;
+  const campaignId = character?.campaignId ?? null;
+  const placement = character?.placementGeneration ?? null;
+  const events = usePlayEvents(character ? `${characterId}:${campaignId ?? ""}:${placement}` : null);
   const { publish } = events;
   useLayoutEffect(() => {
     publisher.current = (response, startedAt) => {
@@ -195,15 +205,15 @@ function CharacterDetailLoaded({
     };
     return () => { publisher.current = undefined; };
   }, [campaignId, placement, publish]);
-  const offline = useOfflineAvailability(snapshot.onlineOnly ? null : confirmed);
+  const offline = useOfflineAvailability(snapshot.view?.source === "stored" ? snapshot.view.character : null);
 
   // Task 7: template catalog for slot pickers and granted-action buttons.
   // Fetched only when the projected sheet actually contains a slot, so
   // systems without slots behave exactly as before (no extra request).
   // A failed fetch degrades to the custom-entry fallback; entries still
   // list, remove, and sync.
-  const characterIdForTemplates = snapshot.confirmed?.characterId;
-  const hasSlots = snapshot.confirmed?.projection.sheets.some((sheet) =>
+  const characterIdForTemplates = character?.characterId;
+  const hasSlots = character?.projection.sheets.some((sheet) =>
     sheet.sections.some((section) => section.elements.some((element) => element.kind === "slot")),
   ) ?? false;
   const [templateRefresh, setTemplateRefresh] = useState(0);
@@ -215,12 +225,12 @@ function CharacterDetailLoaded({
   const [templates, setTemplates] = useState<SlotTemplate[]>([]);
   // A projection-only refresh can advance the store generation without
   // changing the character revision. Cancel its old catalog request and
-  // read a fresh guard whenever the confirmed snapshot is replaced.
+  // read a fresh guard whenever the shown view is replaced.
   useEffect(() => {
     setTemplates([]);
-    if (!hasSlots || characterIdForTemplates === undefined || snapshot.phase === "purged" || snapshot.confirmed === null) return;
+    if (!hasSlots || characterIdForTemplates === undefined || snapshot.phase === "purged" || character === null) return;
     let cancelled=false;
-    const campaignId=snapshot.confirmed.campaignId;
+    const campaignId=character.campaignId;
     const map=(choices:import("./types.js").EntryTemplate[]) => choices.filter(choice=>choice.source?.kind !== "campaign" || choice.source.campaignId === campaignId).map(template=>({...template,fields:template.fields.map(field=>({...field})),grantedActions:template.grantedActions.map(action=>({...action,inputs:action.inputs.map(input=>({...input}))}))}));
     void (async () => {
       const guard=await store.read(actorId,characterIdForTemplates);
@@ -243,21 +253,21 @@ function CharacterDetailLoaded({
       }
     })().catch(()=> { if(!cancelled) setTemplates([]); });
     return () => {cancelled=true;};
-  }, [api,store,session,actorId,hasSlots,characterIdForTemplates,online,templateRefresh,snapshot.confirmed,snapshot.phase === "purged"]);
+  }, [api,store,session,actorId,hasSlots,characterIdForTemplates,online,templateRefresh,character,snapshot.phase === "purged"]);
 
   const focusedFor = useRef<string | null>(null);
   useEffect(() => {
-    const fields = snapshot.confirmed?.projection.completionFields;
-    if (snapshot.confirmed === null || fields === undefined || fields.length === 0) return;
+    const fields = character?.projection.completionFields;
+    if (character === null || fields === undefined || fields.length === 0) return;
     const key = `${actorId}:${characterId}`;
     if (focusedFor.current === key) return;
     focusedFor.current = key;
     document.getElementById("character-completion")?.focus();
-  }, [snapshot.confirmed, actorId, characterId]);
+  }, [character, actorId, characterId]);
 
   const [cached, setCached] = useState<Array<{ characterId: string; name: string }>>([]);
   const showRecovery =
-    !online || snapshot.error !== null || (snapshot.confirmed === null && snapshot.phase !== "loading");
+    !online || snapshot.error !== null || (character === null && snapshot.phase !== "loading");
   useEffect(() => {
     if (!showRecovery) return;
     let cancelled = false;
@@ -290,9 +300,8 @@ function CharacterDetailLoaded({
   // Single-tab editing takeover. The session owns coordination lifetime; this
   // control only asks the session to request editing. Unsupported Web Locks
   // explain why the tab stays read-only instead of offering unsafe editing.
-  const locksSupported = locksSupportedProp ?? browserSupportsTakeover();
-  const readOnly = session !== null && snapshot.confirmed !== null && !snapshot.editing.owned;
-  const storageUnavailable = snapshot.error?.kind === "storage-error";
+  const readOnly = session !== null && character !== null && !canEdit(snapshot);
+  const storageUnavailable = snapshot.storage === "unavailable";
   const [takeoverBusy, setTakeoverBusy] = useState(false);
   const [takeoverDenied, setTakeoverDenied] = useState(false);
   const requestTakeover = () => {
@@ -312,7 +321,7 @@ function CharacterDetailLoaded({
     );
   };
 
-  if (session === null || (snapshot.confirmed === null && snapshot.phase === "loading")) {
+  if (session === null || (character === null && snapshot.phase === "loading")) {
     return (
       <section aria-labelledby="character-detail-title">
         <h1 id="character-detail-title">{t("character.loading")}</h1>
@@ -320,7 +329,7 @@ function CharacterDetailLoaded({
       </section>
     );
   }
-  if (snapshot.confirmed === null) {
+  if (character === null) {
     return (
       <section aria-labelledby="character-detail-title">
         <h1 id="character-detail-title">{t("character.loading")}</h1>
@@ -339,10 +348,19 @@ function CharacterDetailLoaded({
         <DiceOverlay key={campaignId ?? characterId} client={physicalDiceClient} actor={actorId}
           campaignId={campaignId} localSimulation={localSimulation} />
       ) : null}
-      <PlayEventOverlay events={events} presentation={snapshot.confirmed.projection.presentation} />
+      <PlayEventOverlay events={events} presentation={character.projection.presentation} />
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}
-      <p role="status">{snapshot.editing.owned ? t("character.detail.editing")
-        : t(storageUnavailable || !locksSupported ? "character.detail.readOnlyHere" : "character.detail.readOnly")}</p>
+      <p role="status">{canEdit(snapshot) ? t("character.detail.editing") : t(readOnlyMessage(snapshot.editing.blockedBy))}</p>
+      {readOnly && storageUnavailable && locksSupported ? (
+        // D3 released the lock when saving failed. Requesting editing again
+        // rereads the store and retries saving; a new failure releases it again.
+        <div>
+          <button type="button" disabled={takeoverBusy || snapshot.phase === "loading"} onClick={requestTakeover}>
+            {takeoverBusy ? t("character.detail.retryingStorage") : t("character.detail.retryStorage")}
+          </button>
+          {takeoverDenied ? <p role="alert">{t("character.detail.takeoverFailed")}</p> : null}
+        </div>
+      ) : null}
       {readOnly && !storageUnavailable ? (
         <section aria-labelledby="character-takeover-title">
           <h2 id="character-takeover-title">{t("character.detail.takeoverTitle")}</h2>
@@ -365,8 +383,8 @@ function CharacterDetailLoaded({
       {snapshot.error !== null && !reviewOpen ? <p role="alert">{snapshot.error.message}</p> : null}
       <CharacterSheet
         entryImages={api.entryImages}
-        portrait={api.images ? <PortraitEditor key={`${actorId}:${identity.getGeneration()}:${characterId}`} api={api.images} characterId={characterId} characterRevision={snapshot.confirmed.revision}
-          online={online} canEdit={snapshot.editing.owned && snapshot.confirmed.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} onRefresh={session.refresh} /> : null}
+        portrait={api.images ? <PortraitEditor key={`${actorId}:${identity.getGeneration()}:${characterId}`} api={api.images} characterId={characterId} characterRevision={character.revision}
+          online={online} canEdit={canEdit(snapshot) && character.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} onRefresh={session.refresh} /> : null}
         snapshot={snapshot}
         pushApi={api}
         loadRollOptions={api.rollOptions}
@@ -383,7 +401,7 @@ function CharacterDetailLoaded({
           // Online-only: the server applies a saved roll, then the sheet reads the result.
           onApplyRoll: async (resourceId: string, rollId: string, direction: "subtract" | "add") => {
             await api.applyRoll!(characterId, resourceId, {
-              rollId, direction, expectedRevision: snapshot.confirmed!.revision, idempotencyKey: randomUUID(),
+              rollId, direction, expectedRevision: character!.revision, idempotencyKey: randomUUID(),
             });
             await session.refresh();
           },

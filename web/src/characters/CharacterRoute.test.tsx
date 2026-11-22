@@ -128,7 +128,8 @@ describe("CharacterRoute", () => {
       try {
         expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
         expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
-        expect(screen.getByText("Read-only in this browser.")).toBeVisible();
+        expect(screen.getByText(canAcquire ? "Can't save this character in this browser, so it is read-only."
+          : "Read-only in this browser.")).toBeVisible();
         expect(screen.queryByText("Saved", { exact: true })).not.toBeInTheDocument();
         expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
         act(() => { online = false; notify(); });
@@ -141,6 +142,46 @@ describe("CharacterRoute", () => {
       } finally { ui.unmount(); await store.close(); }
     },
   );
+
+  it.each(["no editing lock", "snapshot write failure"])(
+    "shows another device's edit in an open online sheet after %s without a reload",
+    async (failure) => {
+      const store = await openStore();
+      const api = makeApi();
+      const canAcquire = failure === "snapshot write failure";
+      if (canAcquire) {
+        vi.spyOn(store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+      }
+      const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+        identity={makeIdentity()} coordination={makeCoordination(canAcquire)} locksSupported={canAcquire} />);
+      try {
+        expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+        const edited = completionView();
+        api.open.mockImplementation(async () => makeOpenEnvelope({ ...edited, name: "Briar Thorn",
+          revision: 2, reconciliation: { ...edited.reconciliation, revision: 2 } }));
+        act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+        expect(await screen.findByRole("heading", { name: "Briar Thorn" }, { timeout: 3000 })).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
+        expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
+        expect(api.send).not.toHaveBeenCalled();
+      } finally { ui.unmount(); await store.close(); }
+    },
+  );
+
+  it("hides an open online sheet when a refresh reports the access was revoked", async () => {
+    const store = await openStore();
+    const api = makeApi();
+    const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+      identity={makeIdentity()} coordination={makeCoordination(false)} locksSupported={false} />);
+    try {
+      expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+      api.open.mockRejectedValue(new ApiError({ status: 404, code: "not_found", message: "Not found",
+        cacheDisposition: "purge", requestId: "r", latestRevision: null, diagnostics: [] }));
+      act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+      await waitFor(() => expect(screen.queryByRole("heading", { name: "Briar" })).not.toBeInTheDocument());
+      expect(api.send).not.toHaveBeenCalled();
+    } finally { ui.unmount(); await store.close(); }
+  });
 
   it("purges the active sheet and releases editing when template discovery denies access", async () => {
     const store = await openStore();

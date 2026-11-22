@@ -92,7 +92,7 @@ it("real sessions never send without a lock and takeover waits for the active re
   expect(send).toHaveBeenCalledOnce();
   await store.purgeCharacter("a", "c");
   first.invalidate();
-  await vi.waitFor(() => expect(reader.getSnapshot().confirmed).toBeNull());
+  await vi.waitFor(() => expect(reader.getSnapshot().view).toBeNull());
   await expect(reader.setField("name", "purged")).rejects.toThrow();
   owner.dispose(); reader.dispose(); identity.dispose(); await store.close();
 });
@@ -131,7 +131,7 @@ it.each(["switch", "logout"])("real identity %s hides cached data and blocks act
   await vi.waitFor(() => expect(send).toHaveBeenCalledOnce());
   const before = await store.read("a", "c");
   if (mode === "switch") { actor = "b"; await identity.refresh(); } else await identity.signOut();
-  expect(session.getSnapshot()).toMatchObject({ confirmed: null, tentative: null, entries: [], editing: { owned: false } });
+  expect(session.getSnapshot()).toMatchObject({ view: null, tentative: null, entries: [], editing: { owned: false } });
   await expect(session.bumpResource("hp", "up")).rejects.toThrow();
   finish(new Response(JSON.stringify(makeEnvelope(makeView({ characterId: "c", revision: 2 })))));
   await session.whenIdle();
@@ -159,7 +159,7 @@ it("checks durable account identity before send even when the other tab's broadc
   vi.spyOn(store, "freeze").mockImplementation(async (...args) => { await freeze(...args); await other.refresh(); });
   await session.setField("name", "Briar"); await session.whenIdle();
   expect(send).not.toHaveBeenCalled();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   expect((await store.read("a", "c")).entries[0]?.attempt).not.toBeNull();
   session.dispose(); identity.dispose(); other.dispose(); await store.close();
 });

@@ -1,7 +1,7 @@
 import type { CampaignPlayFeed } from "../playEvents/CampaignPlayFeed.js";
 import type { PublishCommand } from "../playEvents/PlayEvents.js";
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
-import type {CharacterSession} from "../characters/session.js";
+import {canEdit, type CharacterSession} from "../characters/session.js";
 import {useCharacterSession} from "../characters/useCharacterSession.js";
 import { hasRollSelection, RollContextFields } from "../rolls/RollContextFields.js";
 import type { CampaignRollSelection } from "../characters/types.js";
@@ -316,11 +316,11 @@ function SessionRollRow(props: {
 
 function SessionPushPanel({factory,characterId,api,roll,onBlocked,publishRoll}:{factory:NonNullable<SessionBoardProps["createSession"]>;publishRoll?: PublishCommand | undefined;characterId:string;api:PushApi;roll:CommandResultResponse["result"]["roll"];onBlocked:(blocked:boolean)=>void}){
  const create=useMemo(() => () => publishRoll ? factory(characterId, publishRoll) : factory(characterId), [factory, characterId, publishRoll]);const {session,snapshot}=useCharacterSession(create);
- const blocked=snapshot.phase!=="ready"||!snapshot.editing.owned||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0;
+ const blocked=snapshot.phase!=="ready"||!canEdit(snapshot)||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0;
  useEffect(()=>{onBlocked(blocked);return()=>onBlocked(false);},[blocked,onBlocked]);
  const retained=snapshot.lastRoll;
  const current=retained?.push&&(!roll?.push||(retained.push.rootRollId===roll.push.rootRollId&&retained.push.attempt>=roll.push.attempt))?retained:roll;
- return <div>{snapshot.error?<p role="alert">{snapshot.error.message}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={blocked||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:null}</div>;
+ return <div>{snapshot.error?<p role="alert">{snapshot.error.message}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.view?.character.revision} disabled={blocked||snapshot.view?.character.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:null}</div>;
 }
 
 function SessionCharacterRow(props: {

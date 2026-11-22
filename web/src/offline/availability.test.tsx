@@ -10,7 +10,7 @@ import { useOfflineAvailability } from "./useOfflineAvailability.js";
 function snapshot(): CharacterSnapshot {
   return {
     phase: "ready",
-    confirmed: makeView({ characterId: "char-1", revision: 1 }),
+    storage: "available", view: { source: "stored" as const, character: makeView({ characterId: "char-1", revision: 1 }) },
     tentative: null,
     entries: [],
     editing: { owned: true },

@@ -19,7 +19,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
     ] }] }],
   };
   return {
-    phase: "ready", confirmed: makeView({ characterId: "character", revision: 1, projection }), tentative: null,
+    phase: "ready", storage: "available", view: { source: "stored" as const, character: makeView({ characterId: "character", revision: 1, projection }) }, tentative: null,
     entries: [], editing: { owned: true }, error: null, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: true, ...overrides,
   };
 }

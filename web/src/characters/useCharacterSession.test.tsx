@@ -22,7 +22,7 @@ it("binds stable snapshots and releases subscriptions on navigation including St
     now: () => "2026-09-06T00:00:00Z", newId: () => crypto.randomUUID(),
   });
   const { result, unmount } = renderHook(() => useCharacterSession(factory), { wrapper: StrictMode });
-  await waitFor(() => expect(result.current.snapshot.confirmed?.name).toBe("Aria"));
+  await waitFor(() => expect(result.current.snapshot.view?.character.name).toBe("Aria"));
   expect(result.current.snapshot.editing.owned).toBe(false);
   unmount();
   expect(listeners.size).toBe(0);

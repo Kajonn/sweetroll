@@ -12,7 +12,7 @@ import { CampaignSceneView } from "./campaigns/SceneViewport.js";
 import { CampaignCreate, campaignCreateViewKey } from "./campaigns/CampaignCreate.js";
 import { CampaignLibrary, campaignLibraryViewKey } from "./campaigns/CampaignLibrary.js";
 import { InvitationReviewView } from "./campaigns/InvitationReview.js";
-import { createCoordination } from "./characters/coordination.js";
+import { browserSupportsLocks, createCoordination } from "./characters/coordination.js";
 import type { BrowserChannel } from "./characters/identity.js";
 import type { IdentityGate } from "./characters/identity.js";
 import { storePostSigninPath, takePostSigninPath } from "./characters/identity.js";
@@ -570,7 +570,7 @@ function CampaignDetailRouteView() {
   const createSession=useMemo(()=>identity&&store?((characterId:string, publishRoll?: PublishCommand)=>{
     const actorId=identity.getActorId();if(!actorId)throw new Error("Sign in to manage this character.");
     const coordination=createCoordination({actorId,characterId});
-    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID(),captureRollPublisher:()=>publishRoll,captureDicePreparation:()=>prepare});
+    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID(),captureRollPublisher:()=>publishRoll,captureDicePreparation:()=>prepare,locksSupported:browserSupportsLocks()});
     return {...session,dispose(){session.dispose();coordination.dispose();}};
   }):undefined,[identity,store,charactersApi,prepare]);
   if (identity === null) {

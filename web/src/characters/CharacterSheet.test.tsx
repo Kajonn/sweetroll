@@ -27,7 +27,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
     ],
   };
   return {
-    phase: "ready", confirmed: makeView({ characterId: "character", revision: 1, projection }), tentative: null,
+    phase: "ready", storage: "available", view: { source: "stored" as const, character: makeView({ characterId: "character", revision: 1, projection }) }, tentative: null,
     entries: [], editing: { owned: true }, error: null, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: true, ...overrides,
   };
 }
@@ -39,7 +39,7 @@ describe("CharacterSheet", () => {
   });
   it("shows a section title once when its first element repeats the title", () => {
     const current = snapshot();
-    const basics = current.confirmed!.projection.sheets[0]!.sections[0]!;
+    const basics = current.view!.character.projection.sheets[0]!.sections[0]!;
     basics.elements.unshift({ kind: "heading", id: "repeated", text: "Basics", level: 2 });
     render(<CharacterSheet snapshot={current} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getAllByRole("heading", { name: "Basics" })).toHaveLength(1);
@@ -102,7 +102,7 @@ describe("CharacterSheet", () => {
 
   it("labels a nominal action by its entry when templates share the action ID", () => {
     const current = snapshot({ lastNominal: { actionId: "activate", entryId: "torch-1", output: "Result: {total}" } });
-    current.confirmed!.projection.sheets[1]!.sections[0]!.elements.push({
+    current.view!.character.projection.sheets[1]!.sections[0]!.elements.push({
       kind: "action", id: "torch-1__activate", actionId: "activate", entryId: "torch-1",
       label: "Raise Torch", actionKind: "roll", inputs: [], validations: [],
     });
@@ -135,12 +135,12 @@ describe("CharacterSheet", () => {
   it("uses projected attribute names in roll expressions and binding details", async () => {
     const user = userEvent.setup();
     const base = snapshot();
-    const projection = base.confirmed!.projection;
+    const projection = base.view!.character.projection;
     const sheets = projection.sheets.map(sheet => ({ ...sheet, sections: sheet.sections.map(section => ({
       ...section,
       elements: [...section.elements, { kind: "field" as const, id: "might-control", fieldId: "might", label: "Might", fieldKind: "integer" as const, value: 3, editable: true, constraints: {}, validations: [] }],
     })) }));
-    render(<CharacterSheet snapshot={{ ...base, confirmed: { ...base.confirmed!, projection: { ...projection, sheets } }, lastRoll: {
+    render(<CharacterSheet snapshot={{ ...base, view: { source: "stored" as const, character: { ...base.view!.character, projection: { ...projection, sheets } } }, lastRoll: {
       actionId: "hit", expression: "d20 + fields.might + fields.unknown", dice: [{ sides: 20, value: 12, kept: true }], breakdown: { version: "1.0", rootId: "root", groups: [], terms: [] },
       bindings: [{ scope: "fields", definitionId: "might", value: 3 }, { scope: "fields", definitionId: "unknown", value: 1 }],
       total: 16, output: "Hit: 16", audience: "owner_only",
@@ -176,13 +176,13 @@ describe("CharacterSheet", () => {
     expect(screen.getByText("Actions are unavailable while this character is read-only.")).toBeVisible();
     expect(readOnlyAction).toHaveAttribute("aria-describedby", "character-action-unavailable");
 
-    rerender(<CharacterSheet snapshot={snapshot({ confirmed: { ...snapshot().confirmed!, lifecycle: "archived" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    rerender(<CharacterSheet snapshot={snapshot({ view: { source: "stored" as const, character: { ...snapshot().view!.character, lifecycle: "archived" } } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByText("Actions are unavailable while this character is archived.")).toBeVisible();
   });
 
   it("labels unavailable completion metadata instead of treating it as an empty list", () => {
     const state = snapshot();
-    delete state.confirmed!.projection.completionFields;
+    delete state.view!.character.projection.completionFields;
     render(<CharacterSheet snapshot={state} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByText("Completion fields are unavailable until this character refreshes.")).toBeVisible();
   });
@@ -198,7 +198,7 @@ describe("CharacterSheet", () => {
 
   it("disables increase at the character's own maximum, below the field's upper bound", () => {
     const base = snapshot();
-    const resource = base.confirmed!.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;
+    const resource = base.view!.character.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;
     resource.value = { current: 4, max: 4 };
     render(<CharacterSheet snapshot={base} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByText("4 / 4")).toBeVisible();
@@ -262,10 +262,10 @@ describe("CharacterSheet", () => {
 
   it("shows the same estimate in every duplicate resource control", () => {
     const base = snapshot({ tentative: { health: 5 } });
-    const resource = base.confirmed!.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;
+    const resource = base.view!.character.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;
     const duplicated = {
-      ...base.confirmed!.projection,
-      sheets: base.confirmed!.projection.sheets.map(sheet => ({
+      ...base.view!.character.projection,
+      sheets: base.view!.character.projection.sheets.map(sheet => ({
         ...sheet,
         sections: sheet.sections.map(section => ({
           ...section,
@@ -273,7 +273,7 @@ describe("CharacterSheet", () => {
         })),
       })),
     };
-    render(<CharacterSheet snapshot={{ ...base, confirmed: { ...base.confirmed!, projection: duplicated } }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={{ ...base, view: { source: "stored" as const, character: { ...base.view!.character, projection: duplicated } } }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getAllByText("5 / 6")).toHaveLength(2);
   });
 
@@ -286,7 +286,7 @@ describe("CharacterSheet", () => {
     expect(screen.getAllByRole("status")[0]).toHaveTextContent("Saved");
     expect(screen.getByText("Available offline")).toBeVisible();
 
-    rerender(<CharacterSheet snapshot={snapshot({ confirmed: { ...snapshot().confirmed!, lifecycle: "archived" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} offlineAvailable={false} />);
+    rerender(<CharacterSheet snapshot={snapshot({ view: { source: "stored" as const, character: { ...snapshot().view!.character, lifecycle: "archived" } } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} offlineAvailable={false} />);
     expect(screen.getByRole("region", { name: "Aria" })).toHaveTextContent("Archived");
     expect(screen.getByText("Offline copy not ready yet")).toBeVisible();
   });
@@ -327,7 +327,7 @@ describe("CharacterSheet", () => {
   });
 
   it("exposes no private detail once purged", () => {
-    render(<CharacterSheet snapshot={{ phase: "purged", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={{ phase: "purged", view: null, storage: "available", tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByRole("status")).toHaveTextContent("This character is no longer available.");
     expect(screen.queryByText("Aria")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -367,7 +367,7 @@ describe("CharacterSheet", () => {
   it("renders slot elements through SlotListControl and skips synthetic granted actions", async () => {
     const user = userEvent.setup();
     const state = snapshot();
-    const moves = state.confirmed!.projection.sheets[1]!.sections[0]!;
+    const moves = state.view!.character.projection.sheets[1]!.sections[0]!;
     moves.elements.push(
       { kind: "slot", id: "inv-element", slotId: "inventory", label: "Inventory", accepts: ["item"], entries: [
         { entryId: "aaaaaaaa-1111-4111-8111-111111111111", templateId: "longsword", label: "Longsword", values: { weapon_bonus: 1 } },

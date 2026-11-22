@@ -28,6 +28,9 @@ export type AuthContext =
   | { state: "anonymous" }
   | { state: "session_expired" };
 
+/** A session lookup result. `unavailable` means storage failed: the cookie may still be valid. */
+export type SessionResolution = AuthContext | { state: "unavailable" };
+
 export interface Identity {
   personalTokens: ReturnType<typeof createPersonalTokens>;
   completeSignIn(input: {
@@ -35,7 +38,7 @@ export interface Identity {
     redirectUri: string;
     previousToken: string | undefined;
   }): Promise<Result<SessionHandle>>;
-  resolveSession(token: string): Promise<AuthContext>;
+  resolveSession(token: string): Promise<SessionResolution>;
   signOut(token: string): Promise<Result<void>>;
   /** Internal bounded projection. Callers must authorize the resource roster first. */
   getDisplayNames(userIds: readonly UserId[]): Promise<Result<Array<{ userId: UserId; displayName: string | null }>>>;
@@ -111,7 +114,9 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
           sessionId: session.sessionId,
         };
       } catch {
-        return { state: "anonymous" as const };
+        // A failed lookup (for example a busy connection pool) says nothing
+        // about the token. Reporting it as anonymous would sign the user out.
+        return { state: "unavailable" as const };
       }
     },
 

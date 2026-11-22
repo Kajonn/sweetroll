@@ -1012,7 +1012,10 @@ Browser sessions use one fixed expiry in PostgreSQL and the session cookie.
 Re-authentication atomically replaces the previous session, and only active
 users resolve to a browser identity. Cookie-authenticated writes require an
 exact allowed origin or browser same-origin Fetch Metadata when Origin is
-absent. Bearer-token operations authenticate independently.
+absent. Bearer-token operations authenticate independently. If the session
+lookup itself fails, for example because no database connection is free, the
+request gets `503 temporarily_unavailable` with `Retry-After` and the cookie is
+kept; only an unknown, revoked or expired session clears it.
 
 API and web responses deny framing and referrer disclosure. The content
 security policy limits resources to the app origin, allows local image

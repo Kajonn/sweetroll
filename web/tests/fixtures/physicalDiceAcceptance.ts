@@ -63,9 +63,13 @@ async function observeStream(page: Page) {
   });
 }
 
+// The server renews each stream after 60 seconds and the new connection replays
+// recent settlements. Clients deduplicate by attempt ID, so the test does too.
 const streamEvents = (page: Page, id: string) =>
   page.evaluate(
-    (id) => (window.physicalDiceAcceptance ?? []).filter((event) => event.data.attemptId === id),
+    (id) => (window.physicalDiceAcceptance ?? []).filter((event, index, all) =>
+      event.data.attemptId === id &&
+      all.findIndex((other) => other.type === event.type && other.data.attemptId === id) === index),
     id,
   );
 const canvas = (page: Page) => page.locator('[data-testid="physical-dice-canvas"][data-dice-ready="true"]');

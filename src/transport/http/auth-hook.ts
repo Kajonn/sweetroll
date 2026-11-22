@@ -54,6 +54,13 @@ export const buildAuthHook: (input: BuildAuthHookInput) => FastifyPluginCallback
         });
       }
       const result = await identity.resolveSession(raw);
+      if (result.state === "unavailable") {
+        request.log.warn("Session lookup failed; keeping the session cookie");
+        return reply.code(503).header("retry-after", "2").send({
+          error: { code: "temporarily_unavailable", message: "Sign-in could not be checked. Try again." },
+          requestId: request.id,
+        });
+      }
       // Unresolvable sessions clear the cookie. Expired sessions surface
       // distinctly (so the UI can offer re-auth) while still clearing the
       // dead cookie like anonymous ones.

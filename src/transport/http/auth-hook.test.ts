@@ -5,10 +5,10 @@ import cookie from "@fastify/cookie";
 import pino from "pino";
 import { afterAll, describe, expect, it } from "vitest";
 
-import type { AuthContext, Identity } from "../../identity/index.js";
+import type { AuthContext, Identity, SessionResolution } from "../../identity/index.js";
 import { buildAuthHook } from "./auth-hook.js";
 
-const fakeIdentity = (resolve: (token: string) => Promise<AuthContext>): Identity =>
+const fakeIdentity = (resolve: (token: string) => Promise<SessionResolution>): Identity =>
   ({
     completeSignIn: async () => {
       throw new Error("not used");
@@ -70,6 +70,16 @@ describe("buildAuthHook", () => {
       method: "POST", url: "/auth-test", headers: { host: "app.example.com", cookie: "session=token", ...headers },
     });
     expect(response.statusCode).toBe(status);
+  });
+
+  it("answers 503 and keeps the cookie when the session cannot be looked up", async () => {
+    const app = await build(fakeIdentity(async () => ({ state: "unavailable" })));
+    apps.push(app);
+    const response = await app.inject({ headers: { cookie: "session=valid-token" }, method: "GET", url: "/auth-test" });
+    expect(response.statusCode).toBe(503);
+    expect(response.headers["retry-after"]).toBe("2");
+    expect(response.json()).toMatchObject({ error: { code: "temporarily_unavailable" } });
+    expect(response.headers["set-cookie"]).toBeUndefined();
   });
 
   it("treats a missing cookie as anonymous", async () => {

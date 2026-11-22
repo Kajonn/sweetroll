@@ -108,6 +108,40 @@ describe("CharacterRoute", () => {
     vi.restoreAllMocks();
   });
 
+  it.each(["no editing lock", "snapshot write failure"])(
+    "opens a fresh online sheet read-only after %s and reopens it after reconnecting",
+    async (failure) => {
+      const store = await openStore();
+      const api = makeApi();
+      const canAcquire = failure === "snapshot write failure";
+      if (canAcquire) {
+        vi.spyOn(store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+      }
+      let online = true;
+      let notify = () => {};
+      const identity = makeIdentity({
+        isOnline: () => online,
+        subscribe: (listener) => { notify = listener; return () => {}; },
+      });
+      const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+        identity={identity} coordination={makeCoordination(canAcquire)} locksSupported={canAcquire} />);
+      try {
+        expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
+        expect(screen.getByText("Read-only in this browser.")).toBeVisible();
+        expect(screen.queryByText("Saved", { exact: true })).not.toBeInTheDocument();
+        expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
+        act(() => { online = false; notify(); });
+        expect(screen.queryByRole("heading", { name: "Briar" })).not.toBeInTheDocument();
+        act(() => { online = true; notify(); });
+        expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
+        expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
+        expect(api.send).not.toHaveBeenCalled();
+      } finally { ui.unmount(); await store.close(); }
+    },
+  );
+
   it("purges the active sheet and releases editing when template discovery denies access", async () => {
     const store = await openStore();
     const view = completionView();

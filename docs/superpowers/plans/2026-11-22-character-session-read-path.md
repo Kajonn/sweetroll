@@ -1,7 +1,7 @@
 # Separate viewing from local storage and editing in the character session
 
 Design plan · 22 November 2026  
-Based on Sweetroll `9ead9cd` and PR #93 (`1804771`). **The owner answered D1–D4 on 2026-11-22. Implementation is not yet authorized.**
+Based on Sweetroll `9ead9cd` and PR #93 (`1804771`). **The owner answered D1–D4 and authorized implementation on 2026-11-22.**
 
 ## Why
 
@@ -73,3 +73,7 @@ Update `design_v2.md` Sections 8 and 10.2 and the GUI integration plan with S2 a
 - Server push for character changes. D1 uses fetching only; the campaign SSE streams are not extended.
 - Changes to the queue, idempotency, conflict review or the server API.
 - Application-version migration of stored sessions. The app is unreleased (Section 17.0).
+
+## Implementation record
+
+Stages are implemented in order on `claude/vibrant-hopper-xoftei` (PR #96). Each stage adds its entry below.

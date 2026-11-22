@@ -81,6 +81,8 @@ export type CoordinationPort = {
 export type CharacterSnapshot = {
   phase: SessionPhase;
   confirmed: CharacterView | null;
+  /** An authorized online view that has not been saved to the local store. */
+  onlineOnly?: true;
   tentative: Record<string, unknown> | null;
   entries: QueueEntry[];
   editing: { owned: boolean; owner?: string | null };
@@ -252,6 +254,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   const { actorId, characterId, api, store, identity, coordination, now, newId } = input;
 
   let confirmed: CharacterView | null = null;
+  let onlinePreview: CharacterView | null = null;
+  /** True once this session has shown an online-only view; reconnecting reopens it. */
+  let previewShown = false;
+  let previewOpening: Promise<void> | null = null;
   let entries: QueueEntry[] = [];
   let pendingOnline: OnlineAttempt[] = [];
   let generation = 0;
@@ -309,12 +315,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
   function getSnapshot(): CharacterSnapshot {
     const visible = identityMatches();
+    const preview = visible && confirmed === null && isConnected() ? onlinePreview : null;
     return cachedSnapshot ??= {
       phase,
-      confirmed: visible ? confirmed : null,
+      confirmed: visible ? confirmed ?? preview : null,
+      ...(preview !== null && { onlineOnly: true as const }),
       tentative: visible ? computeTentative() : null,
       entries: visible ? entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })) : [],
-      editing: { ...editing, owned: visible && editing.owned },
+      editing: { ...editing, owned: visible && editing.owned && preview === null },
       error: visible && error ? { ...error } : null,
       connected: isConnected(),
       lastRoll: visible ? lastRoll : null,
@@ -573,6 +581,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) return "blocked";
     confirmed = null;
+    onlinePreview = null;
     entries = [];
     pendingOnline = [];
     lastRoll = null;
@@ -924,6 +933,26 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     await reconcile(server);
   }
 
+  function openReadOnly(): Promise<void> {
+    return previewOpening ??= fetchReadOnly().finally(() => { previewOpening = null; });
+  }
+
+  async function fetchReadOnly() {
+    if (!isConnected() || !await identityIsCurrent()) return;
+    const guard = { generation, accountGeneration };
+    try {
+      const { character } = await api.open(characterId);
+      if (!await identityIsCurrent() || !isConnected() || confirmed !== null ||
+          error?.kind === "purged" || generation !== guard.generation || accountGeneration !== guard.accountGeneration) return;
+      onlinePreview = character;
+      previewShown = true;
+      emit();
+    } catch (err) {
+      if (await identityIsCurrent()) await handleOpenError(err);
+      emit();
+    }
+  }
+
   /**
    * Manual review states (conflict/invalid/expired/not-found) and terminal
    * states must not be auto-cleared. Temporary pauses (reauthenticate,
@@ -1015,6 +1044,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         coordination.invalidate?.();
         if (!sameRollScope(confirmed, server)) lastRoll = null;
         confirmed = server;
+        onlinePreview = null;
         generation += 1;
       } catch (err) {
         if (!await identityIsCurrent()) return;
@@ -1022,6 +1052,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         // metadata changes can finish reconciling and purges stay terminal.
         if (isStaleAck(err)) return reconcileSnapshot(server);
         await handleAckError(err);
+        // A successful GET is enough to display the sheet online. Editing
+        // still needs a snapshot persisted against the current cache guard.
+        if (local === null && confirmed === null && error?.kind === "storage-error" &&
+            identityMatches() && isConnected()) {
+          onlinePreview = server;
+          previewShown = true;
+        }
         return;
       }
     }
@@ -1866,6 +1903,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await requestEditing();
       }
     }
+    if (!editing.owned && confirmed === null) await openReadOnly();
     initialized = true;
     scheduleDrain();
     if (draining) await new Promise<void>(resolve => idleWaiters.push(resolve));
@@ -1887,6 +1925,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const loaded = await store.read(actorId, characterId);
       if (!identityMatches() || !coordination.isOwner()) return;
       confirmed = loaded.confirmed;
+      onlinePreview = null;
       lastRoll = loaded.lastRoll ?? null;
       entries = loaded.entries; generation = loaded.generation;
       accountGeneration = loaded.accountGeneration;
@@ -1937,7 +1976,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       confirmed = null; lastRoll = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
       coordination.letGo();
     }
-    if (!isConnected()) needsFresh = true;
+    if (!isConnected()) {
+      onlinePreview = null;
+      needsFresh = true;
+    }
     if (isConnected() && (error?.kind === "reauthenticate" || error?.kind === "network-unavailable")) {
       error = null;
     }
@@ -1945,6 +1987,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       scheduleDrain();
     } else {
       refreshPhase();
+    }
+    // The online-only view is not stored, so a reconnect must fetch it again.
+    // Neither a blocked session nor a tab without the editing lock drains.
+    if (initialized && previewShown && isConnected() && identityMatches() && confirmed === null &&
+        onlinePreview === null && error?.kind !== "purged" && error?.kind !== "not-found") {
+      void openReadOnly();
     }
     emit();
   });
@@ -1966,6 +2014,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (loaded.accountGeneration === accountGeneration &&
             (loaded.generation < generation || (editing.owned && loaded.generation === generation))) return;
         confirmed = loaded.confirmed;
+        onlinePreview = null;
         lastRoll = loaded.lastRoll ?? null;
         entries = loaded.entries;
         generation = loaded.generation;

@@ -210,6 +210,7 @@ function syncStatusText(snapshot: CharacterSnapshot, pending: boolean): string {
         break;
     }
   }
+  if (snapshot.onlineOnly) return t("character.sync.onlineOnly");
   switch (snapshot.phase) {
     case "uncertain":
       return t("character.sync.uncertain");

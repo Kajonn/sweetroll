@@ -638,6 +638,7 @@ Because play happens at physical tables with unreliable venue connectivity, **of
 - Conflicts surface through the existing **revision + 409** mechanism rather than silently overwriting.
 - An open sheet is refreshed from the server through one read path: on open, on reconnect, when the page becomes visible, after commands (the command response or an explicit refresh) and, for a view that is not saved locally, every 30 seconds while visible. The tab that holds the editing lock saves the refreshed view; other tabs show it without writing local storage. A refresh that reports revoked access purges the cached copy and hides the sheet.
 - The character session reports three separate facts, and the sheet derives its state from them: the view and its source (`stored`, a copy this browser keeps, or `live`, an authorized server view that is not saved locally), whether local storage is available, and whether this tab edits or why it cannot (`storage`, no Web Locks, or another tab holds the lock). The saved (confirmed) copy stays internal to the write path.
+- Editing is derived from those facts: a tab may edit only while it holds the editing lock and shows a `stored` view. The session's commands check the same predicate as the controls, so a command in a `live` view or in a tab without the lock is refused without queuing, writing local storage or sending a request. A tab that holds the lock but cannot save locally releases the lock, so a tab or browser profile that can save is able to take over; it edits again only after editing is requested again, which first retries saving.
 
 # 9. Authorization model
 
@@ -685,7 +686,7 @@ into several rows. Navigation and viewport changes preserve the active view's
 state; Escape closes the disclosure and restores focus to its trigger.
 
 - Character identity, save/offline status and resource sections scroll with the rest of the sheet; the character header must not stick over fields or actions on small screens.
-- An authorized online sheet can open read-only when the browser cannot acquire the editing lock or save the initial local copy. This `live` view (Section 8) is available only while signed in and connected. It is fetched again after reconnecting, when the page becomes visible and every 30 seconds while visible, so other devices' edits appear and revoked access hides it at the next refresh. Editing still requires the lock and a saved local copy.
+- An authorized online sheet can open read-only when the browser cannot acquire the editing lock or save the initial local copy. This `live` view (Section 8) is available only while signed in and connected. It is fetched again after reconnecting, when the page becomes visible and every 30 seconds while visible, so other devices' edits appear and revoked access hides it at the next refresh. Editing still requires the lock and a saved local copy; a tab whose local save fails gives up the lock and stays read-only (Section 8).
 - Platform-owned bottom navigation for Characters, Activity, and Account; Campaigns is added in I6. System creators cannot add navigation destinations or divide the linear sheet into tabs.
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).

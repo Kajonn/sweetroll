@@ -21,7 +21,7 @@ import type {
 import type { CharactersApi } from "./api.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import { makeEntry, makeView, makePushRoll, PUSH_ROOT_ID } from "./testing.js";
-import { createCharacterSession } from "./session.js";
+import { canEdit, createCharacterSession } from "./session.js";
 import type { CharacterSession, CoordinationEvent, CoordinationPort, IdentityPort } from "./session.js";
 
 let counter = 0;
@@ -620,6 +620,7 @@ describe("CharacterSession", () => {
     };
     // The prior tab already sent this exact request and crashed before acking.
     api.sent.push(frozen);
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
     await seedQueue(store, "char-1", [
       { id: "e1", intent: { kind: "setField", fieldId: "name", value: "Briar" }, request: frozen },
     ]);
@@ -2077,8 +2078,12 @@ describe("CharacterSession uncertain online outcomes", () => {
     spy.mockRestore();
     expect(acknowledge).toBeDefined();
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+    // D3: the failed save released the lock; this tab edits again only after requesting it.
+    expect(session.getSnapshot().editing.blockedBy).toBe("storage");
+    // Requesting editing replays the retained attempt verbatim.
     api.scriptSend(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
-    await session.archive();
+    expect(await session.requestEditing()).toBe(true);
+    await session.whenIdle();
     expect(api.sent).toHaveLength(2);
     expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
     expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
@@ -2979,5 +2984,161 @@ describe("CharacterSession read path", () => {
     } finally {
       h.session.dispose(); await h.store.close();
     }
+  });
+});
+
+describe("CharacterSession derived editing (S3)", () => {
+  async function openLive(h: Harness) {
+    const confirm = vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+    h.api.scriptOpenView(viewFor("char-1", 1));
+    await h.session.open();
+    await h.session.whenIdle();
+    expect(h.session.getSnapshot().view?.source).toBe("live");
+    return confirm;
+  }
+
+  /** Every send must happen with a stored view and the editing lock. */
+  function guardSends(h: Harness): Array<{ canEdit: boolean; owner: boolean }> {
+    const calls: Array<{ canEdit: boolean; owner: boolean }> = [];
+    const send = h.api.send.bind(h.api);
+    h.api.send = async (request: FrozenRequest) => {
+      calls.push({ canEdit: canEdit(h.session.getSnapshot()), owner: h.coordination.isOwner() });
+      return send(request);
+    };
+    return calls;
+  }
+
+  async function expectCommandsRefused(h: Harness) {
+    const sends = guardSends(h);
+    const enqueue = vi.spyOn(h.store, "enqueue");
+    const freeze = vi.spyOn(h.store, "freeze");
+    const saveAttempt = vi.spyOn(h.store, "saveOnlineAttempt");
+    const s = h.session;
+    const commands: Array<[string, () => Promise<unknown>]> = [
+      ["setField", () => s.setField("name", "Briar")],
+      ["bumpResource", () => s.bumpResource("hp", "up")],
+      ["adjustResource", () => s.adjustResource("hp", -1)],
+      ["setResource", () => s.setResource("hp", { current: 3 })],
+      ["executeAction", () => s.executeAction("strike")],
+      ["executeGrantedAction", () => s.executeGrantedAction("sword-copy", "sword_pool")],
+      ["addEntry", () => s.addEntry("inventory", null, {})],
+      ["removeEntry", () => s.removeEntry("sword-copy")],
+      ["updateEntryValues", () => s.updateEntryValues("sword-copy", {})],
+      ["refresh", () => s.refresh()],
+      ["pushRoll", () => s.pushRoll(PUSH_ROOT_ID)],
+      ["archive", () => s.archive()],
+      ["recover", () => s.recover()],
+      ["changeVersion", () => s.changeVersion({} as never)],
+      ["resolveConflict", () => s.resolveConflict({ mode: "discard", selectedIds: [] } as never)],
+    ];
+    for (const [name, command] of commands) {
+      await expect(command(), name).rejects.toThrow();
+    }
+    await s.whenIdle();
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(freeze).not.toHaveBeenCalled();
+    expect(saveAttempt).not.toHaveBeenCalled();
+    expect(h.api.sent).toEqual([]);
+    expect(sends).toEqual([]);
+    expect((await h.store.read(ARM, "char-1")).entries).toEqual([]);
+    expect(await h.store.readOnlineAttempts(ARM)).toEqual([]);
+  }
+
+  it("refuses every command in a live view and releases the lock after a snapshot write failure (D3)", async () => {
+    const h = await makeHarness();
+    try {
+      await openLive(h);
+      const snap = h.session.getSnapshot();
+      expect(canEdit(snap)).toBe(false);
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.editing.owned).toBe(false);
+      expect(snap.editing.blockedBy).toBe("storage");
+      expect(h.coordination.isOwner()).toBe(false);
+      await expectCommandsRefused(h);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("refuses every command in a tab without the lock", async () => {
+    const h = await makeHarness("char-1", false);
+    h.coordination.requestEditing = async () => false;
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1), requestId: "r" }));
+      await h.session.open();
+      const snap = h.session.getSnapshot();
+      expect(snap.view?.source).toBe("stored");
+      expect(snap.editing.blockedBy).toBe("other-tab");
+      expect(canEdit(snap)).toBe(false);
+      await expectCommandsRefused(h);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("releases the lock when a stored view cannot be saved again and keeps showing it read-only (D3)", async () => {
+    const h = await makeHarness();
+    try {
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      expect(canEdit(h.session.getSnapshot())).toBe(true);
+      vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2), requestId: "r" }));
+      await h.session.refresh();
+      await h.session.whenIdle();
+      const snap = h.session.getSnapshot();
+      expect(snap.view?.source).toBe("stored");
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.editing.owned).toBe(false);
+      expect(snap.editing.blockedBy).toBe("storage");
+      expect(canEdit(snap)).toBe(false);
+      expect(h.coordination.isOwner()).toBe(false);
+      await expectCommandsRefused(h);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("edits again only after editing is requested once storage works (D3)", async () => {
+    const h = await makeHarness();
+    try {
+      const confirm = await openLive(h);
+      confirm.mockRestore();
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1), requestId: "r" }));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await h.session.whenIdle();
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.source).toBe("live"));
+      // No automatic reacquisition: the lock stays free for another tab.
+      expect(h.coordination.isOwner()).toBe(false);
+      expect(canEdit(h.session.getSnapshot())).toBe(false);
+      expect(await h.session.requestEditing()).toBe(true);
+      await h.session.whenIdle();
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.source).toBe("stored"));
+      const snap = h.session.getSnapshot();
+      expect(snap.storage).toBe("available");
+      expect(snap.error).toBeNull();
+      expect(canEdit(snap)).toBe(true);
+      const sends = guardSends(h);
+      h.api.setSendFallback(async () => successEnvelope(viewFor("char-1", 2)));
+      await h.session.setField("name", "Briar");
+      await h.session.whenIdle();
+      expect(h.api.sent).toHaveLength(1);
+      expect(sends).toEqual([{ canEdit: true, owner: true }]);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("does not save or send an online command when the lock is lost while it refreshes", async () => {
+    const h = await makeHarness();
+    try {
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      const sends = guardSends(h);
+      h.api.setOpenFallback(async () => {
+        h.coordination.signalOwnership(false, "other-tab");
+        return { character: viewFor("char-1", 1), requestId: "r" };
+      });
+      await expect(h.session.archive()).rejects.toThrow();
+      await h.session.whenIdle();
+      expect(h.api.sent).toEqual([]);
+      expect(sends).toEqual([]);
+      expect(await h.store.readOnlineAttempts(ARM)).toEqual([]);
+      expect(canEdit(h.session.getSnapshot())).toBe(false);
+    } finally { h.session.dispose(); await h.store.close(); }
   });
 });

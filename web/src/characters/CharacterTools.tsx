@@ -6,7 +6,7 @@ import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
 import type { CharactersApi } from "./api.js";
 import { captureOpener, focusFirst, restoreOpener, trapTabKey } from "./dialogTrap.js";
-import type { CharacterSession } from "./session.js";
+import { canEdit, type CharacterSession } from "./session.js";
 import type { ActivityEvent } from "./types.js";
 import styles from "./characters.module.css";
 import { VersionDialog } from "./VersionDialog.js";
@@ -38,7 +38,7 @@ export function CharacterTools({ characterId, api, session }: CharacterToolsProp
   const snapshot = useSnapshot(session);
   const blocked = snapshot.entries.length > 0 || snapshot.phase !== "ready";
   const uncertain = snapshot.pendingOnlineAttempts.length > 0;
-  const readOnly = !snapshot.editing.owned;
+  const readOnly = !canEdit(snapshot);
   const offline = !snapshot.connected;
   const manageBlocked = blocked || uncertain || readOnly || offline;
   const lifecycle = snapshot.view?.character.lifecycle ?? "active";
@@ -200,7 +200,7 @@ function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:
     <li>
       <span>{label}</span>{" · "}
       <time dateTime={event.occurredAt}>{formattedDate}</time>
-      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.view?.character.characterId??""} api={api} online={snapshot.connected} revision={snapshot.view?.character.revision} disabled={!snapshot.editing.owned||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.view?.character.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:<RollBreakdown roll={event.roll}/>}
+      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.view?.character.characterId??""} api={api} online={snapshot.connected} revision={snapshot.view?.character.revision} disabled={!canEdit(snapshot)||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.view?.character.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:<RollBreakdown roll={event.roll}/>}
     </li>
   );
 }
@@ -308,7 +308,7 @@ function ExportDialog({ characterId, api, session, onClose }: { characterId: str
   const queued = snapshot.entries.length > 0 || snapshot.phase !== "ready";
   const uncertain = snapshot.pendingOnlineAttempts.length > 0;
   const offline = !snapshot.connected;
-  const readOnly = !snapshot.editing.owned;
+  const readOnly = !canEdit(snapshot);
   const blocked = queued || uncertain || offline || readOnly;
   const blockReason = uncertain
     ? t("character.tools.exportBlockedAttempts")

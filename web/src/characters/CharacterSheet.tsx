@@ -10,7 +10,7 @@ import { Fragment, useCallback, useEffect, useMemo, useState, type ReactNode } f
 import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
 import { Select } from "../ui/Select.js";
-import { resourceMaxKey, type CharacterSnapshot } from "./session.js";
+import { canEdit, resourceMaxKey, type CharacterSnapshot } from "./session.js";
 import { FieldControl, type ProjectedField } from "./FieldControl.js";
 import { SlotListControl, type SlotTemplate } from "./SlotListControl.js";
 import styles from "./characters.module.css";
@@ -362,7 +362,7 @@ export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdju
   // network-unavailable (e.g. a failed refresh) still allows durable
   // offline field sets and resource bumps.
   const blocked = snapshot.error !== null && snapshot.error.kind !== "network-unavailable";
-  const editable = snapshot.editing.owned && character.lifecycle === "active" && !blocked;
+  const editable = canEdit(snapshot) && character.lifecycle === "active" && !blocked;
   const invokeCommand = (invoke: () => void | Promise<void>) => {
     setCommandError(null);
     let result: void | Promise<void>;
@@ -384,7 +384,7 @@ export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdju
       ? t("character.action.offline")
     : character.lifecycle === "archived"
       ? t("character.action.archived")
-      : !snapshot.editing.owned
+      : !canEdit(snapshot)
         ? t("character.action.readOnly")
         : snapshot.phase !== "ready"
           ? t("character.action.unavailable")
@@ -436,7 +436,7 @@ export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdju
           accepts={[...element.accepts]}
           entries={element.entries.map((entry) => ({ ...entry, values: { ...entry.values } }))}
           templates={templates ?? []}
-          renderEntryImage={imageFactory ? entry => <ItemArtwork key={entry.entryId} resourceId={entry.entryId} createApi={imageFactory} online={snapshot.connected} canEdit={snapshot.editing.owned && character.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} parentRevision={character.revision} /> : undefined}
+          renderEntryImage={imageFactory ? entry => <ItemArtwork key={entry.entryId} resourceId={entry.entryId} createApi={imageFactory} online={snapshot.connected} canEdit={canEdit(snapshot) && character.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} parentRevision={character.revision} /> : undefined}
           disabled={!entriesEditable}
           characterId={character.campaignId ? character.characterId : undefined}
           loadRollOptions={loadRollOptions}

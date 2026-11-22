@@ -16,7 +16,7 @@ import { ConflictReview } from "./ConflictReview.js";
 import type { SlotTemplate } from "./SlotListControl.js";
 import { CreateCharacter, type CreateCharacterIdentity } from "./CreateCharacter.js";
 import { browserSupportsLocks } from "./coordination.js";
-import { createCharacterSession, type CoordinationPort, type IdentityPort } from "./session.js";
+import { canEdit, createCharacterSession, type CoordinationPort, type IdentityPort } from "./session.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import { useCharacterSession } from "./useCharacterSession.js";
 import { useOfflineAvailability } from "../offline/useOfflineAvailability.js";
@@ -288,7 +288,7 @@ function CharacterDetailLoaded({
   // Single-tab editing takeover. The session owns coordination lifetime; this
   // control only asks the session to request editing. Unsupported Web Locks
   // explain why the tab stays read-only instead of offering unsafe editing.
-  const readOnly = session !== null && character !== null && !snapshot.editing.owned;
+  const readOnly = session !== null && character !== null && !canEdit(snapshot);
   const storageUnavailable = snapshot.storage === "unavailable";
   const [takeoverBusy, setTakeoverBusy] = useState(false);
   const [takeoverDenied, setTakeoverDenied] = useState(false);
@@ -338,7 +338,7 @@ function CharacterDetailLoaded({
       ) : null}
       <PlayEventOverlay events={events} presentation={character.projection.presentation} />
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}
-      <p role="status">{snapshot.editing.owned ? t("character.detail.editing")
+      <p role="status">{canEdit(snapshot) ? t("character.detail.editing")
         : t(snapshot.editing.blockedBy === "other-tab" ? "character.detail.readOnly" : "character.detail.readOnlyHere")}</p>
       {readOnly && !storageUnavailable ? (
         <section aria-labelledby="character-takeover-title">
@@ -363,7 +363,7 @@ function CharacterDetailLoaded({
       <CharacterSheet
         entryImages={api.entryImages}
         portrait={api.images ? <PortraitEditor key={`${actorId}:${identity.getGeneration()}:${characterId}`} api={api.images} characterId={characterId} characterRevision={character.revision}
-          online={online} canEdit={snapshot.editing.owned && character.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} onRefresh={session.refresh} /> : null}
+          online={online} canEdit={canEdit(snapshot) && character.lifecycle === "active" && snapshot.entries.length === 0 && !snapshot.error} onRefresh={session.refresh} /> : null}
         snapshot={snapshot}
         pushApi={api}
         loadRollOptions={api.rollOptions}

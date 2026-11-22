@@ -997,6 +997,26 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
       bindings:[expect.objectContaining({scope:"target",definitionId:"defense"})]});
   });
 
+  it("accepts the ordinary roll with the same key when a prepared physical throw cannot settle", async () => {
+    const { sharedId } = await setup();
+    const headers = { cookie: h.users.player.cookie };
+    const command = { actionId: "check", inputs: { bonus: 2 }, expectedRevision: 1, idempotencyKey: randomUUID() };
+    const prepared = await h.app.inject({ method: "POST", url: `/characters/${sharedId}/physical-rolls`, headers,
+      payload: { kind: "executeAction", ...command } });
+    expect(prepared.statusCode, prepared.body).toBe(200);
+    expect(prepared.json().attempt).toBeTruthy();
+    const ordinary = await h.app.inject({ method: "POST", url: `/characters/${sharedId}/actions/check`, headers,
+      payload: { inputs: command.inputs, expectedRevision: 1, idempotencyKey: command.idempotencyKey } });
+    expect(ordinary.statusCode, ordinary.body).toBe(200);
+    expect(ordinary.json().result.roll).toBeTruthy();
+    expect(await rollCount(sharedId)).toBe(1);
+    const late = await h.app.inject({ method: "POST", url: `/characters/${sharedId}/physical-rolls/${prepared.json().attempt.attemptId}/complete`, headers,
+      payload: { tick: 100, dice: prepared.json().attempt.dice.map((die: { id: string }) => ({ id: die.id, value: 1, position: { x: 1, y: 0, z: 1 },
+        orientation: { x: Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 } })) } });
+    expect(late.statusCode, late.body).not.toBe(200);
+    expect(await rollCount(sharedId)).toBe(1);
+  });
+
   it.each(["expired", "revision", "membership"] as const)("rejects a physical settlement after %s changes", async (change) => {
     const {sharedId,campaignId} = await setup();
     const url = `/characters/${sharedId}/physical-rolls`;

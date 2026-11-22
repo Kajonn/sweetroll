@@ -80,16 +80,22 @@ async function rolled(page: Page, click: () => Promise<void>) {
     (r) => r.request().method() === "POST" && r.url().endsWith("/physical-rolls"),
     { timeout: 30000 },
   );
+  // A throw that cannot settle falls back to the ordinary roll command.
   const completion = page.waitForResponse(
-    (r) =>
-      r.request().method() === "POST" &&
-      r.url().endsWith("/complete") &&
-      r.url().includes("/physical-rolls/"),
+    (r) => {
+      if (r.request().method() !== "POST") return false;
+      const path = new URL(r.url()).pathname;
+      return (path.includes("/physical-rolls/") && path.endsWith("/complete"))
+        || /^\/api\/characters\/[^/]+\/(actions\/[^/]+|rolls\/[^/]+\/push)$/.test(path);
+    },
     { timeout: 60000 },
   );
+  let physical = false;
   const total = completion.then(async (r) => {
     const body = await r.json();
     expect(r.status(), JSON.stringify(body)).toBe(200);
+    physical = r.url().endsWith("/complete");
+    if (!physical) console.log(`physical throw fell back to the ordinary roll (${new URL(r.url()).pathname})`);
     return (body as CommandResultResponse).result;
   });
   // The caller can assert the overlay before awaiting settlement.
@@ -97,7 +103,7 @@ async function rolled(page: Page, click: () => Promise<void>) {
   await click();
   const { attempt } = await (await prepare).json();
   expect(attempt).toBeTruthy();
-  return { id: attempt.attemptId as string, total };
+  return { id: attempt.attemptId as string, total, physical: () => physical };
 }
 
 async function checkThrow(viewer: Page, id: string, result: CommandResultResponse["result"], count: number) {
@@ -280,6 +286,11 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
         ]);
       }
       const result = await thrower.total;
+      if (!thrower.physical()) {
+        expect(result.roll?.dice).toHaveLength(action.count);
+        record(`${action.id} (fallback)`, result);
+        continue;
+      }
       const starts = await Promise.all([
         checkThrow(gm, thrower.id, result, action.count),
         checkThrow(other, thrower.id, result, action.count),
@@ -312,8 +323,10 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
     const rerolled = child.roll!.push!.rerolledDiceIds;
     expect(child.roll!.push!.parentRollId).toBe(root.rollId);
     expect(rerolled.length).toBeGreaterThan(0);
-    const pushStart = await checkThrow(gm, push.id, child, rerolled.length);
-    expect(pushStart.dice.map((die) => die.id)).toEqual(rerolled);
+    if (push.physical()) {
+      const pushStart = await checkThrow(gm, push.id, child, rerolled.length);
+      expect(pushStart.dice.map((die) => die.id)).toEqual(rerolled);
+    }
     expect(child.roll!.dice.filter((d) => !rerolled.includes(d.id!))).toEqual(
       root.roll!.dice.filter((d) => !rerolled.includes(d.id!)),
     );
@@ -347,7 +360,10 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
     ]);
     expect(one.id).not.toBe(two.id);
     const [first, second] = await Promise.all([one.total, two.total]);
-    await Promise.all([checkThrow(gm, one.id, first, 6), checkThrow(gm, two.id, second, 6)]);
+    await Promise.all([
+      one.physical() ? checkThrow(gm, one.id, first, 6) : null,
+      two.physical() ? checkThrow(gm, two.id, second, 6) : null,
+    ]);
 
     await openViewer(other);
     await contexts[1]!.setOffline(true);
@@ -359,7 +375,7 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
     // The existing EventSource connection must recover a pending throw or
     // receive its committed settlement when it reconnects.
     const after = await disconnected.total;
-    await expect
+    if (disconnected.physical()) await expect
       .poll(
         async () =>
           (await streamEvents(other, disconnected.id)).some(

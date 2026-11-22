@@ -15,7 +15,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
   });
   return {
     phase: "conflict",
-    confirmed,
+    storage: "available", view: { source: "stored", character: confirmed },
     tentative: { name: "LocalName" },
     entries: [
       makeEntry({
@@ -43,7 +43,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
 describe("ConflictReview", () => {
   it("uses projected labels for conflict choices while preserving exact intents", () => {
     const snap = snapshot();
-    (snap.confirmed!.projection as any).completionFields = [{ kind: "field", fieldId: "name", label: "Character name" }];
+    (snap.view!.character.projection as any).completionFields = [{ kind: "field", fieldId: "name", label: "Character name" }];
     render(<ConflictReview snapshot={snap} onResolve={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByRole("checkbox", { name: /Character name → LocalName/ })).toBeVisible();
   });
@@ -60,7 +60,7 @@ describe("ConflictReview", () => {
       state: { schemaVersion: "1.0", entries: {}, values: { health: 4 } },
     });
     const snap = snapshot({
-      confirmed,
+      view: { source: "stored", character: confirmed },
       tentative: { health: { up: 1, down: 0 } },
       entries: [
         makeEntry({
@@ -101,11 +101,11 @@ describe("ConflictReview", () => {
   it("keeps showing a repeated conflict after reapply", () => {
     const { rerender } = render(<ConflictReview snapshot={snapshot()} onResolve={vi.fn()} onClose={vi.fn()} />);
     const again = snapshot({
-      confirmed: makeView({
+      view: { source: "stored" as const, character: makeView({
         characterId: "char-1",
         revision: 9,
         state: { schemaVersion: "1.0", entries: {}, values: { name: "ServerAgain" } },
-      }),
+      }) },
     });
     rerender(<ConflictReview snapshot={again} onResolve={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByText(/ServerAgain/)).toBeVisible();
@@ -312,7 +312,7 @@ describe("ConflictReview", () => {
     } as unknown as Parameters<typeof makeView>[0]);
     const snap = snapshot({
       phase: "invalid",
-      confirmed,
+      view: { source: "stored", character: confirmed },
       entries: [
         makeEntry({
           id: "e-level",

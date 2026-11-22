@@ -35,13 +35,13 @@ function isReviewableOnlineAttempt(attempt: OnlineAttempt, now: number): boolean
 }
 
 function serverValue(snapshot: CharacterSnapshot, fieldId: string): string {
-  const values = snapshot.confirmed?.state.values as Record<string, unknown> | undefined;
+  const values = snapshot.view?.character.state.values as Record<string, unknown> | undefined;
   const value = values?.[fieldId];
   return value === undefined || value === null ? "—" : String(value);
 }
 
 function definitionLabel(snapshot: CharacterSnapshot, id: string, debug: boolean): string {
-  const projection = snapshot.confirmed?.projection;
+  const projection = snapshot.view?.character.projection;
   const elements = [
     ...(projection?.completionFields ?? []),
     ...(projection?.sheets.flatMap(sheet => sheet.sections.flatMap(section => section.elements)) ?? []),
@@ -83,7 +83,7 @@ type ProjectedFieldConstraints = {
 };
 
 function projectedField(snapshot: CharacterSnapshot, fieldId: string): ProjectedFieldConstraints | undefined {
-  const sheets = snapshot.confirmed?.projection.sheets as
+  const sheets = snapshot.view?.character.projection.sheets as
     | Array<{ sections?: Array<{ elements?: Array<Record<string, unknown>> }> }>
     | undefined;
   const elements: Array<Record<string, unknown>> = [];
@@ -92,7 +92,7 @@ function projectedField(snapshot: CharacterSnapshot, fieldId: string): Projected
       for (const element of section.elements ?? []) elements.push(element);
     }
   }
-  const completion = snapshot.confirmed?.projection.completionFields as Array<Record<string, unknown>> | undefined;
+  const completion = snapshot.view?.character.projection.completionFields as Array<Record<string, unknown>> | undefined;
   for (const field of completion ?? []) elements.push(field);
   return elements.find((element) => element["kind"] === "field" && element["fieldId"] === fieldId) as
     | ProjectedFieldConstraints

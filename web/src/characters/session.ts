@@ -78,14 +78,25 @@ export type CoordinationPort = {
   requestTakeover?(): Promise<boolean>;
 };
 
+/**
+ * What the session shows. `stored` is the copy this browser keeps (it may
+ * have been refreshed in memory from the server in a tab without the lock);
+ * `live` is an authorized server view that is not saved locally and is
+ * shown only while online.
+ */
+export type CharacterViewState = { source: "stored" | "live"; character: CharacterView };
+
+/** Why a tab with a view cannot edit: local storage failed, no Web Locks, or another tab holds the lock. */
+export type EditingBlockedBy = "storage" | "locks" | "other-tab";
+
 export type CharacterSnapshot = {
   phase: SessionPhase;
-  confirmed: CharacterView | null;
-  /** An authorized online view that has not been saved to the local store. */
-  onlineOnly?: true;
+  view: CharacterViewState | null;
+  /** Whether this browser can keep a local copy; "unavailable" after a local storage failure. */
+  storage: "available" | "unavailable";
   tentative: Record<string, unknown> | null;
   entries: QueueEntry[];
-  editing: { owned: boolean; owner?: string | null };
+  editing: { owned: boolean; owner?: string | null; blockedBy?: EditingBlockedBy };
   error: BlockingError | null;
   /** True while this session's actor is authenticated online. Read-only panels gate on this. */
   connected: boolean;
@@ -187,6 +198,8 @@ export type CreateCharacterSessionInput = {
   newId: () => string;
   captureDicePreparation?: (campaignId: string | null) => PrepareDice | undefined;
   captureRollPublisher?: () => ((response: CommandResultResponse, startedAt: string) => void) | undefined;
+  /** False when the browser has no Web Locks, so no tab can ever edit. Defaults to true. */
+  locksSupported?: boolean;
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -263,10 +276,12 @@ function entryMatchesBase(entry: QueueEntry, base: CharacterView): boolean {
 export function createCharacterSession(input: CreateCharacterSessionInput): CharacterSession {
   const { actorId, characterId, api, store, identity, coordination, now, newId } = input;
 
+  /** The stored view: written only by the write path (owner) or read from the store. */
   let confirmed: CharacterView | null = null;
-  let onlinePreview: CharacterView | null = null;
-  /** True once this session has shown an online-only view; reconnecting reopens it. */
-  let previewShown = false;
+  /** An authorized server view that is not saved locally (`view.source === "live"`). */
+  let liveView: CharacterView | null = null;
+  /** True once this session has shown a live view; reconnecting reopens it. */
+  let liveShown = false;
   let viewFetch: Promise<void> | null = null;
   let viewFetchAgain = false;
   let liveTimer: ReturnType<typeof setInterval> | null = null;
@@ -328,15 +343,23 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return identityMatches() && await identity.isCurrent() && identityMatches();
   }
   function getSnapshot(): CharacterSnapshot {
+    if (cachedSnapshot !== null) return cachedSnapshot;
     const visible = identityMatches();
-    const preview = visible && confirmed === null && isConnected() ? onlinePreview : null;
-    return cachedSnapshot ??= {
+    const live = visible && confirmed === null && isConnected() ? liveView : null;
+    const view: CharacterViewState | null = !visible ? null
+      : confirmed !== null ? { source: "stored", character: confirmed }
+      : live !== null ? { source: "live", character: live } : null;
+    const storage = visible && error?.kind === "storage-error" ? "unavailable" : "available";
+    const owned = visible && editing.owned && live === null;
+    const blockedBy: EditingBlockedBy | undefined = owned || view === null ? undefined
+      : storage === "unavailable" ? "storage" : input.locksSupported === false ? "locks" : "other-tab";
+    return cachedSnapshot = {
       phase,
-      confirmed: visible ? confirmed ?? preview : null,
-      ...(preview !== null && { onlineOnly: true as const }),
+      view,
+      storage,
       tentative: visible ? computeTentative() : null,
       entries: visible ? entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })) : [],
-      editing: { ...editing, owned: visible && editing.owned && preview === null },
+      editing: { ...editing, owned, ...(blockedBy !== undefined && { blockedBy }) },
       error: visible && error ? { ...error } : null,
       connected: isConnected(),
       lastRoll: visible ? lastRoll : null,
@@ -595,7 +618,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) return "blocked";
     confirmed = null;
-    onlinePreview = null;
+    liveView = null;
     entries = [];
     pendingOnline = [];
     lastRoll = null;
@@ -959,7 +982,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   /** D1: poll only a shown live view, and only while the page is visible. */
   function syncLiveTimer() {
-    const live = !disposed && confirmed === null && onlinePreview !== null && identityMatches() && isConnected();
+    const live = !disposed && confirmed === null && liveView !== null && identityMatches() && isConnected();
     if (live && pageVisible()) {
       liveTimer ??= setInterval(() => { void refreshView("timer"); }, LIVE_REFRESH_MS);
     } else if (liveTimer !== null) {
@@ -1020,7 +1043,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       // own state: only a purge changes it here.
       const denied = err instanceof ApiError && (err.status === 404 || err.status === 401);
       if (confirmed === null && (trigger === "open" || trigger === "reconnect" || denied)) {
-        if (err instanceof ApiError && err.status === 404) onlinePreview = null;
+        if (err instanceof ApiError && err.status === 404) liveView = null;
         await handleOpenError(err);
       }
       emit();
@@ -1029,8 +1052,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (!await identityIsCurrent() || !isConnected() || disposed || error?.kind === "purged" ||
         generation !== guard.generation || accountGeneration !== guard.accountGeneration) return;
     if (confirmed === null) {
-      onlinePreview = character;
-      previewShown = true;
+      liveView = character;
+      liveShown = true;
     } else if (!editing.owned && (character.reconciliation.revision > confirmed.reconciliation.revision ||
         (character.reconciliation.revision === confirmed.reconciliation.revision &&
          (!sameRollScope(confirmed, character) || !projectionsEqual(character.projection, confirmed.projection))))) {
@@ -1135,7 +1158,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         coordination.invalidate?.();
         if (!sameRollScope(confirmed, server)) lastRoll = null;
         confirmed = server;
-        onlinePreview = null;
+        liveView = null;
         generation += 1;
       } catch (err) {
         if (!await identityIsCurrent()) return;
@@ -1147,8 +1170,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         // still needs a snapshot persisted against the current cache guard.
         if (local === null && confirmed === null && error?.kind === "storage-error" &&
             identityMatches() && isConnected()) {
-          onlinePreview = server;
-          previewShown = true;
+          liveView = server;
+          liveShown = true;
         }
         return;
       }
@@ -2016,7 +2039,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const loaded = await store.read(actorId, characterId);
       if (!identityMatches() || !coordination.isOwner()) return;
       confirmed = loaded.confirmed;
-      onlinePreview = null;
+      liveView = null;
       lastRoll = loaded.lastRoll ?? null;
       entries = loaded.entries; generation = loaded.generation;
       accountGeneration = loaded.accountGeneration;
@@ -2072,7 +2095,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       coordination.letGo();
     }
     if (!isConnected()) {
-      onlinePreview = null;
+      liveView = null;
       needsFresh = true;
     }
     if (isConnected() && (error?.kind === "reauthenticate" || error?.kind === "network-unavailable")) {
@@ -2083,11 +2106,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     } else {
       refreshPhase();
     }
-    // The online-only view is not stored, so a reconnect must fetch it again.
+    // A live view is not stored, so a reconnect must fetch it again.
     // Neither a blocked session nor a tab without the editing lock drains,
     // so both refresh through the read path.
     if (initialized && identityMatches() && isConnected() &&
-        (reconnected || (previewShown && confirmed === null && onlinePreview === null))) {
+        (reconnected || (liveShown && confirmed === null && liveView === null))) {
       void refreshView("reconnect");
     }
     emit();
@@ -2117,7 +2140,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (loaded.accountGeneration === accountGeneration &&
             (loaded.generation < generation || (editing.owned && loaded.generation === generation))) return;
         confirmed = loaded.confirmed;
-        onlinePreview = null;
+        liveView = null;
         lastRoll = loaded.lastRoll ?? null;
         entries = loaded.entries;
         generation = loaded.generation;

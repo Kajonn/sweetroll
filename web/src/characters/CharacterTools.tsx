@@ -41,14 +41,14 @@ export function CharacterTools({ characterId, api, session }: CharacterToolsProp
   const readOnly = !snapshot.editing.owned;
   const offline = !snapshot.connected;
   const manageBlocked = blocked || uncertain || readOnly || offline;
-  const lifecycle = snapshot.confirmed?.lifecycle ?? "active";
+  const lifecycle = snapshot.view?.character.lifecycle ?? "active";
   const [dialog, setDialog] = useState<DialogKind>(null);
   // Design 6.7: standalone characters change rules version here; attached
   // characters move with their campaign.
   const versionApi = api.versionOptions !== undefined && api.versionCheck !== undefined
     ? { versionOptions: api.versionOptions, versionCheck: api.versionCheck }
     : null;
-  const standalone = (snapshot.confirmed?.campaignId ?? null) === null;
+  const standalone = (snapshot.view?.character.campaignId ?? null) === null;
   const openerRef = useRef<Element | null>(null);
 
   const openDialog = (kind: Exclude<DialogKind, null>) => {
@@ -200,7 +200,7 @@ function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:
     <li>
       <span>{label}</span>{" · "}
       <time dateTime={event.occurredAt}>{formattedDate}</time>
-      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.confirmed?.characterId??""} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={!snapshot.editing.owned||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:<RollBreakdown roll={event.roll}/>}
+      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.view?.character.characterId??""} api={api} online={snapshot.connected} revision={snapshot.view?.character.revision} disabled={!snapshot.editing.owned||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.view?.character.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:<RollBreakdown roll={event.roll}/>}
     </li>
   );
 }

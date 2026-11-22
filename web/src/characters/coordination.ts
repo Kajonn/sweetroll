@@ -1,6 +1,13 @@
 import type { BrowserChannel } from "./identity.js";
 import type { CoordinationEvent } from "./session.js";
 
+/** True when the browser has Web Locks, the only way a tab can own editing. */
+export function browserSupportsLocks(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const locks = (navigator as unknown as { locks?: LockManager | null }).locks;
+  return locks !== undefined && locks !== null;
+}
+
 export function createCoordination(input: {
   actorId: string; characterId: string; locks?: LockManager | null; channel?: BrowserChannel | null;
 }) {

@@ -74,11 +74,11 @@ it("does not restore an older sheet when clearing a revoked roll races a fresh s
   // One refresh must finish reconciliation even if clearing the roll
   // advanced the cache generation while its earlier read is held.
   await session.refresh();
-  expect(session.getSnapshot().confirmed?.revision).toBe(2);
+  expect(session.getSnapshot().view?.character.revision).toBe(2);
   release();
   await forgetting;
-  expect(session.getSnapshot().confirmed?.revision).toBe(2);
-  expect(session.getSnapshot().confirmed?.campaignId).toBeNull();
+  expect(session.getSnapshot().view?.character.revision).toBe(2);
+  expect(session.getSnapshot().view?.character.campaignId).toBeNull();
   api.setSendFallback(async () => successEnvelope(returned));
   await session.executeGrantedAction("sword-copy", "sword_pool");
   await session.whenIdle();
@@ -116,12 +116,12 @@ it("finishes startup reconciliation when clearing an old roll changes the cache 
   await observedRead;
   const readyRevisions: number[] = [];
   const unsubscribe = session.subscribe(snapshot => {
-    if (snapshot.phase === "ready" && snapshot.confirmed) readyRevisions.push(snapshot.confirmed.revision);
+    if (snapshot.phase === "ready" && snapshot.view) readyRevisions.push(snapshot.view.character.revision);
   });
   try {
     releaseOpen();
     await opening;
-    expect(session.getSnapshot().confirmed?.revision).toBe(2);
+    expect(session.getSnapshot().view?.character.revision).toBe(2);
     expect(readyRevisions).not.toContain(1);
     releaseRead();
     await clearing;
@@ -149,11 +149,11 @@ it.each(["roll clear", "access purge"] as const)("handles a %s between reading a
     await session.open();
     if (change === "roll clear") {
       expect(session.getSnapshot().phase).toBe("ready");
-      expect(session.getSnapshot().confirmed?.revision).toBe(2);
+      expect(session.getSnapshot().view?.character.revision).toBe(2);
       expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(2);
     } else {
       expect(session.getSnapshot().phase).toBe("purged");
-      expect(session.getSnapshot().confirmed).toBeNull();
+      expect(session.getSnapshot().view).toBeNull();
       expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
     }
     expect(api.sent).toEqual([]);
@@ -175,7 +175,7 @@ it("keeps actions blocked when reconciliation re-fetches a revision behind one a
     await session.open();
     expect(session.getSnapshot().phase).toBe("offline");
     expect(session.getSnapshot().error?.kind).toBe("network-unavailable");
-    expect(session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(session.getSnapshot().view?.character.revision).toBe(1);
     expect(api.sent).toEqual([]);
   } finally { session.dispose(); await store.close(); }
 });
@@ -205,7 +205,7 @@ it("rejects an already accepted edit whose enqueue arrives after another tab's l
   await store.clearAccount(ARM);
   finish(); await edit; await session.whenIdle();
   expect(await store.read(ARM, "char-1")).toMatchObject({ confirmed: null, entries: [] });
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   expect(api.sent).toEqual([]);
   session.dispose(); await store.close();
 });
@@ -250,7 +250,7 @@ it("retries a denied initial acquisition so a releasing predecessor does not wed
   await session.open();
   await vi.waitFor(() => expect(session.getSnapshot().editing.owned).toBe(true));
   expect(calls).toBeGreaterThanOrEqual(3);
-  await vi.waitFor(() => expect(session.getSnapshot().confirmed?.revision).toBe(1));
+  await vi.waitFor(() => expect(session.getSnapshot().view?.character.revision).toBe(1));
   session.dispose(); await store.close();
 });
 
@@ -262,7 +262,7 @@ it("keeps snapshots stable and hides cached data on account switch", async () =>
   identity.actorId = "other";
   identity.generationCounter++;
   identity.signal();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   await expect(session.setField("name", "leak")).rejects.toThrow();
   session.dispose(); await store.close();
 });
@@ -291,7 +291,7 @@ it("ignores late success after identity changes without modifying the frozen att
   pending.release(viewFor("char-1", 2));
   await session.whenIdle();
   expect(await store.read(ARM, "char-1")).toEqual(before);
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   session.dispose(); await store.close();
 });
 
@@ -306,7 +306,7 @@ it("checks identity again after persisting a frozen attempt, before sending", as
   await session.setField("name", "Briar"); await session.whenIdle();
   expect(api.sent).toEqual([]);
   expect((await store.read(ARM, "char-1")).entries[0]?.attempt).not.toBeNull();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   session.dispose(); await store.close();
 });
 
@@ -324,7 +324,7 @@ it.each([401, 404, 409])("ignores late %s errors after account switch without pu
   await session.whenIdle();
   expect(await store.read(ARM, "char-1")).toEqual(before);
   expect(open).not.toHaveBeenCalled();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   session.dispose(); await store.close();
 });
 
@@ -338,7 +338,7 @@ it("ignores a late initial GET after account switch", async () => {
   finish({ character: viewFor("char-1", 1), requestId: "r" });
   await opening;
   expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   session.dispose(); await store.close();
 });
 
@@ -635,7 +635,7 @@ describe("CharacterSession", () => {
     expect(api.sent[1]?.body).toEqual(frozen.body);
     expect(api.sent[1]?.body.idempotencyKey).toBe("frozen-key");
     const snap = session.getSnapshot();
-    expect(snap.confirmed?.revision).toBe(2);
+    expect(snap.view?.character.revision).toBe(2);
     expect(snap.entries).toEqual([]);
     expect(snap.phase).toBe("ready");
     const stored = await store.read(ARM, "char-1");
@@ -658,7 +658,7 @@ describe("CharacterSession", () => {
 
     expect(api.sent[0]?.body.expectedRevision).toBe(1);
     expect(api.sent[1]?.body.expectedRevision).toBe(2);
-    expect(session.getSnapshot().confirmed?.revision).toBe(3);
+    expect(session.getSnapshot().view?.character.revision).toBe(3);
     expect(session.getSnapshot().entries).toEqual([]);
     await store.close();
   });
@@ -669,7 +669,7 @@ describe("CharacterSession", () => {
     api.scriptOpenView(viewFor("char-1", 5));
     await session.open();
 
-    expect(session.getSnapshot().confirmed?.revision).toBe(5);
+    expect(session.getSnapshot().view?.character.revision).toBe(5);
     expect(session.getSnapshot().phase).toBe("ready");
     expect(session.getSnapshot().entries).toEqual([]);
     const stored = await store.read(ARM, "char-1");
@@ -687,7 +687,7 @@ describe("CharacterSession", () => {
     await session.executeAction("ironclad", { difficulty: 10 });
     await session.whenIdle();
 
-    expect(session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(session.getSnapshot().view?.character.revision).toBe(1);
     expect(session.getSnapshot().entries).toEqual([]);
     const stored = await store.read(ARM, "char-1");
     expect(stored.entries).toEqual([]);
@@ -771,7 +771,7 @@ describe("CharacterSession", () => {
     // selection keeps the remainder paused (see selection-safe tests below).
     const selected = session.getSnapshot().entries.map((e) => e.id);
     expect(selected).toHaveLength(3);
-    expect(session.getSnapshot().confirmed?.revision).toBe(7);
+    expect(session.getSnapshot().view?.character.revision).toBe(7);
     expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(7);
     expect(session.getSnapshot().tentative).toEqual({ health: 11, gold: 20, name: "Ivy" });
 
@@ -964,7 +964,7 @@ describe("CharacterSession", () => {
     const snap = session.getSnapshot();
     expect(snap.phase).toBe("purged");
     expect(snap.entries).toEqual([]);
-    expect(snap.confirmed).toBeNull();
+    expect(snap.view).toBeNull();
     const stored = await store.read(ARM, "char-1");
     expect(stored.entries).toEqual([]);
     expect(stored.confirmed).toBeNull();
@@ -1095,7 +1095,7 @@ describe("CharacterSession", () => {
     await session.open();
 
     const snap = session.getSnapshot();
-    expect(snap.confirmed?.projection.completionFields).toBeDefined();
+    expect(snap.view?.character.projection.completionFields).toBeDefined();
     expect(snap.phase).toBe("invalid");
     expect(snap.tentative).toEqual({ origin: "Feywild" });
     expect((await store.read(ARM, "char-1")).entries[0]?.id).toBe("legacy-pending");
@@ -1188,7 +1188,7 @@ describe("CharacterSession serialization", () => {
     first.api.scriptOpenView(viewFor("char-1", 1));
     first.api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
     first.session.subscribe(snapshot => {
-      if (snapshot.confirmed?.revision === 2 && snapshot.entries.length === 1) first.session.dispose();
+      if (snapshot.view?.character.revision === 2 && snapshot.entries.length === 1) first.session.dispose();
     });
     await first.session.open();
     expect(first.api.sent).toHaveLength(1);
@@ -1289,7 +1289,7 @@ describe("CharacterSession serialization", () => {
     api.scriptOpenError(new TypeError("offline"));
     await session.open();
     expect(session.getSnapshot().phase).toBe("offline");
-    expect(session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(session.getSnapshot().view?.character.revision).toBe(1);
     expect(api.sent).toEqual([]);
     expect((await store.read(ARM, "char-1")).entries[0]?.attempt).toBeNull();
     session.dispose();
@@ -1310,7 +1310,7 @@ describe("CharacterSession serialization", () => {
       await session.open();
       expect(api.sent).toEqual([request]);
       expect(get).not.toHaveBeenCalled();
-      expect(session.getSnapshot().confirmed?.revision).toBe(1);
+      expect(session.getSnapshot().view?.character.revision).toBe(1);
       expect(session.getSnapshot().phase).toBe("uncertain");
       expect((await store.read(ARM, "char-1")).entries[0]?.attempt).toEqual(request);
     } finally { session.dispose(); await store.close(); }
@@ -1351,7 +1351,7 @@ describe("CharacterSession serialization", () => {
     d.release(viewFor("char-1", 2));
     await opening;
     expect(api.sent).toHaveLength(1);
-    expect(session.getSnapshot().confirmed?.revision).toBe(7);
+    expect(session.getSnapshot().view?.character.revision).toBe(7);
     expect(session.getSnapshot().phase).toBe("conflict");
     session.dispose();
     await store.close();
@@ -1371,7 +1371,7 @@ describe("CharacterSession serialization", () => {
     await session.setField("name", "Briar");
     await session.whenIdle();
     expect(session.getSnapshot().error?.kind).toBe(kind);
-    expect(session.getSnapshot().confirmed?.revision).toBe(kind === "purged" ? undefined : 1);
+    expect(session.getSnapshot().view?.character.revision).toBe(kind === "purged" ? undefined : 1);
     await expect(session.resolveConflict({ mode: "reapply", selectedIds: session.getSnapshot().entries.map(e => e.id) })).rejects.toThrow();
     expect(api.sent).toHaveLength(1);
     if (kind === "purged") expect((await store.read(ARM, "char-1")).entries).toEqual([]);
@@ -1442,7 +1442,7 @@ describe("CharacterSession online operations", () => {
     expect(api.sent[0]?.path).toBe("/characters/char-1");
     expect(api.sent[0]?.body).toMatchObject({ command: "archive", expectedRevision: 3 });
     expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     session.dispose();
     await store.close();
@@ -1461,7 +1461,7 @@ describe("CharacterSession online operations", () => {
     expect(api.sent[0]?.path).toBe("/characters/char-1/composition");
     expect(api.sent[0]?.body).toMatchObject({ target: { systemVersionId: target, extensions: [] }, expectedRevision: 3 });
     expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
-    expect(session.getSnapshot().confirmed?.systemVersionId).toBe(target);
+    expect(session.getSnapshot().view?.character.systemVersionId).toBe(target);
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     session.dispose();
     await store.close();
@@ -1475,7 +1475,7 @@ describe("CharacterSession online operations", () => {
     api.setSendFallback(async () => successEnvelope(viewFor("char-1", 5, { lifecycle: "active" })));
     await session.recover();
     expect(api.sent[0]?.body).toMatchObject({ command: "recover", expectedRevision: 4 });
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("active");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("active");
     session.dispose();
     await store.close();
   });
@@ -1772,7 +1772,7 @@ describe("CharacterSession selection-safe conflict recovery", () => {
     ).rejects.toThrow(/stale/);
     expect((await h.store.read(ARM, "char-1")).entries).toEqual([]);
     expect(h.api.sent).toHaveLength(h.sentBefore);
-    expect(h.session.getSnapshot().confirmed).toBeNull();
+    expect(h.session.getSnapshot().view).toBeNull();
     h.session.dispose();
     await h.store.close();
     h.pending1.catch(() => {});
@@ -1829,7 +1829,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     releaseReplay(successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
     await opening;
     await session.whenIdle();
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     expect(api.sent).toHaveLength(1);
     // The acknowledgment itself is authoritative: no extra fresh-state
@@ -1861,7 +1861,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     expect(api.sent[1]?.path).toBe(first.path);
     expect(api.sent[1]?.body).toEqual(first.body);
     expect(api.sent[1]?.firstAttemptAt).toBe(first.firstAttemptAt);
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     session.dispose();
     await store.close();
@@ -1884,7 +1884,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
       expect(api.sent[1]?.path).toBe(api.sent[0]?.path);
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       session.dispose();
       await store.close();
     },
@@ -1914,7 +1914,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await session.whenIdle();
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     } finally {
       session.dispose();
       await store.close();
@@ -1956,7 +1956,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     identity.signal();
     await session.whenIdle();
     expect(api.sent).toHaveLength(1);
-    expect(session.getSnapshot().confirmed).toBeNull();
+    expect(session.getSnapshot().view).toBeNull();
     // The same account resumes with the identical body.
     identity.actorId = ARM;
     identity.signal();
@@ -1964,7 +1964,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     await session.whenIdle();
     expect(api.sent).toHaveLength(2);
     expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     session.dispose();
     await store.close();
   });
@@ -2007,7 +2007,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     const stored = await store.read(ARM, "char-1");
     expect(stored.confirmed).toBeNull();
     expect(stored.entries).toEqual([]);
-    expect(snap.confirmed).toBeNull();
+    expect(snap.view).toBeNull();
     session.dispose();
     await store.close();
   });
@@ -2046,7 +2046,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     const retained = await store.readOnlineAttempts(ARM);
     expect(retained).toHaveLength(1);
     expect(retained[0]?.request.body).toEqual({ command: "archive", expectedRevision: 3, idempotencyKey: "archive-key" });
-    expect(session.getSnapshot().confirmed?.revision).toBe(3);
+    expect(session.getSnapshot().view?.character.revision).toBe(3);
     // Ordinary recovery and newer sends stay blocked.
     await expect(session.resolveConflict({ mode: "discard", selectedIds: [] })).rejects.toThrow(/uncertain/i);
     await expect(session.archive()).rejects.toThrow(/replay window|manual review|expired/i);
@@ -2081,7 +2081,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     await session.archive();
     expect(api.sent).toHaveLength(2);
     expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     session.dispose();
     await store.close();
@@ -2102,7 +2102,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     await session.whenIdle();
     const snap = session.getSnapshot();
     expect(snap.phase).toBe("purged");
-    expect(snap.confirmed).toBeNull();
+    expect(snap.view).toBeNull();
     expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
     expect(await store.readOnlineAttempts(ARM)).toEqual([]);
     session.dispose();
@@ -2174,7 +2174,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await session.archive();
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body.idempotencyKey).not.toBe(retiredKey);
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       session.dispose();
       await store.close();
     });
@@ -2197,7 +2197,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await session.archive();
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body.idempotencyKey).not.toBe(api.sent[0]?.body.idempotencyKey);
-      expect(session.getSnapshot().confirmed?.revision).toBe(4);
+      expect(session.getSnapshot().view?.character.revision).toBe(4);
       session.dispose();
       await store.close();
     });
@@ -2254,7 +2254,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await first;
       await second;
       await session.whenIdle();
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       expect(session.getSnapshot().error).toBeNull();
       expect(session.getSnapshot().phase).toBe("ready");
       expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
@@ -2305,7 +2305,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       release(successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
       await sending;
       await reviewing;
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
       session.dispose();
       await store.close();
@@ -2339,7 +2339,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await sending;
       // The send resolved the outcome first: there is nothing left to review.
       await expect(reviewing).rejects.toThrow(/no longer pending/);
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
       session.dispose();
       await store.close();
@@ -2901,8 +2901,8 @@ describe("CharacterSession read path", () => {
     h.api.scriptOpenView(viewFor("char-1", 1));
     await h.session.open();
     await h.session.whenIdle();
-    expect(h.session.getSnapshot().onlineOnly).toBe(true);
-    expect(h.session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(h.session.getSnapshot().view?.source).toBe("live");
+    expect(h.session.getSnapshot().view?.character.revision).toBe(1);
   }
 
   it("refreshes a live view every 30 seconds while visible and stops on dispose", async () => {
@@ -2912,11 +2912,11 @@ describe("CharacterSession read path", () => {
       await openLive(h);
       h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2, { name: "Edited elsewhere" }), requestId: "r" }));
       await vi.advanceTimersByTimeAsync(29_000);
-      expect(h.session.getSnapshot().confirmed?.revision).toBe(1);
+      expect(h.session.getSnapshot().view?.character.revision).toBe(1);
       await vi.advanceTimersByTimeAsync(1_000);
-      await vi.waitFor(() => expect(h.session.getSnapshot().confirmed?.revision).toBe(2));
-      expect(h.session.getSnapshot().confirmed?.name).toBe("Edited elsewhere");
-      expect(h.session.getSnapshot().onlineOnly).toBe(true);
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(2));
+      expect(h.session.getSnapshot().view?.character.name).toBe("Edited elsewhere");
+      expect(h.session.getSnapshot().view?.source).toBe("live");
       expect((await h.store.read(ARM, "char-1")).confirmed).toBeNull();
       h.session.dispose();
       expect(vi.getTimerCount()).toBe(0);
@@ -2938,7 +2938,7 @@ describe("CharacterSession read path", () => {
       expect(opens).toBe(0);
       visibility.mockReturnValue("visible");
       document.dispatchEvent(new Event("visibilitychange"));
-      await vi.waitFor(() => expect(h.session.getSnapshot().confirmed?.revision).toBe(3));
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(3));
       expect(opens).toBe(1);
     } finally {
       visibility.mockRestore(); vi.useRealTimers(); h.session.dispose(); await h.store.close();
@@ -2954,8 +2954,7 @@ describe("CharacterSession read path", () => {
       await vi.advanceTimersByTimeAsync(30_000);
       await vi.waitFor(() => expect(h.session.getSnapshot().phase).toBe("purged"));
       const snap = h.session.getSnapshot();
-      expect(snap.confirmed).toBeNull();
-      expect(snap.onlineOnly).toBeUndefined();
+      expect(snap.view).toBeNull();
       expect(snap.error?.kind).toBe("purged");
       expect(vi.getTimerCount()).toBe(0);
     } finally {
@@ -2969,11 +2968,11 @@ describe("CharacterSession read path", () => {
     try {
       await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
       await h.session.open();
-      expect(h.session.getSnapshot().confirmed?.revision).toBe(1);
-      expect(h.session.getSnapshot().onlineOnly).toBeUndefined();
+      expect(h.session.getSnapshot().view?.character.revision).toBe(1);
+      expect(h.session.getSnapshot().view?.source).toBe("stored");
       h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2, { name: "Other device" }), requestId: "r" }));
       document.dispatchEvent(new Event("visibilitychange"));
-      await vi.waitFor(() => expect(h.session.getSnapshot().confirmed?.revision).toBe(2));
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(2));
       expect(h.session.getSnapshot().editing.owned).toBe(false);
       expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(1);
       expect(h.api.sent).toEqual([]);

@@ -48,7 +48,7 @@ export type CharacterSheetProps = { snapshot: CharacterSnapshot;pushApi?:PushApi
   portrait?: ReactNode;
   entryImages?: CharactersApi["entryImages"];
 };
-type Element = NonNullable<CharacterSnapshot["confirmed"]>["projection"]["sheets"][number]["sections"][number]["elements"][number];
+type Element = NonNullable<CharacterSnapshot["view"]>["character"]["projection"]["sheets"][number]["sections"][number]["elements"][number];
 
 function ValidationList({ validations }: { validations: Array<{ validationId: string; severity: "error" | "warning"; message: string }> }) {
   return validations.length > 0 ? <ul className={styles.validationList}>{validations.map(validation => <li key={validation.validationId} data-severity={validation.severity}>{validation.message}</li>)}</ul> : null;
@@ -177,9 +177,9 @@ function ResourceEditor({ element, current, max, disabled, invoke, onAdjustResou
 }
 
 function resourceEstimateActive(snapshot: CharacterSnapshot): boolean {
-  if (snapshot.tentative === null || snapshot.confirmed === null) return false;
+  if (snapshot.tentative === null || snapshot.view === null) return false;
   const resourceIds = new Set<string>();
-  for (const sheet of snapshot.confirmed.projection.sheets) {
+  for (const sheet of snapshot.view.character.projection.sheets) {
     for (const section of sheet.sections) {
       for (const element of section.elements) {
         if (element.kind === "resource") resourceIds.add(element.resourceId);
@@ -210,7 +210,7 @@ function syncStatusText(snapshot: CharacterSnapshot, pending: boolean): string {
         break;
     }
   }
-  if (snapshot.onlineOnly) return t("character.sync.onlineOnly");
+  if (snapshot.view?.source === "live") return t("character.sync.onlineOnly");
   switch (snapshot.phase) {
     case "uncertain":
       return t("character.sync.uncertain");
@@ -282,7 +282,7 @@ function audienceLabel(audience: NonNullable<CharacterSnapshot["lastRoll"]>["aud
 
 function nominalActionLabel(
   nominal: NonNullable<CharacterSnapshot["lastNominal"]>,
-  sheets: NonNullable<CharacterSnapshot["confirmed"]>["projection"]["sheets"],
+  sheets: NonNullable<CharacterSnapshot["view"]>["character"]["projection"]["sheets"],
   templates: SlotTemplate[],
 ): string | null {
   for (const sheet of sheets) {
@@ -316,9 +316,9 @@ function RollResult({ roll, fieldLabels }: { roll: NonNullable<CharacterSnapshot
 }
 
 export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdjustResource, onSetResource, loadApplicableRolls, onApplyRoll, onExecuteAction, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, offlineAvailable, templates, portrait, entryImages, loadRollOptions, pushApi, onPushRoll, onRefreshRoll, onDeniedRoll }: CharacterSheetProps) {
-  const characterIdForImages = snapshot.confirmed?.characterId;
+  const characterIdForImages = snapshot.view?.character.characterId;
   const imageFactory = useMemo(() => entryImages && characterIdForImages ? (id: string) => entryImages(characterIdForImages, id) : undefined, [entryImages, characterIdForImages]);
-  const character = snapshot.confirmed;
+  const character = snapshot.view?.character ?? null;
   const [commandError, setCommandError] = useState<string | null>(null);
   // Design 6.4: deck counts are read from the server on load and after each
   // draw or shuffle. Other players' draws show up on the next read.

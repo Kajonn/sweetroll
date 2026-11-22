@@ -380,7 +380,7 @@ describe("SessionBoard", () => {
 
 it("routes GM pushes through the shared durable character session",async()=>{
  const roll={actionId:"a1",expression:"2d6",dice:[],bindings:[],total:4,output:"GM saved pool",audience:"campaign",breakdown:{version:"1.0",rootId:"root",groups:[],terms:[]},push:{version:"1.0",rollId:"root",rootRollId:"root",parentRollId:null,attempt:0,maxAttempts:2,rerolledDiceIds:[],faceOutcomes:[]}};
- const snapshot={phase:"ready",confirmed:sheet(),tentative:null,entries:[],editing:{owned:true},error:null,lastRoll:roll,lastNominal:null,lastMigration:null,pendingOnlineAttempts:[],connected:true};
+ const snapshot={phase:"ready",view:{source:"stored",character:sheet()},storage:"available",tentative:null,entries:[],editing:{owned:true},error:null,lastRoll:roll,lastNominal:null,lastMigration:null,pendingOnlineAttempts:[],connected:true};
  const push=vi.fn(async()=>{});const factory=vi.fn(()=>({open:vi.fn(async()=>{}),subscribe:()=>()=>{},getSnapshot:()=>snapshot,pushRoll:push,refresh:vi.fn(async()=>{}),dispose:vi.fn()}));
  const chars={open:vi.fn().mockResolvedValue({character:sheet()}),executeCharacterAction:vi.fn(),bumpCharacterResource:vi.fn(),pushOptions:vi.fn().mockResolvedValue({options:{canPush:true,reason:null,eligibleDiceIds:[],revision:7,nextAttempt:1,maxAttempts:2}}),readRoll:vi.fn()};
  const campaigns={listContent:vi.fn().mockResolvedValue({content:[],nextCursor:null}),listActivity:vi.fn().mockResolvedValue({events:[],nextCursor:null}),listCampaignCharacters:vi.fn().mockResolvedValue({characters:[{characterId:"s1",name:"Bram",controllers:[]}],nextCursor:null})};

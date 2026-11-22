@@ -75,14 +75,17 @@ const streamEvents = (page: Page, id: string) =>
 const canvas = (page: Page) => page.locator('[data-testid="physical-dice-canvas"][data-dice-ready="true"]');
 
 async function rolled(page: Page, click: () => Promise<void>) {
+  // Bounded waits name the stalled step instead of exhausting the test timeout.
   const prepare = page.waitForResponse(
     (r) => r.request().method() === "POST" && r.url().endsWith("/physical-rolls"),
+    { timeout: 30000 },
   );
   const completion = page.waitForResponse(
     (r) =>
       r.request().method() === "POST" &&
       r.url().endsWith("/complete") &&
       r.url().includes("/physical-rolls/"),
+    { timeout: 60000 },
   );
   const total = completion.then(async (r) => {
     const body = await r.json();
@@ -124,6 +127,7 @@ async function setDicePreferences(page: Page, show: boolean, color: string) {
   if ((await checkbox.isChecked()) !== show) {
     const saved = page.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().endsWith("/me/preferences") && r.ok(),
+      { timeout: 30000 },
     );
     await checkbox.click();
     expect((await (await saved).json()).show_3d_dice).toBe(show);
@@ -133,6 +137,7 @@ async function setDicePreferences(page: Page, show: boolean, color: string) {
   if ((await input.inputValue()) !== color) {
     const saved = page.waitForResponse(
       (r) => r.request().method() === "PATCH" && r.url().endsWith("/me/preferences") && r.ok(),
+      { timeout: 30000 },
     );
     await input.fill(color);
     await page.getByRole("button", { name: "Save dice color" }).click();
@@ -172,6 +177,15 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
   try {
     const roller = await contexts[0]!.newPage();
     const other = await contexts[1]!.newPage();
+    // Printed only when the test fails: request failures explain most stalls.
+    const started = Date.now();
+    for (const [who, page] of [["gm", gm], ["roller", roller], ["other", other]] as const) {
+      const note = (what: string) => console.log(`[${((Date.now() - started) / 1000).toFixed(1)}s] ${who} ${what}`);
+      page.on("response", (r) => {
+        if (r.status() === 401 || r.status() >= 500) note(`${r.status()} ${r.request().method()} ${new URL(r.url()).pathname}`);
+      });
+      page.on("requestfailed", (r) => note(`failed ${r.method()} ${new URL(r.url()).pathname} ${r.failure()?.errorText ?? ""}`));
+    }
     const rollerId = await signInAcceptance(roller, baseURL, "code-journey-p1");
     const otherId = await signInAcceptance(other, baseURL, "code-journey-p2");
     const rules = testRules();
@@ -221,8 +235,8 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
     await setDicePreferences(gm, true, "#4c79c9");
     await Promise.all([observeStream(gm), observeStream(other)]);
     const openViewer = async (page: Page) => {
-      const stream = page.waitForResponse((r) => r.ok() && r.url().endsWith("/physical-rolls/events"));
-      const feed = page.waitForResponse((r) => r.ok() && new URL(r.url()).pathname === `${path}/activity`);
+      const stream = page.waitForResponse((r) => r.ok() && r.url().endsWith("/physical-rolls/events"), { timeout: 30000 });
+      const feed = page.waitForResponse((r) => r.ok() && new URL(r.url()).pathname === `${path}/activity`, { timeout: 30000 });
       await page.goto(`/campaigns/${campaignId}`);
       await Promise.all([stream, feed]);
     };
@@ -313,7 +327,7 @@ export async function physicalDiceAcceptance(gm: Page, browser: Browser, baseURL
     const privateThrow = await rolled(gm, () => privateButton.click());
     const secret = await privateThrow.total;
     expect(secret.roll?.audience).toBe("owner_only");
-    await other.waitForResponse((r) => r.ok() && new URL(r.url()).pathname === `${path}/activity`);
+    await other.waitForResponse((r) => r.ok() && new URL(r.url()).pathname === `${path}/activity`, { timeout: 30000 });
     expect(await streamEvents(other, privateThrow.id)).toEqual([]);
     const lookup = await json(roller.request, "GET", `/api/characters/${characterIds[0]}/activity`);
     expect(lookup.events.some((event: { rollId: string | null }) => event.rollId === secret.rollId)).toBe(

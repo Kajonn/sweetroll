@@ -128,7 +128,8 @@ describe("CharacterRoute", () => {
       try {
         expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
         expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
-        expect(screen.getByText("Read-only in this browser.")).toBeVisible();
+        expect(screen.getByText(canAcquire ? "Can't save this character in this browser, so it is read-only."
+          : "Read-only in this browser.")).toBeVisible();
         expect(screen.queryByText("Saved", { exact: true })).not.toBeInTheDocument();
         expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
         act(() => { online = false; notify(); });

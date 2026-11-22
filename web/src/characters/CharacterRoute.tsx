@@ -90,6 +90,18 @@ export function CharacterDetail({ characterId, api, store, identity, coordinatio
   );
 }
 
+/** The read-only status names why this tab cannot edit (S4). */
+function readOnlyMessage(blockedBy: "storage" | "locks" | "other-tab" | undefined): string {
+  switch (blockedBy) {
+    case "storage":
+      return "character.detail.storageUnavailable";
+    case "other-tab":
+      return "character.detail.readOnly";
+    default:
+      return "character.detail.readOnlyHere";
+  }
+}
+
 function RecoveryNav({
   cached,
   navigation,
@@ -338,8 +350,17 @@ function CharacterDetailLoaded({
       ) : null}
       <PlayEventOverlay events={events} presentation={character.projection.presentation} />
       {!online ? <p role="status">{t("character.detail.offlineCached")}</p> : null}
-      <p role="status">{canEdit(snapshot) ? t("character.detail.editing")
-        : t(snapshot.editing.blockedBy === "other-tab" ? "character.detail.readOnly" : "character.detail.readOnlyHere")}</p>
+      <p role="status">{canEdit(snapshot) ? t("character.detail.editing") : t(readOnlyMessage(snapshot.editing.blockedBy))}</p>
+      {readOnly && storageUnavailable && locksSupported ? (
+        // D3 released the lock when saving failed. Requesting editing again
+        // rereads the store and retries saving; a new failure releases it again.
+        <div>
+          <button type="button" disabled={takeoverBusy || snapshot.phase === "loading"} onClick={requestTakeover}>
+            {takeoverBusy ? t("character.detail.retryingStorage") : t("character.detail.retryStorage")}
+          </button>
+          {takeoverDenied ? <p role="alert">{t("character.detail.takeoverFailed")}</p> : null}
+        </div>
+      ) : null}
       {readOnly && !storageUnavailable ? (
         <section aria-labelledby="character-takeover-title">
           <h2 id="character-takeover-title">{t("character.detail.takeoverTitle")}</h2>

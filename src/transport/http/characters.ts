@@ -506,7 +506,7 @@ const physicalSettlementBody = Type.Object({
     position:Type.Object(xyz,strict), orientation:Type.Object({...xyz,w:Type.Number()},strict)},strict),{minItems:1,maxItems:100}),
 },strict);
 const physicalLaunchDto = Type.Object({
-  version: Type.Literal("rapier-v1"), seed: Type.Integer({minimum:0,maximum:4294967295}), startsAt: Type.String({format:"date-time"}),
+  version: Type.Literal("rapier-v2"), seed: Type.Integer({minimum:0,maximum:4294967295}), startsAt: Type.String({format:"date-time"}),
   bodies: Type.Array(Type.Object({position:Type.Object(xyz),orientation:Type.Object({...xyz,w:Type.Number()}),
     linearVelocity:Type.Object(xyz),angularVelocity:Type.Object(xyz)}),{minItems:1,maxItems:100}),
 });

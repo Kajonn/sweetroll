@@ -1,5 +1,6 @@
 import RAPIER from "@dimforge/rapier3d-deterministic-compat";
 import {
+  closestPhysicalFace,
   readPhysicalFace,
   type PhysicalDieSides,
   type Orientation,
@@ -116,16 +117,12 @@ export async function createSimulation(
     let allSettled = true;
     for (const die of bodies) {
       const still = squared(die.body.linvel()) < 0.045 ** 2 && squared(die.body.angvel()) < 0.09 ** 2;
-      const readable = still && readPhysicalFace(die.sides, die.body.rotation()) !== null;
+      // After its rethrows a die that still rests cocked (for example against
+      // another die) is read by the face closest to up instead of failing the throw.
+      const readable = still && (die.retries >= maxRetries || readPhysicalFace(die.sides, die.body.rotation()) !== null);
       die.alignedTicks = readable ? die.alignedTicks + 1 : 0;
       die.cockedTicks = still && !readable ? die.cockedTicks + 1 : 0;
-      if (die.cockedTicks >= 30) {
-        if (die.retries >= maxRetries) {
-          status = "unsettled";
-          return;
-        }
-        retryDie(die, launch.seed);
-      }
+      if (die.cockedTicks >= 30) retryDie(die, launch.seed);
       if (die.alignedTicks < 18) allSettled = false;
     }
     if (allSettled) status = "settled";
@@ -148,7 +145,7 @@ export async function createSimulation(
           id,
           position: body.translation(),
           orientation: body.rotation(),
-          value: status === "settled" ? readPhysicalFace(sides, body.rotation()) : null,
+          value: status === "settled" ? closestPhysicalFace(sides, body.rotation()) : null,
         })),
       };
     },

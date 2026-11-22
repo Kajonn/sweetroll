@@ -1,6 +1,6 @@
 import { expect, type Browser, type Page } from "@playwright/test";
 import type { RollFinished, RollStarted } from "../../../src/campaigns/physical-dice-stream.js";
-import { readPhysicalFace, type PhysicalDieSides } from "../../../src/systems/physical-dice/faces.js";
+import { closestPhysicalFace, type PhysicalDieSides } from "../../../src/systems/physical-dice/faces.js";
 import type { CommandResultResponse } from "../../src/characters/types.js";
 import { cleanup, json, key, publish, pushDocument, workspace } from "./configurablePush.js";
 
@@ -115,7 +115,7 @@ async function checkThrow(viewer: Page, id: string, result: CommandResultRespons
   expect(finish.data.rollId).toBe(result.rollId);
   expect(finish.data.dice.map((physical) => physical.value)).toEqual(
     start.data.dice.map((die, index) =>
-      readPhysicalFace(die.sides as PhysicalDieSides, finish.data.dice[index]!.orientation),
+      closestPhysicalFace(die.sides as PhysicalDieSides, finish.data.dice[index]!.orientation),
     ),
   );
   expect(

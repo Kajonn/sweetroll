@@ -86,3 +86,11 @@ it.each(["explode(d6)", "rerollOnce(d6, 1)", "d100"])(
     expect(draws.supported).toBe(false);
   },
 );
+
+it("accepts a tilted die read by its closest face and rejects any other value", () => {
+  const die = { id: "die", groupId: "g", sides: 6 as const };
+  const tilt = { x: Math.sin(Math.PI / 12), y: 0, z: 0, w: Math.cos(Math.PI / 12) };
+  const pose = (value: number) => [{ id: "die", value, orientation: tilt, position: { x: 0, y: 0, z: 1 } }];
+  expect(settledValues([die], pose(3))).toEqual([3]);
+  expect(settledValues([die], pose(1))).toBeNull();
+});

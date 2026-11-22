@@ -49051,7 +49051,7 @@
                               ],
                               "properties": {
                                 "version": {
-                                  "const": "rapier-v1",
+                                  "const": "rapier-v2",
                                   "type": "string"
                                 },
                                 "seed": {

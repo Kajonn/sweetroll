@@ -2,7 +2,7 @@ import { children, containsDice } from "../implementation/rules/groups.js";
 import type { ExpressionAstV1 } from "../implementation/package/schema/expression.js";
 import type { PoolDraw } from "../implementation/rules/evaluate.js";
 import {
-  readPhysicalFace,
+  closestPhysicalFace,
   type Orientation,
   type PhysicalDieSides,
 } from "./faces.js";
@@ -101,7 +101,7 @@ export function settledValues(
       pose.id !== die.id ||
       !Number.isInteger(pose.value) ||
       !Object.values(pose.position).every(Number.isFinite) ||
-      readPhysicalFace(die.sides, pose.orientation) !== pose.value
+      closestPhysicalFace(die.sides, pose.orientation) !== pose.value
     )
       return null;
   }

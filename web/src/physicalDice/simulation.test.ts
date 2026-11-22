@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { expect, it } from "vitest";
 import { createDiceLaunch } from "../../../src/systems/physical-dice/launch.js";
-import { readPhysicalFace, type PhysicalDieSides } from "../../../src/systems/physical-dice/faces.js";
+import { closestPhysicalFace, readPhysicalFace, type PhysicalDieSides } from "../../../src/systems/physical-dice/faces.js";
 import { createSimulation } from "./simulation.js";
 
 it("replays the same collision pool through different frame schedules", async () => {
@@ -59,7 +59,7 @@ it("changes the trajectories of two colliding dice before they reach the floor",
   }
 });
 
-it("ends an unreadable throw without inventing a value", async () => {
+it("reads a die that stays cocked after its rethrows by its closest face", async () => {
   const launch = createDiceLaunch(1, 159, new Date(0));
   // Deliberately misaligned collider: a d6 resting on any face of this
   // tetrahedron cannot point a numbered d6 normal straight up.
@@ -72,10 +72,29 @@ it("ends an unreadable throw without inventing a value", async () => {
   const sim = await createSimulation([{ id: "cocked", sides: 6 }], launch, async () => tetra);
   try {
     const frame = sim.advance(3600);
-    expect(frame.status).toBe("unsettled");
-    expect(frame.dice[0]!.value).toBeNull();
+    expect(frame.status).toBe("settled");
+    expect(frame.dice[0]!.value).toBe(closestPhysicalFace(6, frame.dice[0]!.orientation));
+    expect(readPhysicalFace(6, frame.dice[0]!.orientation)).toBeNull();
     expect(frame.tick).toBeLessThanOrEqual(1200);
   } finally {
     sim.free();
   }
 });
+
+it.each([1868799082, 3444386514, 3820079113, 2218061803, 703393030])(
+  "settles a 20d6 throw whose die stays cocked after its rethrows (seed %i)",
+  async (seed) => {
+    const dice = Array.from({ length: 20 }, (_, i) => ({ id: `@root:${i}`, sides: 6 as const }));
+    const sim = await createSimulation(dice, createDiceLaunch(20, seed, new Date(0)), async (sides) =>
+      JSON.parse(await readFile(new URL(`../../public/dice/v1/d${sides}.hull.json`, import.meta.url), "utf8")) as number[][],
+    );
+    try {
+      let frame = sim.advance(1);
+      while (frame.status === "rolling") frame = sim.advance(sim.tick + 120);
+      expect(frame.status).toBe("settled");
+      expect(frame.dice.map((d) => d.value)).toEqual(frame.dice.map((d) => closestPhysicalFace(6, d.orientation)));
+    } finally {
+      sim.free();
+    }
+  },
+);

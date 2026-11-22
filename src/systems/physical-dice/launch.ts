@@ -1,6 +1,6 @@
 import type { Orientation } from "./faces.js";
 
-export const simulationVersion = "rapier-v1" as const;
+export const simulationVersion = "rapier-v2" as const;
 export const tray = { halfWidth: 12, halfHeight: 9, modelScale: 0.6, ticksPerSecond: 60 } as const;
 export type Vector3 = { x: number; y: number; z: number };
 export type LaunchBody = {

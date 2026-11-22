@@ -1493,7 +1493,6 @@ export const defaultMessages: MessageTable = {
   "physicalDice.color": "My dice color",
   "physicalDice.saveColor": "Save dice color",
   "physicalDice.preferencesFailed": "Dice preferences could not be loaded or saved.",
-  "physicalDice.unsettled": "The dice throw could not finish. Review the roll before trying again.",
   "player.account.themeSaveFailed": "Account theme default could not be saved.",
   "pwa.install": "Install",
   "pwa.dismiss": "Not now",

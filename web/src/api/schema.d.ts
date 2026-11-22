@@ -14723,7 +14723,7 @@ export interface operations {
                         attempt: {
                             launch: {
                                 /** @constant */
-                                version: "rapier-v1";
+                                version: "rapier-v2";
                                 seed: number;
                                 /** Format: date-time */
                                 startsAt: string;

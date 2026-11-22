@@ -16,7 +16,7 @@ it("keeps the frozen campaign command identity and replays only the exact settle
   const fetch = vi
     .fn()
     .mockResolvedValueOnce({
-      attempt: { attemptId: "throw", launch: { version: "rapier-v1" } },
+      attempt: { attemptId: "throw", launch: { version: "rapier-v2" } },
       serverTime: dates.firstAttemptAt,
     })
     .mockRejectedValueOnce(new TypeError("connection lost"))
@@ -57,4 +57,28 @@ it("uses the normal roll when the server reports an unsupported push", async () 
   ).toBe(normal);
   expect(fetch.mock.calls[0]![2].body).toMatchObject({ kind: "pushRoll", parentRollId: "root" });
   expect(simulate).not.toHaveBeenCalled();
+});
+
+it("falls back to the ordinary roll when the physical throw cannot settle", async () => {
+  const fetch = vi.fn().mockResolvedValue({
+    attempt: { attemptId: "throw", launch: { version: "rapier-v2" } },
+    serverTime: dates.firstAttemptAt,
+  });
+  const simulate = vi.fn().mockRejectedValue(Error("The dice did not settle cleanly."));
+  const frozen = await preparePhysicalRequest({ fetch } as ApiClient, request, new AbortController().signal, simulate);
+  expect(frozen).toBe(request);
+  expect(frozen.physical).toBeUndefined();
+});
+
+it("still stops when the throw is cancelled", async () => {
+  const fetch = vi.fn().mockResolvedValue({
+    attempt: { attemptId: "throw", launch: { version: "rapier-v2" } },
+    serverTime: dates.firstAttemptAt,
+  });
+  const controller = new AbortController();
+  const simulate = vi.fn().mockImplementation(async () => {
+    controller.abort();
+    throw new DOMException("Aborted", "AbortError");
+  });
+  await expect(preparePhysicalRequest({ fetch } as ApiClient, request, controller.signal, simulate)).rejects.toThrow();
 });

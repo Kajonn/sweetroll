@@ -1,8 +1,7 @@
 import type { DiceLaunch } from "../../../src/systems/physical-dice/launch.js";
 import type { PhysicalDie } from "../../../src/systems/physical-dice/resolution.js";
-import { ApiError, type ApiClient } from "../api/client.js";
+import type { ApiClient } from "../api/client.js";
 import type { FrozenRequest } from "../characters/types.js";
-import { t } from "../i18n/index.js";
 import { playThrow, serverClock } from "./playback.js";
 
 export type PrepareDice = (request: FrozenRequest, signal: AbortSignal) => Promise<FrozenRequest>;
@@ -40,14 +39,10 @@ export async function preparePhysicalRequest(
     return { ...request, physical: { path: `${url}/${attempt.attemptId}/complete`, settlement } };
   } catch (error) {
     if (signal.aborted) throw error;
-    throw new ApiError({
-      status: 422,
-      code: "physical_dice_unsettled",
-      message: t("physicalDice.unsettled"),
-      requestId: "",
-      latestRevision: null,
-      diagnostics: [],
-    });
+    // A throw that cannot settle (a die stays cocked after its rethrows) or a
+    // failed worker falls back to the ordinary server roll for the whole
+    // action. The prepared attempt is never completed and expires.
+    return request;
   }
 }
 

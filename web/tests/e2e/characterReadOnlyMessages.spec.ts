@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 
 import { expect, test, type Browser, type Page } from "../fixtures/browserTest";
+import { armProfileFaults } from "../fixtures/faultyProfile";
 import { lookUpCreationVersion } from "../fixtures/lookUpCreationVersion";
 import { expectSheetSaved } from "../fixtures/sheetSaved";
 
@@ -45,20 +46,7 @@ type StorageState = Awaited<ReturnType<ReturnType<Page["context"]>["storageState
  */
 async function openWithFault(browser: Browser, baseURL: string, storageState: StorageState, path: string, fault: "storage" | "locks") {
   const context = await browser.newContext({ baseURL, storageState });
-  await context.addInitScript((kind) => {
-    if (kind === "locks") {
-      // A browser without the Web Locks API.
-      Object.defineProperty(Navigator.prototype, "locks", { configurable: true, get: () => undefined });
-      return;
-    }
-    // An incomplete profile: IndexedDB opens and the account records save,
-    // but no character copy can be written.
-    const put = IDBObjectStore.prototype.put;
-    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore["put"]>) {
-      if (this.name === "characters") throw new DOMException("Quota exceeded.", "QuotaExceededError");
-      return put.apply(this, args);
-    };
-  }, fault);
+  await armProfileFaults(context, [fault]);
   const page = await context.newPage();
   await page.goto(path);
   return { context, page };

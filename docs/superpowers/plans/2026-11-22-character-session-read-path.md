@@ -1,7 +1,7 @@
 # Separate viewing from local storage and editing in the character session
 
 Design plan · 22 November 2026  
-Based on Sweetroll `9ead9cd` and PR #93 (`1804771`). **Proposed. Not owner-approved. No work is authorized by this plan.**
+Based on Sweetroll `9ead9cd` and PR #93 (`1804771`). **The owner answered D1–D4 on 2026-11-22. Implementation is not yet authorized.**
 
 ## Why
 
@@ -42,9 +42,11 @@ type CharacterSnapshot = {
 
 Unchanged: the queue, attempts, generations, account guards, purge rules, the server API and the `/api/v1` contract.
 
-## Decisions for the owner
+## Owner decisions (2026-11-22)
 
-| # | Question | Proposed answer |
+The owner chose the proposed answer for all four.
+
+| # | Question | Decision |
 | --- | --- | --- |
 | D1 | How often should a `live` view be refreshed? | On reconnect, on becoming visible and after commands, plus every 30 seconds while visible. No server push. |
 | D2 | Should a non-owner tab with a `stored` view also refresh from the server, rather than only from the owner tab's saves? | Yes, using the same read path. This also covers browsers without the Lock API, where no tab ever becomes owner. |

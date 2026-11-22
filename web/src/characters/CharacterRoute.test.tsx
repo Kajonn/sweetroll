@@ -109,7 +109,7 @@ describe("CharacterRoute", () => {
   });
 
   it.each(["no editing lock", "snapshot write failure"])(
-    "opens a fresh online sheet read-only after %s",
+    "opens a fresh online sheet read-only after %s and reopens it after reconnecting",
     async (failure) => {
       const store = await openStore();
       const api = makeApi();
@@ -133,6 +133,10 @@ describe("CharacterRoute", () => {
         expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
         act(() => { online = false; notify(); });
         expect(screen.queryByRole("heading", { name: "Briar" })).not.toBeInTheDocument();
+        act(() => { online = true; notify(); });
+        expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
+        expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
         expect(api.send).not.toHaveBeenCalled();
       } finally { ui.unmount(); await store.close(); }
     },

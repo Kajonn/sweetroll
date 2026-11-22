@@ -572,7 +572,7 @@ into several rows. Navigation and viewport changes preserve the active view's
 state; Escape closes the disclosure and restores focus to its trigger.
 
 - Character identity, save/offline status and resource sections scroll with the rest of the sheet; the character header must not stick over fields or actions on small screens.
-- An authorized online sheet can open read-only when the browser cannot acquire the editing lock or save the initial local copy. The temporary view is available only while signed in and connected. Editing still requires the lock and a saved local copy.
+- An authorized online sheet can open read-only when the browser cannot acquire the editing lock or save the initial local copy. The temporary view is available only while signed in and connected; it is fetched again after reconnecting. Editing still requires the lock and a saved local copy.
 - Platform-owned bottom navigation for Characters, Activity, and Account; Campaigns is added in I6. System creators cannot add navigation destinations or divide the linear sheet into tabs.
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).

@@ -251,6 +251,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   let confirmed: CharacterView | null = null;
   let onlinePreview: CharacterView | null = null;
+  /** True once this session has shown an online-only view; reconnecting reopens it. */
+  let previewShown = false;
+  let previewOpening: Promise<void> | null = null;
   let entries: QueueEntry[] = [];
   let pendingOnline: OnlineAttempt[] = [];
   let generation = 0;
@@ -898,7 +901,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     await reconcile(server);
   }
 
-  async function openReadOnly() {
+  function openReadOnly(): Promise<void> {
+    return previewOpening ??= fetchReadOnly().finally(() => { previewOpening = null; });
+  }
+
+  async function fetchReadOnly() {
     if (!isConnected() || !await identityIsCurrent()) return;
     const guard = { generation, accountGeneration };
     try {
@@ -906,8 +913,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       if (!await identityIsCurrent() || !isConnected() || confirmed !== null ||
           error?.kind === "purged" || generation !== guard.generation || accountGeneration !== guard.accountGeneration) return;
       onlinePreview = character;
+      previewShown = true;
+      emit();
     } catch (err) {
       if (await identityIsCurrent()) await handleOpenError(err);
+      emit();
     }
   }
 
@@ -1015,6 +1025,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (local === null && confirmed === null && error?.kind === "storage-error" &&
             identityMatches() && isConnected()) {
           onlinePreview = server;
+          previewShown = true;
         }
         return;
       }
@@ -1933,6 +1944,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       scheduleDrain();
     } else {
       refreshPhase();
+    }
+    // The online-only view is not stored, so a reconnect must fetch it again.
+    // Neither a blocked session nor a tab without the editing lock drains.
+    if (initialized && previewShown && isConnected() && identityMatches() && confirmed === null &&
+        onlinePreview === null && error?.kind !== "purged" && error?.kind !== "not-found") {
+      void openReadOnly();
     }
     emit();
   });

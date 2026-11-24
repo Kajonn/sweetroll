@@ -1,7 +1,9 @@
 # Character session: newest view, separate conditions and translated errors
 
 Status: **proposed 2026-11-23; owner decisions E1–E4 recorded 2026-11-24.
-Owner instruction 2026-11-24: "Implement with subagents".** Follow-up to the
+Owner instruction 2026-11-24: "Implement with subagents". Stages V1–V4 are
+implemented locally (2026-11-24); the hosted run of the V4 journey is open, together
+with the read-path S5 hosted run.** Follow-up to the
 [read-path plan](2026-11-22-character-session-read-path.md). It closes that plan's two
 open gaps and the causes behind them.
 
@@ -286,3 +288,36 @@ The queue, idempotency, conflict review rules, purge, D1–D4, the server API an
 Offline browser suite (`playwright.offline.config.ts`, fresh `sweetroll_offline` database, after `npm run -s web:build` and a pause of a few minutes after the journeys) 32/32 passed on the first run.
 
 **Not done in V3.** Refused or failed commands that do not come from the session's open error or storage failure (for example "Session closed.", "Account changed. Reopen this character.", the ownership refusal, or the retained 5xx retry notice the session builds around a server message) still carry English `Error` messages that the command-failure alerts show; they are not `BlockingErrorKind` texts and were left as they are. The guard test checks the route, the review panel and the session board with a fake session; it does not drive every session path to each kind. Gap 1's journey (V4) is not started. The hosted run was not done for V3.
+
+### V4. Journey (2026-11-24, local and CI parts)
+
+**Change.** A second journey in `web/tests/e2e/characterReadPath.spec.ts` (journeys suite), "a tab without the editing lock keeps the GM's newer name when the owner tab edits". It is in the S5 spec rather than a new file because it uses the same campaign set-up (GM, invited player, GM-created campaign character with the player as controller), the same `visibilitychange` trigger and the same command recording. That set-up and the cleanup moved into two helpers in the spec, `createCampaignCharacter` and `archiveCreated`; the S5 journey uses them with the same steps and assertions. No application code changed, and the journey found no bug in V1–V3.
+
+**Journey steps.** One healthy player browser context (`code-journey-p1`; Web Locks, BroadcastChannel and IndexedDB working) and the GM (`code-journey-gm`).
+
+1. **Set-up.** As in S5: the GM creates a d20 campaign, invites the player, who accepts, and creates the player's character in the campaign.
+2. **Owner tab.** The first tab opens `/characters/:id`, takes the editing lock and saves its copy ("Saved", no read-only status, "Decrease Health" enabled).
+3. **Non-owner tab.** A second tab in the same context opens the character. It shows "Read-only in this tab. Another tab is editing this character." (`blockedBy: "other-tab"`), "Saved" and a disabled "Decrease Health". Every non-GET request it sends to `/api/characters…` is recorded.
+4. **GM edit.** The GM renames the character over the API. After one second the non-owner tab still shows the old name (no push, D1). A `visibilitychange` event dispatched on its `document` starts its refresh; the journey waits for the `GET /api/characters/:id` (200) and the GM's name replaces the old one. The owner tab still shows the old name and has sent no character GET since the rename.
+5. **Owner edit.** The owner tab clicks "Decrease Health". Its command request is held by a route. The enqueue writes a queue entry to the store without a new saved copy and broadcasts `invalidate`; the non-owner tab rereads the store and shows "Changes pending" (the adopted queue entry), and still shows the GM's name, the other-tab status and a disabled button. The owner tab still shows the old name.
+6. **Owner conflict save.** The held command is released. It carries the old revision, so the server answers 409. The owner tab fetches and saves the GM's version (a new saved copy and another `invalidate`) and shows "Review conflicts" with the GM's name.
+7. **Owner sync.** The owner selects the queued change, reapplies it and confirms; the sheet is saved and the review closes. A `visibilitychange` event in the owner tab then runs its drain refresh (`GET` 200). The server has the GM's name at the GM's revision plus one.
+8. **Non-owner afterwards.** The non-owner tab shows "Saved" and the GM's name, then refreshes once more through `visibilitychange` (`GET` 200) and still shows the GM's name, the other-tab status and a disabled button. It sent no character command.
+
+From step 4 on, a `MutationObserver` in the non-owner tab records whether the page text ever contains the old name after the GM's name was shown. The journey checks it after the owner's enqueue, after the owner's conflict save and at the end; it stayed false, so the older name was never rendered, not only absent at the checks.
+
+**Determinism.**
+- **Refresh triggers.** Only the triggers the journey drives run: `visibilitychange` events dispatched on one tab's `document` (as in S5), and the owner's command, conflict fetch and reapply. A saved sheet has no timer refresh (the 30-second timer runs only for a `live` view), the context never goes offline, and Playwright keeps both pages visible (the journey checks that both report `document.visibilityState` "visible"), so no real `visibilitychange` reaches the owner tab. The owner tab therefore cannot refresh between the GM's rename and its own edit. The journey does not rely on that: it counts the owner tab's character GETs and asserts none happened in that window, and that the owner still shows the old name.
+- **Ordering of the broadcast.** The owner's command is held by `page.route` until the non-owner tab shows "Changes pending", the visible sign that it has processed the enqueue's `invalidate` (it adopted the store record holding the old saved copy and the new queue entry). So the gap-1 moment is checked before any later save can mask it.
+- **Sensitivity check (not committed).** With the `invalidate` handler temporarily changed to drop the newer view on every reread (the behaviour before V2), the journey failed at step 5: the non-owner tab showed the old name after "Changes pending". With the code restored it passes.
+
+**Equal-revision correction.** Covered by `session.test.ts` only ("shows a same-revision fetched view until the store saves a new copy"). The journey cannot drive it in a way that tells the rules apart: every change it can make to the character over the API (rename, resource change) bumps the revision, and the same-revision step it does reach (the owner saving the revision the non-owner tab already shows, step 6) shows the same content under either rule. A same-revision projection or roll-scope change visible to the player was not found as a deterministic browser step.
+
+**CI.** The journeys suite runs every `tests/e2e/*.spec.ts` except `visual.spec.ts` (`web/playwright.config.ts`), sharded 1/3–3/3 in `.github/workflows/ci.yml`; the journey is in an existing spec, so no workflow change is needed.
+
+**Results.** Local PostgreSQL 16, Node 24, the Chromium build substitution described in V1.
+- The new journey alone (`npm run test:e2e -- --suite=journeys characterReadPath -g "editing lock"`) passed in every run, 9 in a row, with no failure. Runs 1–3 (dot reporter): 22.7 s, 23.2 s and 22.6 s total runner time. Runs 4–6 (list reporter): 14.0 s, 14.4 s and 13.7 s for the test (23.9 s, 24.3 s, 22.7 s total). Runs 7–9, after adding the check that both tabs report `visibilityState` "visible": 13.4 s, 14.0 s and 13.1 s for the test (22.4 s, 22.9 s, 21.9 s total). The whole spec (S5 and V4) then passed 2/2 (9.5 s and 10.1 s).
+- `npm run test:e2e -- --suite=journeys character campaign session` 37/37 passed (36 after V3 plus the new journey), twice: before and after the visibility check (3.6 and 3.4 minutes).
+- `npm run -s web:typecheck` passed. `npm run -s web:test` 146 files, 1423 tests passed (unchanged; no unit test was added).
+
+**Open.** The hosted acceptance run on the Railway build, with its deployed SHA recorded, to be done together with the read-path S5 hosted run; it cannot be run from this environment. CI on the pushed branch is still to be observed.

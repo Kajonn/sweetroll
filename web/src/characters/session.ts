@@ -28,9 +28,48 @@ export type BlockingErrorKind =
   | "not-found"
   | "network-unavailable";
 
+/**
+ * The kinds `snapshot.error` holds: review and pause events (V3). A storage
+ * failure is its own state (`snapshot.storage`, V1) and never takes this
+ * slot; `storage-error` remains a kind a refused command can carry.
+ */
+export type SessionErrorKind = Exclude<BlockingErrorKind, "storage-error">;
+
+/**
+ * Distinguishes situations that share a kind but need different text (V3).
+ * The UI maps kind and reason to an i18n key (`sessionErrors.ts`).
+ */
+export type BlockingErrorReason =
+  | "request-in-flight"      // conflict: state changed while a request was in flight
+  | "newer-version"          // conflict: a newer revision or package exists
+  | "roll-preparation"       // invalid: the roll could not be prepared
+  | "unknown-outcome"        // expired-attempt: an online change whose outcome is unknown
+  | "review-base-unavailable"; // network-unavailable: the latest state is not available yet
+
+/**
+ * A review or pause event, reported as a code (V3). The session writes no
+ * user-facing text: `serverMessage` is the server's own message (server data,
+ * shown as today) and `diagnostic` is English for logs and tests only; it is
+ * never rendered.
+ */
 export type BlockingError = {
-  kind: BlockingErrorKind;
-  message: string;
+  kind: SessionErrorKind;
+  reason?: BlockingErrorReason;
+  serverMessage?: string;
+  details?: unknown;
+  diagnostic: string;
+};
+
+/**
+ * A refused command's error: the diagnostic as `message`, plus its code.
+ * `blocked` marks a refusal caused by the session's open error or storage
+ * failure; the UI translates those codes (`sessionErrors.ts`).
+ */
+export type SessionCommandError = Error & {
+  blocked?: true;
+  kind?: BlockingErrorKind;
+  reason?: BlockingErrorReason;
+  serverMessage?: string;
   details?: unknown;
 };
 
@@ -229,11 +268,10 @@ type RefreshTrigger = "open" | "reconnect" | "visible" | "timer" | "sync" | "com
 /** Backend-declared idempotency replay-window expiry for one exact key. */
 const REPLAY_EXPIRED_RE = /replay window/i;
 
-const KIND_TO_PHASE: Record<BlockingErrorKind, SessionPhase> = {
+const KIND_TO_PHASE: Record<SessionErrorKind, SessionPhase> = {
   conflict: "conflict",
   invalid: "invalid",
   reauthenticate: "reauthenticate",
-  "storage-error": "storage-error",
   purged: "purged",
   "expired-attempt": "conflict",
   protocol: "conflict",
@@ -243,12 +281,17 @@ const KIND_TO_PHASE: Record<BlockingErrorKind, SessionPhase> = {
 
 type SendOutcome = "acked" | "retry" | "blocked";
 
-function structuredError(message: string, kind: BlockingErrorKind, details?: unknown): Error & { kind?: BlockingErrorKind } {
-  const err = new Error(message) as Error & { kind?: BlockingErrorKind };
+function structuredError(
+  message: string,
+  kind: BlockingErrorKind,
+  details?: unknown,
+  code: { reason?: BlockingErrorReason | undefined; serverMessage?: string | undefined } = {},
+): SessionCommandError {
+  const err = new Error(message) as SessionCommandError;
   err.kind = kind;
-  if (details !== undefined) {
-    (err as Error & { details?: unknown }).details = details;
-  }
+  if (details !== undefined) err.details = details;
+  if (code.reason !== undefined) err.reason = code.reason;
+  if (code.serverMessage !== undefined) err.serverMessage = code.serverMessage;
   return err;
 }
 
@@ -322,11 +365,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
    * V1: storage has its own state. A failed store read or write sets it, and
    * no other error kind replaces or clears it. Only a successful store read
    * under the lock (requestEditing → reloadOwned) clears it; the drain's next
-   * save then retries, and a new failure sets it again. `storageMessage` keeps
-   * the failure's text so `error` can report it again once another error clears.
+   * save then retries, and a new failure sets it again. V3: it never takes the
+   * `error` slot; the phase reports it while no review or pause error is set.
+   * `storageDiagnostic` keeps the failure's diagnostic for a refused command.
    */
   let storageFailed = false;
-  let storageMessage = "";
+  let storageDiagnostic = "";
   let lastRoll: CommandResultResponse["result"]["roll"] = null;
   let lastNominal: CommandResultResponse["result"]["nominal"] = null;
   let editing: { owned: boolean; owner: string | null } = { owned: coordination.isOwner(), owner: null };
@@ -490,25 +534,54 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return identity.getActorId() === actorId && identity.isOnline() && identity.getGeneration() === identityGeneration;
   }
 
+  /** A review or pause error, or a storage failure, stops the drain. */
   function isBlocked(): boolean {
-    return error !== null;
+    return error !== null || storageFailed;
   }
 
-  function setBlocked(kind: BlockingErrorKind, message: string, details?: unknown) {
+  /** The error a refused command carries: the open error, else the storage failure. */
+  function blockedCommandError(): SessionCommandError {
+    const err = error !== null
+      ? structuredError(error.diagnostic, error.kind, error.details, { reason: error.reason, serverMessage: error.serverMessage })
+      : structuredError(storageDiagnostic, "storage-error");
+    err.blocked = true;
+    return err;
+  }
+
+  /**
+   * Sets a review or pause error as a code (V3). `diagnostic` is English for
+   * logs and tests and is never rendered; `serverMessage` is the server's own
+   * message, when the error carries one.
+   */
+  function setBlocked(
+    kind: SessionErrorKind,
+    diagnostic: string,
+    options: { details?: unknown; reason?: BlockingErrorReason; serverMessage?: string } = {},
+  ) {
     if (retryTimer !== null) {
       clearTimeout(retryTimer);
       retryTimer = null;
     }
-    error = { kind, message };
-    if (details !== undefined) error.details = details;
+    error = { kind, diagnostic };
+    if (options.reason !== undefined) error.reason = options.reason;
+    if (options.serverMessage !== undefined) error.serverMessage = options.serverMessage;
+    if (options.details !== undefined) error.details = options.details;
     phase = KIND_TO_PHASE[kind];
-    if (kind === "storage-error") failStorage(message);
   }
 
-  /** Records a failed store read or write (V1) and applies D3. */
-  function failStorage(message: string) {
+  /**
+   * Records a failed store read or write (V1) and applies D3. V3: storage does
+   * not take the `error` slot, so an open review or pause error keeps its kind;
+   * the phase is `storage-error` only while no such error is set.
+   */
+  function failStorage(diagnostic: string) {
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
     storageFailed = true;
-    storageMessage = message;
+    storageDiagnostic = diagnostic;
+    phase = error !== null ? KIND_TO_PHASE[error.kind] : "storage-error";
     // D3: a tab that cannot save gives up the editing lock, so a tab or
     // browser profile that can save is able to take over. This tab edits
     // again only through requestEditing (the takeover flow).
@@ -520,11 +593,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   /**
    * Clears a review or pause error. A storage failure is not cleared with it:
-   * while storage has failed, the error reports `storage-error` again.
+   * while storage has failed, the phase reports `storage-error` again.
    */
   function clearError() {
-    error = storageFailed ? { kind: "storage-error", message: storageMessage } : null;
-    if (storageFailed) phase = KIND_TO_PHASE["storage-error"];
+    error = null;
+    if (storageFailed) phase = "storage-error";
   }
 
   /**
@@ -574,9 +647,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // gates on recovery.
     const canQueue = options?.offlineIntent === true
       && (error?.kind === "protocol" || error?.kind === "network-unavailable");
-    if (error && !canQueue) {
-      throw structuredError(error.message, error.kind, error.details);
-    }
+    if (error && !canQueue) throw blockedCommandError();
+    if (storageFailed) throw blockedCommandError();
     if (!editAllowed()) {
       if (editing.owned && coordination.isOwner() && !saved) throw new Error("Cannot edit until the character is loaded.");
       throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");
@@ -625,7 +697,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       entries = entries.filter(e => e.id !== entry.id);
       if (isStaleAck(storageErr)) {
         if (await identityIsCurrent()) await handleAckError(storageErr);
-      } else setBlocked("storage-error", "Could not save your edit because local storage is unavailable.");
+      } else failStorage("Could not save your edit because local storage is unavailable.");
       freezeWaiters.delete(entry.id);
       emit();
       throw storageErr instanceof Error ? storageErr : new Error("storage failure");
@@ -768,7 +840,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       if (saved === null) {
         setBlocked("purged", "This character is no longer available.");
       } else {
-        setBlocked("conflict", "State changed while a request was in flight. Review before continuing.");
+        setBlocked("conflict", "State changed while a request was in flight. Review before continuing.", { reason: "request-in-flight" });
       }
       return "blocked";
     }
@@ -785,7 +857,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         return "blocked";
       }
     }
-    setBlocked("storage-error", "Could not persist the confirmed state. Storage is unavailable.");
+    failStorage("Could not persist the confirmed state. Storage is unavailable.");
     return "blocked";
   }
 
@@ -800,18 +872,20 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const local = saved;
       if (server.reconciliation.revision < Math.max(local?.reconciliation.revision ?? 0, conflictMinimumRevision)) {
         // A lagging GET is not a review base for the revision the conflict reported.
-        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
+        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.", { reason: "review-base-unavailable" });
         return;
       }
       await reconcile(server);
-      if (error === null || error.kind === "conflict") conflictRefreshPending = false;
+      if ((error === null && !storageFailed) || error?.kind === "conflict") conflictRefreshPending = false;
     } catch (err) {
       if (!await identityIsCurrent()) return;
       await handleOpenError(err);
       return;
     }
-    if (error === null || (message !== undefined && error.kind === "conflict")) {
-      setBlocked("conflict", message ?? "The character changed on the server. Review before re-sending.");
+    if ((error === null && !storageFailed) || (message !== undefined && error?.kind === "conflict")) {
+      // A 409 `conflict` carries the server's own message (server data).
+      setBlocked("conflict", message ?? "The character changed on the server. Review before re-sending.",
+        message !== undefined ? { serverMessage: message } : {});
     }
   }
 
@@ -836,7 +910,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           await fetchLatestForConflict(err.latestRevision, err.code === "conflict" ? err.message : undefined);
           return "blocked";
         case 422:
-          setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
+          setBlocked("invalid", err.message, { serverMessage: err.message, details: { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics } });
           return "blocked";
       }
       if (err.code === "expected_revision_mismatch") {
@@ -844,7 +918,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         return "blocked";
       }
       if (err.code === "invalid_value" || err.code === "bad_request") {
-        setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
+        setBlocked("invalid", err.message, { serverMessage: err.message, details: { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics } });
         return "blocked";
       }
       // command_in_progress/temporarily_unavailable are handled above; any
@@ -874,7 +948,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       try {
         await pendingWrite;
       } catch {
-        setBlocked("storage-error", "Could not save this edit because local storage is unavailable.");
+        failStorage("Could not save this edit because local storage is unavailable.");
         return "blocked";
       }
     }
@@ -885,7 +959,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (saved !== null && !entryMatchesBase(current, saved)) {
       setBlocked("conflict", "The character changed on the server. Review before re-sending.", {
-        retainedIds: [current.id],
+        details: { retainedIds: [current.id] },
       });
       return "blocked";
     }
@@ -903,7 +977,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           // Preparation has not committed a roll. Retry the exact frozen
           // completion only after it has been recorded below.
           if (!(err instanceof ApiError) || err.status === 404 || err.status >= 500) {
-            setBlocked("invalid", err instanceof Error ? err.message : "Could not prepare this roll.");
+            if (err instanceof ApiError) setBlocked("invalid", err.message, { serverMessage: err.message });
+            else setBlocked("invalid", err instanceof Error ? err.message : "Could not prepare this roll.", { reason: "roll-preparation" });
             return "blocked";
           }
           return await handleSendError(err);
@@ -913,7 +988,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       try {
         await store.freeze(actorId, characterId, current.id, frozen);
       } catch {
-        setBlocked("storage-error", "Could not persist this edit as an attempt. Storage is unavailable.");
+        failStorage("Could not persist this edit as an attempt. Storage is unavailable.");
         return "blocked";
       }
       current = { ...current, attempt: frozen };
@@ -944,7 +1019,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       if (!await identityIsCurrent()) return "blocked";
       if (err instanceof ApiError && err.status === 404) {
         if (attempt.physical && err.cacheDisposition !== "purge") {
-          setBlocked("invalid", err.message);
+          setBlocked("invalid", err.message, { serverMessage: err.message });
         } else await handleNotFound(err);
         return "blocked";
       }
@@ -1061,7 +1136,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     draining = true;
     runDrainPass()
       .catch(() => {
-        setBlocked("storage-error", "An unexpected local error interrupted synchronization.");
+        failStorage("An unexpected local error interrupted synchronization.");
         return "blocked" as const;
       })
       .then((outcome: "idle" | "retry" | "blocked") => {
@@ -1216,7 +1291,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         return;
       }
       if (server.reconciliation.revision < minimumRevision) {
-        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
+        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.", { reason: "review-base-unavailable" });
         return;
       }
       minimumRevision = server.reconciliation.revision;
@@ -1257,7 +1332,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     const local = saved;
     if (local && server.reconciliation.revision < local.reconciliation.revision) {
-      setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
+      setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.", { reason: "review-base-unavailable" });
       return;
     }
     const drifted = local
@@ -1280,7 +1355,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await handleAckError(err);
         // A successful GET is enough to display the sheet online. Editing
         // still needs a snapshot persisted against the current cache guard.
-        if (local === null && saved === null && error?.kind === "storage-error" &&
+        if (local === null && saved === null && storageFailed &&
             identityMatches() && isConnected()) {
           latest = server;
           liveShown = true;
@@ -1291,13 +1366,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const unresolved = entries.some(e => e.attempt === null &&
       (e.baseRevision !== server.reconciliation.revision || e.packageChecksum !== server.projection.packageChecksum));
     if ((drifted || unresolved) && entries.length > 0) {
-      setBlocked("conflict", "A newer revision or package of this character exists. Review before continuing.");
+      setBlocked("conflict", "A newer revision or package of this character exists. Review before continuing.", { reason: "newer-version" });
     }
   }
 
   function refreshPhase() {
     if (error) {
       phase = KIND_TO_PHASE[error.kind];
+      return;
+    }
+    if (storageFailed) {
+      phase = "storage-error";
       return;
     }
     if (identity.getActorId() !== actorId || identity.getGeneration() !== identityGeneration) {
@@ -1520,7 +1599,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (!await identityIsCurrent()) return;
         await handleOpenError(err);
         if (!identityMatches()) return;
-        if (error !== null && error.kind !== "conflict" && error.kind !== "network-unavailable") {
+        if (error !== null ? error.kind !== "conflict" && error.kind !== "network-unavailable" : storageFailed) {
           return;
         }
       }
@@ -1528,7 +1607,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     setBlocked(
       "expired-attempt",
       "This change is older than the server's replay window. Its outcome is unknown: review the current state and explicitly acknowledge the unknown outcome before continuing.",
-      { attemptId: attempt.id },
+      { reason: "unknown-outcome", details: { attemptId: attempt.id } },
     );
   }
 
@@ -1724,7 +1803,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }
         if (err.status === 422 || err.code === "invalid_value" || err.code === "bad_request") {
           await retireRejectedOnlineAttempt(attempt);
-          setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
+          setBlocked("invalid", err.message, { serverMessage: err.message, details: { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics } });
           emit();
           throw err;
         }
@@ -1852,7 +1931,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     await refreshView("command");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
-    if (isBlocked()) throw structuredError(error!.message, error!.kind, error!.details);
+    if (isBlocked()) throw blockedCommandError();
     if (entries.length > 0 || !saved) {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
     }
@@ -1881,7 +1960,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await store.saveOnlineAttempt(attempt, { generation, accountGeneration });
     } catch (saveErr) {
       if (!await identityIsCurrent()) throw saveErr instanceof Error ? saveErr : new Error("Account changed.");
-      setBlocked("storage-error", "Could not save this change because local storage is unavailable.");
+      failStorage("Could not save this change because local storage is unavailable.");
       emit();
       throw saveErr instanceof Error ? saveErr : new Error("storage failure");
     }
@@ -2007,7 +2086,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   function open(): Promise<void> {
     opening ??= initialize().catch(() => {
       if (!identityMatches()) return;
-      setBlocked("storage-error", "Could not load local character state.");
+      failStorage("Could not load local character state.");
       emit();
     });
     return opening;
@@ -2135,13 +2214,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       editing = { owned: true, owner: null }; needsFresh = true;
       // D3: the lock is granted again only through requestEditing. The store
       // read succeeded, so try saving again; a new failure releases the lock.
-      storageFailed = false;
-      if (error?.kind === "storage-error") { error = null; refreshPhase(); }
+      if (storageFailed) { storageFailed = false; refreshPhase(); }
       emit(); scheduleDrain();
     })().catch(() => {
       if (!identityMatches()) return;
       editing = { owned: false, owner: null };
-      setBlocked("storage-error", "Could not load local character state.");
+      failStorage("Could not load local character state.");
       coordination.letGo(); emit();
     }).finally(() => { reloading = null; });
   }
@@ -2240,7 +2318,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         emit();
       }).catch(() => {
         if (!identityMatches()) return;
-        setBlocked("storage-error", "Could not reload local character state."); emit();
+        failStorage("Could not reload local character state."); emit();
       });
     }
   });
@@ -2263,7 +2341,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         adoptSaved(fresh, { sequence: "keep" });
         coordination.invalidate?.();
       } catch {
-        if (identityMatches()) setBlocked("storage-error", "Could not clear the saved roll. Reconnect before reopening it.");
+        if (identityMatches()) failStorage("Could not clear the saved roll. Reconnect before reopening it.");
       }
       emit();
     },

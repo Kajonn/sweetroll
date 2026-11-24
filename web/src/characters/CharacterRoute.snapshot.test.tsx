@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../api/client.js";
 import type { CharactersApi } from "./api.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import type { CharacterSession, CoordinationEvent, CoordinationPort, IdentityPort } from "./session.js";
@@ -114,6 +115,41 @@ describe("CharacterRoute session snapshot", () => {
       }, { timeout: 3000 });
       expect(session.getSnapshot()).not.toHaveProperty("confirmed");
       expect(session.getSnapshot()).not.toHaveProperty("onlineOnly");
+    } finally { ui.unmount(); await store.close(); }
+  });
+});
+
+// V3: a storage failure no longer takes the error slot, so an open conflict
+// keeps its review surface while the storage status is shown.
+describe("CharacterRoute review and storage (V3)", () => {
+  afterEach(() => {
+    created.sessions.length = 0;
+    vi.restoreAllMocks();
+  });
+
+  it("keeps the conflict review visible when storage also fails", async () => {
+    const store: CharacterStore = await openCharacterStore(`route-snapshot-${crypto.randomUUID()}`);
+    await store.confirmSnapshot(ACTOR, CHARACTER_ID, view(), 0);
+    const api = makeApi() as CharactersApi & { send: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn> };
+    api.send.mockRejectedValue(new ApiError({ status: 409, code: "expected_revision_mismatch", message: "newer",
+      requestId: "r", latestRevision: 2, diagnostics: [] }));
+    const { coordination, broadcast } = makeCoordination(true);
+    const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+      identity={makeIdentity()} coordination={coordination} locksSupported />);
+    try {
+      expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+      api.open.mockResolvedValue(makeOpenEnvelope(makeView({ characterId: CHARACTER_ID, revision: 2, name: "Briar" })));
+      const session = created.sessions.at(-1)!;
+      await waitFor(() => expect(session.getSnapshot().editing.owned).toBe(true));
+      await act(async () => { await session.whenIdle(); });
+      await act(async () => { await session.setField("name", "Ivy").catch(() => {}); await session.whenIdle(); });
+      expect(await screen.findByRole("heading", { name: "Review conflicts" }, { timeout: 3000 })).toBeVisible();
+
+      vi.spyOn(store, "read").mockRejectedValue(new DOMException("Read failed", "UnknownError"));
+      act(() => { broadcast({ type: "invalidate", characterId: CHARACTER_ID }); });
+      expect(await screen.findByText("Can't save this character in this browser, so it is read-only.", {}, { timeout: 3000 })).toBeVisible();
+      expect(screen.getByRole("heading", { name: "Review conflicts" })).toBeVisible();
+      expect(session.getSnapshot().error?.kind).toBe("conflict");
     } finally { ui.unmount(); await store.close(); }
   });
 });

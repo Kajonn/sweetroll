@@ -19,6 +19,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { CharactersApi } from "../characters/api.js";
 import type { CommandResultResponse, CharacterView } from "../characters/types.js";
 import { t } from "../i18n/index.js";
+import { sessionErrorText } from "../characters/sessionErrors.js";
 import { Button, EmptyState, FormField, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import { campaignCharactersKey, listAllCampaignCharacters } from "./campaignQueries.js";
@@ -320,7 +321,9 @@ function SessionPushPanel({factory,characterId,api,roll,onBlocked,publishRoll}:{
  useEffect(()=>{onBlocked(blocked);return()=>onBlocked(false);},[blocked,onBlocked]);
  const retained=snapshot.lastRoll;
  const current=retained?.push&&(!roll?.push||(retained.push.rootRollId===roll.push.rootRollId&&retained.push.attempt>=roll.push.attempt))?retained:roll;
- return <div>{snapshot.error?<p role="alert">{snapshot.error.message}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.view?.character.revision} disabled={blocked||snapshot.view?.character.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:null}</div>;
+ // V3: the board has no read-only status, sync line or review panel, so it shows
+ // every session error and a storage failure as one translated alert each.
+ return <div>{snapshot.error?<p role="alert">{sessionErrorText(snapshot.error)}</p>:null}{snapshot.storage==="unavailable"?<p role="alert">{t("character.detail.storageUnavailable")}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.view?.character.revision} disabled={blocked||snapshot.view?.character.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:null}</div>;
 }
 
 function SessionCharacterRow(props: {

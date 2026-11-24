@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 
 import { t } from "../i18n/index.js";
+import { describeCommandFailure } from "./sessionErrors.js";
 import type { CharacterView } from "./types.js";
 import styles from "./characters.module.css";
 
@@ -51,8 +52,7 @@ export function FieldControl({ field, tentativeValue, disabled, pending, onCommi
   }, [displayed]);
 
   const failCommit = (error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    setCommitError(t("character.command.failed", { message }));
+    setCommitError(describeCommandFailure(error));
   };
   // Rejected UI command promises are caught and surfaced here: the draft is
   // preserved because only a changed tentative/confirmed value resets it.

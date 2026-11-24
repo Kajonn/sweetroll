@@ -12,6 +12,7 @@ import { Button } from "../ui/Button.js";
 import { Select } from "../ui/Select.js";
 import { canEdit, resourceMaxKey, type CharacterSnapshot } from "./session.js";
 import { FieldControl, type ProjectedField } from "./FieldControl.js";
+import { describeCommandFailure } from "./sessionErrors.js";
 import { SlotListControl, type SlotTemplate } from "./SlotListControl.js";
 import styles from "./characters.module.css";
 
@@ -204,12 +205,12 @@ function syncStatusText(snapshot: CharacterSnapshot, pending: boolean): string {
         return t("character.sync.invalid");
       case "reauthenticate":
         return t("character.sync.reauthenticate");
-      case "storage-error":
-        return t("character.sync.storageError");
       case "network-unavailable":
         break;
     }
   }
+  // V3: a storage failure is its own state, not an error.
+  if (snapshot.storage === "unavailable") return t("character.sync.storageError");
   if (snapshot.view?.source === "live") return t("character.sync.onlineOnly");
   switch (snapshot.phase) {
     case "uncertain":
@@ -221,10 +222,7 @@ function syncStatusText(snapshot: CharacterSnapshot, pending: boolean): string {
   }
 }
 
-function describeCommandError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return t("character.command.failed", { message });
-}
+const describeCommandError = describeCommandFailure;
 
 function ActionControl({ element, disabled, disabledReason, onExecuteAction, characterId, loadRollOptions, deck, onDeckChanged }: {
   element: Extract<Element, { kind: "action" }>;
@@ -361,7 +359,8 @@ export function CharacterSheet({ snapshot, loadDecks, onSetField, onBump, onAdju
   // storage-error/purged pause must never look editable. A bare
   // network-unavailable (e.g. a failed refresh) still allows durable
   // offline field sets and resource bumps.
-  const blocked = snapshot.error !== null && snapshot.error.kind !== "network-unavailable";
+  const blocked = snapshot.storage === "unavailable" ||
+    (snapshot.error !== null && snapshot.error.kind !== "network-unavailable");
   const editable = canEdit(snapshot) && character.lifecycle === "active" && !blocked;
   const invokeCommand = (invoke: () => void | Promise<void>) => {
     setCommandError(null);

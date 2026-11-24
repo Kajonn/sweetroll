@@ -272,7 +272,7 @@ it("hides private validation details when the account changes", async () => {
   api.scriptOpenView(viewFor("char-1", 1)); await session.open();
   api.scriptSend(async () => ({ error: new ApiError({ status: 422, code: "invalid_value", message: "private character detail", requestId: "r", latestRevision: null, diagnostics: [] }) }));
   await session.setField("name", "Briar"); await session.whenIdle();
-  expect(session.getSnapshot().error?.message).toBe("private character detail");
+  expect(session.getSnapshot().error?.serverMessage).toBe("private character detail");
   identity.actorId = "other"; identity.generationCounter++; identity.signal();
   expect(session.getSnapshot().error).toBeNull();
   session.dispose(); await store.close();
@@ -854,8 +854,8 @@ describe("CharacterSession", () => {
     const snap = session.getSnapshot();
     expect(snap.phase).toBe("purged");
     expect(snap.error?.kind).toBe("purged");
-    expect(String(snap.error?.message)).not.toContain("private payload");
-    expect(String(snap.error?.message)).not.toContain("health");
+    expect(JSON.stringify(snap.error)).not.toContain("private payload");
+    expect(JSON.stringify(snap.error)).not.toContain("health");
     const stored = await store.read(ARM, "char-1");
     expect(stored.confirmed).toBeNull();
     expect(stored.entries).toEqual([]);
@@ -909,7 +909,8 @@ describe("CharacterSession", () => {
 
     const snap = session.getSnapshot();
     expect(snap.phase).toBe("storage-error");
-    expect(snap.error?.kind).toBe("storage-error");
+    expect(snap.storage).toBe("unavailable");
+    expect(snap.error).toBeNull();
     expect(snap.entries).toEqual([]);
     await expect(session.setField("gold", 10)).rejects.toThrow();
     await store.close();
@@ -937,7 +938,8 @@ describe("CharacterSession", () => {
     spy.mockRestore();
 
     expect(session.getSnapshot().phase).toBe("storage-error");
-    expect(session.getSnapshot().error?.kind).toBe("storage-error");
+    expect(session.getSnapshot().storage).toBe("unavailable");
+    expect(session.getSnapshot().error).toBeNull();
     expect(session.getSnapshot().entries).toHaveLength(1);
     expect(session.getSnapshot().entries[0]?.attempt).toBeNull();
     const stored = await store.read(ARM, "char-1");
@@ -1238,7 +1240,8 @@ describe("CharacterSession serialization", () => {
     const confirm = vi.spyOn(store, "confirmSnapshot").mockRejectedValue(new Error("quota"));
     await session.setField("name", "Briar");
     await session.whenIdle();
-    expect(session.getSnapshot().error?.kind).toBe("storage-error");
+    expect(session.getSnapshot().storage).toBe("unavailable");
+    expect(session.getSnapshot().error).toBeNull();
     expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(1);
     await expect(session.resolveConflict({ mode: "reapply", selectedIds: session.getSnapshot().entries.map(e => e.id) })).rejects.toThrow();
     confirm.mockRestore();
@@ -2002,8 +2005,8 @@ describe("CharacterSession uncertain online outcomes", () => {
     await expect(session.archive()).rejects.toThrow();
     const snap = session.getSnapshot();
     expect(snap.error?.kind).toBe("purged");
-    expect(String(snap.error?.message)).not.toContain("private");
-    expect(String(snap.error?.message)).not.toContain("private-key");
+    expect(JSON.stringify(snap.error)).not.toContain("private");
+    expect(JSON.stringify(snap.error)).not.toContain("private-key");
     expect(await store.readOnlineAttempts(ARM)).toEqual([]);
     const stored = await store.read(ARM, "char-1");
     expect(stored.confirmed).toBeNull();
@@ -2786,7 +2789,7 @@ it('retains a campaign selection and explains stale catalog revisions during con
  const {api,identity,store,session}=await makeHarness();api.scriptOpenView(viewFor('char-1',1));await session.open();identity.online=false;identity.signal();
  const source={kind:'campaign' as const,campaignId:ARM,templateId:ARM,templateRevision:2,contentRevision:1};await session.addEntry('inventory',null,{},undefined,source);await session.whenIdle();
  api.setOpenFallback(async()=>({character:viewFor('char-1',1),requestId:'reconnect'}));api.scriptSend(async()=>({error:new ApiError({code:'conflict',message:'The campaign template has changed. Refresh and explicitly review the selected revision.',status:409,requestId:'req-1',latestRevision:null,diagnostics:[]})}));
- identity.online=true;identity.signal();await vi.waitFor(()=>expect(session.getSnapshot().phase).toBe('conflict'));await session.whenIdle();expect(session.getSnapshot().error?.message).toContain('campaign template has changed');
+ identity.online=true;identity.signal();await vi.waitFor(()=>expect(session.getSnapshot().phase).toBe('conflict'));await session.whenIdle();expect(session.getSnapshot().error?.serverMessage).toContain('campaign template has changed');
  expect((await store.read(ARM,'char-1')).entries[0]?.intent).toMatchObject({entry:{source}});session.dispose();await store.close();
 });
 
@@ -3174,7 +3177,7 @@ describe("CharacterSession storage state (V1)", () => {
       expect(snap.storage).toBe("unavailable");
       expect(snap.editing.owned).toBe(false);
       expect(snap.editing.blockedBy).toBe("storage");
-      expect(snap.error?.kind).toBe("storage-error");
+      expect(snap.error).toBeNull();
       expect(snap.phase).toBe("storage-error");
       expect(canEdit(snap)).toBe(false);
       expect(h.coordination.isOwner()).toBe(false);
@@ -3212,7 +3215,8 @@ describe("CharacterSession storage state (V1)", () => {
       const snap = h.session.getSnapshot();
       expect(snap.storage).toBe("unavailable");
       expect(snap.editing.blockedBy).toBe("storage");
-      expect(snap.error?.kind).toBe("storage-error");
+      expect(snap.error).toBeNull();
+      expect(snap.phase).toBe("storage-error");
       expect(canEdit(snap)).toBe(false);
       expect(h.coordination.isOwner()).toBe(false);
     } finally { h.session.dispose(); await h.store.close(); }
@@ -3233,7 +3237,8 @@ describe("CharacterSession storage state (V1)", () => {
       expect(h.session.getSnapshot().storage).toBe("unavailable");
       h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1), requestId: "r" }));
       h.identity.signal();
-      await vi.waitFor(() => expect(h.session.getSnapshot().error?.kind).toBe("storage-error"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().error).toBeNull());
+      expect(h.session.getSnapshot().phase).toBe("storage-error");
       expect(h.session.getSnapshot().storage).toBe("unavailable");
 
       // A retry that fails again releases the lock again.
@@ -3436,6 +3441,84 @@ describe("CharacterSession saved copy and newest view (V2)", () => {
       await h.session.setField("name", "Briar");
       await h.session.whenIdle();
       expect(h.api.sent[0]?.body.expectedRevision).toBe(3);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+});
+
+// V3: `error` holds review and pause events only, as codes. A storage failure
+// is reported by `storage` and the phase, so it no longer hides a review.
+describe("CharacterSession error codes (V3)", () => {
+  const writeFailed = () => new DOMException("Write failed", "QuotaExceededError");
+
+  it("reports a storage failure through storage and the phase, not the error", async () => {
+    const h = await makeHarness();
+    try {
+      vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(writeFailed());
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      const snap = h.session.getSnapshot();
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.phase).toBe("storage-error");
+      expect(snap.error).toBeNull();
+      await expect(h.session.setField("name", "Briar")).rejects.toMatchObject({ kind: "storage-error" });
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("keeps an open conflict's kind when storage also fails", async () => {
+    const h = await makeHarness();
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      h.api.scriptSend(async () => ({ error: conflictError() }));
+      h.api.scriptOpenView(viewFor("char-1", 7));
+      await h.session.setField("name", "Ivy").catch(() => {});
+      await h.session.whenIdle();
+      expect(h.session.getSnapshot().error?.kind).toBe("conflict");
+
+      vi.spyOn(h.store, "read").mockRejectedValueOnce(new DOMException("Read failed", "UnknownError"));
+      h.coordination.signalInvalidation("char-1");
+      await vi.waitFor(() => expect(h.session.getSnapshot().storage).toBe("unavailable"));
+      const snap = h.session.getSnapshot();
+      expect(snap.error?.kind).toBe("conflict");
+      expect(snap.phase).toBe("conflict");
+      expect(snap.editing.blockedBy).toBe("storage");
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("reports a code, a reason and a non-rendered diagnostic instead of a sentence", async () => {
+    const h = await makeHarness();
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      h.api.setOpenFallback(async () => { throw new TypeError("Failed to fetch"); });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().error?.kind).toBe("network-unavailable"));
+      const error = h.session.getSnapshot().error!;
+      expect(error).not.toHaveProperty("message");
+      expect(error.reason).toBeUndefined();
+      expect(typeof error.diagnostic).toBe("string");
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("keeps a server's conflict message as server data", async () => {
+    const h = await makeHarness();
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      h.api.scriptSend(async () => ({ error: new ApiError({ status: 409, code: "conflict", message: "The character is archived.",
+        requestId: "r", latestRevision: 1, diagnostics: [] }) }));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.setField("name", "Ivy").catch(() => {});
+      await h.session.whenIdle();
+      const error = h.session.getSnapshot().error!;
+      expect(error.kind).toBe("conflict");
+      expect(error.serverMessage).toBe("The character is archived.");
+      expect(error).not.toHaveProperty("message");
     } finally { h.session.dispose(); await h.store.close(); }
   });
 });

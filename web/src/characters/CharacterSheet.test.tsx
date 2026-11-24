@@ -292,18 +292,20 @@ describe("CharacterSheet", () => {
   });
 
   it.each([
-    { phase: "storage-error" as const, kind: "storage-error" as const, status: "Local storage unavailable", disabled: true },
+    // V3: a storage failure is `storage: "unavailable"`, not an error.
+    { phase: "storage-error" as const, kind: null, storage: "unavailable" as const, status: "Local storage unavailable", disabled: true },
     { phase: "invalid" as const, kind: "invalid" as const, status: "A value needs correction", disabled: true },
     { phase: "conflict" as const, kind: "conflict" as const, status: "Needs review before continuing", disabled: true },
     { phase: "reauthenticate" as const, kind: "reauthenticate" as const, status: "Sign in again to continue", disabled: true },
     { phase: "uncertain" as const, kind: null, status: "Confirming the last change", disabled: false },
     { phase: "sending" as const, kind: null, status: "Saving", disabled: false },
-  ])("reports a truthful $phase status instead of Saved", ({ phase, kind, status, disabled }) => {
+  ])("reports a truthful $phase status instead of Saved", ({ phase, kind, status, disabled, ...rest }) => {
     const queued = snapshot().entries;
     const blocked = snapshot({
       phase,
       entries: [{ id: "pending", actorId: "a", characterId: "character", sequence: 0, baseRevision: 1, packageChecksum: "checksum", createdAt: "2026-09-06T00:00:00Z", intent: { kind: "setField", fieldId: "name", value: "Briar" }, attempt: null }],
-      error: kind === null ? null : { kind, message: "blocked for review" },
+      error: kind === null ? null : { kind, diagnostic: "blocked for review" },
+      storage: "storage" in rest ? rest.storage : "available",
     });
     expect(queued).toEqual([]);
     render(<CharacterSheet snapshot={blocked} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
@@ -327,7 +329,7 @@ describe("CharacterSheet", () => {
   });
 
   it("exposes no private detail once purged", () => {
-    render(<CharacterSheet snapshot={{ phase: "purged", view: null, storage: "available", tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={{ phase: "purged", view: null, storage: "available", tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", diagnostic: "This character is no longer available." }, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByRole("status")).toHaveTextContent("This character is no longer available.");
     expect(screen.queryByText("Aria")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();

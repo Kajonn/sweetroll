@@ -181,3 +181,5 @@ Throughout, the faulty context records every non-GET request to `/api/characters
 **Open.** The hosted acceptance run on the Railway build, with its deployed SHA recorded, has not been done; it cannot be run from this environment. CI on the pushed branch is also still to be observed. S1's gap (an older stored copy replacing an in-memory refresh on an `invalidate` broadcast) and S4's remaining session error alert are unchanged.
 
 **Resolved later (2026-11-24).** S1's gap (noted under S1–S5 above) is closed by V2 of the [session view plan](2026-11-23-character-session-view-and-conditions.md#v2-saved-copy-and-newest-view-2026-11-24).
+
+**Resolved later (2026-11-24).** S4's remaining session error alert is closed by V3 of the [session view plan](2026-11-23-character-session-view-and-conditions.md#v3-error-codes-and-messages-2026-11-24): a storage failure now shows only the read-only status and the sync line.

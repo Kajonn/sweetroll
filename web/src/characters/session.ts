@@ -302,6 +302,15 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   let nextSequence = 0;
   let phase: SessionPhase = "loading";
   let error: BlockingError | null = null;
+  /**
+   * V1: storage has its own state. A failed store read or write sets it, and
+   * no other error kind replaces or clears it. Only a successful store read
+   * under the lock (requestEditing → reloadOwned) clears it; the drain's next
+   * save then retries, and a new failure sets it again. `storageMessage` keeps
+   * the failure's text so `error` can report it again once another error clears.
+   */
+  let storageFailed = false;
+  let storageMessage = "";
   let lastRoll: CommandResultResponse["result"]["roll"] = null;
   let lastNominal: CommandResultResponse["result"]["nominal"] = null;
   let editing: { owned: boolean; owner: string | null } = { owned: coordination.isOwner(), owner: null };
@@ -367,12 +376,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
    */
   function editAllowed(): boolean {
     const { view, owned } = deriveView();
-    return canEdit({ editing: { owned }, view }) && coordination.isOwner();
+    return canEdit({ editing: { owned }, view }) && coordination.isOwner() && !storageFailed;
   }
   function getSnapshot(): CharacterSnapshot {
     if (cachedSnapshot !== null) return cachedSnapshot;
     const { visible, view, owned } = deriveView();
-    const storage = visible && error?.kind === "storage-error" ? "unavailable" : "available";
+    const storage = visible && storageFailed ? "unavailable" : "available";
     const blockedBy: EditingBlockedBy | undefined = owned || view === null ? undefined
       : storage === "unavailable" ? "storage" : input.locksSupported === false ? "locks" : "other-tab";
     return cachedSnapshot = {
@@ -464,13 +473,29 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     error = { kind, message };
     if (details !== undefined) error.details = details;
     phase = KIND_TO_PHASE[kind];
+    if (kind === "storage-error") failStorage(message);
+  }
+
+  /** Records a failed store read or write (V1) and applies D3. */
+  function failStorage(message: string) {
+    storageFailed = true;
+    storageMessage = message;
     // D3: a tab that cannot save gives up the editing lock, so a tab or
     // browser profile that can save is able to take over. This tab edits
     // again only through requestEditing (the takeover flow).
-    if (kind === "storage-error" && (editing.owned || coordination.isOwner())) {
+    if (editing.owned || coordination.isOwner()) {
       editing = { owned: false, owner: null };
       coordination.letGo();
     }
+  }
+
+  /**
+   * Clears a review or pause error. A storage failure is not cleared with it:
+   * while storage has failed, the error reports `storage-error` again.
+   */
+  function clearError() {
+    error = storageFailed ? { kind: "storage-error", message: storageMessage } : null;
+    if (storageFailed) phase = KIND_TO_PHASE["storage-error"];
   }
 
   function assertMutationAllowed(options?: { offlineIntent?: boolean }) {
@@ -1369,7 +1394,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // still mismatches the confirmed base stays paused at the send gate and
     // needs its own explicit review rather than inheriting the reviewed
     // revision. That gate is stateless, so the pause survives reopen.
-    error = null;
+    clearError();
     needsFresh = false;
     coordination.invalidate?.();
     emit();
@@ -1550,7 +1575,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     await refreshPendingOnline();
     const blockedAttempt = (error?.details as { attemptId?: string } | undefined)?.attemptId;
     if (error?.kind === "expired-attempt" && blockedAttempt === attempt.id) {
-      error = null;
+      clearError();
     }
     emit();
     return true;
@@ -1940,7 +1965,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // and any deliberate new mutation needs its own fresh key.
     const blockedAttempt = (error?.details as { attemptId?: string } | undefined)?.attemptId;
     if (error?.kind === "expired-attempt" && blockedAttempt === stored.id) {
-      error = null;
+      clearError();
     }
     needsFresh = false;
     coordination.invalidate?.();
@@ -2086,6 +2111,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       editing = { owned: true, owner: null }; needsFresh = true;
       // D3: the lock is granted again only through requestEditing. The store
       // read succeeded, so try saving again; a new failure releases the lock.
+      storageFailed = false;
       if (error?.kind === "storage-error") { error = null; refreshPhase(); }
       emit(); scheduleDrain();
     })().catch(() => {
@@ -2138,7 +2164,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       needsFresh = true;
     }
     if (isConnected() && (error?.kind === "reauthenticate" || error?.kind === "network-unavailable")) {
-      error = null;
+      clearError();
     }
     if (isConnected() && !isBlocked()) {
       scheduleDrain();

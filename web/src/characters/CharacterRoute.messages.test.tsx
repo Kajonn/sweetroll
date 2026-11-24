@@ -169,3 +169,54 @@ describe("CharacterRoute read-only messages", () => {
     } finally { ui.unmount(); await store.close(); }
   });
 });
+
+// V1: storage has its own state. Another error that comes and goes does not
+// turn the storage status back into an editing-access request.
+describe("CharacterRoute storage state (V1)", () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it("keeps offering to try saving again after offline, a failed reconnect fetch and a reconnect", async () => {
+    const store: CharacterStore = await openCharacterStore(`route-messages-${crypto.randomUUID()}`);
+    vi.spyOn(store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+    let online = true;
+    const identityListeners = new Set<() => void>();
+    const identity: IdentityPort = {
+      getActorId: () => ACTOR, getGeneration: () => 0, isOnline: () => online, isCurrent: async () => true,
+      subscribe: (listener) => { identityListeners.add(listener); return () => { identityListeners.delete(listener); }; },
+    };
+    const signal = () => act(() => { for (const l of [...identityListeners]) l(); });
+    let owner = true;
+    const coordination: CoordinationPort = {
+      isOwner: () => owner,
+      requestEditing: async () => { owner = true; return true; },
+      letGo: () => { owner = false; },
+      subscribe: () => () => {},
+      setQuiesce: () => {},
+      invalidate: () => {},
+      dispose: () => {},
+      requestTakeover: async () => { owner = true; return true; },
+    };
+    const api = makeApi();
+    const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+      identity={identity} coordination={coordination} locksSupported />);
+    try {
+      expect(await screen.findByText(STORAGE, {}, { timeout: 3000 })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Try saving again" })).toBeVisible();
+      online = false;
+      signal();
+      await waitFor(() => expect(screen.queryByRole("heading", { name: "Briar" })).not.toBeInTheDocument());
+      api.open.mockRejectedValue(new TypeError("Failed to fetch"));
+      online = true;
+      signal();
+      await waitFor(() => expect(api.open).toHaveBeenCalledTimes(2));
+      api.open.mockResolvedValue(makeOpenEnvelope(view()));
+      signal();
+      expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+      expect(await screen.findByText(STORAGE, {}, { timeout: 3000 })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Try saving again" })).toBeVisible();
+      expect(screen.queryByRole("button", { name: "Request editing access" })).not.toBeInTheDocument();
+      for (const other of [LOCKS, OTHER_TAB, UNAVAILABLE]) expect(screen.queryByText(other)).not.toBeInTheDocument();
+      expect(api.send).not.toHaveBeenCalled();
+    } finally { ui.unmount(); await store.close(); }
+  });
+});

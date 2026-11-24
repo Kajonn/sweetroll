@@ -3142,3 +3142,115 @@ describe("CharacterSession derived editing (S3)", () => {
     } finally { h.session.dispose(); await h.store.close(); }
   });
 });
+
+describe("CharacterSession storage state (V1)", () => {
+  const writeFailed = () => new DOMException("Write failed", "QuotaExceededError");
+
+  it("keeps a storage failure through offline, a failed reconnect fetch and a later reconnect", async () => {
+    const h = await makeHarness();
+    try {
+      vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(writeFailed());
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+      expect(h.coordination.isOwner()).toBe(false);
+
+      h.identity.online = false;
+      h.identity.signal();
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+
+      h.api.setOpenFallback(async () => { throw new TypeError("Failed to fetch"); });
+      h.identity.online = true;
+      h.identity.signal();
+      await vi.waitFor(() => expect(h.session.getSnapshot().error?.kind).toBe("network-unavailable"));
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2), requestId: "r" }));
+      h.identity.signal();
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(2));
+      const snap = h.session.getSnapshot();
+      expect(snap.view?.source).toBe("live");
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.editing.owned).toBe(false);
+      expect(snap.editing.blockedBy).toBe("storage");
+      expect(snap.error?.kind).toBe("storage-error");
+      expect(snap.phase).toBe("storage-error");
+      expect(canEdit(snap)).toBe(false);
+      expect(h.coordination.isOwner()).toBe(false);
+      await expect(h.session.setField("name", "Briar")).rejects.toThrow();
+      expect(h.api.sent).toEqual([]);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("does not clear a storage failure when a conflict review completes", async () => {
+    const h = await makeHarness();
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      h.api.scriptSend(async () => ({ error: conflictError() }));
+      h.api.scriptOpenView(viewFor("char-1", 7));
+      const pending = h.session.setField("name", "Ivy").catch(() => {});
+      await h.session.whenIdle();
+      expect(h.session.getSnapshot().phase).toBe("conflict");
+      const selected = h.session.getSnapshot().entries.map((e) => e.id);
+
+      // Storage fails while the review is being saved: another tab's change
+      // makes this tab reread the store, and that read fails.
+      const resolve = h.store.resolveEntries.bind(h.store);
+      vi.spyOn(h.store, "resolveEntries").mockImplementation(async (...args) => {
+        await resolve(...args);
+        vi.spyOn(h.store, "read").mockRejectedValueOnce(new DOMException("Read failed", "UnknownError"));
+        h.coordination.signalInvalidation("char-1");
+        await vi.waitFor(() => expect(h.session.getSnapshot().storage).toBe("unavailable"));
+      });
+      await h.session.resolveConflict({ mode: "discard", selectedIds: selected });
+      await h.session.whenIdle();
+      await pending;
+
+      const snap = h.session.getSnapshot();
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.editing.blockedBy).toBe("storage");
+      expect(snap.error?.kind).toBe("storage-error");
+      expect(canEdit(snap)).toBe(false);
+      expect(h.coordination.isOwner()).toBe(false);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("clears a storage failure only after editing is requested and the store works", async () => {
+    const h = await makeHarness();
+    try {
+      const write = vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(writeFailed());
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      // Another kind of error comes and goes: storage stays unavailable.
+      h.api.setOpenFallback(async () => { throw new ApiError({ status: 401, code: "unauthenticated", message: "x",
+        requestId: "r", latestRevision: null, diagnostics: [] }); });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().error?.kind).toBe("reauthenticate"));
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1), requestId: "r" }));
+      h.identity.signal();
+      await vi.waitFor(() => expect(h.session.getSnapshot().error?.kind).toBe("storage-error"));
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+
+      // A retry that fails again releases the lock again.
+      expect(await h.session.requestEditing()).toBe(true);
+      await h.session.whenIdle();
+      await vi.waitFor(() => expect(h.coordination.isOwner()).toBe(false));
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+      expect(h.session.getSnapshot().editing.blockedBy).toBe("storage");
+
+      write.mockRestore();
+      expect(await h.session.requestEditing()).toBe(true);
+      await h.session.whenIdle();
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.source).toBe("stored"));
+      const snap = h.session.getSnapshot();
+      expect(snap.storage).toBe("available");
+      expect(snap.error).toBeNull();
+      expect(canEdit(snap)).toBe(true);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+});

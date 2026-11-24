@@ -10,6 +10,7 @@ import { Dialog } from "../ui/Dialog.js";
 import { EmptyState } from "../ui/EmptyState.js";
 import { Panel } from "../ui/Panel.js";
 import { Select } from "../ui/Select.js";
+import { describeCommandFailure } from "./sessionErrors.js";
 import styles from "./characters.module.css";
 
 export type SlotGrantedActionInput = {
@@ -89,10 +90,7 @@ export type SlotListControlProps = {
   onExecuteGranted(entryId: string, actionId: string, inputs: Record<string, unknown>, selection?: CampaignRollSelection): void | Promise<void>;
 };
 
-function describeCommandError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return t("character.command.failed", { message });
-}
+const describeCommandError = describeCommandFailure;
 
 function scalarSummary(values: Record<string, unknown>, label: string): string | null {
   const parts: string[] = [];

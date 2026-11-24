@@ -10,10 +10,18 @@ import { expectSheetSaved } from "../fixtures/sheetSaved";
  * or edit names the reason, and both read-only states pass axe (serious or
  * critical findings, including colour contrast) in light and dark at 360, 768
  * and 1280px with no horizontal scroll.
+ *
+ * Session view plan, V3: one message per condition. A storage failure shows
+ * the read-only status and the sync line and no alert; a failed refresh and an
+ * expired sign-in show one translated alert each. These states pass the same
+ * axe and width checks.
  */
 const D20_VERSION = "a0000000-0000-5000-8000-000000000002";
 const STORAGE = "Can't save this character in this browser, so it is read-only.";
 const LOCKS = "Read-only in this browser.";
+const SYNC_STORAGE = "Local storage unavailable — changes are not saved";
+const REFRESH_FAILED = "Could not refresh the character. The saved copy is unchanged; try again when connected.";
+const REAUTHENTICATE = "Your session expired. Sign in again with the same account to continue.";
 
 async function signIn(page: Page) {
   await page.goto("/");
@@ -74,6 +82,10 @@ test("read-only sheets name the storage or lock reason and pass axe", async ({ b
     await expect(storage.page.getByText(STORAGE)).toBeVisible({ timeout: 30_000 });
     await expect(storage.page.getByRole("button", { name: "Try saving again" })).toBeVisible();
     await expect(storage.page.getByText("This character is unavailable.")).toHaveCount(0);
+    // V3: the status and the sync line, and no session alert.
+    await expect(storage.page.getByText(STORAGE)).toHaveCount(1);
+    await expect(storage.page.getByText(SYNC_STORAGE)).toHaveCount(1);
+    await expect(storage.page.getByRole("alert")).toHaveCount(0);
     await expectAccessible(storage.page, "storage unavailable");
   } finally { await storage.context.close(); }
 
@@ -85,4 +97,41 @@ test("read-only sheets name the storage or lock reason and pass axe", async ({ b
     await expect(locks.page.getByText("This character is unavailable.")).toHaveCount(0);
     await expectAccessible(locks.page, "no Web Locks");
   } finally { await locks.context.close(); }
+});
+
+test("a failed refresh and an expired sign-in show one translated alert and pass axe", async ({ page }) => {
+  test.setTimeout(240_000);
+  await signIn(page);
+  const characterName = `V3 alerts ${Date.now().toString(36)}`;
+  await page.goto(`/characters/new?systemVersionId=${D20_VERSION}`);
+  await lookUpCreationVersion(page, D20_VERSION);
+  await page.getByLabel("Entity").selectOption("character");
+  await page.getByLabel("Character name").fill(characterName);
+  await page.getByRole("button", { name: "Create character", exact: true }).click();
+  await expect(page).toHaveURL(/\/characters\/[0-9a-f-]+/, { timeout: 30_000 });
+  await expectSheetSaved(page);
+  const characterId = new URL(page.url()).pathname.split("/").at(-1)!;
+  const characterGet = `**/api/characters/${characterId}`;
+
+  // The saved copy opens, and its refresh fails at the network.
+  await page.route(characterGet, (route) => route.request().method() === "GET" ? route.abort("failed") : route.continue());
+  await page.reload();
+  await expect(page.getByRole("heading", { name: characterName })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("alert")).toHaveText(REFRESH_FAILED, { timeout: 30_000 });
+  await expect(page.getByRole("alert")).toHaveCount(1);
+  await expectAccessible(page, "refresh failed");
+  await page.unroute(characterGet);
+
+  // The saved copy opens, and the server answers its refresh with 401.
+  await page.route(characterGet, (route) => route.request().method() === "GET"
+    ? route.fulfill({ status: 401, contentType: "application/json",
+      body: JSON.stringify({ error: { code: "unauthenticated", message: "Sign in required." }, requestId: "e2e" }) })
+    : route.continue());
+  await page.reload();
+  await expect(page.getByRole("heading", { name: characterName })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole("alert")).toHaveText(REAUTHENTICATE, { timeout: 30_000 });
+  await expect(page.getByRole("alert")).toHaveCount(1);
+  await expect(page.getByText("Sign in again to continue")).toBeVisible();
+  await expectAccessible(page, "expired sign-in");
+  await page.unroute(characterGet);
 });

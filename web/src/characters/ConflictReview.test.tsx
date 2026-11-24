@@ -32,7 +32,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
       }),
     ],
     editing: { owned: true },
-    error: { kind: "conflict", message: "The character changed on the server. Review before re-sending." },
+    error: { kind: "conflict", diagnostic: "The character changed on the server. Review before re-sending." },
     lastRoll: null, lastNominal: null,
     pendingOnlineAttempts: [],
     connected: true,
@@ -128,7 +128,7 @@ describe("ConflictReview", () => {
           },
         }),
       ],
-      error: { kind: "expired-attempt", message: "older than the server's replay window" },
+      error: { kind: "expired-attempt", diagnostic: "older than the server's replay window" },
     });
     render(<ConflictReview snapshot={snap} onResolve={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getAllByText(/replay window|expired|uncertain/i).length).toBeGreaterThan(0);
@@ -139,7 +139,8 @@ describe("ConflictReview", () => {
       phase: "invalid",
       error: {
         kind: "invalid",
-        message: "Health must be positive",
+        diagnostic: "Health must be positive",
+        serverMessage: "Health must be positive",
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Health must be positive", targetDefinitionId: "health" }] },
       },
     });
@@ -170,7 +171,8 @@ describe("ConflictReview", () => {
       phase: "invalid",
       error: {
         kind: "invalid",
-        message: "Health must be positive",
+        diagnostic: "Health must be positive",
+        serverMessage: "Health must be positive",
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Health must be positive", targetDefinitionId: "health" }] },
       },
     });
@@ -250,7 +252,8 @@ describe("ConflictReview", () => {
       phase: "invalid",
       error: {
         kind: "invalid",
-        message: "Name is too short",
+        diagnostic: "Name is too short",
+        serverMessage: "Name is too short",
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Name is too short", targetDefinitionId: "name" }] },
       },
     });
@@ -323,7 +326,8 @@ describe("ConflictReview", () => {
       ],
       error: {
         kind: "invalid",
-        message: "Level must be between 1 and 10",
+        diagnostic: "Level must be between 1 and 10",
+        serverMessage: "Level must be between 1 and 10",
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Level must be between 1 and 10", targetDefinitionId: "level" }] },
       },
     });
@@ -409,7 +413,7 @@ describe("ConflictReview", () => {
       entries: [],
       error: {
         kind: "expired-attempt",
-        message: "older than the server's replay window",
+        diagnostic: "older than the server's replay window",
         details: { attemptId: "online-1" },
       },
       pendingOnlineAttempts: [onlineAttempt({ replayExpired: true })],

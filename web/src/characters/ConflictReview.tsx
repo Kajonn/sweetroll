@@ -5,6 +5,7 @@ import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
 import { captureOpener, focusFirst, restoreOpener, trapTabKey } from "./dialogTrap.js";
 import type { CharacterSnapshot } from "./session.js";
+import { sessionErrorText } from "./sessionErrors.js";
 import type { OnlineAttempt } from "./store.js";
 import type { EditIntent } from "./types.js";
 import styles from "./characters.module.css";
@@ -336,7 +337,7 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
   return (
     <section className={styles.sheet} aria-labelledby={`${dialogId}-title`}>
       <h2 id={`${dialogId}-title`}>{t("character.conflict.title")}</h2>
-      <p>{snapshot.error?.message ?? t("character.conflict.message")}</p>
+      <p>{snapshot.error ? sessionErrorText(snapshot.error) : t("character.conflict.message")}</p>
       {expired ? <p role="alert">{t("character.conflict.expired")}</p> : null}
       {snapshot.error?.kind === "invalid" && invalidDetails.length > 0 ? (
         <ul>

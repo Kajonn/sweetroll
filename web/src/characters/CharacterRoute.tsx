@@ -13,6 +13,7 @@ import { CharacterSheet } from "./CharacterSheet.js";
 import { PortraitEditor } from "./PortraitEditor.js";
 import { CharacterTools } from "./CharacterTools.js";
 import { ConflictReview } from "./ConflictReview.js";
+import { routeShowsErrorAlert, sessionErrorText } from "./sessionErrors.js";
 import type { SlotTemplate } from "./SlotListControl.js";
 import { CreateCharacter, type CreateCharacterIdentity } from "./CreateCharacter.js";
 import { browserSupportsLocks } from "./coordination.js";
@@ -267,7 +268,8 @@ function CharacterDetailLoaded({
 
   const [cached, setCached] = useState<Array<{ characterId: string; name: string }>>([]);
   const showRecovery =
-    !online || snapshot.error !== null || (character === null && snapshot.phase !== "loading");
+    !online || snapshot.error !== null || snapshot.storage === "unavailable" ||
+    (character === null && snapshot.phase !== "loading");
   useEffect(() => {
     if (!showRecovery) return;
     let cancelled = false;
@@ -283,9 +285,10 @@ function CharacterDetailLoaded({
   }, [showRecovery, store, actorId, characterId]);
 
   // Explicit conflict/error review: conflicts, invalid values and expired
-  // online attempts mount the review surface; every other session error is
-  // shown as a command alert. Closing the review keeps a reopen control so
-  // the workflow stays reachable until the session error clears.
+  // online attempts mount the review surface. Closing the review keeps a
+  // reopen control so the workflow stays reachable until the session error
+  // clears. V3: one message per condition; only errors without another
+  // surface get the route's translated alert (`routeShowsErrorAlert`).
   const reviewable =
     snapshot.error !== null &&
     (snapshot.error.kind === "conflict" ||
@@ -380,7 +383,8 @@ function CharacterDetailLoaded({
           )}
         </section>
       ) : null}
-      {snapshot.error !== null && !reviewOpen ? <p role="alert">{snapshot.error.message}</p> : null}
+      {snapshot.error !== null && routeShowsErrorAlert(snapshot.error)
+        ? <p role="alert">{sessionErrorText(snapshot.error)}</p> : null}
       <CharacterSheet
         entryImages={api.entryImages}
         portrait={api.images ? <PortraitEditor key={`${actorId}:${identity.getGeneration()}:${characterId}`} api={api.images} characterId={characterId} characterRevision={character.revision}

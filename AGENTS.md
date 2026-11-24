@@ -128,3 +128,10 @@ implemented: extension authoring and composition changes through `/api/v1`.
 E4b is deferred. The E8 local journey passed on 2026-11-21
 ([record](docs/acceptance/extensions-e8-local-2026-11-21.md)); the hosted E8
 journey is open.
+
+The owner approved the [session view plan](docs/superpowers/plans/2026-11-23-character-session-view-and-conditions.md)
+with decisions E1–E4 on 2026-11-24. Stages V1–V4 are implemented locally: storage
+failure is its own session state, a tab without the editing lock keeps the newer
+server view next to the saved copy, session errors are codes mapped to i18n keys,
+and a two-tab journey in `web/tests/e2e/characterReadPath.spec.ts` covers it. Its
+hosted journey is open together with the read-path S5 hosted run.

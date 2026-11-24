@@ -1,7 +1,7 @@
 # Character session: newest view, separate conditions and translated errors
 
 Status: **proposed 2026-11-23; owner decisions E1–E4 recorded 2026-11-24.
-Implementation not yet approved.** Follow-up to the
+Owner instruction 2026-11-24: "Implement with subagents".** Follow-up to the
 [read-path plan](2026-11-22-character-session-read-path.md). It closes that plan's two
 open gaps and the causes behind them.
 
@@ -144,3 +144,8 @@ Update `design_v2.md` Section 8 (session state) and the GUI integration plan wit
   right as soon as a read or write fails.
 - **Out of scope:** server push for characters (D1), a storage backend other than IndexedDB,
   and changes to the queue, idempotency, conflict review or the server API.
+
+## Implementation record
+
+Stages are implemented in order on `ccr-bafcadf5-g0ofeb`, one subagent per stage. Each
+stage adds its entry below.

@@ -80,7 +80,16 @@ type CharacterSnapshot = {
   the 11 adoption sites. The view shown is `latest` when its
   `reconciliation.revision` is greater than `saved.confirmed`'s, otherwise `saved.confirmed`.
   When they are equal, the saved copy wins, because the owner saved it from the server and
-  the next refresh corrects any difference. A purge, account change, sign-out or a saved
+  the next refresh corrects any difference.
+  **Correction (2026-11-24):** at an equal revision the newest observed view wins. A fetched
+  view with the same revision stays shown over the saved copy until the store's saved copy
+  itself changes after that fetch (a new store write of the confirmed view, not an enqueue
+  or metadata write that keeps it). Older revisions never replace newer ones. The reason:
+  "the next refresh corrects any difference" is false when no tab ever saves (no Web Locks,
+  or no tab holding the lock refreshes), so "saved wins" lost read-path D2's same-revision
+  changes (projection or roll-scope changes without a revision bump, such as
+  access-dependent content). Editing still uses only the saved copy.
+  A purge, account change, sign-out or a saved
   copy that becomes `null` clears `latest` as well. Gaining the lock clears `latest`, and the
   owner's drain persists the newest view as now.
 - **`view.source`** is `stored` when a saved copy exists (offline use possible) and `live`
@@ -180,12 +189,12 @@ No existing test changed. The read-path S1–S5 tests pass unchanged.
 **Change.** `web/src/characters/session.ts` keeps the saved copy and the newest view apart:
 
 - **`saved`** (the former internal `confirmed`) is exactly the store's confirmed view. With `entries`, `generation`, `accountGeneration` and `lastRoll` it is the store record the session last adopted, or wrote itself on the owner's write path. Commands, queue entries (`baseRevision`, `packageChecksum`), frozen requests (`expectedRevision`), tentative estimates (`computeTentative`, `resourceBounds`), the archived check, conflict review and reconciliation all read `saved`, as they read `confirmed` before.
-- **`latest`** is the newest authorized server view this tab fetched and did not save. **Decision: `liveView` and `latest` are one variable.** Both are "a server view this tab did not save"; only the rule for showing it differs. Without a saved copy it is the `live` view, shown only while online and cleared on going offline, as before. With a saved copy it is shown in place of it (`shownSaved()`) while its `reconciliation.revision` is greater and the tab does not hold the lock; at an equal revision the saved copy wins. Offline it stays shown (E2). `view.source` is `stored` whenever a saved copy exists.
+- **`latest`** is the newest authorized server view this tab fetched and did not save. **Decision: `liveView` and `latest` are one variable.** Both are "a server view this tab did not save"; only the rule for showing it differs. Without a saved copy it is the `live` view, shown only while online and cleared on going offline, as before. With a saved copy it is shown in place of it (`shownSaved()`) while its `reconciliation.revision` is greater and the tab does not hold the lock. At an equal revision the newest observed view wins (see "Equal-revision correction" below); as first committed (`0abffed`) the saved copy won. Offline it stays shown (E2). `view.source` is `stored` whenever a saved copy exists.
 - **`adoptSaved(record, options)`** replaces all 11 adoption sites (`handleAckError`'s stale branch, `reconcileSnapshot`'s generation race, both reads in `resolveConflict` and in `reviewExpiredAttemptInner`, `retiredByConcurrentReview`, `initialize`, `reloadOwned`, the `invalidate` handler and `forgetRoll`) and the two sites that adopted a record whose saved copy is null (`handleAckError`'s purge branch, `reconcileSnapshot`'s purge branch). None was kept. Each site keeps its own guards and side effects (`refreshPendingOnline`, purge and conflict blocks, `emit`, the retry check, `clearError`). The options keep each site's existing rules: `sequence` "advance" (the default, the sites that advanced `nextSequence`), "reset" (`initialize`, `reloadOwned`) or "keep" (`handleAckError`, the `invalidate` handler, `forgetRoll`, which did not touch it), and `account: false` for `handleAckError`'s stale branch, which did not adopt the account generation. The purge-branch sites set `lastRoll = null`; `adoptSaved` takes the record's roll, which the store never keeps with a null saved copy (purge and account clearing delete it).
 - **Clearing `latest`.** `adoptSaved` clears it when the saved copy becomes null, when the account generation changes, and when it is no longer newer than the adopted copy. The `invalidate` handler still clears it for a null record (as it cleared `liveView`), so a purge broadcast hides a `live` view as before. `purgeAccess`, sign-out (identity mismatch), `reloadOwned` (gaining the lock) and the owner's `confirmSnapshot` clear it as before. The owner's drain then saves the newest server view on its next refresh.
 - **`lastRoll`.** `fetchView` compares roll scope with the view shown (newest or saved), as it compared with `confirmed`. `adoptSaved` takes the store's roll and drops it when the newest view shown has another roll scope than the saved copy, so a reread does not bring back a roll from a scope the sheet no longer shows.
 - **Owner tabs.** Only a tab with the lock edits. `fetchView` sets `latest` over a saved copy only while `editing.owned` is false, `reloadOwned` clears it before the tab edits, and `shownSaved()` never shows it while `editing.owned` is true. So the view `canEdit`/`editAllowed` check is always the saved copy, and no command, queue entry, estimate or reconciliation reads `latest`.
-- **Same-revision refresh.** Before V2, a tab without the lock also took a server view with the same revision but a different projection or roll scope. Now the saved copy wins at an equal revision, as the target model says; the tab holding the lock saves such a view and the next reread shows it.
+- **Same-revision refresh.** Before V2, a tab without the lock also took a server view with the same revision but a different projection or roll scope. As first committed (`0abffed`), V2 let the saved copy win at an equal revision, as the target model then said. That was corrected the same day (below).
 
 `design_v2.md` Section 8 and the GUI integration plan's "Character session read path" paragraph describe the newest view. The read-path plan's S1–S5 gap note points to this entry. The queue, idempotency, conflict review, purge rules, D1–D4, the server API and `/api/v1` are unchanged.
 
@@ -197,7 +206,7 @@ No existing test changed. The read-path S1–S5 tests pass unchanged.
 - "keeps the newer view when clearing a roll rereads the store" (`forgetRoll`). Failed: revision 2.
 - "does not bring back a saved roll from another scope with the saved copy": the saved copy has a roll in campaign A; the fetched revision 3 has left the campaign. After the owner's enqueue the roll stays cleared. Failed: revision 2 (with the old roll).
 - "keeps showing the newer view offline, also after the owner queues an offline edit (E2)". Failed after the offline enqueue: revision 2.
-- "shows the saved copy when the refresh has the same revision" (a projection that differs only in its entity label). Failed: the fetched view ("Same revision") was shown.
+- "shows the saved copy when the refresh has the same revision" (a projection that differs only in its entity label). Failed: the fetched view ("Same revision") was shown. This case was replaced by the equal-revision correction below.
 - Four guards passed before the change and pass after: "clears the newer view when another tab purges the saved copy", "clears the newer view when a refresh purges access", "clears the newer view on sign-out" (signing in again with the fetch pending shows nothing) and "drops the newer view on gaining the lock and the owner's refresh saves it" (the store then holds revision 3 and the next edit sends `expectedRevision: 3`).
 
 No existing test changed.
@@ -205,3 +214,24 @@ No existing test changed.
 **Results after the change:** `npm run -s web:typecheck` passed. `npm run -s web:test` 145 files, 1386 tests passed (1377 after V1 plus the nine new cases). Browser journeys `npm run test:e2e -- --suite=journeys character campaign session` 35/35 passed (local PostgreSQL 16, Node 24, the Chromium build substitution described in V1). Offline browser suite (`playwright.offline.config.ts`, fresh `sweetroll_offline` database, after `npm run -s web:build`) 32/32 passed on the third run. The first run, right after the journeys, had one failure: the pool-system character journey at 360px ("journey at 360px (pool)") showed "This character is unavailable." after creating its character through the UI. Its trace was overwritten, so the cause was not confirmed. `tests/offline/character.spec.ts` alone then passed 5/5 twice on fresh databases. A second full run straight after those runs had 4 failures, all `429 rate_limited` responses to test setup requests (clone system, create character), as in V1. A full run on a fresh database after a pause passed.
 
 **Not done in V2.** A `stored` view in a tab without the lock still shows the queued entries and pending estimates of the saved copy (computed against the saved copy, as before), also when a newer view is shown. A storage failure still takes the `error` slot (V1's note). Error codes and messages (V3) and the journey (V4) are not started. The hosted run was not done for V2.
+
+#### Equal-revision correction (2026-11-24, after `0abffed`)
+
+**Why.** As first committed, V2 let the saved copy win at an equal revision, relying on "the next refresh corrects any difference". That is false when no tab ever saves: in a browser without Web Locks, or when no tab holding the lock refreshes. It lost read-path D2's same-revision changes (projection or roll-scope changes without a revision bump, such as access-dependent content). The Target model bullet carries the correction.
+
+**Change.** `web/src/characters/session.ts`: the newest observed view wins at an equal revision.
+- `fetchView` in a tab without the lock keeps a fetched view whose revision is at least the saved copy's, unless it equals the view shown (same revision, projection and roll scope). Older revisions are still ignored.
+- `shownSaved()` shows `latest` while its revision is at least the saved copy's (still never in a tab holding the lock).
+- `adoptSaved` drops `latest` when it is older than the adopted copy, or equal and the adopted saved copy differs from the one held before (a new store write of the confirmed view). An enqueue or a metadata write that keeps the same confirmed view keeps `latest`. Editing, the queue, estimates and reconciliation still use only the saved copy.
+
+**First failing test.** "shows the saved copy when the refresh has the same revision" was replaced by "shows a same-revision fetched view until the store saves a new copy" (`session.test.ts`, V2 block). A tab without the lock has revision 2 with projection A saved and fetches revision 2 with projection B: B is shown, read-only. The owner tab enqueues and broadcasts: B is still shown. The owner saves revision 2 with projection C: C is shown. A lagging fetch of revision 1 does not replace it. On `0abffed` it failed at the first check (expected "Fetched B", received "Saved A"). The old case expected the opposite rule, so it was removed, not kept.
+
+**Results:** `npm run -s web:typecheck` passed. `npm run -s web:test` 145 files, 1386 tests passed (the replaced case keeps the count). Browser journeys `npm run test:e2e -- --suite=journeys character campaign session` 35/35 passed.
+
+**The offline failure investigated.** The one failure in V2's first offline run ("journey at 360px (pool)" showed "This character is unavailable." right after creating its character through the UI; the page had no other alert, so the session reported no view, no error and a phase other than `loading`) did not reproduce:
+- `tests/offline/character.spec.ts` (5 tests) with `--trace on`, a fresh `sweetroll_offline` database per run and a pause between runs: 5 runs on the V2 code with this correction, 25/25 passed, 25 traces kept.
+- The full offline suite on fresh databases after 4-minute pauses: 2 runs, 32/32 passed each.
+- For comparison, the same spec 5 times on the V1 commit `0e15851` (a separate worktree with its own build): 25/25 passed.
+
+No run reproduced it, so its cause is not known and no fix was made. Reading the code, no V2 change applies to a tab that holds the lock with no saved copy, which is the state right after creation: the owner never sets `latest` over a saved copy, gaining the lock clears it as `liveView` was cleared, and the adoption sites keep the previous field-by-field behaviour there. It is recorded as an unexplained intermittent failure; the 429 failures seen right after other runs are separate.
+

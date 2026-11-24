@@ -3350,19 +3350,37 @@ describe("CharacterSession saved copy and newest view (V2)", () => {
     } finally { h.session.dispose(); await h.store.close(); }
   });
 
-  it("shows the saved copy when the refresh has the same revision", async () => {
+  it("shows a same-revision fetched view until the store saves a new copy", async () => {
     const h = await makeHarness("char-1", false);
+    const withLabel = (name: string, label: string) => {
+      const view = viewFor("char-1", 2, { name });
+      view.projection = { ...view.projection, entityLabel: label };
+      return view;
+    };
     try {
       h.coordination.requestEditing = async () => false;
-      await seedConfirmed(h.store, "char-1", viewFor("char-1", 2, { name: "Saved" }));
-      const same = viewFor("char-1", 2, { name: "Same revision" });
-      same.projection = { ...same.projection, entityLabel: "Changed label" };
-      h.api.setOpenFallback(async () => ({ character: same, requestId: "r" }));
+      await seedConfirmed(h.store, "char-1", withLabel("Saved A", "A"));
+      h.api.setOpenFallback(async () => ({ character: withLabel("Fetched B", "B"), requestId: "r" }));
       await h.session.open();
+      // Newest observed wins at an equal revision (no tab may ever save it).
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.name).toBe("Fetched B"));
+      expect(h.session.getSnapshot().view?.source).toBe("stored");
+      expect(canEdit(h.session.getSnapshot())).toBe(false);
+      // An enqueue keeps the same saved copy: the fetched view stays.
+      const stored = await h.store.read(ARM, "char-1");
+      await h.store.enqueue(makeEntry({ id: "owner-edit", actorId: ARM, characterId: "char-1", sequence: 10, baseRevision: 2 }), stored);
+      h.coordination.signalInvalidation("char-1");
+      await vi.waitFor(() => expect(h.session.getSnapshot().entries.map((e) => e.id)).toContain("owner-edit"));
+      expect(h.session.getSnapshot().view?.character.name).toBe("Fetched B");
+      // The owner saves a new copy at the same revision: it is shown.
+      await h.store.confirmSnapshot(ARM, "char-1", withLabel("Saved C", "C"), (await h.store.read(ARM, "char-1")).generation);
+      h.coordination.signalInvalidation("char-1");
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.name).toBe("Saved C"));
+      // A lagging fetch of an older revision never replaces it.
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1, { name: "Older" }), requestId: "r" }));
       document.dispatchEvent(new Event("visibilitychange"));
-      await h.session.whenIdle();
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(h.session.getSnapshot().view?.character.name).toBe("Saved");
+      expect(h.session.getSnapshot().view?.character.name).toBe("Saved C");
     } finally { h.session.dispose(); await h.store.close(); }
   });
 

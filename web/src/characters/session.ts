@@ -299,9 +299,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   /**
    * V2: the newest authorized server view this tab fetched and did not save.
    * Without a saved copy it is the `live` view (shown only while online).
-   * With one, it is shown instead of the saved copy only while its revision
-   * is greater (`shownSaved`), in a tab without the lock, online or offline
-   * (E2). Purge, sign-out, an account change, a saved copy that becomes null
+   * With one, it is shown instead of the saved copy while its revision is
+   * greater, or equal and fetched after the saved copy last changed
+   * (`shownSaved`), in a tab without the lock, online or offline (E2). Purge, sign-out, an account change, a saved copy that becomes null
    * and gaining the lock clear it.
    */
   let latest: CharacterView | null = null;
@@ -377,14 +377,16 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return identityMatches() && await identity.isCurrent() && identityMatches();
   }
   /**
-   * V2: the character shown while a saved copy exists. The newest fetched
-   * view wins only with a greater revision; at an equal revision the saved
-   * copy wins. A tab holding the lock always shows its saved copy.
+   * V2: the character shown while a saved copy exists. The newest observed
+   * view wins: `latest` is shown while its revision is at least the saved
+   * copy's. An equal-revision `latest` is kept only while the saved copy has
+   * not changed since it was fetched (`adoptSaved` drops it otherwise). A tab
+   * holding the lock always shows its saved copy.
    */
   function shownSaved(): CharacterView | null {
     if (saved === null) return null;
     return latest !== null && !editing.owned &&
-      latest.reconciliation.revision > saved.reconciliation.revision ? latest : saved;
+      latest.reconciliation.revision >= saved.reconciliation.revision ? latest : saved;
   }
   /** The shown view and whether this tab reports editing, computed from current state. */
   function deriveView(): { visible: boolean; view: CharacterViewState | null; owned: boolean } {
@@ -534,8 +536,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
    * ("keep"); `account: false` keeps this session's account generation.
    *
    * The newest fetched view (`latest`) is kept: it is shown while its
-   * revision is greater than the adopted copy's. It is cleared when the saved
-   * copy becomes null or the account generation changes. A saved roll is not
+   * revision is greater than the adopted copy's, or equal while the saved
+   * copy itself is unchanged. It is cleared when the saved copy becomes
+   * null, the account generation changes or an older revision is left. A saved roll is not
    * shown with a newer view from another roll scope.
    */
   function adoptSaved(
@@ -543,6 +546,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     options: { sequence?: "advance" | "reset" | "keep"; account?: boolean } = {},
   ) {
     const { sequence = "advance", account = true } = options;
+    const savedChanged = JSON.stringify(saved) !== JSON.stringify(record.confirmed);
     if ((record.confirmed === null && saved !== null) ||
         (account && record.accountGeneration !== accountGeneration)) latest = null;
     saved = record.confirmed;
@@ -553,7 +557,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (sequence !== "keep") {
       nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), sequence === "reset" ? 0 : nextSequence);
     }
-    if (saved !== null && latest !== null && latest.reconciliation.revision <= saved.reconciliation.revision) latest = null;
+    // Older revisions never replace newer ones. At an equal revision the
+    // newest observed view wins: a fetched view stays until the store saves a
+    // new copy (an enqueue or metadata write keeps the same saved copy).
+    if (saved !== null && latest !== null && (latest.reconciliation.revision < saved.reconciliation.revision ||
+        (latest.reconciliation.revision === saved.reconciliation.revision && savedChanged))) latest = null;
     const shown = shownSaved();
     if (shown !== saved && !sameRollScope(saved, shown!)) lastRoll = null;
   }
@@ -1163,11 +1171,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (saved === null) {
       latest = character;
       liveShown = true;
-    } else if (!editing.owned && character.reconciliation.revision > saved.reconciliation.revision) {
-      // D2/V2: a tab without the lock keeps the newer server view next to its
-      // saved copy and shows it (`shownSaved`). Only the owner persists views,
-      // so the store, the saved copy and its queue stay untouched. At an equal
-      // revision the saved copy wins; an older view is a lagging fetch.
+    } else if (!editing.owned && character.reconciliation.revision >= saved.reconciliation.revision) {
+      // D2/V2: a tab without the lock keeps the newest observed server view
+      // next to its saved copy and shows it (`shownSaved`), also at an equal
+      // revision when the projection or roll scope differs. Only the owner
+      // persists views, so the store, the saved copy and its queue stay
+      // untouched. An older revision is a lagging fetch.
       const shown = shownSaved()!;
       if (character.reconciliation.revision < shown.reconciliation.revision ||
           (character.reconciliation.revision === shown.reconciliation.revision &&

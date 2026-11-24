@@ -179,3 +179,5 @@ Throughout, the faulty context records every non-GET request to `/api/characters
 **Results.** `npm run test:e2e -- --suite=journeys characterReadPath` passed 3 times in a row (19.4 s, 18.3 s, 18.9 s), after one earlier passing run. `npm run test:e2e -- --suite=journeys character campaign session` 35/35 passed (34 before plus the new journey). `npm run -s web:typecheck` passed. `npm run -s web:test` 145 files, 1366 tests passed.
 
 **Open.** The hosted acceptance run on the Railway build, with its deployed SHA recorded, has not been done; it cannot be run from this environment. CI on the pushed branch is also still to be observed. S1's gap (an older stored copy replacing an in-memory refresh on an `invalidate` broadcast) and S4's remaining session error alert are unchanged.
+
+**Resolved later (2026-11-24).** S1's gap (noted under S1–S5 above) is closed by V2 of the [session view plan](2026-11-23-character-session-view-and-conditions.md#v2-saved-copy-and-newest-view-2026-11-24).

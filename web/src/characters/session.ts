@@ -79,10 +79,10 @@ export type CoordinationPort = {
 };
 
 /**
- * What the session shows. `stored` is the copy this browser keeps (it may
- * have been refreshed in memory from the server in a tab without the lock);
- * `live` is an authorized server view that is not saved locally and is
- * shown only while online.
+ * What the session shows. `stored` means this browser keeps a saved copy, so
+ * the character stays available offline; in a tab without the lock the
+ * character shown may be a newer server view that was not saved (V2). `live`
+ * is an authorized server view without a saved copy, shown only while online.
  */
 export type CharacterViewState = { source: "stored" | "live"; character: CharacterView };
 
@@ -213,6 +213,9 @@ export type CreateCharacterSessionInput = {
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+/** A store record as `CharacterStore.read` returns it. */
+type SavedRecord = Awaited<ReturnType<CharacterStore["read"]>>;
+
 /** D1: a live (unsaved) view is fetched again this often while the page is visible. */
 export const LIVE_REFRESH_MS = 30_000;
 
@@ -285,10 +288,23 @@ function entryMatchesBase(entry: QueueEntry, base: CharacterView): boolean {
 export function createCharacterSession(input: CreateCharacterSessionInput): CharacterSession {
   const { actorId, characterId, api, store, identity, coordination, now, newId } = input;
 
-  /** The stored view: written only by the write path (owner) or read from the store. */
-  let confirmed: CharacterView | null = null;
-  /** An authorized server view that is not saved locally (`view.source === "live"`). */
-  let liveView: CharacterView | null = null;
+  /**
+   * V2: the saved copy. `saved` is exactly the store's confirmed view; with
+   * `entries`, `generation`, `accountGeneration` and `lastRoll` it is the
+   * store record this session last adopted (`adoptSaved`) or wrote itself
+   * (the owner's write path). Commands, queue entries, tentative estimates
+   * and reconciliation use only this copy.
+   */
+  let saved: CharacterView | null = null;
+  /**
+   * V2: the newest authorized server view this tab fetched and did not save.
+   * Without a saved copy it is the `live` view (shown only while online).
+   * With one, it is shown instead of the saved copy only while its revision
+   * is greater (`shownSaved`), in a tab without the lock, online or offline
+   * (E2). Purge, sign-out, an account change, a saved copy that becomes null
+   * and gaining the lock clear it.
+   */
+  let latest: CharacterView | null = null;
   /** True once this session has shown a live view; reconnecting reopens it. */
   let liveShown = false;
   let viewFetch: Promise<void> | null = null;
@@ -360,12 +376,23 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function identityIsCurrent(): Promise<boolean> {
     return identityMatches() && await identity.isCurrent() && identityMatches();
   }
+  /**
+   * V2: the character shown while a saved copy exists. The newest fetched
+   * view wins only with a greater revision; at an equal revision the saved
+   * copy wins. A tab holding the lock always shows its saved copy.
+   */
+  function shownSaved(): CharacterView | null {
+    if (saved === null) return null;
+    return latest !== null && !editing.owned &&
+      latest.reconciliation.revision > saved.reconciliation.revision ? latest : saved;
+  }
   /** The shown view and whether this tab reports editing, computed from current state. */
   function deriveView(): { visible: boolean; view: CharacterViewState | null; owned: boolean } {
     const visible = identityMatches();
-    const live = visible && confirmed === null && isConnected() ? liveView : null;
+    const live = visible && saved === null && isConnected() ? latest : null;
+    const shown = shownSaved();
     const view: CharacterViewState | null = !visible ? null
-      : confirmed !== null ? { source: "stored", character: confirmed }
+      : shown !== null ? { source: "stored", character: shown }
       : live !== null ? { source: "live", character: live } : null;
     return { visible, view, owned: visible && editing.owned && live === null };
   }
@@ -400,8 +427,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   function resourceBounds(resourceId: string): { current: number; min: number; max: number; step: number; valueMax: number } | null {
-    if (!confirmed) return null;
-    for (const sheet of confirmed.projection.sheets) {
+    if (!saved) return null;
+    for (const sheet of saved.projection.sheets) {
       for (const section of sheet.sections) {
         for (const element of section.elements) {
           if (element.kind === "resource" && element.resourceId === resourceId) {
@@ -414,7 +441,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   function computeTentative(): Record<string, unknown> | null {
-    if (!confirmed) return null;
+    if (!saved) return null;
     const values: Record<string, unknown> = {};
     const ordered = [...entries].sort((a, b) => a.sequence - b.sequence);
     for (const entry of ordered) {
@@ -498,6 +525,39 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (storageFailed) phase = KIND_TO_PHASE["storage-error"];
   }
 
+  /**
+   * V2: adopts a store record as the saved copy. Every place that copies the
+   * store into memory uses this. Each caller keeps its own guards and side
+   * effects; the options keep its existing rules: `sequence` advances the
+   * next queue sequence past the adopted entries ("advance"), recomputes it
+   * from them ("reset", on open and on gaining the lock) or leaves it
+   * ("keep"); `account: false` keeps this session's account generation.
+   *
+   * The newest fetched view (`latest`) is kept: it is shown while its
+   * revision is greater than the adopted copy's. It is cleared when the saved
+   * copy becomes null or the account generation changes. A saved roll is not
+   * shown with a newer view from another roll scope.
+   */
+  function adoptSaved(
+    record: SavedRecord,
+    options: { sequence?: "advance" | "reset" | "keep"; account?: boolean } = {},
+  ) {
+    const { sequence = "advance", account = true } = options;
+    if ((record.confirmed === null && saved !== null) ||
+        (account && record.accountGeneration !== accountGeneration)) latest = null;
+    saved = record.confirmed;
+    lastRoll = record.lastRoll ?? null;
+    entries = record.entries;
+    generation = record.generation;
+    if (account) accountGeneration = record.accountGeneration;
+    if (sequence !== "keep") {
+      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), sequence === "reset" ? 0 : nextSequence);
+    }
+    if (saved !== null && latest !== null && latest.reconciliation.revision <= saved.reconciliation.revision) latest = null;
+    const shown = shownSaved();
+    if (shown !== saved && !sameRollScope(saved, shown!)) lastRoll = null;
+  }
+
   function assertMutationAllowed(options?: { offlineIntent?: boolean }) {
     if (disposed) throw new Error("Session closed.");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
@@ -510,7 +570,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       throw structuredError(error.message, error.kind, error.details);
     }
     if (!editAllowed()) {
-      if (editing.owned && coordination.isOwner() && !confirmed) throw new Error("Cannot edit until the character is loaded.");
+      if (editing.owned && coordination.isOwner() && !saved) throw new Error("Cannot edit until the character is loaded.");
       throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");
     }
   }
@@ -518,7 +578,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   function baseForNewEntry(): number {
     const last = entries[entries.length - 1];
     if (last) return last.baseRevision;
-    return confirmed?.reconciliation.revision ?? 1;
+    return saved?.reconciliation.revision ?? 1;
   }
 
   function newEntry(intent: EditIntent): QueueEntry {
@@ -528,7 +588,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       characterId,
       sequence: nextSequence++,
       baseRevision: baseForNewEntry(),
-      packageChecksum: confirmed?.projection.packageChecksum ?? "unknown",
+      packageChecksum: saved?.projection.packageChecksum ?? "unknown",
       createdAt: now(),
       intent,
       attempt: null,
@@ -578,7 +638,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   function buildFrozenRequest(entry: QueueEntry): FrozenRequest {
-    const expectedRevision = confirmed?.reconciliation.revision ?? entry.baseRevision;
+    const expectedRevision = saved?.reconciliation.revision ?? entry.baseRevision;
     const method = "POST" as const;
     const firstAttemptAt = now();
     const key = newId();
@@ -673,8 +733,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       // A storage failure must still hide private data in this session.
     }
     if (!identityMatches()) return "blocked";
-    confirmed = null;
-    liveView = null;
+    saved = null;
+    latest = null;
     entries = [];
     pendingOnline = [];
     lastRoll = null;
@@ -696,11 +756,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function handleAckError(err: unknown): Promise<SendOutcome> {
     if (isStaleAck(err)) {
       const fresh = await store.read(actorId, characterId);
-      confirmed = fresh.confirmed;
-      lastRoll = fresh.lastRoll ?? null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      if (confirmed === null) {
+      adoptSaved(fresh, { sequence: "keep", account: false });
+      if (saved === null) {
         setBlocked("purged", "This character is no longer available.");
       } else {
         setBlocked("conflict", "State changed while a request was in flight. Review before continuing.");
@@ -711,14 +768,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // and nulls the snapshot: a "not found" write failure afterwards reports
     // that terminal state rather than a storage error. A session that never
     // confirmed anything keeps the storage-error diagnosis.
-    if (confirmed !== null) {
+    if (saved !== null) {
       const fresh = await store.read(actorId, characterId).catch(() => null);
       if (fresh !== null && identityMatches() && fresh.confirmed === null) {
-        confirmed = null;
-        lastRoll = null;
-        entries = fresh.entries;
-        generation = fresh.generation;
-        accountGeneration = fresh.accountGeneration;
+        adoptSaved(fresh, { sequence: "keep" });
         await refreshPendingOnline();
         setBlocked("purged", "This character is no longer available.");
         return "blocked";
@@ -736,7 +789,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const envelope = await api.open(characterId);
       if (!await identityIsCurrent()) return;
       const server = envelope.character;
-      const local = confirmed;
+      const local = saved;
       if (server.reconciliation.revision < Math.max(local?.reconciliation.revision ?? 0, conflictMinimumRevision)) {
         // A lagging GET is not a review base for the revision the conflict reported.
         setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
@@ -800,7 +853,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function maybePrepareDice(request: FrozenRequest): Promise<FrozenRequest> {
-    const prepare = confirmed && input.captureDicePreparation?.(confirmed.campaignId);
+    const prepare = saved && input.captureDicePreparation?.(saved.campaignId);
     if (!prepare) return request;
     phase = "sending";
     emit();
@@ -822,7 +875,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       refreshPhase();
       return "blocked";
     }
-    if (confirmed !== null && !entryMatchesBase(current, confirmed)) {
+    if (saved !== null && !entryMatchesBase(current, saved)) {
       setBlocked("conflict", "The character changed on the server. Review before re-sending.", {
         retainedIds: [current.id],
       });
@@ -905,8 +958,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) return "blocked";
     coordination.invalidate?.();
-    if (!sameRollScope(confirmed, character)) lastRoll = null;
-    confirmed = character;
+    if (!sameRollScope(saved, character)) lastRoll = null;
+    saved = character;
     if (current.intent.kind === "executeAction") {
       lastRoll = response.result.roll;
       lastNominal = response.result.nominal;
@@ -1038,7 +1091,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   /** D1: poll only a shown live view, and only while the page is visible. */
   function syncLiveTimer() {
-    const live = !disposed && confirmed === null && liveView !== null && identityMatches() && isConnected();
+    const live = !disposed && saved === null && latest !== null && identityMatches() && isConnected();
     if (live && pageVisible()) {
       liveTimer ??= setInterval(() => { void refreshView("timer"); }, LIVE_REFRESH_MS);
     } else if (liveTimer !== null) {
@@ -1098,8 +1151,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       // or visibility refresh keeps the current view. A stored view keeps its
       // own state: only a purge changes it here.
       const denied = err instanceof ApiError && (err.status === 404 || err.status === 401);
-      if (confirmed === null && (trigger === "open" || trigger === "reconnect" || denied)) {
-        if (err instanceof ApiError && err.status === 404) liveView = null;
+      if (saved === null && (trigger === "open" || trigger === "reconnect" || denied)) {
+        if (err instanceof ApiError && err.status === 404) latest = null;
         await handleOpenError(err);
       }
       emit();
@@ -1107,16 +1160,20 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!await identityIsCurrent() || !isConnected() || disposed || error?.kind === "purged" ||
         generation !== guard.generation || accountGeneration !== guard.accountGeneration) return;
-    if (confirmed === null) {
-      liveView = character;
+    if (saved === null) {
+      latest = character;
       liveShown = true;
-    } else if (!editing.owned && (character.reconciliation.revision > confirmed.reconciliation.revision ||
-        (character.reconciliation.revision === confirmed.reconciliation.revision &&
-         (!sameRollScope(confirmed, character) || !projectionsEqual(character.projection, confirmed.projection))))) {
-      // D2: a tab without the lock shows the newer server view. Only the
-      // owner persists views, so the store and its queue stay untouched.
-      if (!sameRollScope(confirmed, character)) lastRoll = null;
-      confirmed = character;
+    } else if (!editing.owned && character.reconciliation.revision > saved.reconciliation.revision) {
+      // D2/V2: a tab without the lock keeps the newer server view next to its
+      // saved copy and shows it (`shownSaved`). Only the owner persists views,
+      // so the store, the saved copy and its queue stay untouched. At an equal
+      // revision the saved copy wins; an older view is a lagging fetch.
+      const shown = shownSaved()!;
+      if (character.reconciliation.revision < shown.reconciliation.revision ||
+          (character.reconciliation.revision === shown.reconciliation.revision &&
+           sameRollScope(shown, character) && projectionsEqual(character.projection, shown.projection))) return;
+      if (!sameRollScope(shown, character)) lastRoll = null;
+      latest = character;
     } else {
       return;
     }
@@ -1167,39 +1224,29 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // a stale in-flight GET to confirm over it afterwards.
     const fresh = await store.read(actorId, characterId).catch(() => null);
     if (!identityMatches() || fresh === null) return;
-    if (fresh.confirmed === null && (confirmed !== null || error?.kind === "purged")) {
-      confirmed = null;
-      lastRoll = null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      accountGeneration = fresh.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    if (fresh.confirmed === null && (saved !== null || error?.kind === "purged")) {
+      adoptSaved(fresh);
       await refreshPendingOnline();
       setBlocked("purged", "This character is no longer available.");
       emit();
       return;
     }
     if (fresh.generation !== generation || fresh.accountGeneration !== accountGeneration) {
-      confirmed = fresh.confirmed;
-      lastRoll = fresh.lastRoll ?? null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      accountGeneration = fresh.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      adoptSaved(fresh);
       await refreshPendingOnline();
-      if (confirmed === null) {
+      if (saved === null) {
         setBlocked("purged", "This character is no longer available.");
       }
       emit();
       // A local metadata write (for example clearing an inaccessible roll)
       // can win the generation race while retaining an older sheet. Re-read
       // under the adopted guard before enabling actions on that cached view.
-      if (confirmed !== null && server.reconciliation.revision >= confirmed.reconciliation.revision &&
-          (server.reconciliation.revision !== confirmed.reconciliation.revision ||
-           !sameRollScope(confirmed, server) || !projectionsEqual(server.projection, confirmed.projection))) return "retry";
+      if (saved !== null && server.reconciliation.revision >= saved.reconciliation.revision &&
+          (server.reconciliation.revision !== saved.reconciliation.revision ||
+           !sameRollScope(saved, server) || !projectionsEqual(server.projection, saved.projection))) return "retry";
       return;
     }
-    const local = confirmed;
+    const local = saved;
     if (local && server.reconciliation.revision < local.reconciliation.revision) {
       setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
       return;
@@ -1212,9 +1259,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await store.confirmSnapshot(actorId, characterId, server, generation);
         if (!identityMatches()) return;
         coordination.invalidate?.();
-        if (!sameRollScope(confirmed, server)) lastRoll = null;
-        confirmed = server;
-        liveView = null;
+        if (!sameRollScope(saved, server)) lastRoll = null;
+        saved = server;
+        latest = null;
         generation += 1;
       } catch (err) {
         if (!await identityIsCurrent()) return;
@@ -1224,9 +1271,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await handleAckError(err);
         // A successful GET is enough to display the sheet online. Editing
         // still needs a snapshot persisted against the current cache guard.
-        if (local === null && confirmed === null && error?.kind === "storage-error" &&
+        if (local === null && saved === null && error?.kind === "storage-error" &&
             identityMatches() && isConnected()) {
-          liveView = server;
+          latest = server;
           liveShown = true;
         }
         return;
@@ -1258,7 +1305,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function resolveConflict(input: ResolveConflictInput): Promise<void> {
     if (disposed) return;
     if (!identityMatches() || !editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
-    if (confirmed !== null && !editAllowed()) throw new Error("Editing ownership required.");
+    if (saved !== null && !editAllowed()) throw new Error("Editing ownership required.");
     // Ordinary conflict recovery never retires online attempts: an uncertain
     // online outcome blocks it until replay or explicit expired-outcome
     // review resolves the local decision.
@@ -1270,7 +1317,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (draining || conflictRefreshPending || !error || !["conflict", "invalid", "expired-attempt", "protocol", "not-found"].includes(error.kind)) {
       throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
-    if (!confirmed) {
+    if (!saved) {
       throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
     const ordered = [...entries].sort((a, b) => a.sequence - b.sequence);
@@ -1291,7 +1338,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // review set is the drifted entries in order; otherwise (invalid without
     // drift) every queued entry still needs its own ordered review.
     const reviewSet = (() => {
-      const drifted = ordered.filter((entry) => !entryMatchesBase(entry, confirmed!));
+      const drifted = ordered.filter((entry) => !entryMatchesBase(entry, saved!));
       return drifted.length > 0 ? drifted : ordered;
     })();
     if (reviewSet.length > 0) {
@@ -1346,8 +1393,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
             actorId,
             characterId,
             sequence: entry.sequence,
-            baseRevision: confirmed!.reconciliation.revision,
-            packageChecksum: confirmed!.projection.packageChecksum,
+            baseRevision: saved!.reconciliation.revision,
+            packageChecksum: saved!.projection.packageChecksum,
             createdAt: now(),
             intent: corrected[entry.id] ?? entry.intent,
             attempt: null,
@@ -1369,21 +1416,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (fresh.accountGeneration !== accountGeneration) {
       // Another tab cleared or replaced the account mid-review: adopt the
       // cleared state and fail instead of recreating intentions.
-      confirmed = fresh.confirmed;
-      lastRoll = fresh.lastRoll ?? null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      accountGeneration = fresh.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      adoptSaved(fresh);
       emit();
       throw new Error("stale recovery: account changed during review");
     }
-    confirmed = fresh.confirmed;
-    lastRoll = fresh.lastRoll ?? null;
-    entries = fresh.entries;
-    generation = fresh.generation;
-    accountGeneration = fresh.accountGeneration;
-    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    adoptSaved(fresh);
     for (const entry of ordered) {
       if (selected.has(entry.id)) {
         resolveFreezeWaiter(entry.id);
@@ -1523,7 +1560,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (disposed) throw new Error("Session closed.");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     if (!editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
-    if (!confirmed) throw new Error("Cannot manage until the character is loaded.");
+    if (!saved) throw new Error("Cannot manage until the character is loaded.");
     if (!editAllowed()) throw new Error("Editing ownership required.");
     if (!isConnected()) {
       throw structuredError(
@@ -1566,12 +1603,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (attempts.some((a) => a.id === attempt.id && a.characterId === characterId)) return false;
     const fresh = await store.read(actorId, characterId).catch(() => null);
     if (fresh === null || !identityMatches() || fresh.confirmed === null) return false;
-    confirmed = fresh.confirmed;
-    lastRoll = fresh.lastRoll ?? null;
-    entries = fresh.entries;
-    generation = fresh.generation;
-    accountGeneration = fresh.accountGeneration;
-    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    adoptSaved(fresh);
     await refreshPendingOnline();
     const blockedAttempt = (error?.details as { attemptId?: string } | undefined)?.attemptId;
     if (error?.kind === "expired-attempt" && blockedAttempt === attempt.id) {
@@ -1739,8 +1771,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     coordination.invalidate?.();
-    if (!sameRollScope(confirmed, character)) lastRoll = null;
-    confirmed = character;
+    if (!sameRollScope(saved, character)) lastRoll = null;
+    saved = character;
     // Authoritative action results survive later online acknowledgments: only
     // a non-null roll replaces the retained one (online ops return null).
     if (response.result.roll !== null && response.result.roll !== undefined) {
@@ -1812,12 +1844,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     await refreshView("command");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     if (isBlocked()) throw structuredError(error!.message, error!.kind, error!.details);
-    if (entries.length > 0 || !confirmed) {
+    if (entries.length > 0 || !saved) {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
     }
     // The refresh awaited the server: the lock or the stored view may be gone.
     assertOnlineOperationAllowed();
-    let request = buildOnlineRequest(op, confirmed.reconciliation.revision);
+    let request = buildOnlineRequest(op, saved.reconciliation.revision);
     if (op.operation === "push") {
       try {
         request = await maybePrepareDice(request);
@@ -1943,22 +1975,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (fresh.accountGeneration !== accountGeneration) {
       // Another tab cleared or replaced the account mid-review: adopt the
       // cleared state and fail instead of recreating anything.
-      confirmed = fresh.confirmed;
-      lastRoll = fresh.lastRoll ?? null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      accountGeneration = fresh.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      adoptSaved(fresh);
       await refreshPendingOnline();
       emit();
       throw new Error("stale recovery: account changed during review");
     }
-    confirmed = fresh.confirmed;
-    lastRoll = fresh.lastRoll ?? null;
-    entries = fresh.entries;
-    generation = fresh.generation;
-    accountGeneration = fresh.accountGeneration;
-    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    adoptSaved(fresh);
     await refreshPendingOnline();
     // Clearing the expired pause authorizes nothing by itself: any other
     // retained attempt still blocks newer sends at the ordering boundary,
@@ -2053,12 +2075,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function initialize(): Promise<void> {
     const loaded = await store.read(actorId, characterId);
     if (!identityMatches()) return;
-    confirmed = loaded.confirmed;
-    lastRoll = loaded.lastRoll ?? null;
-    entries = loaded.entries;
-    generation = loaded.generation;
-    accountGeneration = loaded.accountGeneration;
-    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
+    adoptSaved(loaded, { sequence: "reset" });
     // Load unresolved per-character online attempts before any drain pass so
     // an uncertain outcome replays verbatim before fresh-state decisions.
     await refreshPendingOnline();
@@ -2099,12 +2116,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return reloading ??= (async () => {
       const loaded = await store.read(actorId, characterId);
       if (!identityMatches() || !coordination.isOwner()) return;
-      confirmed = loaded.confirmed;
-      liveView = null;
-      lastRoll = loaded.lastRoll ?? null;
-      entries = loaded.entries; generation = loaded.generation;
-      accountGeneration = loaded.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
+      // Gaining the lock drops the newest unsaved view: the owner shows and
+      // edits its saved copy, and its drain saves the newest server view.
+      latest = null;
+      adoptSaved(loaded, { sequence: "reset" });
       // A new owner resolves any inherited uncertain outcome first.
       await refreshPendingOnline();
       if (!identityMatches() || !coordination.isOwner()) return;
@@ -2156,11 +2171,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const reconnected = isConnected() && !wasConnected;
     wasConnected = isConnected();
     if (!identityMatches()) {
-      confirmed = null; lastRoll = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
+      saved = null; latest = null; lastRoll = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
       coordination.letGo();
     }
     if (!isConnected()) {
-      liveView = null;
+      // A live view is hidden offline. A newer view over a saved copy stays
+      // shown offline (V2, E2): it is the same authorized projection.
+      if (saved === null) latest = null;
       needsFresh = true;
     }
     if (isConnected() && (error?.kind === "reauthenticate" || error?.kind === "network-unavailable")) {
@@ -2175,7 +2192,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // Neither a blocked session nor a tab without the editing lock drains,
     // so both refresh through the read path.
     if (initialized && identityMatches() && isConnected() &&
-        (reconnected || (liveShown && confirmed === null && liveView === null))) {
+        (reconnected || (liveShown && saved === null && latest === null))) {
       void refreshView("reconnect");
     }
     emit();
@@ -2204,15 +2221,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (!identityMatches()) return;
         if (loaded.accountGeneration === accountGeneration &&
             (loaded.generation < generation || (editing.owned && loaded.generation === generation))) return;
-        confirmed = loaded.confirmed;
-        liveView = null;
-        lastRoll = loaded.lastRoll ?? null;
-        entries = loaded.entries;
-        generation = loaded.generation;
-        accountGeneration = loaded.accountGeneration;
+        // V2: a newer fetched view stays shown over an older saved copy (an
+        // enqueue in the owner tab broadcasts without a new generation).
+        if (loaded.confirmed === null) latest = null;
+        adoptSaved(loaded, { sequence: "keep" });
         await refreshPendingOnline();
         if (!identityMatches()) return;
-        if (confirmed === null) setBlocked("purged", "This character is no longer available.");
+        if (saved === null) setBlocked("purged", "This character is no longer available.");
         emit();
       }).catch(() => {
         if (!identityMatches()) return;
@@ -2236,11 +2251,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         // read is in flight. Clearing a roll must never restore its old sheet.
         if (fresh.accountGeneration < accountGeneration ||
             (fresh.accountGeneration === accountGeneration && fresh.generation < generation)) return;
-        confirmed = fresh.confirmed;
-        lastRoll = fresh.lastRoll ?? null;
-        entries = fresh.entries;
-        generation = fresh.generation;
-        accountGeneration = fresh.accountGeneration;
+        adoptSaved(fresh, { sequence: "keep" });
         coordination.invalidate?.();
       } catch {
         if (identityMatches()) setBlocked("storage-error", "Could not clear the saved roll. Reconnect before reopening it.");
@@ -2259,22 +2270,22 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async setField(fieldId: string, value: unknown): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "setField", fieldId, value }));
     },
     async bumpResource(resourceId: string, direction: "up" | "down"): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "bumpResource", resourceId, direction }));
     },
     async adjustResource(resourceId: string, delta: number): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "adjustResource", resourceId, delta }));
     },
     async setResource(resourceId: string, values: { current?: number; max?: number }): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({
         kind: "setResource",
         resourceId,
@@ -2284,7 +2295,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async executeAction(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void> {
       assertMutationAllowed();
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
         throw structuredError(
           "Actions require connectivity and cannot be initiated offline.",
@@ -2302,7 +2313,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void> {
       assertMutationAllowed();
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
         throw structuredError(
           "Actions require connectivity and cannot be initiated offline.",
@@ -2321,7 +2332,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({
         kind: "addEntry",
         entry: {
@@ -2338,12 +2349,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async removeEntry(entryId: string): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "removeEntry", entryId }));
     },
     async updateEntryValues(entryId: string, values: Record<string, unknown>, quantity?: number): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "updateEntryValues", entryId, values,
         ...(quantity === undefined ? {} : { quantity }) }));
     },

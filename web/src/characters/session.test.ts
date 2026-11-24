@@ -3254,3 +3254,170 @@ describe("CharacterSession storage state (V1)", () => {
     } finally { h.session.dispose(); await h.store.close(); }
   });
 });
+
+describe("CharacterSession saved copy and newest view (V2)", () => {
+  const purgeError = () => new ApiError({ status: 404, code: "not_found", message: "Not found",
+    cacheDisposition: "purge", requestId: "r", latestRevision: null, diagnostics: [] });
+
+  /** A tab without the lock: the store holds revision 2, its refresh fetched revision 3. */
+  async function openNewer(h: Harness, newer = viewFor("char-1", 3, { name: "Newer" })) {
+    h.coordination.requestEditing = async () => false;
+    await seedConfirmed(h.store, "char-1", viewFor("char-1", 2, { name: "Saved" }));
+    h.api.setOpenFallback(async () => ({ character: newer, requestId: "r" }));
+    await h.session.open();
+    await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(3));
+    const snap = h.session.getSnapshot();
+    expect(snap.view?.source).toBe("stored");
+    expect(snap.editing.owned).toBe(false);
+    expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(2);
+  }
+
+  /** What the owner tab does for an edit: enqueue (the generation stays) and broadcast. */
+  async function ownerEnqueues(h: Harness, id = "owner-edit") {
+    const stored = await h.store.read(ARM, "char-1");
+    await h.store.enqueue(makeEntry({ id, actorId: ARM, characterId: "char-1", sequence: 10, baseRevision: 2 }), stored);
+    h.coordination.signalInvalidation("char-1");
+    await vi.waitFor(() => expect(h.session.getSnapshot().entries.map((e) => e.id)).toContain(id));
+  }
+
+  function expectNewer(h: Harness) {
+    const snap = h.session.getSnapshot();
+    expect(snap.view?.character.revision).toBe(3);
+    expect(snap.view?.character.name).toBe("Newer");
+    expect(snap.view?.source).toBe("stored");
+    expect(canEdit(snap)).toBe(false);
+  }
+
+  it("keeps the newer view when the owner tab enqueues an edit and broadcasts invalidate", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      await ownerEnqueues(h);
+      expectNewer(h);
+      // The saved copy and its queue are adopted; nothing is written or sent.
+      expect(h.session.getSnapshot().entries.map((e) => e.baseRevision)).toEqual([2]);
+      expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(2);
+      await expect(h.session.setField("name", "Briar")).rejects.toThrow();
+      expect(h.api.sent).toEqual([]);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("keeps the newer view when clearing a roll rereads the store", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      await h.session.forgetRoll(PUSH_ROOT_ID);
+      expectNewer(h);
+      expect(h.session.getSnapshot().error).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("does not bring back a saved roll from another scope with the saved copy", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      h.coordination.requestEditing = async () => false;
+      const saved = viewFor("char-1", 2, { name: "Saved", campaignId: "campaign-a" });
+      await seedConfirmed(h.store, "char-1", saved);
+      const roll = makePushRoll();
+      await h.store.acknowledge(ARM, "char-1", "none", saved, (await h.store.read(ARM, "char-1")).generation, roll);
+      h.api.setOpenFallback(async () => ({ character: saved, requestId: "r" }));
+      await h.session.open();
+      expect(h.session.getSnapshot().lastRoll).toEqual(roll);
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 3, { name: "Newer", campaignId: null, placementGeneration: 2 }), requestId: "r" }));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(3));
+      expect(h.session.getSnapshot().lastRoll).toBeNull();
+      await ownerEnqueues(h);
+      expectNewer(h);
+      expect(h.session.getSnapshot().lastRoll).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("keeps showing the newer view offline, also after the owner queues an offline edit (E2)", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      h.identity.online = false;
+      h.identity.signal();
+      expectNewer(h);
+      await ownerEnqueues(h);
+      expectNewer(h);
+      expect(h.session.getSnapshot().connected).toBe(false);
+      h.identity.online = true;
+      h.identity.signal();
+      await h.session.whenIdle();
+      expectNewer(h);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("shows the saved copy when the refresh has the same revision", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      h.coordination.requestEditing = async () => false;
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 2, { name: "Saved" }));
+      const same = viewFor("char-1", 2, { name: "Same revision" });
+      same.projection = { ...same.projection, entityLabel: "Changed label" };
+      h.api.setOpenFallback(async () => ({ character: same, requestId: "r" }));
+      await h.session.open();
+      document.dispatchEvent(new Event("visibilitychange"));
+      await h.session.whenIdle();
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(h.session.getSnapshot().view?.character.name).toBe("Saved");
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("clears the newer view when another tab purges the saved copy", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      await h.store.purgeCharacter(ARM, "char-1");
+      h.coordination.signalInvalidation("char-1");
+      await vi.waitFor(() => expect(h.session.getSnapshot().phase).toBe("purged"));
+      expect(h.session.getSnapshot().view).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("clears the newer view when a refresh purges access", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      h.api.setOpenFallback(async () => { throw purgeError(); });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().phase).toBe("purged"));
+      expect(h.session.getSnapshot().view).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("clears the newer view on sign-out", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      h.identity.actorId = null;
+      h.identity.signal();
+      expect(h.session.getSnapshot().view).toBeNull();
+      // Signed in again: nothing from before is shown while the fetch is pending.
+      h.api.setOpenFallback(() => new Promise(() => {}));
+      h.identity.actorId = ARM;
+      h.identity.signal();
+      expect(h.session.getSnapshot().view).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("drops the newer view on gaining the lock and the owner's refresh saves it", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      h.coordination.requestEditing = async () => { h.coordination.owner = true; return true; };
+      expect(await h.session.requestEditing()).toBe(true);
+      await h.session.whenIdle();
+      await vi.waitFor(async () => expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(3));
+      const snap = h.session.getSnapshot();
+      expect(snap.view?.character.revision).toBe(3);
+      expect(canEdit(snap)).toBe(true);
+      h.api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
+      await h.session.setField("name", "Briar");
+      await h.session.whenIdle();
+      expect(h.api.sent[0]?.body.expectedRevision).toBe(3);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+});

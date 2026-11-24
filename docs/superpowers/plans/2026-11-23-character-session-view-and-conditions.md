@@ -1,8 +1,9 @@
 # Character session: newest view, separate conditions and translated errors
 
-Status: **proposed 2026-11-23, not approved.** Follow-up to the
+Status: **proposed 2026-11-23; owner decisions E1–E4 recorded 2026-11-24.
+Implementation not yet approved.** Follow-up to the
 [read-path plan](2026-11-22-character-session-read-path.md). It closes that plan's two
-open gaps and the causes behind them. Decisions E1–E4 below are for the owner.
+open gaps and the causes behind them.
 
 ## The two gaps and what causes them
 
@@ -83,7 +84,7 @@ type CharacterSnapshot = {
   copy that becomes `null` clears `latest` as well. Gaining the lock clears `latest`, and the
   owner's drain persists the newest view as now.
 - **`view.source`** is `stored` when a saved copy exists (offline use possible) and `live`
-  when none does. With E2's default, the character shown can be newer than the saved copy.
+  when none does. With E2, the character shown can be newer than the saved copy.
 - **Storage is its own state.** A failed store read or write sets `storageFailed`. Only a
   successful store read under the lock, followed by a successful save, clears it (today's
   "Try saving again" path). No other kind of error replaces or clears it. D3 (release the
@@ -100,14 +101,16 @@ type CharacterSnapshot = {
 Unchanged: the queue, attempts, idempotency, generations as write guards, purge rules, D1–D4,
 the server API and `/api/v1`.
 
-## Decisions for the owner
+## Owner decisions (2026-11-24)
 
-| # | Question | Proposed answer |
+The owner chose the proposed answer for all four.
+
+| # | Question | Decision |
 | --- | --- | --- |
-| E1 | Do the gap 2 fix together with the separate storage state (the example bug above), or only hide the duplicate alert? | Together. Hiding the alert alone leaves the wrong status after a reconnect. |
-| E2 | Offline, a tab without the lock that has a newer unsaved view: show that newer view, or fall back to the older saved copy? | Show the newer one. It is the same authorized projection, and it is cleared on purge and sign-out like a `live` view. |
-| E3 | Replace all 11 adoption sites with `adoptSaved`, or fix only the invalidate handler? | All 11. Fixing one site leaves the same bug in the other ten. |
-| E4 | Move every session error text to i18n keys now? This includes texts only seen in the review panel. | Yes, for all `BlockingErrorKind`s, because both surfaces render them. |
+| E1 | Do the gap 2 fix together with the separate storage state (the example bug above), or only hide the duplicate alert? | Together ("yes"). Hiding the alert alone leaves the wrong status after a reconnect. |
+| E2 | Offline, a tab without the lock that has a newer unsaved view: show that newer view, or fall back to the older saved copy? | Show the newer one ("keep"). It is the same authorized projection, and it is cleared on purge and sign-out like a `live` view. |
+| E3 | Replace all 11 adoption sites with `adoptSaved`, or fix only the invalidate handler? | All 11 ("all"). Fixing one site leaves the same bug in the other ten. |
+| E4 | Move every session error text to i18n keys now? This includes texts only seen in the review panel. | Yes, for all `BlockingErrorKind`s ("yes"), because both surfaces render them. |
 
 ## Stages
 

@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 
 // Direct runs delete cloned systems; the canonical runner discards its whole
 // ephemeral database instead. page.request shares the sign-in cookie.

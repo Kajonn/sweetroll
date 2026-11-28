@@ -1,3 +1,7 @@
+import type { ApiClient } from "../api/client.js";
+import { DiceOverlay } from "../physicalDice/DiceOverlay.js";
+import { campaignPlayFeedKey, useCampaignPlayFeed } from "../playEvents/CampaignPlayFeed.js";
+import { commandEvent, PlayEventOverlay, usePlayEvents, type PublishCommand } from "../playEvents/PlayEvents.js";
 import { SystemPresentationScope } from "../theme/SystemPresentation.js";
 import {CampaignProposals} from "./CampaignProposals.js";
 import {CampaignTemplates} from "./CampaignTemplates.js";
@@ -97,6 +101,7 @@ export function CampaignDetail(props: {
   actorId: string;
   onLeft: () => void;
   navigation?: { onOpenCharacter: (characterId: string) => void };
+  physicalDiceClient?: ApiClient | undefined;
   metadataApi?: CampaignCharacterMetadataApi;
   charactersApi?: SessionBoardProps["charactersApi"];
   createSession?: SessionBoardProps["createSession"];
@@ -111,6 +116,15 @@ export function CampaignDetail(props: {
   const [leavePhase, setLeavePhase] = useState<LeavePhase>("idle");
   const [leaveError, setLeaveError] = useState<string | null>(null);
   const [accessChanged, setAccessChanged] = useState(false);
+  const [left, setLeft] = useState(false);
+  const activeCampaignId = detail.isSuccess && !accessChanged && !left ? props.campaignId : null;
+  const events = usePlayEvents(activeCampaignId);
+  const { publish, clear, target } = events;
+  const publishRoll = useCallback<PublishCommand>((response, startedAt, label) => {
+    if (activeCampaignId === null || response.result.character.campaignId !== activeCampaignId) return;
+    const popup = commandEvent(response, startedAt, label);
+    if (popup) publish([popup]);
+  }, [activeCampaignId, publish]);
 
   // Hoisted roster read: same params as the former inline section call, so
   // the query key matches and the request stays deduped. Enabled only once
@@ -119,7 +133,7 @@ export function CampaignDetail(props: {
   const generation = props.generation ?? 0;
   const online = props.online ?? true;
   const roster = useCampaignMembers(props.api, props.campaignId, props.actorId, generation, {
-    enabled: detail.status === "success",
+    enabled: detail.status === "success" && !accessChanged && !left,
     online,
   });
   const members = roster.data?.pages.flatMap((page) => page.members) ?? [];
@@ -132,6 +146,8 @@ export function CampaignDetail(props: {
   // invalidated (not purged) so it reloads without the revoked campaign. The
   // sign-out path already purges via AppShell and is untouched here.
   const handleAccessRevoked = useCallback((): void => {
+    clear();
+    queryClient.removeQueries({ queryKey: campaignPlayFeedKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
     queryClient.removeQueries({ queryKey: campaignCharactersPrefix(props.campaignId) });
     queryClient.removeQueries({ queryKey: ["campaigns", "creation-options", props.campaignId] });
@@ -149,7 +165,11 @@ export function CampaignDetail(props: {
     queryClient.removeQueries({ queryKey: ["campaigns", "invitations", props.campaignId] });
     void queryClient.invalidateQueries({ queryKey: ["campaigns", "list"] });
     setAccessChanged(true);
-  }, [queryClient, props.campaignId]);
+  }, [clear, queryClient, props.campaignId]);
+  const activity = useCampaignPlayFeed({
+    api: props.api, campaignId: activeCampaignId, actorId: props.actorId, generation, online, events,
+    onAccessRevoked: handleAccessRevoked,
+  });
 
   useEffect(() => {
     if (detail.status === "error" && isNotFound(detail.error) && !accessChanged) {
@@ -168,6 +188,9 @@ export function CampaignDetail(props: {
         expectedCampaignRevision: campaign.revision,
         idempotencyKey,
       });
+      setLeft(true);
+      clear();
+      queryClient.removeQueries({ queryKey: campaignPlayFeedKey(props.campaignId) });
       queryClient.removeQueries({ queryKey: campaignDetailKey(props.campaignId) });
       queryClient.removeQueries({ queryKey: campaignCharactersPrefix(props.campaignId) });
       queryClient.removeQueries({ queryKey: ["campaigns", "creation-options", props.campaignId] });
@@ -210,6 +233,8 @@ export function CampaignDetail(props: {
       </section>
     );
   }
+
+  if (left) return null;
 
   if (accessChanged) {
     return (
@@ -263,6 +288,10 @@ export function CampaignDetail(props: {
     });
   return (
     <SystemPresentationScope as="section" aria-label={campaign.title} presentation={campaign.presentation}>
+      {props.physicalDiceClient && online && activeCampaignId ? (
+        <DiceOverlay key={activeCampaignId} client={props.physicalDiceClient} actor={props.actorId} campaignId={activeCampaignId} />
+      ) : null}
+      <PlayEventOverlay events={events} presentation={campaign.presentation} />
       <PageHeader
         title={campaign.title}
         actions={<>
@@ -350,6 +379,7 @@ export function CampaignDetail(props: {
                 actorId={props.actorId}
                 api={props.api}
                 campaignId={props.campaignId}
+                sharedActivity={target ? activity : undefined}
                 onAccessRevoked={handleAccessRevoked}
               />
             ),
@@ -364,6 +394,8 @@ export function CampaignDetail(props: {
                       campaignsApi={props.api}
                       charactersApi={props.charactersApi}
                       createSession={props.createSession}
+                      publishRoll={target ? publishRoll : undefined}
+                      sharedActivity={target ? activity : undefined}
                       campaignId={props.campaignId}
                       actorId={props.actorId}
                       generation={generation}

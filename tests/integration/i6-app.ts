@@ -5,11 +5,15 @@ import type { FastifyInstance } from "fastify";
 import type { Pool } from "pg";
 
 import { createCampaignsModule, type Campaigns } from "../../src/campaigns/index.js";
+import type { DisplayObserver } from "../../src/campaigns/display.js";
+import type { SceneEventHub } from "../../src/campaigns/scene-events.js";
 import {
   createCampaignPlacement,
   type CampaignPlacement,
 } from "../../src/characters/campaignPlacement.js";
 import { buildCampaignsRoutes } from "../../src/transport/http/campaigns.js";
+import { buildPersonalTokenRoutes } from "../../src/transport/http/personal-tokens.js";
+import { buildPublicApi, publicApiPrefix } from "../../src/transport/http/public-api/index.js";
 import type { Characters } from "../../src/characters/index.js";
 import { DEFAULT_CAMPAIGN_LIMITS, type CampaignLimits } from "../../src/platform/config.js";
 import type { RequestContext } from "../../src/systems/authoring.js";
@@ -32,6 +36,9 @@ export type TestActor = { actorId: string; cookie: string };
 
 export type I6Harness = {
   app: FastifyInstance;
+  /** Schema-scoped connection string (search_path set) for extra processes. */
+  databaseUrl: string;
+  schema: string;
   pool: Pool;
   campaigns: Campaigns;
   characters: Characters;
@@ -112,12 +119,19 @@ function cookieFromSignIn(response: {
 }
 
 export async function buildI6Harness(input?: {
+  physicalDiceEnabled?: boolean;
   scanImage?: import("../../src/platform/image-processing.js").ImageScanner;
   /** Wraps the runtime (e.g. to stall resolution for race tests). */
   wrapRuntime?: (runtime: SystemRuntime) => SystemRuntime;
   document?:SystemDocumentV1;
   /** Overrides the shared campaign limits (e.g. tiny maxAttachedCharacters). */
   limits?: CampaignLimits;
+  /** Scene streaming: per-process change hub (null disables streams). */
+  sceneEvents?: SceneEventHub | null;
+  displayObserver?: DisplayObserver;
+  displayStream?: { heartbeatMs?: number; stallTimeoutMs?: number };
+  /** Registers public API v1 and cookie token issuance at /me/personal-tokens. */
+  publicApi?: boolean;
 }): Promise<I6Harness> {
   const databaseUrl = process.env.TEST_DATABASE_URL;
   if (databaseUrl === undefined || databaseUrl.length === 0) {
@@ -136,10 +150,12 @@ export async function buildI6Harness(input?: {
   let placement!: CampaignPlacement;
   let campaigns!: Campaigns;
   const handle = await buildI3App({
+    physicalDiceEnabled: input?.physicalDiceEnabled ?? false,
     ...(input?.scanImage ? { scanImage: input.scanImage } : {}),
     pool,
     wrapRuntime: input?.wrapRuntime,
-    extraRoutes: ({ authoring, characters, runtime, identity }) => {
+    allowPersonalTokens: input?.publicApi ?? false,
+    extraRoutes: ({ authoring, extensions, characters, runtime, identity }) => {
       const limits = input?.limits ?? DEFAULT_CAMPAIGN_LIMITS;
       placement = createCampaignPlacement({
         pool,
@@ -147,13 +163,30 @@ export async function buildI6Harness(input?: {
         maxAttachedCharacters: limits.maxAttachedCharacters,
       });
       campaigns = createCampaignsModule({
+        sceneEvents: input?.sceneEvents ?? null,
+        displayObserver: input?.displayObserver,
+        displayStream: input?.displayStream,
         scanImage: input?.scanImage ?? (async () => "clean" as const),
         pool,
         limits,
         charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
+    authorizeExtensionUse: extensions.authorizeExtensionUse,
+    listUpgradeTargets: authoring.listUpgradeTargets,
+    describeVersionChoices: authoring.describeVersionChoices,
+    listExtensionUpgradeTargets: extensions.listUpgradeTargets,
+    describeCompositionChoices: extensions.describeCompositionChoices,
       });
-      return buildCampaignsRoutes({ campaigns, characters, runtime, identity });
+      const browser = buildCampaignsRoutes({ campaigns, characters, runtime, identity });
+      if (!input?.publicApi) return browser;
+      return [
+        browser,
+        buildPersonalTokenRoutes({ identity }),
+        (app, _opts, done) => {
+          void app.register(buildPublicApi({ identity, authoring, characters, runtime, campaigns, pool, extensions }), { prefix: publicApiPrefix });
+          done();
+        },
+      ];
     },
   });
 
@@ -190,6 +223,8 @@ export async function buildI6Harness(input?: {
 
   return {
     app: handle.app,
+    databaseUrl,
+    schema,
     pool,
     campaigns,
     characters: handle.characters,

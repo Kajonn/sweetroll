@@ -33,7 +33,7 @@ const fakeIdentity: Identity = {
   signOut: async () => ({ ok: true, value: undefined }),
 } as unknown as Identity;
 
-const cookie = { cookie: "session=t" };
+const cookie = { cookie: "session=t", "sec-fetch-site": "same-origin" };
 
 const apps: ReturnType<typeof Fastify>[] = [];
 
@@ -88,13 +88,14 @@ function characterView(overrides: Partial<CharacterView> = {}): CharacterView {
     returnOwnerId: null,
     name: "Aria",
     systemVersionId,
+    extensions: [],
     entityDefinitionId: "character",
     revision: 1,
     lifecycle: "active",
     archivedAt: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
-    state: { schemaVersion: "1.0", values: { ability: 10 } },
+    state: { schemaVersion: "1.0", entries: {}, values: { ability: 10 } },
     derivedValues: { defense: 0 },
     validations: [],
     projection: makeProjection(systemVersionId),
@@ -132,12 +133,15 @@ function characterExport(): CharacterExportV1 {
     systemVersionId: randomUUID(),
     packageChecksum: d20Package.integrity.checksum,
     revision: 1,
-    state: { schemaVersion: "1.0", values: { ability: 10 } },
+    state: { schemaVersion: "1.0", entries: {}, values: { ability: 10 } },
   };
 }
 
 function makeCharacters(overrides: Partial<Characters> = {}): Characters {
   const base: Characters = {
+    listDecks: async () => ({ ok: true, value: [] }),
+    readReferenceData: async () => ({ ok: true, value: { datasets: [] } }),
+    listApplicableRolls: async () => ({ ok: true, value: [] }),
     openEntryImage: async () => ({ ok: true, value: { revision: 0, image: null } }),
     setEntryImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
     removeEntryImage: async () => ({ ok: true, value: { revision: 1, image: null } }),
@@ -146,6 +150,7 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
     setPortrait: async () => ({ ok: true, value: { revision: 1, portrait: null } }),
     removePortrait: async () => ({ ok: true, value: { revision: 1, portrait: null } }),
     openPortraitImage: async () => ({ ok: false, error: { code: "not_found", message: "Unavailable" } }),
+    rollOptions: async () => ({ ok: true, value: { targets: [], rolls: [] } }),
     readRoll:async()=>({ok:false,error:{code:"not_found",message:"Unavailable"}}),
     pushOptions:async()=>({ok:true,value:{canPush:false,reason:"no_eligible_dice",eligibleDiceIds:[],revision:1,nextAttempt:1,maxAttempts:1}}),
     create: async () => ({ ok: true, value: characterView() }),
@@ -166,6 +171,8 @@ function makeCharacters(overrides: Partial<Characters> = {}): Characters {
     duplicate: async () => ({ ok: true, value: characterView() }),
     listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null } }),
     exportCharacter: async () => ({ ok: true, value: characterExport() }),
+    listVersionOptions: async () => ({ ok: false, error: { code: "not_found", message: "not found" } }),
+    checkVersionChange: async () => ({ ok: false, error: { code: "not_found", message: "not found" } }),
   };
   return { ...base, ...overrides };
 }
@@ -180,7 +187,6 @@ async function build(characters: Characters, anonymous = false): Promise<ReturnT
         : fakeIdentity,
       cookieName: "session",
       secure: true,
-      maxAgeSeconds: 3600,
     }),
   );
   await app.register(buildCharactersRoutes({ characters }));
@@ -562,7 +568,9 @@ describe("character HTTP routes", () => {
         apply: async (_ctx, input) => {
           received = input;
           return { ok: true, value: commandResult({
-            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience: "owner_only",
+            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12",
+            breakdown: { version: "1.0", rootId: "root", groups: [], terms: [{ id: "root", operation: "literal", operandIds: [], value: 12 }] },
+            audience: "owner_only",
           } as CharacterCommandResult["roll"]) };
         },
       }),
@@ -606,7 +614,9 @@ describe("character HTTP routes", () => {
         apply: async (_ctx, input) => {
           received = input;
           return { ok: true, value: commandResult({
-            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience: "campaign",
+            actionId: "check", expression: "d20", dice: [], bindings: [], total: 12, output: "12",
+            breakdown: { version: "1.0", rootId: "root", groups: [], terms: [{ id: "root", operation: "literal", operandIds: [], value: 12 }] },
+            audience: "campaign",
           } as CharacterCommandResult["roll"]) };
         },
       }),

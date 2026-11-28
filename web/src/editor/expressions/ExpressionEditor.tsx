@@ -1,16 +1,17 @@
 import { DebugOnly } from "../../ui/debugMode.js";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 
 import { useAssessDraft } from "../../api/assessDraft.js";
 import { ApiError, type ApiClient } from "../../api/client.js";
 import { t } from "../../i18n/index.js";
 import {
-  tokenizeExpression,
+  parseExpression,
   type ExpressionDiagnostic,
 } from "../../ports/expressions.js";
 import { registerShortcut } from "../../shell/ShortcutHelp.js";
 import { useShortcut } from "../../shell/useShortcut.js";
 import { Button, FormField } from "../../ui/index.js";
+import { ExpressionSuggestions } from "./ExpressionSuggestions.js";
 import styles from "./ExpressionEditor.module.css";
 
 export type ExpressionEditorProps = {
@@ -19,6 +20,8 @@ export type ExpressionEditorProps = {
   source: string;
   onSourceChange: (next: string) => void;
   expressionId?: string;
+  roll?: boolean;
+  references?: readonly string[];
   disabled?: boolean;
 };
 
@@ -39,12 +42,16 @@ export function ExpressionEditor({
   source,
   onSourceChange,
   expressionId,
+  roll,
+  references = [],
   disabled,
 }: ExpressionEditorProps) {
   const assess = useAssessDraft(client);
+  const sourceRef = useRef<HTMLTextAreaElement>(null);
 
   const liveDiagnostics: ReadonlyArray<ExpressionDiagnostic> = useMemo(() => {
-    const result = tokenizeExpression(source);
+    if (source.trim() === "") return [];
+    const result = parseExpression(source);
     return result.ok ? [] : result.diagnostics;
   }, [source]);
 
@@ -82,6 +89,7 @@ export function ExpressionEditor({
         <div className={hasError ? styles.sourceError : undefined}>
           <FormField label={t("editor.expression.title")}>
             <textarea
+              ref={sourceRef}
               value={source}
               onChange={(e) => onSourceChange(e.target.value)}
               spellCheck={false}
@@ -94,6 +102,21 @@ export function ExpressionEditor({
             />
           </FormField>
         </div>
+        <ExpressionSuggestions
+          references={references}
+          roll={roll ?? false}
+          disabled={disabled}
+          onInsert={(token) => {
+            const input = sourceRef.current;
+            const start = input?.selectionStart ?? source.length;
+            const end = input?.selectionEnd ?? start;
+            onSourceChange(source.slice(0, start) + token + source.slice(end));
+            requestAnimationFrame(() => {
+              input?.focus();
+              input?.setSelectionRange(start + token.length, start + token.length);
+            });
+          }}
+        />
         <div className={styles.actions}>
           <Button
             variant="secondary"

@@ -1,9 +1,10 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures/browserTest";
 import {
   namedDicePoolDocument,
   namedPoolSource,
 } from "../../../src/systems/implementation/package/fixtures/named-dice-pool.js";
 import { uid } from "../offline/test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 test("named groups survive guided authoring, publishing, both action sources and history reload", async ({
   page,
@@ -26,7 +27,6 @@ test("named groups survive guided authoring, publishing, both action sources and
   const systemId = workspace.system.systemId;
   try {
     const doc = namedDicePoolDocument();
-    doc.schemaVersion = "1.0";
     doc.expressions.find((e) => e.id === "pool_roll_expr")!.source =
       "countSuccesses(dice(fields.attribute + fields.skill + inputs.bonus_dice, 6), 6)";
     const saved = await page.request.put(`/api/systems/${systemId}/draft`, {
@@ -83,7 +83,7 @@ test("named groups survive guided authoring, publishing, both action sources and
         return false;
       const d = r.request().postDataJSON()?.document;
       return (
-        d?.schemaVersion === "1.1" &&
+        d?.schemaVersion === "2.0" &&
         d.expressions.some((e: { source: string }) =>
           e.source.endsWith('group("group_3", "Gear", dice(fields.gear, 4))'),
         )
@@ -176,7 +176,7 @@ test("named groups survive guided authoring, publishing, both action sources and
     await page.getByTestId("slot-add-confirm-gear_slot").click();
     await page.getByRole("button", { name: "Gear Pool", exact: true }).click();
     await expect(page.getByTestId("roll-group-attribute")).toBeVisible();
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await expectSheetSaved(page);
     for (const width of [320, 360, 768, 1280])
       for (const colorScheme of ["light", "dark"] as const) {
         await page.setViewportSize({ width, height: 900 });

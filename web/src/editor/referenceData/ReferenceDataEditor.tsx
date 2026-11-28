@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { t } from "../../i18n/index.js";
 import { Button, FormField } from "../../ui/index.js";
 import styles from "../actions/RollActionEditor.module.css";
@@ -16,6 +17,8 @@ export type ReferenceDataV1 = {
   id: DefinitionId;
   label: string;
   records: ReferenceRecordV1[];
+  keyColumn?: string;
+  columns?: Record<string, "number" | "text" | "boolean">;
 };
 
 export type ReferenceDataEditorProps = {
@@ -69,6 +72,7 @@ export function ReferenceDataEditor({
   onChange,
   disabled,
 }: ReferenceDataEditorProps) {
+  const [columnError, setColumnError] = useState(false);
   const setLabel = (label: string) => {
     onChange({ ...referenceData, label });
   };
@@ -120,6 +124,35 @@ export function ReferenceDataEditor({
           </FormField>
         </div>
       </div>
+      <details>
+        <summary>{t("editor.referenceData.typedTable")}</summary>
+        <FormField label={t("editor.referenceData.keyColumn")}>
+          <input type="text" defaultValue={referenceData.keyColumn ?? ""} disabled={disabled} onBlur={event => {
+            const { keyColumn: _previous, ...next } = referenceData;
+            const keyColumn = event.target.value.trim();
+            onChange(keyColumn === "" ? next : { ...next, keyColumn });
+          }} />
+        </FormField>
+        <FormField label={t("editor.referenceData.columns")}>
+          <textarea defaultValue={JSON.stringify(referenceData.columns ?? {}, null, 2)} disabled={disabled} rows={4} onBlur={event => {
+            try {
+              const parsed: unknown = JSON.parse(event.target.value);
+              if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed) || Object.entries(parsed).some(([id, type]) =>
+                !/^[a-z][a-z0-9_]{0,63}$/.test(id) || (type !== "number" && type !== "text" && type !== "boolean"))) {
+                setColumnError(true);
+                return;
+              }
+              const { columns: _previous, ...next } = referenceData;
+              const columns = parsed as NonNullable<ReferenceDataV1["columns"]>;
+              setColumnError(false);
+              onChange(Object.keys(columns).length === 0 ? next : { ...next, columns });
+            } catch {
+              setColumnError(true);
+            }
+          }} />
+        </FormField>
+        {columnError ? <p role="alert">{t("editor.referenceData.invalidColumns")}</p> : null}
+      </details>
       <div className={styles.row} data-testid={`reference-data-records-${referenceData.id}`}>
         <div className={styles.field}>
           {t("editor.referenceData.records")}

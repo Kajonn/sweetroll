@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Browser, type Page } from "../fixtures/browserTest";
 import { uid } from "../offline/test-auth.js";
 import { JOURNEY_CODES, JOURNEY_ACTION_LABELS, publishJourneySystem } from "./tableJourneySystem.js";
 
@@ -258,8 +258,8 @@ test("table journey 4/4: join and session", async ({ page, browser }) => {
   await page.getByRole("button", { name: boardRoll }).click({ timeout: STEP_TIMEOUT });
   expect((await rollRequest).postDataJSON()).toMatchObject({ audience: "campaign" });
   const rollBody = await (await rollResponse).json() as { result: { roll: { total: number } } };
-  await expect(page.getByRole("button", { name: boardRoll }).locator("..").getByRole("status"))
-    .toHaveText(String(rollBody.result.roll.total), { timeout: STEP_TIMEOUT });
+  await expect(page.getByRole("button", { name: boardRoll }).locator("..").getByText(String(rollBody.result.roll.total), { exact: true }))
+    .toBeVisible({ timeout: STEP_TIMEOUT });
   await expect(page.getByText("The roll may have applied.")).toHaveCount(0);
   // Session, part 3: each player sees the activity — seeding events plus the
   // GM's campaign-audience roll (Activity-tab assertions per

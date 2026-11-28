@@ -1,3 +1,6 @@
+import { hasRollSelection, RollContextFields, type RollRequirements } from "../rolls/RollContextFields.js";
+import type { CharactersApi } from "./api.js";
+import type { CampaignRollSelection } from "./types.js";
 import {TypedEntryFields} from "./TypedEntryFields.js";
 import { useEffect, useState, type ReactNode } from "react";
 
@@ -7,6 +10,7 @@ import { Dialog } from "../ui/Dialog.js";
 import { EmptyState } from "../ui/EmptyState.js";
 import { Panel } from "../ui/Panel.js";
 import { Select } from "../ui/Select.js";
+import { describeCommandFailure } from "./sessionErrors.js";
 import styles from "./characters.module.css";
 
 export type SlotGrantedActionInput = {
@@ -17,7 +21,7 @@ export type SlotGrantedActionInput = {
   default: unknown;
 };
 
-export type SlotGrantedAction = {
+export type SlotGrantedAction = RollRequirements & {
   id: string;
   label: string;
   actionKind: "roll" | "resourceBump";
@@ -26,6 +30,9 @@ export type SlotGrantedAction = {
 
 export type SlotTemplate = {
   source?: import("./types.js").EntrySource;
+  /** Design 6.8: templates from an extension; base templates have none. */
+  extensionId?: string;
+  extensionName?: string;
   defaultQuantity?: number;
   id: string;
   label: string;
@@ -49,13 +56,15 @@ export type SlotTemplateField = {
 };
 
 export type SlotListEntry = {
-  definition?: {id:string;label:string;kind:string;fields:SlotTemplateField[];grantedActions:Array<{id:string;label:string;kind:"roll"|"resourceBump";inputs?:SlotGrantedActionInput[]}>};
+  definition?: {id:string;label:string;kind:string;fields:SlotTemplateField[];grantedActions:Array<RollRequirements & {id:string;label:string;kind:"roll"|"resourceBump";inputs?:SlotGrantedActionInput[]}>};
   metadata?: {name:string;description?:string;notes?:string};
   source?: import("./types.js").EntrySource;
   entryId: string;
   templateId: string | null;
   label: string;
   values: Record<string, unknown>;
+  /** Read-only computed template fields of the entry. */
+  derived?: Array<{ id: string; label: string; value: string | number | boolean }>;
   quantity?: number;
 };
 
@@ -76,13 +85,12 @@ export type SlotListControlProps = {
   onAddEntry(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
   onRemoveEntry(entryId: string): void | Promise<void>;
   onUpdateEntry(entryId: string, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
-  onExecuteGranted(entryId: string, actionId: string, inputs: Record<string, unknown>): void | Promise<void>;
+  characterId?: string | undefined;
+  loadRollOptions?: CharactersApi["rollOptions"];
+  onExecuteGranted(entryId: string, actionId: string, inputs: Record<string, unknown>, selection?: CampaignRollSelection): void | Promise<void>;
 };
 
-function describeCommandError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  return t("character.command.failed", { message });
-}
+const describeCommandError = describeCommandFailure;
 
 function scalarSummary(values: Record<string, unknown>, label: string): string | null {
   const parts: string[] = [];
@@ -110,23 +118,29 @@ function invokeCommand(invoke: () => void | Promise<void>, onError: (message: st
   }
 }
 
-function GrantedActionForm({ entryId, action, disabled, onExecute }: {
+function GrantedActionForm({ entryId, action, disabled, onExecute, characterId, loadRollOptions }: {
   entryId: string;
   action: SlotGrantedAction;
   disabled: boolean;
-  onExecute(entryId: string, actionId: string, inputs: Record<string, unknown>): void | Promise<void>;
+  characterId?: string | undefined;
+  loadRollOptions?: CharactersApi["rollOptions"];
+  onExecute(entryId: string, actionId: string, inputs: Record<string, unknown>, selection?: CampaignRollSelection): void | Promise<void>;
 }) {
   const [inputs, setInputs] = useState<Record<string, unknown>>(() =>
     Object.fromEntries(action.inputs.map((input) => [input.id, input.default])));
   const [commandError, setCommandError] = useState("");
+  const [selection, setSelection] = useState<CampaignRollSelection>({});
+  const contextual = Boolean(action.target || action.respondsTo);
+  const blocked = disabled || (contextual && (!characterId || !hasRollSelection(action, selection)));
   return (
     <form
       className={styles.action}
       data-testid={`slot-granted-${entryId}-${action.id}`}
       onSubmit={(event) => {
         event.preventDefault();
-        if (disabled) return;
-        invokeCommand(() => onExecute(entryId, action.id, inputs), (message) => setCommandError(message));
+        if (blocked) return;
+        invokeCommand(() => contextual
+          ? onExecute(entryId, action.id, inputs, selection) : onExecute(entryId, action.id, inputs), (message) => setCommandError(message));
       }}
     >
       {action.inputs.map((input) => (
@@ -149,7 +163,9 @@ function GrantedActionForm({ entryId, action, disabled, onExecute }: {
           />
         </label>
       ))}
-      <Button type="submit" variant="secondary" disabled={disabled}>{action.label}</Button>
+      <RollContextFields requirements={action} selection={selection} onChange={setSelection} disabled={disabled}
+        characterId={characterId} actionId={action.id} entryId={entryId} loadOptions={loadRollOptions} />
+      <Button type="submit" variant="secondary" disabled={blocked}>{action.label}</Button>
       {commandError !== "" ? <p role="alert" className={styles.commandError}>{commandError}</p> : null}
     </form>
   );
@@ -330,6 +346,28 @@ function TemplateEntryForm({ entry, template, disabled, onUpdate }: {
   </form>;
 }
 
+/** Picker key: extension templates may reuse a base template ID (decision X5). */
+export function templateChoiceKey(template: Pick<SlotTemplate, "id" | "extensionId" | "source">): string {
+  if (template.source?.kind === "campaign") return `campaign:${template.id}`;
+  return template.extensionId === undefined ? template.id : `${template.extensionId}:${template.id}`;
+}
+
+function originLabel(template: SlotTemplate): string {
+  if (template.source?.kind === "campaign") return t("character.slot.originCampaign");
+  if (template.extensionId !== undefined) return template.extensionName ?? t("character.slot.originExtension");
+  return t("character.slot.originSystem");
+}
+
+function orderByOrigin(templates: SlotTemplate[]): SlotTemplate[] {
+  const rank = (template: SlotTemplate) => template.source?.kind === "campaign" ? 2 : template.extensionId === undefined ? 0 : 1;
+  return templates
+    .map((template, index) => ({ template, index }))
+    .sort((a, b) => rank(a.template) - rank(b.template)
+      || (a.template.extensionName ?? "").localeCompare(b.template.extensionName ?? "")
+      || a.index - b.index)
+    .map(({ template }) => template);
+}
+
 function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: {
   slotId: string;
   label: string;
@@ -339,19 +377,23 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
   onAdd(slotId: string, templateId: string | null, values: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false);
-  const offered = templates.filter((template) => accepts.includes(template.kind));
-  const [selected, setSelected] = useState<string>(offered[0]?.id ?? "");
+  // Design 6.8 (E6): base templates first, then each extension and campaign
+  // items, so the picker can group them by origin. Keys qualify extension IDs.
+  const offered = orderByOrigin(templates.filter((template) => accepts.includes(template.kind)));
+  const [selected, setSelected] = useState<string>(offered[0] === undefined ? "" : templateChoiceKey(offered[0]));
   const [selectedTemplate, setSelectedTemplate] = useState<SlotTemplate | null>(null);
   const [customValues, setCustomValues] = useState<Record<string, unknown>>({ name: "" });
   const [quantity, setQuantity] = useState(1);
   const [pending, setPending] = useState(false);
   const [commandError, setCommandError] = useState("");
   const isCustom = selected === "";
-  const latest = offered.find(template => template.id === selected);
+  // Group only when the choices come from more than one origin.
+  const grouped = new Set(offered.map(originLabel)).size > 1;
+  const latest = offered.find(template => templateChoiceKey(template) === selected);
   const selectionChanged = selectedTemplate?.source?.kind === "campaign" &&
     JSON.stringify(latest?.source) !== JSON.stringify(selectedTemplate.source);
   // Keep the selected option visible while a refresh replaces or removes it.
-  const options = offered.map(template => template.id === selected ? selectedTemplate ?? template : template);
+  const options = offered.map(template => templateChoiceKey(template) === selected ? selectedTemplate ?? template : template);
   if (selectedTemplate && !latest) options.push(selectedTemplate);
   return (
     <>
@@ -362,7 +404,7 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
         data-testid={`slot-add-${slotId}`}
         onClick={() => {
           setCommandError("");
-          setSelected(offered[0]?.id ?? "");
+          setSelected(offered[0] === undefined ? "" : templateChoiceKey(offered[0]));
           setSelectedTemplate(offered[0] ? structuredClone(offered[0]) : null);
           setCustomValues({ name: "" });
           setQuantity(1);
@@ -390,7 +432,9 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
                 ? onAdd(slotId, null, { ...customValues, name: String(customValues.name).trim() }, quantity)
                 : selectedTemplate?.source?.kind === "campaign"
                   ? onAdd(slotId, null, {}, undefined, selectedTemplate.source)
-                  : onAdd(slotId, selectedTemplate!.id, {})).then(
+                  : selectedTemplate?.source?.kind === "system"
+                    ? onAdd(slotId, selectedTemplate.id, {}, undefined, selectedTemplate.source)
+                    : onAdd(slotId, selectedTemplate!.id, {})).then(
                 () => setOpen(false), (error: unknown) => setCommandError(describeCommandError(error)),
               ).finally(() => setPending(false));
             }}
@@ -406,12 +450,16 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
           disabled={disabled || pending}
           onChange={(event) => {
             setSelected(event.target.value);
-            const choice = offered.find(template => template.id === event.target.value);
+            const choice = offered.find(template => templateChoiceKey(template) === event.target.value);
             setSelectedTemplate(choice ? structuredClone(choice) : null);
           }}
           options={[
-            ...options.map((template) => ({ value: template.id, label: template.source?.kind === "campaign" ? `${template.label} · ${t("character.slot.campaign")}` : template.label })),
-            { value: "", label: t("character.slot.customEntry") },
+            ...options.map((template) => ({
+              value: templateChoiceKey(template),
+              label: template.source?.kind === "campaign" ? `${template.label} · ${t("character.slot.campaign")}` : template.label,
+              ...(grouped ? { group: originLabel(template) } : {}),
+            })),
+            { value: "", label: t("character.slot.customEntry"), ...(grouped ? { group: t("character.slot.originPersonal") } : {}) },
           ]}
         />
         {selectionChanged ? <div>
@@ -438,8 +486,8 @@ function AddEntryDialog({ slotId, label, accepts, templates, disabled, onAdd }: 
  * projection elements are owned here (CharacterSheet skips them), resolved
  * against the template catalog passed down from the route.
  */
-export function SlotListControl({ slotId, label, accepts, entries, templates, disabled, actionsDisabled, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, renderEntryImage }: SlotListControlProps) {
-  const byId = new Map(templates.map((template) => [template.id, template]));
+export function SlotListControl({ slotId, label, accepts, entries, templates, disabled, actionsDisabled, onAddEntry, onRemoveEntry, onUpdateEntry, onExecuteGranted, renderEntryImage, characterId, loadRollOptions }: SlotListControlProps) {
+  const byId = new Map(templates.map((template) => [templateChoiceKey(template), template]));
   const grantedDisabled = actionsDisabled ?? disabled;
   return (
     <div data-testid={`slot-list-${slotId}`}>
@@ -463,7 +511,7 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
         ) : (
           <ul className={styles.slotList}>
             {entries.map((entry) => {
-              const template:SlotTemplate|undefined = entry.definition ? {...entry.definition,grantedActions:entry.definition.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,inputs:a.inputs ?? []}))} : entry.templateId === null ? undefined : byId.get(entry.templateId);
+              const template:SlotTemplate|undefined = entry.definition ? {...entry.definition,grantedActions:entry.definition.grantedActions.map(a=>({ ...a, actionKind: a.kind, inputs: a.inputs ?? [] }))} : entry.templateId === null ? undefined : byId.get(entry.source?.kind === "system" && entry.source.extensionId !== undefined ? `${entry.source.extensionId}:${entry.templateId}` : entry.templateId);
               const summary = entry.templateId === null && !entry.definition ? null : scalarSummary(entry.values, entry.label);
               return (
                 <li key={entry.entryId} data-system-item data-testid={`slot-entry-${entry.entryId}`} className={styles.slotEntry}>
@@ -477,6 +525,16 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
                       ? <p className={styles.personalText} key={key}><strong>{t(key === "description" ? "character.slot.description" : "character.slot.notes")}: </strong>{String((entry.metadata ?? entry.values)[key])}</p> : null)}
                   </> : null}
                   {summary !== null ? <span className={styles.meta}>{summary}</span> : null}
+                  {entry.derived?.map(({ id, label, value }) => {
+                    const shown = String(value);
+                    if (shown === "") return null;
+                    // Long looked-up text (a spell or feature description) stays folded until opened.
+                    return shown.length > 120
+                      ? <details key={id} data-testid={`slot-entry-derived-${entry.entryId}-${id}`}>
+                          <summary>{label}</summary><p className={styles.personalText}>{shown}</p>
+                        </details>
+                      : <p className={styles.personalText} key={id} data-testid={`slot-entry-derived-${entry.entryId}-${id}`}><strong>{label}: </strong>{shown}</p>;
+                  })}
                   {template?.grantedActions.map((action) => (
                     <GrantedActionForm
                       key={action.id}
@@ -484,6 +542,8 @@ export function SlotListControl({ slotId, label, accepts, entries, templates, di
                       action={action}
                       disabled={grantedDisabled}
                       onExecute={onExecuteGranted}
+                      characterId={characterId}
+                      loadRollOptions={loadRollOptions}
                     />
                   ))}
                   {entry.templateId === null && !entry.definition ? (

@@ -1,7 +1,9 @@
+import type { PhysicalDiceStreams } from "../../campaigns/physical-dice-stream.js";
+import { PassThrough } from "node:stream";
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
 import { campaignItemImageHandlers, campaignItemImageRoutes } from "./campaignItemImages.js";
 import {campaignProposalRoutes,campaignProposalHandlers,CampaignProposalDto} from "./campaignProposals.js";
-import {RollBreakdownSchema,PushResultSchema} from "../../systems/implementation/rules/result.js";
+import {DieResultSchema,RollBreakdownSchema,PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {campaignTemplateRoutes,campaignTemplateHandlers,CampaignTemplateDto} from "./campaignTemplates.js";
 import { Type, type TSchema } from "@sinclair/typebox";
@@ -22,11 +24,22 @@ import type {
 import type { Characters } from "../../characters/index.js";
 import { prepareCampaignCharacter } from "../../characters/campaignPlacement.js";
 import type { SystemRuntime } from "../../systems/runtime.js";
-import { CharacterViewDto, toCharacterViewDto } from "./characters.js";
+import {
+  CharacterViewDto,
+  CompositionChangeDto,
+  CompositionCheckBody,
+  CompositionDto,
+  CompositionOptionsDto,
+  toCharacterViewDto,
+  toCompositionOptionsDto,
+  VersionChangeDirectionDto,
+  VersionChangeReportDto,
+} from "./characters.js";
 
 import type { Identity } from "../../identity/index.js";
 
 export type BuildCampaignsRoutesInput = {
+  physicalDiceStreams?: PhysicalDiceStreams;
   identity: Pick<Identity, "getDisplayNames">;
   campaigns: Campaigns;
   /** Full-sheet composer for post-commit placement reads (same projection as standalone reads). */
@@ -240,6 +253,13 @@ const ContentViewDto = Type.Object({
   grantedUserIds: Type.Optional(Type.Array(Type.String({ format: UUID_FORMAT }))),
 });
 
+const ActivityRollAudience = Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]);
+const ActivitySummaryDto = Type.Union([
+  Type.Object({ kind: Type.Union([Type.Literal("roll"), Type.Literal("push")]), total: Type.Number(), audience: ActivityRollAudience }),
+  Type.Object({ kind: Type.Literal("draw"), cards: Type.Array(Type.String()), audience: ActivityRollAudience }),
+  Type.Object({ kind: Type.Literal("content"), title: Type.String() }),
+]);
+
 const ActivityEventDto = Type.Object({
   eventId: Type.String({ format: UUID_FORMAT }),
   kind: Type.Union([
@@ -250,12 +270,19 @@ const ActivityEventDto = Type.Object({
     Type.Literal("content_recovered"),
     Type.Literal("content_grants_replaced"),
     Type.Literal("roll_executed"),
+    Type.Literal("system_version_upgraded"),
+    Type.Literal("system_version_reverted"),
+    Type.Literal("extension_added"),
+    Type.Literal("extension_removed"),
+    Type.Literal("extension_upgraded"),
   ]),
   actorId: Type.String({ format: UUID_FORMAT }),
   sourceContentId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
   sourceRollId: Type.Union([Type.String(), Type.Null()]),
   requestId: Type.String(),
   occurredAt: Type.String({ format: DATE_TIME_FORMAT }),
+  summary: Type.Optional(ActivitySummaryDto),
+  actorName: Type.Optional(Type.String()),
 });
 
 const CampaignExportDto = Type.Object({
@@ -306,9 +333,12 @@ const CampaignExportDto = Type.Object({
       actionId: Type.String(),
       audience: Type.Union([Type.Literal("owner_only"), Type.Literal("gm_only"), Type.Literal("campaign")]),
       expression: Type.String(),
-      breakdown: Type.Optional(RollBreakdownSchema),
+      breakdown: RollBreakdownSchema,
+      breakdownText: Type.String(),
+      targetCharacterId: Type.Optional(Type.String({ format: UUID_FORMAT })),
+      respondsTo: Type.Optional(Type.String({ format: UUID_FORMAT })),
       push:Type.Optional(PushResultSchema),
-      dice: Type.Unknown(),
+      dice: Type.Array(DieResultSchema),
       bindings: Type.Unknown(),
       total: Type.Number(),
       output: Type.String(),
@@ -448,6 +478,7 @@ const CreateCampaignCharacterBody = Type.Object({
   name: Type.String({ minLength: 1 }),
   entityDefinitionId: Type.String({ minLength: 1 }),
   initialValues: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  presetId: Type.Optional(Type.String({ minLength: 1 })),
   controllerUserIds: Type.Optional(Type.Array(Type.String({ format: UUID_FORMAT }))),
   expectedCampaignRevision: Type.Integer({ minimum: 1 }),
   idempotencyKey: Type.String({ minLength: 1 }),
@@ -531,6 +562,72 @@ const ExportCampaignBody = Type.Object({
 });
 
 const CampaignIdParams = Type.Object({ id: Type.String({ format: UUID_FORMAT }) });
+// Design 6.7/6.8 (extensions plan E5): campaign composition changes.
+export const CampaignVersionCheckDto = Type.Object({
+  revision: Type.Integer(),
+  direction: VersionChangeDirectionDto,
+  change: CompositionChangeDto,
+  fromVersionId: Type.String(),
+  toVersionId: Type.String(),
+  from: CompositionDto,
+  to: CompositionDto,
+  ok: Type.Boolean(),
+  characters: Type.Array(Type.Object({
+    characterId: Type.String({ format: UUID_FORMAT }),
+    name: Type.String(),
+    ok: Type.Boolean(),
+    report: VersionChangeReportDto,
+  })),
+  templates: Type.Array(Type.Object({
+    templateId: Type.String({ format: UUID_FORMAT }),
+    name: Type.String(),
+    ok: Type.Boolean(),
+    blockers: Type.Array(Type.Object({
+      code: Type.String(),
+      message: Type.String(),
+      definitionId: Type.Optional(Type.String()),
+    })),
+  })),
+});
+// Design 6.8 (stage E4): the campaign composition.
+const CampaignExtensionsDto = Type.Object({
+  campaignId: Type.String({ format: UUID_FORMAT }),
+  revision: Type.Integer({ minimum: 1 }),
+  extensions: Type.Array(Type.Object({
+    extensionId: Type.String({ format: UUID_FORMAT }),
+    versionId: Type.String({ format: UUID_FORMAT }),
+    name: Type.String(),
+    semanticVersion: Type.String(),
+    addedBy: Type.Union([Type.Literal("campaign"), Type.Literal("character")]),
+    addedByCharacterId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
+    addedAt: Type.String({ format: DATE_TIME_FORMAT }),
+  }), { maxItems: 16 }),
+});
+const AddCampaignExtensionBody = Type.Object(
+  {
+    extensionId: Type.String({ format: UUID_FORMAT }),
+    versionId: Type.String({ format: UUID_FORMAT }),
+    expectedCampaignRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
+const RemoveCampaignExtensionBody = Type.Object(
+  {
+    expectedCampaignRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
+
+const ChangeCampaignVersionBody = Type.Object(
+  {
+    target: CompositionDto,
+    expectedCampaignRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
 const MemberParams = Type.Object({
   id: Type.String({ format: UUID_FORMAT }),
   userId: Type.String({ format: UUID_FORMAT }),
@@ -575,7 +672,7 @@ const FogRunDto = Type.Object({
 
 const FogOpDto = Type.Object({
   mode: Type.Union([Type.Literal("reveal"), Type.Literal("conceal")]),
-  runs: Type.Array(FogRunDto, { minItems: 1 }),
+  runs: Type.Array(FogRunDto, { minItems: 1, maxItems: 512 }),
 });
 
 const TokenRecordDto = Type.Object({
@@ -609,6 +706,10 @@ const DisplayProjectionTokenDto = Type.Object({
 const DisplayProjectionDto = Type.Object({
   sceneId: Type.String(),
   sceneRevision: Type.Integer(),
+  imageRevision: Type.Integer({
+    minimum: 1,
+    description: "Player-safe map version. Changes only when fog or a different background changes the map.",
+  }),
   imageUrl: Type.String(),
   tokens: Type.Array(DisplayProjectionTokenDto),
 });
@@ -699,6 +800,9 @@ const RedeemDisplayBody = Type.Object({
 // arrive as strings; Fastify coerces to Integer under the shared query
 // validation (same as the PageQuery limit), and the handler rechecks.
 const ImageRevQuery = Type.Object({ rev: Type.Integer({ minimum: 1 }) });
+// Token art is keyed by the token's image file, so its URL stays stable while
+// the token moves; a different or missing file reads as not_found.
+const TokenImageQuery = Type.Object({ file: Type.String({ format: UUID_FORMAT }) });
 
 const CampaignImageParams = Type.Object({
   id: Type.String({ format: UUID_FORMAT }),
@@ -810,6 +914,73 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
         "200": Type.Object({ campaign: CampaignViewDto, requestId: Type.String() }),
         ...ErrorResponses,
       },
+    },
+  },
+  {
+    method: "get",
+    path: "/campaigns/:id/composition-options",
+    operationId: "get_campaigns_id_composition_options",
+    schema: {
+      params: CampaignIdParams,
+      response: {
+        "200": Type.Object({ options: CompositionOptionsDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/composition-check",
+    operationId: "post_campaigns_id_composition_check",
+    schema: {
+      params: CampaignIdParams,
+      body: CompositionCheckBody,
+      response: {
+        "200": Type.Object({ check: CampaignVersionCheckDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/composition",
+    operationId: "post_campaigns_id_composition",
+    schema: {
+      params: CampaignIdParams,
+      body: ChangeCampaignVersionBody,
+      response: {
+        "200": Type.Object({ campaign: CampaignViewDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/campaigns/:id/extensions",
+    operationId: "get_campaigns_id_extensions",
+    schema: {
+      params: CampaignIdParams,
+      response: { "200": Type.Object({ extensions: CampaignExtensionsDto, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "post",
+    path: "/campaigns/:id/extensions",
+    operationId: "post_campaigns_id_extensions",
+    schema: {
+      params: CampaignIdParams,
+      body: AddCampaignExtensionBody,
+      response: { "200": Type.Object({ extensions: CampaignExtensionsDto, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "delete",
+    path: "/campaigns/:id/extensions/:extensionId",
+    operationId: "delete_campaigns_id_extensions_extensionId",
+    schema: {
+      params: Type.Object({ id: Type.String({ format: UUID_FORMAT }), extensionId: Type.String({ format: UUID_FORMAT }) }),
+      body: RemoveCampaignExtensionBody,
+      response: { "200": Type.Object({ extensions: CampaignExtensionsDto, requestId: Type.String() }), ...ErrorResponses },
     },
   },
   {
@@ -1181,12 +1352,14 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
     operationId: "get_campaigns_id_activity",
     schema: {
       params: CampaignIdParams,
-      querystring: PageQuery,
+      querystring: Type.Composite([PageQuery, Type.Object({ watch: Type.Optional(Type.String({ maxLength: 2048 })) })]),
       response: {
         "200": Type.Object({
           events: Type.Array(ActivityEventDto),
           nextCursor: Type.Union([Type.String(), Type.Null()]),
           requestId: Type.String(),
+          serverTime: Type.Optional(Type.String({ format: DATE_TIME_FORMAT })),
+          visibleWatch: Type.Optional(Type.Array(Type.String())),
         }),
         "400": CampaignErrorEnvelope,
         "401": UnauthorizedEnvelope,
@@ -1410,15 +1583,46 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
   },
   {
     method: "get",
-    path: "/displays/:id/scenes/:sceneId/projection",
-    operationId: "get_displays_id_scenes_sceneId_projection",
+    path: "/campaigns/:id/physical-rolls/events",
+    operationId: "get_campaigns_id_physical_roll_events",
+    schema: {
+      params: CampaignIdParams,
+      response: {
+        "200": {
+          schema: Type.String({description: "Campaign member SSE. roll.started carries the attempt ID, actor, ordered dice and launch state. roll.finished carries the attempt ID, committed roll ID and final poses. roll.removed clears an expired or inaccessible attempt. revoked closes the stream."}),
+          mediaType: "text/event-stream",
+        },
+        "400": CampaignErrorEnvelope,
+        "401": CampaignErrorEnvelope,
+        "404": CampaignErrorEnvelope,
+        "429": CampaignErrorEnvelope,
+        "503": CampaignErrorEnvelope,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/displays/:id/scenes/:sceneId/events",
+    operationId: "get_displays_id_scenes_sceneId_events",
     schema: {
       params: DisplaySceneParams,
       response: {
-        "200": Type.Object({ projection: DisplayProjectionDto, requestId: Type.String() }),
+        "200": {
+          // Documents the JSON `data:` of each `event: scene` message (the
+          // stream itself is never serialized through this schema).
+          schema: Type.Object(DisplayProjectionDto.properties, {
+            description:
+              "Server-sent events. Each `event: scene` message carries this complete credential-scoped " +
+              "projection as JSON data (newer sceneRevision only); `event: revoked` ends the stream when " +
+              "access is lost; `: hb` comment lines are heartbeats. Authenticate with the X-Display-Secret header.",
+          }),
+          mediaType: "text/event-stream",
+        },
         "400": CampaignErrorEnvelope,
         "404": CampaignErrorEnvelope,
+        "429": CampaignErrorEnvelope,
         "500": CampaignErrorEnvelope,
+        "503": CampaignErrorEnvelope,
       },
     },
   },
@@ -1443,7 +1647,7 @@ export const campaignsRouteDefinitions: readonly CampaignsRouteDefinition[] = [
     operationId: "get_displays_id_scenes_sceneId_tokens_tokenId_image",
     schema: {
       params: DisplayTokenParams,
-      querystring: ImageRevQuery,
+      querystring: TokenImageQuery,
       response: {
         "200": { schema: BinaryBodyDto, mediaType: "image/png" },
         "400": CampaignErrorEnvelope,
@@ -1468,7 +1672,7 @@ function toFastifyResponses(response: Record<string, RouteResponse> | undefined)
 }
 
 export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => FastifyPluginCallback =
-  ({ campaigns, characters, runtime, identity }) =>
+  ({ campaigns, characters, runtime, identity, physicalDiceStreams }) =>
   async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
@@ -1476,11 +1680,18 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
       // plugin-scoped onSend covers reads, mutations and errors alike; no
       // shared HTTP cache or service-worker payload caching is introduced.
       // Binary display routes set their own Cache-Control first
-      // (revision-keyed derivatives are privately cacheable), so the
-      // default applies only when the handler set none.
+      // (`private, no-store`), so the default applies only when the
+      // handler set none.
       if (reply.getHeader("cache-control") === undefined) {
         reply.header("cache-control", "no-store");
       }
+    });
+
+    // Long-lived display streams would otherwise hold server.close() open.
+    app.addHook("preClose", async () => {
+      // Contract generation builds routes over a stub module.
+      physicalDiceStreams?.close();
+      if (typeof campaigns.closeDisplayStreams === "function") campaigns.closeDisplayStreams();
     });
 
     app.addHook("preHandler", async (request, reply) => {
@@ -1739,6 +1950,59 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         return { campaign: toCampaignDto(result.value), requestId: request.id };
       },
 
+      get_campaigns_id_composition_options: async (request, reply) => {
+        const params = request.params as { id: string };
+        const result = await campaigns.listVersionOptions(ctxOf(request), { campaignId: params.id });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { options: toCompositionOptionsDto(result.value), requestId: request.id };
+      },
+
+      post_campaigns_id_composition_check: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as { target: unknown };
+        const result = await campaigns.checkVersionChange(ctxOf(request), { campaignId: params.id, target: body.target });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { check: result.value, requestId: request.id };
+      },
+
+      post_campaigns_id_composition: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as { target: unknown; expectedCampaignRevision: number; idempotencyKey: string };
+        const result = await campaigns.changeVersion(ctxOf(request), {
+          campaignId: params.id,
+          target: body.target,
+          expectedCampaignRevision: body.expectedCampaignRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { campaign: toCampaignDto(result.value), requestId: request.id };
+      },
+
+      get_campaigns_id_extensions: async (request, reply) => {
+        const params = request.params as { id: string };
+        const result = await campaigns.listExtensions(ctxOf(request), { campaignId: params.id });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { extensions: result.value, requestId: request.id };
+      },
+
+      post_campaigns_id_extensions: async (request, reply) => {
+        const params = request.params as { id: string };
+        const body = request.body as { extensionId: string; versionId: string; expectedCampaignRevision: number; idempotencyKey: string };
+        const result = await campaigns.addExtension(ctxOf(request), { campaignId: params.id, ...body });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { extensions: result.value, requestId: request.id };
+      },
+
+      delete_campaigns_id_extensions_extensionId: async (request, reply) => {
+        const params = request.params as { id: string; extensionId: string };
+        const body = request.body as { expectedCampaignRevision: number; idempotencyKey: string };
+        const result = await campaigns.removeExtension(ctxOf(request), { campaignId: params.id, extensionId: params.extensionId, ...body });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { extensions: result.value, requestId: request.id };
+      },
+
       post_campaigns_id_recover: async (request, reply) => {
         const params = request.params as { id: string };
         const body = request.body as { expectedCampaignRevision: number; idempotencyKey: string };
@@ -1977,6 +2241,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           name: string;
           entityDefinitionId: string;
           initialValues?: Record<string, unknown>;
+          presetId?: string;
           controllerUserIds?: string[];
           expectedCampaignRevision: number;
           idempotencyKey: string;
@@ -1992,6 +2257,7 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
           systemVersionId: opened.value.systemVersionId,
           entityDefinitionId: body.entityDefinitionId,
           ...(body.initialValues === undefined ? {} : { initialValues: body.initialValues }),
+          ...(body.presetId === undefined ? {} : { presetId: body.presetId }),
         });
         if (!prepared.ok) {
           return sendError(reply, prepared.error, request.id);
@@ -2254,10 +2520,17 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         const params = request.params as { id: string };
         const page = parsePageQuery(request, reply);
         if (page === null) return null;
+        const rawWatch = (request.query as { watch?: string }).watch;
+        const watch = rawWatch?.split(",") ?? [];
+        if (watch.length > 24 || watch.some(key => !/^(?:event|roll):[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(key))) {
+          return sendError(reply, badRequest("watch must contain up to 24 activity keys."), request.id);
+        }
         const result = await campaigns.listActivity(ctxOf(request), {
           campaignId: params.id,
           limit: page.limit,
           cursor: page.cursor,
+          includeSummary: true,
+          watch,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         return {
@@ -2266,6 +2539,8 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
             occurredAt: event.occurredAt.toISOString(),
           })),
           nextCursor: result.value.nextCursor,
+          serverTime: result.value.serverTime.toISOString(),
+          visibleWatch: result.value.visibleWatch,
           requestId: request.id,
         };
       },
@@ -2538,15 +2813,83 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         return { display: result.value, requestId: request.id };
       },
 
-      get_displays_id_scenes_sceneId_projection: async (request, reply) => {
+      get_campaigns_id_physical_roll_events: async (request, reply) => {
+        const { id } = request.params as {id:string};
+        const opened = request.auth.state === "authenticated"
+          ? await physicalDiceStreams?.open(id, request.auth.actorId, request.auth.sessionId)
+          : undefined;
+        if (!opened || !opened.ok) {
+          const status = opened?.status ?? 404;
+          const error = status === 429 ? {code:"rate_limited",message:"Too many open dice streams."}
+            : status === 503 ? {code:"temporarily_unavailable",message:"Live dice events are unavailable."}
+            : {code:"not_found",message:"Campaign dice stream not found."};
+          if (status !== 404) reply.header("retry-after","2");
+          return reply.code(status).send({error,requestId:request.id});
+        }
+        if (reply.raw.destroyed) {
+          opened.value.close();
+          return reply;
+        }
+        const body = new PassThrough();
+        reply.raw.once("close",opened.value.close);
+        body.once("close",opened.value.close);
+        body.once("error",opened.value.close);
+        reply.type("text/event-stream; charset=utf-8")
+          .header("x-accel-buffering","no").header("x-content-type-options","nosniff");
+        body.write(": open\n\n");
+        opened.value.attach({write:chunk=>body.write(chunk),onDrain:callback=>{body.once("drain",callback);},end:()=>body.end()});
+        return reply.send(body);
+      },
+
+      get_displays_id_scenes_sceneId_events: async (request, reply) => {
         const params = request.params as { id: string; sceneId: string };
-        const result = await campaigns.getDisplayProjection({
+        const opened = await campaigns.openDisplayStream({
           displayId: params.id,
           secret: displaySecretOf(request),
           sceneId: params.sceneId,
         });
-        if (!result.ok) return sendError(reply, result.error, request.id);
-        return { projection: result.value, requestId: request.id };
+        if (!opened.ok) {
+          if (opened.error.code === "unavailable") {
+            return reply.code(503).header("retry-after", "2").send({
+              error: { code: "unavailable", message: opened.error.message },
+              requestId: request.id,
+            });
+          }
+          if (opened.error.code === "rate_limited") reply.header("retry-after", "2");
+          return sendError(reply, opened.error, request.id);
+        }
+        const stream = opened.value;
+        // An SSE request body is already complete while the response is open.
+        // Track the response socket so navigation and aborted reads free slots.
+        if (reply.raw.destroyed) {
+          stream.close();
+          return reply;
+        }
+        const body = new PassThrough();
+        const end = (): void => {
+          stream.close();
+        };
+        reply.raw.once("close", end);
+        body.once("close", end);
+        body.once("error", end);
+        reply
+          .code(200)
+          .header("content-type", "text/event-stream; charset=utf-8")
+          .header("cache-control", "no-store")
+          .header("x-accel-buffering", "no")
+          .header("x-content-type-options", "nosniff");
+        // Initial comment flushes headers through proxies before the first snapshot.
+        body.write(": open\n\n");
+        stream.attach({
+          write: (chunk) => body.write(chunk),
+          onDrain: (callback) => {
+            body.on("drain", callback);
+          },
+          end: () => {
+            if (!body.writableEnded) body.end();
+          },
+        });
+        return reply.send(body);
       },
 
       get_displays_id_scenes_sceneId_image: async (request, reply) => {
@@ -2561,24 +2904,30 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("content-type", result.value.contentType);
-        reply.header("cache-control", "private, max-age=3600");
+        // Never reusable from a browser cache: every read re-checks the
+        // credential, fog and image revision (token art URLs are stable).
+        reply.header("cache-control", "private, no-store");
         return reply.send(result.value.bytes);
       },
 
       get_displays_id_scenes_sceneId_tokens_tokenId_image: async (request, reply) => {
         const params = request.params as { id: string; sceneId: string; tokenId: string };
-        // The rev query key is enforced by the route schema (required cache
-        // key); token bytes are immutable originals, so the handler serves
-        // the current bytes without matching rev to the scene revision.
+        // The file query key must name the token's current image file; the
+        // URL stays stable across token moves (no scene-revision key).
+        const query = request.query as { file?: unknown } | undefined;
+        const file = typeof query?.file === "string" ? query.file : "";
         const result = await campaigns.getDisplayTokenImage({
           displayId: params.id,
           secret: displaySecretOf(request),
           sceneId: params.sceneId,
           tokenId: params.tokenId,
+          file,
         });
         if (!result.ok) return sendError(reply, result.error, request.id);
         reply.header("content-type", result.value.contentType);
-        reply.header("cache-control", "private, max-age=3600");
+        // Never reusable from a browser cache: every read re-checks the
+        // credential, fog and image revision (token art URLs are stable).
+        reply.header("cache-control", "private, no-store");
         return reply.send(result.value.bytes);
       },
     };
@@ -2590,8 +2939,9 @@ export const buildCampaignsRoutes: (input: BuildCampaignsRoutesInput) => Fastify
         // Campaign backgrounds and token art carry up to 5 MiB as base64
         // inside JSON. Match the other image routes without raising the
         // default limit for unrelated campaign commands.
-        ...(route.operationId === "post_campaigns_id_images" ? { bodyLimit: 8 * 1024 * 1024 } : {}),
-        ...(route.path.includes("/image") && (route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}) } : {}),
+        ...(route.operationId === "post_displays_redeem" ? { config: { displayRedeem: true } } : {}),
+        ...(route.operationId === "post_campaigns_id_images" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}),
+        ...(route.path.includes("/image") && (route.path.includes("/item-templates") || route.path.includes("/item-proposals")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); }, ...(route.method === "put" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}) } : {}),
       }, handlers[route.operationId]!);
     }
   };

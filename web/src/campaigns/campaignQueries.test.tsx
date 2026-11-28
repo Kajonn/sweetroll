@@ -3,18 +3,19 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { ApiError } from "../api/client.js";
 import type { CampaignsApi } from "./api.js";
 import {
+  CAMPAIGN_CHARACTERS_PAGE_LIMIT,
   CAMPAIGN_LIST_PAGE_LIMIT,
+  listAllCampaignCharacters,
   campaignInvitationsKey,
   campaignListKey,
   campaignMembersKey,
-  displayProjectionKey,
   sceneDetailKey,
   useApplyFogEdit,
   useCampaignList,
   useCampaignMembers,
-  useDisplayProjection,
   useScene,
 } from "./campaignQueries.js";
 
@@ -40,6 +41,41 @@ function wrapper() {
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   );
 }
+
+describe("listAllCampaignCharacters", () => {
+  const limitRejected = () => new ApiError({
+    code: "bad_request", message: "limit must be an integer from 1 through 50.", status: 400,
+    requestId: "r-limit", latestRevision: null, diagnostics: [],
+  });
+  const character = (id: string) => ({ characterId: id }) as never;
+
+  it("falls back to the server default page size when the server maximum is below 100", async () => {
+    // Mocked server with CAMPAIGN_PAGE_MAX = 50: any larger limit is rejected.
+    const listCampaignCharacters = vi.fn(async (_campaignId: string, input?: { cursor?: string | null; limit?: number }) => {
+      if (input?.limit !== undefined && input.limit > 50) throw limitRejected();
+      return input?.cursor === "c2"
+        ? { characters: [character("b")], nextCursor: null }
+        : { characters: [character("a")], nextCursor: "c2" };
+    });
+    const result = await listAllCampaignCharacters({ listCampaignCharacters } as never, "camp-1");
+    expect(result.characters).toEqual([character("a"), character("b")]);
+    expect(result.nextCursor).toBeNull();
+    expect(listCampaignCharacters.mock.calls.map((call) => call[1])).toEqual([
+      { cursor: null, limit: CAMPAIGN_CHARACTERS_PAGE_LIMIT },
+      { cursor: null },
+      { cursor: "c2" },
+    ]);
+  });
+
+  it("rethrows other errors and a 400 that persists without a limit", async () => {
+    const listCampaignCharacters = vi.fn().mockRejectedValue(limitRejected());
+    await expect(listAllCampaignCharacters({ listCampaignCharacters } as never, "camp-1")).rejects.toBeInstanceOf(ApiError);
+    expect(listCampaignCharacters).toHaveBeenCalledTimes(2);
+    const offline = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    await expect(listAllCampaignCharacters({ listCampaignCharacters: offline } as never, "camp-1")).rejects.toThrow("Failed to fetch");
+    expect(offline).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe("campaignListKey", () => {
   it("scopes the list key by account lifetime (actor + generation)", () => {
@@ -146,45 +182,8 @@ describe("useScene", () => {
   });
 });
 
-describe("displayProjectionKey", () => {
-  it("keys the projection by display credential, scene, and revision", () => {
-    expect(displayProjectionKey("d1", "s1", 3)).toEqual(["displays", "projection", "d1", "s1", 3]);
-    expect(displayProjectionKey("d1", "s1", 3)).not.toEqual(displayProjectionKey("d1", "s1", 4));
-    expect(displayProjectionKey("d1", "s1", 3)).not.toEqual(displayProjectionKey("d2", "s1", 3));
-  });
-});
-
-describe("useDisplayProjection", () => {
-  it("stays disabled without a credential or while offline", () => {
-    const api = { getDisplayProjection: vi.fn() };
-    const noCredential = renderHook(
-      () => useDisplayProjection(api as never, "d1", "s1", 3, null, { enabled: true, online: true }),
-      { wrapper: wrapper() },
-    );
-    const offline = renderHook(
-      () => useDisplayProjection(api as never, "d1", "s1", 3, "s3cr3t", { enabled: true, online: false }),
-      { wrapper: wrapper() },
-    );
-    expect(noCredential.result.current.status).toBe("pending");
-    expect(offline.result.current.status).toBe("pending");
-    expect(api.getDisplayProjection).not.toHaveBeenCalled();
-  });
-
-  it("reads the projection with the display credential while online", async () => {
-    const api = {
-      getDisplayProjection: vi.fn().mockResolvedValue({ projection: { sceneId: "s1" }, requestId: "r" }),
-    };
-    const { result } = renderHook(
-      () => useDisplayProjection(api as never, "d1", "s1", 3, "s3cr3t", { enabled: true, online: true }),
-      { wrapper: wrapper() },
-    );
-    await waitFor(() => expect(api.getDisplayProjection).toHaveBeenCalledWith("d1", "s1", "s3cr3t"));
-    await waitFor(() => expect(result.current.status).toBe("success"));
-  });
-});
-
 describe("useApplyFogEdit", () => {
-  it("commits with a caller-minted key and invalidates the scene and projection keys", async () => {
+  it("commits with a caller-minted key and invalidates the scene keys only", async () => {
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const withClient = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={qc}>{children}</QueryClientProvider>
@@ -193,7 +192,6 @@ describe("useApplyFogEdit", () => {
       applyFogEdit: vi.fn().mockResolvedValue({ scene: { sceneId: "s1" }, requestId: "r" }),
     };
     qc.setQueryData(sceneDetailKey("c1", "s1", "u1", 0), { scene: { sceneId: "s1" } });
-    qc.setQueryData(displayProjectionKey("d1", "s1", 3), { projection: { sceneId: "s1" } });
     const invalidateSpy = vi.spyOn(qc, "invalidateQueries");
     const { result } = renderHook(() => useApplyFogEdit(api as never, "c1", "s1"), {
       wrapper: withClient,
@@ -210,15 +208,7 @@ describe("useApplyFogEdit", () => {
       idempotencyKey,
     });
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["campaigns", "scene", "c1"] });
-    const projectionCall = invalidateSpy.mock.calls.find((call) => {
-      const key = (call[0] as { queryKey?: readonly unknown[] }).queryKey;
-      return key?.[0] === "displays";
-    });
-    expect(projectionCall).toBeDefined();
-    const predicate = (projectionCall?.[0] as { predicate?: (query: { queryKey: unknown }) => boolean })
-      .predicate;
-    expect(predicate).toEqual(expect.any(Function));
-    expect(predicate?.({ queryKey: displayProjectionKey("d1", "s1", 3) })).toBe(true);
-    expect(predicate?.({ queryKey: displayProjectionKey("d1", "s2", 3) })).toBe(false);
+    // Displays get committed changes from the scene stream, not query caches.
+    expect(invalidateSpy.mock.calls.some((call) => (call[0] as { queryKey?: readonly unknown[] }).queryKey?.[0] === "displays")).toBe(false);
   });
 });

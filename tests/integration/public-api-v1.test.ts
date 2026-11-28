@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildPublicApi, publicApiPrefix } from "../../src/transport/http/public-api/index.js";
 import { buildPersonalTokenRoutes } from "../../src/transport/http/personal-tokens.js";
 import { DEFAULT_CAMPAIGN_LIMITS } from "../../src/platform/config.js";
-import { createCampaignsModule } from "../../src/campaigns/index.js";
+import { createCampaignsModule, type Campaigns } from "../../src/campaigns/index.js";
 import { createCampaignPlacement } from "../../src/characters/campaignPlacement.js";
 import { knaveDocument, knaveCharacter } from "./fixtures/knave.js";
 import { d20Document } from "../../src/systems/implementation/package/fixtures/index.js";
@@ -40,7 +40,7 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
       }),
       extraRoutes: (modules) => [
         (app, _opts, done) => {
-          void app.register(buildPublicApi({ ...modules, pool }), { prefix: publicApiPrefix });
+          void app.register(buildPublicApi({ ...modules, pool, campaigns: {} as Campaigns }), { prefix: publicApiPrefix });
           done();
         },
         buildPersonalTokenRoutes({ identity: modules.identity }),
@@ -100,6 +100,41 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     expect((await call(expired.token, "GET", "/systems")).statusCode).toBe(401);
   });
 
+  it("keeps concurrent issue requests within the 20-active-token limit", async () => {
+    const { identity, pool, users: { bob } } = handle;
+    const active = async () => (await pool.query(
+      "SELECT count(*)::int AS n FROM personal_access_tokens WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now()",
+      [bob.actorId],
+    )).rows[0].n as number;
+    try {
+      await pool.query("UPDATE personal_access_tokens SET revoked_at = now() WHERE user_id = $1", [bob.actorId]);
+      for (let index = 0; index < 19; index++) {
+        expect(await identity.personalTokens.issue(bob.actorId, { label: "Filler", scopes: ["systems:read"], expiresInDays: 1 })).not.toBeNull();
+      }
+      // A concurrent issuance holds the account lock with its uncommitted
+      // 20th token. Under READ COMMITTED a count alone would miss that row.
+      const concurrent = await pool.connect();
+      try {
+        await concurrent.query("BEGIN");
+        await concurrent.query("SELECT id FROM users WHERE id = $1 FOR UPDATE", [bob.actorId]);
+        await concurrent.query(
+          "INSERT INTO personal_access_tokens (user_id, token_hash, label, scopes, expires_at) VALUES ($1, $2, 'Race', $3, now() + interval '1 day')",
+          [bob.actorId, randomUUID(), ["systems:read"]],
+        );
+        const pending = Promise.all(Array.from({ length: 4 }, () =>
+          identity.personalTokens.issue(bob.actorId, { label: "Race", scopes: ["systems:read"], expiresInDays: 1 })));
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        await concurrent.query("COMMIT");
+        expect(await pending).toEqual([null, null, null, null]);
+      } finally {
+        concurrent.release();
+      }
+      expect(await active()).toBe(20);
+    } finally {
+      await pool.query("UPDATE personal_access_tokens SET revoked_at = now() WHERE user_id = $1", [bob.actorId]);
+    }
+  });
+
   it("shares validation quotas across tokens owned by the same account", async () => {
     const { users: { ada, bob }, pool } = handle;
     const first = (await issue(ada.cookie)).token;
@@ -119,7 +154,37 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
     }
   });
 
-  it("validates without writes, publishes exact revisions and creates and edits pinned standalone sheets", async () => {
+  it("does not spend the general budget on requests rejected by their own bucket", async () => {
+    const { users: { ada }, pool } = handle;
+    const { token } = await issue(ada.cookie);
+    const hits = async (bucket: string) => (await pool.query(
+      "SELECT hits FROM public_api_rate_limits WHERE user_id = $1 AND bucket = $2", [ada.actorId, bucket],
+    )).rows[0]?.hits as number | undefined;
+    const { rows: [{ window_at }] } = await pool.query("SELECT date_trunc('minute', now()) AS window_at");
+    try {
+      await pool.query("INSERT INTO public_api_rate_limits VALUES ($1, 'validate', $2, 12)", [ada.actorId, window_at]);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        expect((await call(token, "POST", "/systems/validate", { document: {} })).statusCode).toBe(429);
+      }
+      expect(await hits("general")).toBeUndefined();
+
+      // A request its bucket accepts but the general budget rejects is
+      // refunded from the bucket.
+      await pool.query("UPDATE public_api_rate_limits SET hits = 5 WHERE user_id = $1 AND bucket = 'validate'", [ada.actorId]);
+      await pool.query("INSERT INTO public_api_rate_limits VALUES ($1, 'general', $2, 600)", [ada.actorId, window_at]);
+      expect((await call(token, "POST", "/systems/validate", { document: {} })).statusCode).toBe(429);
+      expect(await hits("validate")).toBe(5);
+      expect(await hits("general")).toBe(600);
+
+      await pool.query("DELETE FROM public_api_rate_limits WHERE user_id = $1 AND bucket = 'validate'", [ada.actorId]);
+      expect((await call(token, "POST", "/systems/validate", { document: {} })).statusCode).toBe(429);
+      expect(await hits("validate")).toBeUndefined();
+    } finally {
+      await pool.query("DELETE FROM public_api_rate_limits");
+    }
+  });
+
+  it("validates without writes, publishes exact revisions and follows the browser policy after adoption", async () => {
     const { users: { ada, bob }, pool, authoring } = handle;
     const { token } = await issue(ada.cookie);
     const other = (await issue(bob.cookie)).token;
@@ -265,18 +330,25 @@ describe.skipIf(!databaseUrl)("public API v1 with PostgreSQL", () => {
       pauseFieldEdit = undefined;
       resume();
     }
+    // Part B: v1 follows the browser Characters policy, so the adopting GM
+    // keeps reading and editing the attached sheet. The racing edit lost to
+    // the placement revision and must not overwrite it.
+    // The edit resolved against the standalone scope and never commits.
     expect((await racing).statusCode).toBe(404);
-    expect((await call(token, "GET", path)).statusCode).toBe(404);
-    expect((await call(token, "GET", `${path}/portrait`)).statusCode).toBe(404);
-    expect((await call(token, "POST", `${path}/entries`, {
-      entryId: randomUUID(), slotId: "pack", templateId: null, values: { name: "Rope" },
-      expectedRevision: edited.json().revision, idempotencyKey: "adopted-add",
-    })).statusCode).toBe(404);
-    expect((await call(token, "POST", fieldPath, edit)).statusCode).toBe(404);
-    expect((await call(token, "POST", "/characters", { ...create, initialValues: { [field.id]: 12 } })).statusCode).toBe(404);
+    const attached = await call(token, "GET", path);
+    expect(attached.statusCode, attached.body).toBe(200);
+    expect(attached.json()).toMatchObject({
+      ownerId: null, values: { [field.id]: 14 },
+      campaign: { campaignId: campaign.value.campaignId, controllers: [ada.actorId], returnOwnerId: ada.actorId },
+    });
+    expect((await call(token, "GET", `${path}/portrait`)).statusCode).toBe(200);
+    // The standalone list stays limited to standalone sheets, as in the browser.
     expect((await call(token, "GET", "/characters")).json().characters.map(
       (character: { characterId: string }) => character.characterId,
     )).toEqual([secondId]);
+    const outsider = await issue(handle.users.bob.cookie);
+    expect((await call(outsider.token, "GET", path)).statusCode).toBe(404);
+    expect((await call(outsider.token, "POST", fieldPath, edit)).statusCode).toBe(404);
     const browserSheet = await handle.app.inject({ url: path, headers: { cookie: ada.cookie } });
     expect(browserSheet.statusCode).toBe(200);
     expect(browserSheet.json().character.state.values[field.id]).toBe(14);

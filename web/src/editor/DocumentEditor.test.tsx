@@ -333,7 +333,7 @@ describe("DocumentEditor", () => {
     let revision = 1;
     let serverName = "R1";
     const docFor = (name: string) => ({
-      schemaVersion: "1.0",
+      schemaVersion: "2.0", templates: [], slots: [],
       metadata: { name, description: "d", language: "en", defaultDice: "d20" },
       entities: [],
       referenceData: [],
@@ -437,7 +437,7 @@ describe("DocumentEditor", () => {
       fallback: false,
     });
     const docFor = (expressions: Array<ReturnType<typeof expr>>, message: string) => ({
-      schemaVersion: "1.0",
+      schemaVersion: "2.0", templates: [], slots: [],
       metadata: { name: "R1", description: "d", language: "en", defaultDice: "d20" },
       entities: [],
       referenceData: [],
@@ -566,7 +566,7 @@ describe("DocumentEditor", () => {
       value: { ...window.location, search: "" },
     });
     const docFor = (name: string, description: string) => ({
-      schemaVersion: "1.0",
+      schemaVersion: "2.0", templates: [], slots: [],
       metadata: { name, description, language: "en", defaultDice: "d20" },
       entities: [],
       referenceData: [],
@@ -682,7 +682,7 @@ describe("DocumentEditor", () => {
       value: { ...window.location, search: "" },
     });
     const docFor = (name: string) => ({
-      schemaVersion: "1.0",
+      schemaVersion: "2.0", templates: [], slots: [],
       metadata: { name, description: "d", language: "en", defaultDice: "d20" },
       entities: [],
       referenceData: [],
@@ -791,7 +791,7 @@ describe("DocumentEditor", () => {
       value: { ...window.location, search: "" },
     });
     const docFor = (name: string) => ({
-      schemaVersion: "1.0",
+      schemaVersion: "2.0", templates: [], slots: [],
       metadata: { name, description: "d", language: "en", defaultDice: "d20" },
       entities: [],
       referenceData: [],

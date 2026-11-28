@@ -1,4 +1,8 @@
+import { campaignRollRequirements } from "./roll-context.js";
 import {effectiveEntryDefinition} from "./effective-entry.js";
+import { entryItemScope } from "./entry-values.js";
+import { buildFieldBindings } from "./state.js";
+import type { BindingValue } from "../rules/evaluate.js";
 import type {
   CharacterProjectionElement,
   CharacterProjectionFieldConstraints,
@@ -28,11 +32,14 @@ export function buildCharacterProjection(input: {
   const { packageValue, entity, state, derivedValues, validations } = input;
   const fields = new Map(entity.fields.map((field) => [field.id, field]));
   const actions = new Map(packageValue.actions.map((action) => [action.id, action]));
-  const slots = new Map((packageValue.slots ?? []).map((slot) => [slot.id, slot]));
-  const templates = new Map((packageValue.templates ?? []).map((template) => [template.id, template]));
+  const slots = new Map(packageValue.slots.map((slot) => [slot.id, slot]));
+  const templates = new Map(packageValue.templates.map((template) => [template.id, template]));
   const validationsFor = (id: string): RuntimeValidation[] =>
     validations.filter((validation) => validation.targetDefinitionId === id);
   const entitySheets = packageValue.sheets.filter((sheet) => sheet.targetEntityId === entity.id);
+  // Hidden sections and elements are left out of the sheet; their values stay in the API (S9).
+  const visible = (fieldId: string | undefined) => fieldId === undefined
+    || (Object.hasOwn(derivedValues, fieldId) ? derivedValues[fieldId] : state.values[fieldId]) === true;
   const bound = new Set(entitySheets.flatMap(sheet => sheet.sections.flatMap(section =>
     section.elements.flatMap(element => element.kind === "field" ? [element.fieldId] : [])
   )));
@@ -54,12 +61,12 @@ export function buildCharacterProjection(input: {
       .map((sheet) => ({
         id: sheet.id,
         label: sheet.label,
-        sections: sheet.sections.map((section) => ({
+        sections: sheet.sections.filter((section) => visible(section.visibleWhen)).map((section) => ({
           id: section.id,
           label: section.label,
-          elements: section.elements.flatMap((element) => projectElement(
+          elements: section.elements.filter((element) => visible(element.visibleWhen)).flatMap((element) => projectElement(
             element,
-            { fields, actions, slots, templates, packageValue },
+            { fields, actions, slots, templates, packageValue, characterFields: buildFieldBindings(entity, state) },
             state,
             derivedValues,
             validationsFor,
@@ -74,6 +81,7 @@ export function buildCharacterProjection(input: {
 function projectElement(
   element: SheetElementV1,
   lookups: {
+    characterFields: Readonly<Record<string, BindingValue>>;
     fields: Map<string, FieldV1>;
     actions: Map<string, SystemPackageV1["actions"][number]>;
     slots: Map<string, SlotDefinitionV1>;
@@ -85,7 +93,7 @@ function projectElement(
   validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement[] {
   if (element.kind === "heading") return [{ ...element }];
-  if (element.kind === "slot") return projectSlot(element.slotId, element.id, lookups, state, validationsFor);
+  if (element.kind === "slot") return projectSlot(element.slotId, element.id, lookups, state);
   if (element.kind === "action") {
     const action = lookups.actions.get(element.actionId)!;
     return [{
@@ -94,6 +102,14 @@ function projectElement(
       actionId: action.id,
       label: action.label,
       actionKind: action.kind,
+      ...(action.kind === "draw" || action.kind === "shuffle" ? {
+        deck: {
+          deckId: action.deckId,
+          label: lookups.packageValue.decks?.find(deck => deck.id === action.deckId)?.label ?? action.deckId,
+          ...(action.kind === "draw" ? { count: action.count } : {}),
+        },
+      } : {}),
+      ...campaignRollRequirements(action),
       inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
       validations: validationsFor(action.id),
     }];
@@ -112,6 +128,7 @@ function projectElement(
       max: field.max,
       step: field.step,
       resetTo: field.resetTo,
+      ...(field.maxExpressionId === undefined ? {} : { computedMaximum: true }),
       validations: validationsFor(field.id),
     }];
   }
@@ -133,12 +150,12 @@ function projectSlot(
     slots: Map<string, SlotDefinitionV1>;
     templates: Map<string, ObjectTemplateV1>;
     packageValue: SystemPackageV1;
+    characterFields: Readonly<Record<string, BindingValue>>;
   },
   state: RuntimeStateV1,
-  validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement[] {
   const slot = lookups.slots.get(slotId);
-  const slotEntries = Object.values(state.entries ?? {})
+  const slotEntries = Object.values(state.entries)
     .filter((entry) => entry.slotId === slotId)
     .sort((left, right) => (left.entryId < right.entryId ? -1 : left.entryId > right.entryId ? 1 : 0));
   const projected: CharacterProjectionSlotEntry[] = slotEntries.map((entry) => {
@@ -146,10 +163,12 @@ function projectSlot(
     return {
       entryId: entry.entryId,
       templateId: entry.templateId,
+      ...(entry.extensionId === undefined ? {} : { extensionId: entry.extensionId }),
       ...(entry.source === undefined ? {} : {source:structuredClone(entry.source)}),
       label: entry.snapshot && "base" in entry.snapshot ? entry.snapshot.values.name : template?.label ?? customEntryLabel(entry.values),
       ...(entry.snapshot && "base" in entry.snapshot && template ? {definition:projectEntryDefinition(template), metadata:structuredClone(entry.snapshot.values)} : {}),
       values: structuredClone(entry.values),
+      ...derivedEntryValues(lookups.packageValue, template, entry, lookups.characterFields),
       ...(entry.quantity === undefined ? {} : { quantity: entry.quantity }),
     };
   });
@@ -165,16 +184,34 @@ function projectSlot(
     const template = effectiveEntryDefinition(lookups.packageValue, entry);
     if (template === undefined) continue;
     for (const action of template.grantedActions) {
-      elements.push(projectGrantedAction(entry.entryId, action, validationsFor));
+      elements.push(projectGrantedAction(entry.entryId, action));
     }
   }
   return elements;
 }
 
+/** Computed template fields are read-only sheet values; one that fails to evaluate is left out. */
+function derivedEntryValues(
+  packageValue: SystemPackageV1,
+  template: ObjectTemplateV1 | undefined,
+  entry: RuntimeStateV1["entries"][string],
+  characterFields: Readonly<Record<string, BindingValue>>,
+): Pick<CharacterProjectionSlotEntry, "derived"> {
+  if (template === undefined || !template.fields.some((field) => field.kind === "computed")) return {};
+  const scope = entryItemScope(packageValue, template, entry, characterFields);
+  return {
+    derived: template.fields.flatMap((field) => {
+      if (field.kind !== "computed" || !scope.derive(field.id)) return [];
+      const value = scope.item[field.id];
+      return typeof value === "number" || typeof value === "string" || typeof value === "boolean"
+        ? [{ id: field.id, label: field.label, value }] : [];
+    }),
+  };
+}
+
 function projectGrantedAction(
   entryId: string,
   action: GrantedActionV1,
-  validationsFor: (id: string) => RuntimeValidation[],
 ): CharacterProjectionElement {
   return {
     kind: "action",
@@ -183,8 +220,9 @@ function projectGrantedAction(
     entryId,
     label: action.label,
     actionKind: action.kind,
-    inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
-    validations: validationsFor(action.id),
+    ...campaignRollRequirements(action),
+      inputs: action.kind === "roll" ? action.inputs.map((input) => ({ ...input })) : [],
+    validations: [],
   };
 }
 
@@ -241,5 +279,5 @@ function fieldConstraints(
 function projectEntryDefinition(template:ObjectTemplateV1):NonNullable<CharacterProjectionSlotEntry["definition"]>{
  return {id:template.id,label:template.label,kind:template.kind,
   fields:template.fields.filter((f):f is Exclude<FieldV1,{kind:"computed"}|{kind:"image"}>=>f.kind!=="computed" && f.kind!=="image").map(f=>({id:f.id,label:f.label,kind:f.kind,default:structuredClone(f.default),...(f.kind==="resource"?{min:f.min,max:f.max,step:f.step}:fieldConstraints(f))})),
-  grantedActions:template.grantedActions.map(a=>({id:a.id,label:a.label,kind:a.kind,inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]}))};
+  grantedActions:template.grantedActions.map(a=>({id:a.id,label:a.label,kind:a.kind,...campaignRollRequirements(a),inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]}))};
 }

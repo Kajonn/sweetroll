@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { mkdir, readdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,13 +11,17 @@ import { hashToken, newSessionToken } from "../identity/util.js";
 import type { CampaignPersistenceRepository } from "./persistence.js";
 import { canManageCampaign } from "./policy.js";
 import type { CampaignError, CampaignResult } from "./index.js";
-import { resolveMediaRoot } from "./media.js";
+import { resolveMediaRoot } from "../platform/image-storage.js";
 import type { FogOp, TokenRecord } from "./scenes.js";
 
 export type DisplayProjection = {
   sceneId: string;
+  /** Bumps on every saved scene edit (tokens, fog, background). */
   sceneRevision: number;
-  imageUrl: string; // redacted derivative for this revision, e.g. `/displays/:id/scenes/:sceneId/image?rev=N`
+  /** Bumps only when the player-safe map changes (fog or a different background). */
+  imageRevision: number;
+  imageUrl: string; // redacted derivative for this image revision, e.g. `/displays/:id/scenes/:sceneId/image?rev=N`
+  /** Token art URLs stay stable across moves: `/displays/:id/scenes/:sceneId/tokens/:tokenId/image?file=<imageFileId>`. */
   tokens: Array<{ tokenId: string; label: string; x: number; y: number; size: number; imageUrl: string | null }>;
 };
 
@@ -25,7 +29,7 @@ export type PairDisplayInput = { campaignId: string };
 export type PairDisplaySuccess = { code: string };
 export type RedeemDisplayCodeInput = { code: string };
 export type RedeemDisplayCodeSuccess = { displayId: string; secret: string };
-export type GetDisplayProjectionInput = { displayId: string; secret: string; sceneId: string };
+export type DisplaySceneInput = { displayId: string; secret: string; sceneId: string };
 export type RevokeDisplayInput = { displayId: string };
 export type RevokeDisplaySuccess = { displayId: string };
 export type ListDisplayCredentialsInput = { campaignId: string };
@@ -51,6 +55,8 @@ export type GetDisplayTokenImageInput = {
   secret: string;
   sceneId: string;
   tokenId: string;
+  /** The token's current image file (stable URL key); a mismatch reads as not_found. */
+  file?: string | undefined;
 };
 /** I7b Task 4: image bytes for the display-credential binary routes. */
 export type DisplayImageBytes = {
@@ -66,19 +72,25 @@ const PAIRING_CODE_TTL_MS = 5 * 60 * 1000;
 // (typed once from the GM screen into the display), never hand-transcribed
 // from dictation, so readability outranks disambiguation here.
 const CODE_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-const CODE_LENGTH = 6;
+const CODE_LENGTH = 8;
 const MAX_MINT_ATTEMPTS = 8;
+const MAX_LIVE_PAIRING_CODES = 5;
 
 const NOT_FOUND_MESSAGE = "The requested display resource does not exist.";
 
-/** 6-char pairing code over an uppercase alphanumeric alphabet. Codes are
+/** 8-char pairing code over an uppercase alphanumeric alphabet. Codes are
  * machine-copied from the GM screen, never hand-transcribed (0/O and 1/I
  * stay confusable by design, see CODE_ALPHABET). */
 export function generateDisplayCode(): string {
-  const bytes = randomBytes(CODE_LENGTH);
+  // Rejection sampling: bytes at or above the largest multiple of the
+  // alphabet size (252 = 7 * 36) are discarded, so `byte % 36` is uniform.
+  const limit = 256 - (256 % CODE_ALPHABET.length);
   let code = "";
-  for (const byte of bytes) {
-    code += CODE_ALPHABET[(byte as number) % CODE_ALPHABET.length];
+  while (code.length < CODE_LENGTH) {
+    for (const byte of randomBytes(CODE_LENGTH)) {
+      if (byte >= limit || code.length === CODE_LENGTH) continue;
+      code += CODE_ALPHABET[byte % CODE_ALPHABET.length];
+    }
   }
   return code;
 }
@@ -97,26 +109,67 @@ export function resolveDisplayRoot(): string {
 }
 
 /**
- * Derivative cache key: one PNG per (sceneId, revision), so a fog/token
- * stroke (which bumps the revision) composites a new file instead of
- * overwriting the old one. Task 4 serves this path on the display-credential
- * image route.
+ * Derivative cache key: one PNG per (sceneId, imageRevision). Token-only
+ * edits keep the image revision, so they reuse the cached map; a fog edit or
+ * a different background bumps it and composites a new file. Older image
+ * revisions of the same scene are deleted after a newer one is written.
  */
-export function displayDerivativePath(sceneId: string, revision: number): string {
-  return join(resolveDisplayRoot(), `${sceneId}-rev${revision}.png`);
+export function displayDerivativePath(sceneId: string, imageRevision: number): string {
+  return join(resolveDisplayRoot(), `${sceneId}-rev${imageRevision}.png`);
 }
+
+/** Longest side of a cached token-art derivative; smaller images keep their size. */
+export const DISPLAY_TOKEN_IMAGE_MAX_SIDE = 1024;
+
+/**
+ * Token-art derivative cache key: one PNG per (fileId, media revision),
+ * independent of the scene, so moves and other displays reuse it. Media
+ * bytes never change in place; deleting the file removes its derivatives.
+ */
+export function displayTokenDerivativePath(fileId: string, mediaRevision: number): string {
+  return join(resolveDisplayRoot(), "tokens", `${fileId}-rev${mediaRevision}.png`);
+}
+
+/** Best-effort removal of a deleted media file's token-art derivatives. */
+export async function removeDisplayTokenDerivatives(fileId: string): Promise<void> {
+  const directory = join(resolveDisplayRoot(), "tokens");
+  let names: string[];
+  try {
+    names = await readdir(directory);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (!name.startsWith(`${fileId}-rev`) || !name.endsWith(".png")) continue;
+    await unlink(join(directory, name)).catch(() => {});
+  }
+}
+
+/** Observability seam (tests and load comparison): renders and served map bytes. */
+export type DisplayObserver = {
+  onRender?(sceneId: string, imageRevision: number): void;
+  onTokenImageRender?(fileId: string, mediaRevision: number): void;
+  onSceneImageServed?(sceneId: string, imageRevision: number, bytes: number): void;
+};
 
 export type CreateDisplayCommandsInput = {
   pool: Pool;
   repo: CampaignPersistenceRepository;
   now?: (() => Date) | undefined;
   newId?: (() => string) | undefined;
+  observer?: DisplayObserver | undefined;
 };
 
 export interface DisplayCommands {
   pairDisplay(ctx: RequestContext, input: PairDisplayInput): Promise<CampaignResult<PairDisplaySuccess>>;
   redeemDisplayCode(input: RedeemDisplayCodeInput): Promise<CampaignResult<RedeemDisplayCodeSuccess>>;
-  getDisplayProjection(input: GetDisplayProjectionInput): Promise<CampaignResult<DisplayProjection>>;
+  /**
+   * Scene-stream snapshot: the credential-scoped projection plus its owning
+   * campaign (used for event filtering; never sent to the display).
+   */
+  getDisplaySnapshot(
+    input: DisplaySceneInput,
+  ): Promise<CampaignResult<{ campaignId: string; projection: DisplayProjection }>>;
   revokeDisplay(ctx: RequestContext, input: RevokeDisplayInput): Promise<CampaignResult<RevokeDisplaySuccess>>;
   listDisplayCredentials(
     ctx: RequestContext,
@@ -194,7 +247,7 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
    * not_found without distinguishing cases).
    */
   async function resolveDisplayScene(
-    projectionInput: GetDisplayProjectionInput,
+    projectionInput: DisplaySceneInput,
   ): Promise<
     | {
         credential: { displayId: string; campaignId: string };
@@ -202,6 +255,7 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
           sceneId: string;
           campaignId: string;
           revision: number;
+          imageRevision: number;
           backgroundFileId: string;
           fog: unknown;
           tokens: unknown;
@@ -224,7 +278,7 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
     ) {
       return null;
     }
-    const scene = await repo.loadScene(input.pool, projectionInput.sceneId);
+    const scene = await loadSharedScene(projectionInput.sceneId);
     if (scene === null || scene.campaignId !== credential.campaignId) {
       return null;
     }
@@ -235,25 +289,144 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
   }
 
   /**
-   * I7b Task 4: cache-miss composite shared by the projection and the scene
-   * image route. Bytes are deterministic in (background, fog), so a
-   * concurrent second composite writes identical content.
+   * Shared scene read: concurrent projections of one scene (many displays,
+   * one write) share a single row load. Only in-flight loads are shared, so
+   * a later read always observes the latest committed revision. Credential
+   * scope is still checked per caller.
    */
-  async function ensureDerivative(
+  const sceneLoads = new Map<string, Promise<Awaited<ReturnType<typeof repo.loadScene>>>>();
+  function loadSharedScene(sceneId: string): ReturnType<typeof repo.loadScene> {
+    const pending = sceneLoads.get(sceneId);
+    if (pending !== undefined) return pending;
+    const load = repo.loadScene(input.pool, sceneId).finally(() => {
+      sceneLoads.delete(sceneId);
+    });
+    sceneLoads.set(sceneId, load);
+    return load;
+  }
+
+  /** One in-flight render per (scene, image revision) per process. */
+  const renders = new Map<string, Promise<Buffer>>();
+
+  async function readCachedDerivative(sceneId: string, imageRevision: number): Promise<Buffer | null> {
+    try {
+      return await readFile(displayDerivativePath(sceneId, imageRevision));
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Cache-miss render. Atomic write (temp file + rename) so a concurrent
+   * reader never sees a partial PNG; afterwards older image revisions of the
+   * scene are removed (bounded retention). Bytes are deterministic in
+   * (background, fog), so another replica rendering the same version into a
+   * separate cache produces identical content.
+   */
+  function renderDerivative(
     sceneId: string,
-    revision: number,
+    imageRevision: number,
     backgroundBytes: Buffer,
     fog: FogOp[],
-  ): Promise<string> {
-    const derivativePath = displayDerivativePath(sceneId, revision);
-    try {
-      await readFile(derivativePath);
-    } catch {
-      await mkdir(dirname(derivativePath), { recursive: true });
+  ): Promise<Buffer> {
+    const key = `${sceneId}:${imageRevision}`;
+    const pending = renders.get(key);
+    if (pending !== undefined) return pending;
+    const work = (async () => {
+      // A render for this key may have finished between the caller's cache
+      // miss and this call (its file is renamed into place before the
+      // in-flight entry is cleared), so check once more before compositing.
+      const finished = await readCachedDerivative(sceneId, imageRevision);
+      if (finished !== null) return finished;
+      input.observer?.onRender?.(sceneId, imageRevision);
       const derivative = await compositeDerivative(backgroundBytes, fog);
-      await writeFile(derivativePath, derivative, { mode: 0o600 });
+      const derivativePath = displayDerivativePath(sceneId, imageRevision);
+      await mkdir(dirname(derivativePath), { recursive: true });
+      const temporary = `${derivativePath}.${randomUUID()}.tmp`;
+      try {
+        await writeFile(temporary, derivative, { mode: 0o600 });
+        await rename(temporary, derivativePath);
+      } catch {
+        // Caching is an optimization: the authorized bytes are still served.
+        await unlink(temporary).catch(() => {});
+      }
+      await pruneOlderDerivatives(sceneId, imageRevision);
+      return derivative;
+    })().finally(() => {
+      renders.delete(key);
+    });
+    renders.set(key, work);
+    return work;
+  }
+
+  /** One in-flight token-art render per (file, media revision) per process. */
+  const tokenRenders = new Map<string, Promise<Buffer | null>>();
+
+  async function readCachedTokenDerivative(fileId: string, mediaRevision: number): Promise<Buffer | null> {
+    try {
+      return await readFile(displayTokenDerivativePath(fileId, mediaRevision));
+    } catch {
+      return null;
     }
-    return derivativePath;
+  }
+
+  /**
+   * Cache-miss token-art render: PNG, at most DISPLAY_TOKEN_IMAGE_MAX_SIDE
+   * on the longest side, written atomically. Returns null when the original
+   * bytes are missing from disk (fail closed).
+   */
+  function renderTokenDerivative(fileId: string, mediaRevision: number, storageKey: string): Promise<Buffer | null> {
+    const key = `${fileId}:${mediaRevision}`;
+    const pending = tokenRenders.get(key);
+    if (pending !== undefined) return pending;
+    const work = (async () => {
+      const finished = await readCachedTokenDerivative(fileId, mediaRevision);
+      if (finished !== null) return finished;
+      const original = await readBackgroundBytes(storageKey);
+      if (original === null) return null;
+      input.observer?.onTokenImageRender?.(fileId, mediaRevision);
+      const derivative = await sharp(original)
+        .resize({
+          width: DISPLAY_TOKEN_IMAGE_MAX_SIDE,
+          height: DISPLAY_TOKEN_IMAGE_MAX_SIDE,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .png()
+        .toBuffer();
+      const derivativePath = displayTokenDerivativePath(fileId, mediaRevision);
+      const temporary = `${derivativePath}.${randomUUID()}.tmp`;
+      try {
+        await mkdir(dirname(derivativePath), { recursive: true });
+        await writeFile(temporary, derivative, { mode: 0o600 });
+        await rename(temporary, derivativePath);
+      } catch {
+        // Caching is an optimization: the authorized bytes are still served.
+        await unlink(temporary).catch(() => {});
+      }
+      return derivative;
+    })().finally(() => {
+      tokenRenders.delete(key);
+    });
+    tokenRenders.set(key, work);
+    return work;
+  }
+
+  async function pruneOlderDerivatives(sceneId: string, keepImageRevision: number): Promise<void> {
+    let names: string[];
+    try {
+      names = await readdir(resolveDisplayRoot());
+    } catch {
+      return;
+    }
+    const prefix = `${sceneId}-rev`;
+    const keep = `${prefix}${keepImageRevision}.png`;
+    for (const name of names) {
+      if (!name.startsWith(prefix) || !name.endsWith(".png") || name === keep) continue;
+      const revision = Number(name.slice(prefix.length, -".png".length));
+      if (!Number.isInteger(revision) || revision >= keepImageRevision) continue;
+      await unlink(join(resolveDisplayRoot(), name)).catch(() => {});
+    }
   }
 
   async function readBackgroundBytes(storageKey: string): Promise<Buffer | null> {
@@ -427,37 +600,35 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
     return await sharp(data, { raw: { width, height, channels: 4 } }).png().toBuffer();
   }
 
-  return {
+  const commands: DisplayCommands = {
     async pairDisplay(ctx, pairInput) {
       try {
         if (!checkPresent(pairInput.campaignId)) {
           return { ok: false, error: errors.bad_request("campaignId must be a non-empty string.") };
         }
-        const authorized = await withClient(async (client) => {
-          const campaign = await repo.openCampaign(client, pairInput.campaignId);
-          const membership =
-            campaign === null ? null : await repo.loadMembership(client, pairInput.campaignId, ctx.actorId);
-          if (campaign === null || !canManageCampaign(campaign, membership)) return false;
-          return true;
-        });
-        if (!authorized) return { ok: false, error: errors.not_found() };
-
-        // Each call mints a fresh code (no idempotency): the UNIQUE hash
-        // retries on the (astronomically unlikely) collision instead of
-        // failing the pairing attempt.
-        const paired = await withTransaction(async (client) => {
+        return await withTransaction<CampaignResult<PairDisplaySuccess>>(async (client) => {
+          // Serialize concurrent mints while allowing an in-flight redemption
+          // to take the foreign key's KEY SHARE lock on the campaign.
+          const campaign = await repo.lockCampaign(client, pairInput.campaignId, "NO KEY UPDATE");
+          const membership = campaign === null ? null : await repo.loadMembership(client, pairInput.campaignId, ctx.actorId);
+          if (campaign === null || !canManageCampaign(campaign, membership)) {
+            return { ok: false, error: errors.not_found() };
+          }
+          const issuedAt = now();
+          if (await repo.countLiveDisplayCodes(client, pairInput.campaignId, issuedAt) >= MAX_LIVE_PAIRING_CODES) {
+            return { ok: false, error: { code: "conflict", message: "Redeem a pairing code or wait for one to expire." } };
+          }
           for (let attempt = 0; attempt < MAX_MINT_ATTEMPTS; attempt++) {
             const code = generateDisplayCode();
             const inserted = await repo.insertDisplayCode(client, {
               codeHash: hashToken(code),
               campaignId: pairInput.campaignId,
-              expiresAt: new Date(now().getTime() + PAIRING_CODE_TTL_MS),
+              expiresAt: new Date(issuedAt.getTime() + PAIRING_CODE_TTL_MS),
             });
-            if (inserted !== null) return code;
+            if (inserted !== null) return { ok: true, value: { code } };
           }
           throw new Error("display code mint collided repeatedly");
         });
-        return { ok: true, value: { code: paired } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -492,34 +663,30 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
       }
     },
 
-    async getDisplayProjection(projectionInput) {
+    async getDisplaySnapshot(projectionInput) {
       try {
         const resolved = await resolveDisplayScene(projectionInput);
         if (resolved === null) {
           return { ok: false, error: errors.not_found() };
         }
         const { credential, scene } = resolved;
+        // Metadata only: PNG generation happens on the image route, so a
+        // token-only edit neither reads the original map nor renders.
         const background = await repo.loadMediaFile(input.pool, scene.backgroundFileId);
         if (background === null || background.campaignId !== scene.campaignId) {
           // Orphaned background pin (image deleted while pinned, no FK):
           // fail closed — a scene without its background has no projection.
           return { ok: false, error: errors.not_found() };
         }
-        const backgroundBytes = await readBackgroundBytes(background.storageKey);
-        if (backgroundBytes === null) {
-          return { ok: false, error: errors.not_found() };
-        }
         const fog = parseStoredFog(scene.fog);
         const tokens = parseStoredTokens(scene.tokens);
-
-        await ensureDerivative(scene.sceneId, scene.revision, backgroundBytes, fog);
-
         return {
           ok: true,
-          value: {
+          value: { campaignId: scene.campaignId, projection: {
             sceneId: scene.sceneId,
             sceneRevision: scene.revision,
-            imageUrl: `/displays/${credential.displayId}/scenes/${scene.sceneId}/image?rev=${scene.revision}`,
+            imageRevision: scene.imageRevision,
+            imageUrl: `/displays/${credential.displayId}/scenes/${scene.sceneId}/image?rev=${scene.imageRevision}`,
             tokens: tokens
               .filter((token) => token.visible && isPointRevealed(token.x, token.y, fog))
               .map((token) => ({
@@ -528,14 +695,15 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
                 x: token.x,
                 y: token.y,
                 size: token.size,
-                // Task 4 wires this display-credential token image route;
-                // imageless tokens carry null (never a GM original URL).
+                // Stable across moves: keyed by the token's image reference,
+                // not the scene revision. Imageless tokens carry null (never
+                // a GM original URL).
                 imageUrl:
                   token.imageFileId === null
                     ? null
-                    : `/displays/${credential.displayId}/scenes/${scene.sceneId}/tokens/${token.tokenId}/image?rev=${scene.revision}`,
+                    : `/displays/${credential.displayId}/scenes/${scene.sceneId}/tokens/${token.tokenId}/image?file=${token.imageFileId}`,
               })),
-          },
+          } },
         };
       } catch {
         return { ok: false, error: errors.internal() };
@@ -613,33 +781,41 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
           return { ok: false, error: errors.not_found() };
         }
         const { scene } = resolved;
-        // The rev cache key must name the current revision: a stale rev
-        // names fog state that no longer holds, so it reads as missing and
-        // the display refetches the projection instead of showing old fog.
-        if (imageInput.rev !== scene.revision) {
+        // The rev cache key must name the current image revision: a stale
+        // rev names fog state that no longer holds, so it reads as missing
+        // and the display waits for its next snapshot instead of old fog.
+        if (imageInput.rev !== scene.imageRevision) {
           return { ok: false, error: errors.not_found() };
         }
         const background = await repo.loadMediaFile(input.pool, scene.backgroundFileId);
         if (background === null || background.campaignId !== scene.campaignId) {
           return { ok: false, error: errors.not_found() };
         }
-        const backgroundBytes = await readBackgroundBytes(background.storageKey);
-        if (backgroundBytes === null) {
-          return { ok: false, error: errors.not_found() };
-        }
-        const derivativePath = await ensureDerivative(
-          scene.sceneId,
-          scene.revision,
-          backgroundBytes,
-          parseStoredFog(scene.fog),
-        );
+        // Authorized cache hit: reuse the derivative before reading the map.
+        const cached = await readCachedDerivative(scene.sceneId, scene.imageRevision);
         let bytes: Buffer;
-        try {
-          bytes = await readFile(derivativePath);
-        } catch {
-          return { ok: false, error: errors.not_found() };
+        if (cached !== null) {
+          bytes = cached;
+        } else {
+          const backgroundBytes = await readBackgroundBytes(background.storageKey);
+          if (backgroundBytes === null) {
+            return { ok: false, error: errors.not_found() };
+          }
+          bytes = await renderDerivative(
+            scene.sceneId,
+            scene.imageRevision,
+            backgroundBytes,
+            parseStoredFog(scene.fog),
+          );
+          // A slow render may outlive a revocation or a conceal: recheck
+          // access and the image revision before any bytes leave.
+          const rechecked = await resolveDisplayScene(imageInput);
+          if (rechecked === null || rechecked.scene.imageRevision !== imageInput.rev) {
+            return { ok: false, error: errors.not_found() };
+          }
         }
-        return { ok: true, value: { contentType: "image/png", bytes, revision: scene.revision } };
+        input.observer?.onSceneImageServed?.(scene.sceneId, scene.imageRevision, bytes.length);
+        return { ok: true, value: { contentType: "image/png", bytes, revision: scene.imageRevision } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -664,7 +840,8 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
           token === undefined ||
           !token.visible ||
           !isPointRevealed(token.x, token.y, fog) ||
-          token.imageFileId === null
+          token.imageFileId === null ||
+          (tokenImageInput.file !== undefined && tokenImageInput.file !== token.imageFileId)
         ) {
           return { ok: false, error: errors.not_found() };
         }
@@ -672,17 +849,35 @@ export function createDisplayCommands(input: CreateDisplayCommandsInput): Displa
         if (image === null || image.campaignId !== scene.campaignId) {
           return { ok: false, error: errors.not_found() };
         }
-        const bytes = await readBackgroundBytes(image.storageKey);
-        if (bytes === null) {
+        // Token images normalize to PNG (like the scene derivative), so the
+        // documented `image/png` holds for every admitted upload type. The
+        // derivative is cached per (file, media revision); visibility and
+        // fog were checked above, before any cached bytes are read.
+        const cached = await readCachedTokenDerivative(image.fileId, image.revision);
+        const normalized = cached ?? await renderTokenDerivative(image.fileId, image.revision, image.storageKey);
+        if (normalized === null) {
           return { ok: false, error: errors.not_found() };
         }
-        // Token images normalize to PNG (like the scene derivative), so the
-        // documented `image/png` holds for every admitted upload type.
-        const normalized = await sharp(bytes).png().toBuffer();
+        if (cached === null) {
+          // A slow render may outlive a revocation, a hide or a conceal:
+          // recheck access and the token before any bytes leave.
+          const rechecked = await resolveDisplayScene(tokenImageInput);
+          const still = rechecked === null ? undefined : parseStoredTokens(rechecked.scene.tokens).find(
+            (candidate) => candidate.tokenId === tokenImageInput.tokenId,
+          );
+          if (
+            rechecked === null || still === undefined || !still.visible ||
+            !isPointRevealed(still.x, still.y, parseStoredFog(rechecked.scene.fog)) ||
+            still.imageFileId !== image.fileId
+          ) {
+            return { ok: false, error: errors.not_found() };
+          }
+        }
         return { ok: true, value: { contentType: "image/png", bytes: normalized, revision: scene.revision } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
     },
   };
+  return commands;
 }

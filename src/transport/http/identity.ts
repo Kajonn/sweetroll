@@ -2,7 +2,7 @@ import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import fp from "fastify-plugin";
 
-import type { Identity } from "../../identity/index.js";
+import type { AccountPreferences, Identity } from "../../identity/index.js";
 
 const UUID_FORMAT = "uuid";
 
@@ -10,6 +10,7 @@ const MeResponseDto = Type.Union([
   Type.Object({
     state: Type.Literal("authenticated"),
     userId: Type.String({ format: UUID_FORMAT }),
+    physicalDiceEnabled: Type.Optional(Type.Literal(true)),
   }),
   Type.Object({
     state: Type.Literal("anonymous"),
@@ -41,19 +42,25 @@ const ThemeDefaultDto = Type.Union([
   Type.Literal("system"),
 ]);
 
+const DicePreferencesDto = {
+  show_3d_dice: Type.Optional(Type.Boolean()),
+  dice_color: Type.Optional(Type.String({ pattern: "^#[0-9A-Fa-f]{6}$" })),
+};
 const PreferencesResponseDto = Type.Object({
   theme_default: Type.Union([ThemeDefaultDto, Type.Null()]),
+  ...DicePreferencesDto,
 });
 
 const PatchPreferencesBodyDto = Type.Object({
   theme_default: Type.Optional(Type.Union([ThemeDefaultDto, Type.Null()])),
+  ...DicePreferencesDto,
 });
 
 export type BuildIdentityRoutesInput = {
+  physicalDiceEnabled?: boolean;
   identity: Identity;
   cookieName: string;
   secure: boolean;
-  allowedOrigins?: ReadonlyArray<string>;
 };
 
 type HttpMethod = "get" | "post" | "put" | "patch" | "delete";
@@ -119,22 +126,8 @@ export const identityRouteDefinitions: readonly IdentityRouteDefinition[] = [
   },
 ];
 
-export function isSameOrigin(origin: string, request: FastifyRequest, allowedOrigins: ReadonlyArray<string>): boolean {
-  if (allowedOrigins.includes(origin)) return true;
-  try {
-    // Compare the Origin host (including port) against the request Host header.
-    // Scheme is deliberately ignored: behind a TLS-terminating proxy (and in
-    // tests) the request protocol is reported as http even though the
-    // originating request is https, so a strict scheme comparison would reject
-    // legitimate same-origin requests.
-    return new URL(origin).host === request.host;
-  } catch {
-    return false;
-  }
-}
-
 export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPluginCallback =
-  ({ identity, cookieName, secure, allowedOrigins = [] }) =>
+  ({ identity, cookieName, secure, physicalDiceEnabled = false }) =>
   fp(async (app) => {
     app.addHook("onSend", async (request, reply) => {
       reply.header("x-request-id", request.id);
@@ -172,7 +165,11 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
         // cleared by the auth hook) so the UI can offer re-auth. Anything
         // else unauthenticated stays anonymous.
         if (auth.state === "authenticated") {
-          return { state: "authenticated" as const, userId: auth.actorId };
+          return {
+            state: "authenticated" as const,
+            userId: auth.actorId,
+            ...(physicalDiceEnabled && { physicalDiceEnabled: true as const }),
+          };
         }
         if (auth.state === "session_expired") {
           return { state: "session_expired" as const };
@@ -185,18 +182,11 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
       "/signout",
       { schema: { response: { "204": Type.Null(), "403": ErrorEnvelopeDto } } },
       async (request, reply) => {
-        const origin = request.headers.origin;
-        if (origin !== undefined && !isSameOrigin(origin, request, allowedOrigins)) {
-          return reply.code(403).send({
-            error: { code: "forbidden", message: "Cross-origin sign-out is not allowed." },
-            requestId: request.id,
-          });
-        }
         const token = request.cookies[cookieName];
         if (token !== undefined && token.length > 0) {
           await identity.signOut(token);
+          reply.clearCookie(cookieName, clearCookieOptions);
         }
-        reply.clearCookie(cookieName, clearCookieOptions);
         return reply.code(204).send();
       },
     );
@@ -224,14 +214,14 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
       async (request, reply) => {
         const actorId = await requireActor(request, reply);
         if (actorId === null) return;
-        const result = await identity.getThemeDefault(actorId);
+        const result = await identity.getPreferences(actorId);
         if (!result.ok) {
           return reply.code(500).send({
             error: { code: result.error.code, message: result.error.message },
             requestId: request.id,
           });
         }
-        return { theme_default: result.value };
+        return physicalDiceEnabled ? result.value : { theme_default: result.value.theme_default };
       },
     );
 
@@ -250,27 +240,25 @@ export const buildIdentityRoutes: (input: BuildIdentityRoutesInput) => FastifyPl
       async (request, reply) => {
         const actorId = await requireActor(request, reply);
         if (actorId === null) return;
-        // PATCH is partial: an omitted theme_default leaves the stored
-        // default untouched; an explicit null clears it.
-        const body = (request.body ?? {}) as { theme_default?: "light" | "dark" | "system" | null };
-        if (body.theme_default === undefined) {
-          const current = await identity.getThemeDefault(actorId);
-          if (!current.ok) {
-            return reply.code(500).send({
-              error: { code: current.error.code, message: current.error.message },
-              requestId: request.id,
-            });
-          }
-          return { theme_default: current.value };
+        const body = (request.body ?? {}) as Partial<AccountPreferences>;
+        if (!physicalDiceEnabled && (body.show_3d_dice !== undefined || body.dice_color !== undefined)) {
+          return reply.code(400).send({error:{code:"bad_request",message:"Physical dice are disabled."},requestId:request.id});
         }
-        const result = await identity.setThemeDefault(actorId, body.theme_default);
+        const patch = {
+          ...(body.theme_default !== undefined && {theme_default:body.theme_default}),
+          ...(body.dice_color !== undefined && {dice_color:body.dice_color}),
+          ...(body.show_3d_dice !== undefined && {show_3d_dice:body.show_3d_dice}),
+        };
+        const result = Object.keys(patch).length
+          ? await identity.patchPreferences(actorId, patch)
+          : await identity.getPreferences(actorId);
         if (!result.ok) {
           return reply.code(500).send({
             error: { code: result.error.code, message: result.error.message },
             requestId: request.id,
           });
         }
-        return { theme_default: result.value };
+        return physicalDiceEnabled ? result.value : { theme_default: result.value.theme_default };
       },
     );
   });

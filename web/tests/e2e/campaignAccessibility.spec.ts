@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import AxeBuilder from "@axe-core/playwright";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 
 import { uid } from "../offline/test-auth.js";
 
@@ -205,7 +205,7 @@ async function pairDisplayViaUi(page: Page, campaignTitle: string): Promise<stri
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Share this display code now")).toBeVisible({ timeout: STEP_TIMEOUT });
   const code = ((await dialog.locator("strong").last().textContent()) ?? "").trim();
-  expect(code).toMatch(/^[A-Z0-9]{6}$/);
+  expect(code).toMatch(/^[A-Z0-9]{8}$/);
   await dialog.getByRole("button", { name: "Done" }).click({ timeout: STEP_TIMEOUT });
   await expect(dialog).toHaveCount(0, { timeout: STEP_TIMEOUT });
   await expect(page.getByRole("heading", { name: campaignTitle })).toBeVisible({ timeout: STEP_TIMEOUT });
@@ -357,7 +357,7 @@ test.describe("campaign accessibility", () => {
       await expect(page.getByRole("heading", { name: "Latest content" })).toBeVisible({
         timeout: STEP_TIMEOUT,
       });
-      await expect(page.getByText(noteTitle)).toBeVisible({ timeout: STEP_TIMEOUT });
+      await expect(page.getByText(noteTitle, { exact: true })).toBeVisible({ timeout: STEP_TIMEOUT });
       const openHero = page.getByRole("button", { name: `Open ${characterName}` });
       await expect(openHero).toBeVisible({ timeout: STEP_TIMEOUT });
 
@@ -430,7 +430,7 @@ test.describe("campaign accessibility", () => {
         timeout: STEP_TIMEOUT,
       });
       const code = ((await dialog.locator("strong").last().textContent()) ?? "").trim();
-      expect(code).toMatch(/^[A-Z0-9]{6}$/);
+      expect(code).toMatch(/^[A-Z0-9]{8}$/);
       const done = dialog.getByRole("button", { name: "Done" });
       await done.focus();
       await expect(done).toBeFocused();

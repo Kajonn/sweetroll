@@ -2,6 +2,14 @@ name: Hosted scene acceptance
 on:
   workflow_dispatch:
     inputs:
+      deployment_id:
+        description: Railway deployment ID from the acceptance deploy summary
+        type: string
+        required: true
+      sha:
+        description: Full commit SHA from the same deploy summary
+        type: string
+        required: true
       phase:
         type: choice
         options: [create, verify]
@@ -15,20 +23,44 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: hosted-scene-acceptance
+  group: sweetroll-acceptance
   cancel-in-progress: false
 jobs:
   scenes:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
+    environment: acceptance
     env:
       SCENE_BACKGROUND_PHASE: ${{ inputs.phase }}
       FIXTURE_RUN_ID: ${{ inputs.fixture_run_id }}
-      G9_ACCEPTANCE_URL: https://sweetroll-d2-preview.up.railway.app
+      G9_ACCEPTANCE_URL: ${{ vars.RAILWAY_APP_URL }}
       SCENE_BACKGROUND_FIXTURE: ${{ github.workspace }}/scene-evidence/scene-background-fixture.json
       G9_OUTPUT_DIR: ${{ github.workspace }}/scene-evidence/results
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Verify the target deployment
+        env:
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          SOURCE_SHA: ${{ inputs.sha }}
+          RAILWAY_PROJECT_ID: ${{ vars.RAILWAY_PROJECT_ID }}
+          RAILWAY_ENVIRONMENT_ID: ${{ vars.RAILWAY_ENVIRONMENT_ID }}
+          RAILWAY_SERVICE_ID: ${{ vars.RAILWAY_SERVICE_ID }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          npm install --global @railway/cli@5.71.0
+          node scripts/railway-deploy.mjs wait "$DEPLOYMENT_ID"
+          curl --fail --silent --show-error --max-time 15 "$G9_ACCEPTANCE_URL/health/ready"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc

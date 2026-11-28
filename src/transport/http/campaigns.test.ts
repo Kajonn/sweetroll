@@ -1,3 +1,4 @@
+import type { PhysicalDiceStreams } from "../../campaigns/physical-dice-stream.js";
 import { randomUUID } from "node:crypto";
 
 import cookiePlugin from "@fastify/cookie";
@@ -45,7 +46,7 @@ const fakeIdentity: Identity = {
   signOut: async () => ({ ok: true, value: undefined }),
 } as unknown as Identity;
 
-const cookie = { cookie: "session=t" };
+const cookie = { cookie: "session=t", "sec-fetch-site": "same-origin" };
 const apps: ReturnType<typeof Fastify>[] = [];
 
 function campaignView(overrides: Partial<CampaignView> = {}): CampaignView {
@@ -158,7 +159,7 @@ function placedView(overrides: Partial<PlacedCharacterView> = {}): PlacedCharact
     archivedAt: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
-    state: { schemaVersion: "1.0", values: {} },
+    state: { schemaVersion: "1.0", entries: {}, values: {} },
     replayed: false,
     ...overrides,
   };
@@ -206,12 +207,24 @@ function sceneView(overrides: Partial<SceneView> = {}): SceneView {
   };
 }
 
+/** A stream that writes one snapshot and ends, so inject() completes. */
+function finiteStream(projection: DisplayProjection) {
+  return {
+    attach(sink: { write(chunk: string): boolean; end(): void }) {
+      sink.write(`event: scene\ndata: ${JSON.stringify(projection)}\n\n`);
+      sink.end();
+    },
+    close() {},
+  };
+}
+
 function displayProjection(overrides: Partial<DisplayProjection> = {}): DisplayProjection {
   const sceneId = randomUUID();
   const displayId = randomUUID();
   return {
     sceneId,
     sceneRevision: 1,
+    imageRevision: 1,
     imageUrl: `/displays/${displayId}/scenes/${sceneId}/image?rev=1`,
     tokens: [],
     ...overrides,
@@ -223,6 +236,8 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
   const base: Campaigns = {
     openTemplateImage: unavailable, setTemplateImage: unavailable, removeTemplateImage: unavailable,
     openProposalImage: unavailable, setProposalImage: unavailable, removeProposalImage: unavailable,
+    listVersionOptions: unavailable, checkVersionChange: unavailable, changeVersion: unavailable,
+    listExtensions: unavailable, addExtension: unavailable, removeExtension: unavailable,
     openCampaignItemImageBytes: unavailable,
     shareTemplate:unavailable,previewTemplates:unavailable,
     submitProposal:unavailable, openProposal:unavailable, listProposals:unavailable, approveProposal:unavailable, rejectProposal:unavailable,
@@ -265,7 +280,7 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
     deleteContent: async () => ({ ok: true, value: contentView() }),
     recoverContent: async () => ({ ok: true, value: contentView() }),
     replaceGrants: async () => ({ ok: true, value: contentView() }),
-    listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null } }),
+    listActivity: async () => ({ ok: true, value: { events: [], nextCursor: null, serverTime: new Date(), visibleWatch: [] } }),
     exportCampaign: async () => ({
       ok: true,
       value: {
@@ -322,7 +337,6 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
       ok: true as const,
       value: { displayId: randomUUID(), secret: "secret" },
     }),
-    getDisplayProjection: async () => ({ ok: true as const, value: displayProjection() }),
     revokeDisplay: async () => ({ ok: true as const, value: { displayId: randomUUID() } }),
     // I7b Task 4: credential list + binary image reads; the stub keeps the
     // seam total while no route calls them yet.
@@ -335,6 +349,11 @@ function makeCampaigns(overrides: Partial<Campaigns> = {}): Campaigns {
       ok: true as const,
       value: { contentType: "image/png", bytes: Buffer.from([7, 8, 9]), revision: 1 },
     }),
+    openDisplayStream: async () => ({
+      ok: false as const,
+      error: { code: "unavailable" as const, message: "Live display updates are unavailable." },
+    }),
+    closeDisplayStreams: () => {},
   };
   return { ...base, ...overrides };
 }
@@ -351,13 +370,14 @@ function fakeCharacterView(): CharacterView {
     returnOwnerId: null,
     name: "Placed Hero",
     systemVersionId,
+    extensions: [],
     entityDefinitionId: "character",
     revision: 2,
     lifecycle: "active",
     archivedAt: null,
     createdAt: new Date(0),
     updatedAt: new Date(0),
-    state: { schemaVersion: "1.0", values: {} },
+    state: { schemaVersion: "1.0", entries: {}, values: {} },
     derivedValues: {},
     validations: [],
     projection: {
@@ -393,7 +413,7 @@ function makeRuntime(): SystemRuntime {
       ok: true,
       value: {
         versionId: randomUUID(),
-        state: { schemaVersion: "1.0", values: {} },
+        state: { schemaVersion: "1.0", entries: {}, values: {} },
         packageChecksum: "checksum",
       },
     }),
@@ -407,6 +427,7 @@ async function build(input?: {
   runtime?: SystemRuntime;
   anonymous?: boolean;
   serveStatic?: boolean;
+  physicalDiceStreams?: PhysicalDiceStreams;
 }): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) as FastifyBaseLogger });
   await app.register(cookiePlugin);
@@ -417,13 +438,13 @@ async function build(input?: {
         : fakeIdentity,
       cookieName: "session",
       secure: true,
-      maxAgeSeconds: 3600,
     }),
   );
   registerApiRoutes(app, [
     buildCampaignsRoutes({
       identity: input?.identity ?? { getDisplayNames: async () => ({ ok: true, value: [] }) },
       campaigns: input?.campaigns ?? makeCampaigns(),
+      ...(input?.physicalDiceStreams && {physicalDiceStreams:input.physicalDiceStreams}),
       characters: input?.characters ?? ({ open: async () => ({ ok: true, value: fakeCharacterView() }) } as unknown as Characters),
       runtime: input?.runtime ?? makeRuntime(),
     }),
@@ -773,7 +794,7 @@ describe("campaign HTTP routes", () => {
         resolveInput = input;
         return {
           ok: true,
-          value: { versionId: pinnedVersionId, state: { schemaVersion: "1.0", values: {} }, packageChecksum: "chk" },
+          value: { versionId: pinnedVersionId, state: { schemaVersion: "1.0", entries: {}, values: {} }, packageChecksum: "chk" },
         };
       },
     } as unknown as SystemRuntime;
@@ -1665,6 +1686,28 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
     expect(noBody.statusCode).toBe(400);
   });
 
+  it("gates physical roll event streams and sends authenticated SSE without caching", async () => {
+    const url = `/campaigns/${randomUUID()}/physical-rolls/events`;
+    const inactive = await build();
+    expect((await inactive.inject({url,headers:cookie})).statusCode).toBe(404);
+    const anonymous = await build({anonymous:true});
+    expect((await anonymous.inject({url})).statusCode).toBe(401);
+    const active = await build({physicalDiceStreams:{
+      close(){},
+      async open(){
+        return {ok:true,value:{
+          close(){},
+          attach(sink){sink.write("event: roll.started\ndata: {}\n\n");sink.end();},
+        }};
+      },
+    }});
+    const streamed = await active.inject({url,headers:cookie});
+    expect(streamed.statusCode).toBe(200);
+    expect(streamed.headers["content-type"]).toMatch(/^text\/event-stream/);
+    expect(streamed.headers["cache-control"]).toBe("no-store");
+    expect(streamed.body).toContain("event: roll.started");
+  });
+
   it("pairs, redeems and projects displays without a GM session", async () => {
     const campaignId = randomUUID();
     const sceneId = randomUUID();
@@ -1675,7 +1718,7 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
       sceneId,
       sceneRevision: 4,
       imageUrl: `/displays/${displayId}/scenes/${sceneId}/image?rev=4`,
-      tokens: [{ tokenId: randomUUID(), label: "Hero", x: 0.5, y: 0.5, size: 0.1, imageUrl: `/displays/${displayId}/scenes/${sceneId}/tokens/tok/image?rev=4` }],
+      tokens: [{ tokenId: randomUUID(), label: "Hero", x: 0.5, y: 0.5, size: 0.1, imageUrl: `/displays/${displayId}/scenes/${sceneId}/tokens/tok/image?file=${randomUUID()}` }],
     });
     const app = await build({
       campaigns: makeCampaigns({
@@ -1687,10 +1730,10 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
           seen.redeem = input;
           return { ok: true as const, value: { displayId, secret } };
         },
-        getDisplayProjection: async (input) => {
+        openDisplayStream: async (input) => {
           seen.projection = input;
           if (input.secret.length === 0) return { ok: false, error: { code: "not_found", message: "nope" } };
-          return { ok: true as const, value: projection };
+          return { ok: true as const, value: finiteStream(projection) };
         },
       }),
     });
@@ -1707,10 +1750,10 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
           seen.redeem = input;
           return { ok: true as const, value: { displayId, secret } };
         },
-        getDisplayProjection: async (input) => {
+        openDisplayStream: async (input) => {
           seen.projection = input;
           if (input.secret.length === 0) return { ok: false, error: { code: "not_found", message: "nope" } };
-          return { ok: true as const, value: projection };
+          return { ok: true as const, value: finiteStream(projection) };
         },
       }),
       anonymous: true,
@@ -1727,41 +1770,57 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
     const queried = await anonymous.inject({ method: "POST", url: "/displays/redeem?code=ABC123", payload: {} });
     expect(queried.statusCode).toBe(400);
 
-    const projected = await anonymous.inject({
+    const streamed = await anonymous.inject({
       method: "GET",
-      url: `/displays/${displayId}/scenes/${sceneId}/projection`,
+      url: `/displays/${displayId}/scenes/${sceneId}/events`,
       headers: displayHeaders(secret),
     });
-    expect(projected.statusCode).toBe(200);
-    expect(projected.json()).toEqual({ projection: expect.any(Object), requestId: expect.any(String) });
+    expect(streamed.statusCode).toBe(200);
+    expect(streamed.headers["content-type"]).toMatch(/^text\/event-stream/);
+    expect(streamed.headers["cache-control"]).toBe("no-store");
     expect(seen.projection).toEqual({ displayId, secret, sceneId });
-    const text = JSON.stringify(projected.json());
-    expect(text).not.toContain("storage_key");
-    expect(text).not.toContain("secret");
-    expect(text).toContain("image?rev=4");
+    expect(streamed.body).toContain("event: scene\ndata: ");
+    expect(streamed.body).not.toContain("storage_key");
+    expect(streamed.body).not.toContain(secret);
+    expect(streamed.body).toContain("image?rev=4");
 
     // A secret in the URL query is ignored: the header carries the credential.
     const leaked = await anonymous.inject({
       method: "GET",
-      url: `/displays/${displayId}/scenes/${sceneId}/projection?secret=${secret}`,
+      url: `/displays/${displayId}/scenes/${sceneId}/events?secret=${secret}`,
     });
     expect(leaked.statusCode).toBe(404);
     expect(seen.projection).toMatchObject({ secret: "" });
 
+    const unavailable = await build({
+      campaigns: makeCampaigns({
+        openDisplayStream: async () => ({ ok: false, error: { code: "unavailable", message: "down" } }),
+      }),
+      anonymous: true,
+    });
+    const refused = await unavailable.inject({
+      method: "GET",
+      url: `/displays/${displayId}/scenes/${sceneId}/events`,
+      headers: displayHeaders(secret),
+    });
+    expect(refused.statusCode).toBe(503);
+    expect(refused.headers["retry-after"]).toBe("2");
+    expect(refused.json()).toMatchObject({ error: { code: "unavailable" } });
+
     const unknown = await build({
       campaigns: makeCampaigns({
-        getDisplayProjection: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
+        openDisplayStream: async () => ({ ok: false, error: { code: "not_found", message: "nope" } }),
       }),
     });
     const missing = await unknown.inject({
       method: "GET",
-      url: `/displays/${displayId}/scenes/${sceneId}/projection`,
+      url: `/displays/${displayId}/scenes/${sceneId}/events`,
       headers: displayHeaders(secret),
     });
     expect(missing.statusCode).toBe(404);
   });
 
-  it("serves revision-keyed display image bytes with private caching", async () => {
+  it("serves revision-keyed display image bytes without browser caching", async () => {
     const sceneId = randomUUID();
     const displayId = randomUUID();
     const tokenId = randomUUID();
@@ -1775,7 +1834,7 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
         if (input.rev !== 4) return { ok: false as const, error: { code: "not_found" as const, message: "nope" } };
         return { ok: true as const, value: { contentType: "image/png", bytes: sceneBytes, revision: 4 } };
       },
-      getDisplayTokenImage: async (input: { displayId: string; secret: string; sceneId: string; tokenId: string }) => {
+      getDisplayTokenImage: async (input: { displayId: string; secret: string; sceneId: string; tokenId: string; file?: string | undefined }) => {
         seen.tokenImage = input;
         return { ok: true as const, value: { contentType: "image/png", bytes: tokenBytes, revision: 4 } };
       },
@@ -1791,7 +1850,7 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
     });
     expect(image.statusCode).toBe(200);
     expect(image.headers["content-type"]).toBe("image/png");
-    expect(image.headers["cache-control"]).toBe("private, max-age=3600");
+    expect(image.headers["cache-control"]).toBe("private, no-store");
     expect(image.rawPayload.equals(sceneBytes)).toBe(true);
     expect(seen.sceneImage).toEqual({ displayId, secret, sceneId, rev: 4 });
 
@@ -1818,16 +1877,25 @@ describe("campaign media/scene/display HTTP routes (I7b Task 4)", () => {
     });
     expect(noRev.statusCode).toBe(400);
 
+    const fileId = randomUUID();
     const tokenImage = await app.inject({
       method: "GET",
-      url: `/displays/${displayId}/scenes/${sceneId}/tokens/${tokenId}/image?rev=4`,
+      url: `/displays/${displayId}/scenes/${sceneId}/tokens/${tokenId}/image?file=${fileId}`,
       headers: displayHeaders(secret),
     });
     expect(tokenImage.statusCode).toBe(200);
     expect(tokenImage.headers["content-type"]).toBe("image/png");
-    expect(tokenImage.headers["cache-control"]).toBe("private, max-age=3600");
+    expect(tokenImage.headers["cache-control"]).toBe("private, no-store");
     expect(tokenImage.rawPayload.equals(tokenBytes)).toBe(true);
-    expect(seen.tokenImage).toEqual({ displayId, secret, sceneId, tokenId });
+    expect(seen.tokenImage).toEqual({ displayId, secret, sceneId, tokenId, file: fileId });
+
+    // The file key is required and must be a UUID (stable token art identity).
+    const noFile = await app.inject({
+      method: "GET",
+      url: `/displays/${displayId}/scenes/${sceneId}/tokens/${tokenId}/image?rev=4`,
+      headers: displayHeaders(secret),
+    });
+    expect(noFile.statusCode).toBe(400);
   });
 
   it("lists display credentials as secret-free metadata and revokes them", async () => {
@@ -1992,7 +2060,7 @@ describe("display credential authentication in combined deployments", () => {
     const image = { ok: true as const, value: { bytes: Buffer.from([1,2,3]), contentType: "image/png" as const, revision: 1 } };
     const app = await build({ anonymous: true, serveStatic, campaigns: makeCampaigns({
       redeemDisplayCode: async input => input.code === "ABC123" ? { ok: true, value: { displayId, secret } } : denied,
-      getDisplayProjection: async input => input.secret === secret ? { ok: true, value: displayProjection({sceneId}) } : denied,
+      openDisplayStream: async input => input.secret === secret ? { ok: true, value: finiteStream(displayProjection({sceneId})) } : denied,
       getDisplaySceneImage: async input => input.secret === secret ? image : denied,
       getDisplayTokenImage: async input => input.secret === secret ? image : denied,
     }) });
@@ -2002,7 +2070,7 @@ describe("display credential authentication in combined deployments", () => {
     expect(redeemed.json().display).toEqual({displayId,secret});
     const invalid = await app.inject({method:"POST",url:prefix+"/displays/redeem",payload:{code:"WRONG1"}});
     expect(invalid.statusCode).toBe(404);
-    for (const suffix of ["projection", "image?rev=1", `tokens/${tokenId}/image?rev=1`]) {
+    for (const suffix of ["events", "image?rev=1", `tokens/${tokenId}/image?file=${randomUUID()}`]) {
       const url = `${prefix}/displays/${displayId}/scenes/${sceneId}/${suffix}`;
       expect((await app.inject({url,headers:displayHeaders(secret)})).statusCode).toBe(200);
       expect((await app.inject({url})).statusCode).toBe(404);

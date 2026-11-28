@@ -3,6 +3,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { json as requestJSON, key } from "./configurablePush.js";
 import { expectOfflineAvailable } from "../offline/test-auth.js";
 import type { QueueEntry } from "../../src/characters/types.js";
+import { expectSheetSaved } from "./sheetSaved";
 
 /** MU-00–MU-12: user operations are GUI-only. HTTP is restricted to fixture
  * authentication, independent observations/denial probes and scoped archiving.
@@ -292,7 +293,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
         await page.goto(`/characters/${characters[i]!.characterId}`);
         await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
         await expect(page.getByText("Editing in this tab.", { exact: true })).toBeVisible();
-        await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+        await expectSheetSaved(page);
         for (const [field, value] of [["Might", i + 2],["Agility",3],["Will",4 - i]] as const) {
           const fieldId = { Might: "field", Agility: "field_1", Will: "field_2" }[field];
           const committed = page.waitForResponse(r => r.request().method() === "POST" && r.url().endsWith(`/fields/${fieldId}/set`));
@@ -305,7 +306,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
           expect(response.status(), `Player ${i + 1} ${field} save status`).toBe(200);
           expect(response.request().postDataJSON().value).toBe(value);
           expect((await character(i)).state.values[fieldId]).toBe(value);
-          await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+          await expectSheetSaved(page);
         }
       }
     });
@@ -416,7 +417,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
     await step("MU-10 production-worker offline pending/reload/replay", async () => {
       const page = pages[1]!; await page.goto(`/characters/${characters[0]!.characterId}`); await expectOfflineAvailable(page);
       await expect(page.getByText("Editing in this tab.", { exact: true })).toBeVisible();
-      await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+      await expectSheetSaved(page);
       const pendingEntries = () => page.evaluate(({ actorId, characterId }) => new Promise<QueueEntry[]>((resolve, reject) => {
         const request = indexedDB.open("sweetroll-characters");
         request.onerror = () => reject(request.error);
@@ -448,7 +449,7 @@ export async function multiUserJourney({ browser, baseURL }: { browser: Browser;
       expect(response.request().postDataJSON().entry).toEqual(intent.entry);
       expect(Object.values((await character(0)).state.entries).filter((e: any) => e.values.name === "Offline trail ration")).toHaveLength(1);
       expect((await character(0)).state.entries[intent.entry.entryId]).toMatchObject(intent.entry);
-      await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+      await expectSheetSaved(page);
       await expect(page.getByText("Offline trail ration", { exact: true })).toBeVisible();
       expect(await pendingEntries()).toEqual([]);
       await expectOfflineAvailable(page);

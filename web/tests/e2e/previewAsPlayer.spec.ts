@@ -1,4 +1,4 @@
-import { test, expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Browser, type Page } from "../fixtures/browserTest";
 
 import { publishOwnedClone, uid } from "../offline/test-auth.js";
 

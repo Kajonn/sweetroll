@@ -5,7 +5,7 @@ import { imageDescriptorMatches, insertPreparedItemImage, type ItemImageRecord, 
 
 export class InvalidSystemImage extends Error { constructor() { super("An image reference is unavailable to this system."); } }
 export function systemImages(document: SystemDocumentV1 | SystemPackageV1): ImageDescriptor[] {
-  return (document.templates ?? []).flatMap(template => template.image ? [template.image] : []);
+  return document.templates.flatMap(template => template.image ? [template.image] : []);
 }
 export async function assertSystemImages(client: PoolClient, systemId: string, document: SystemDocumentV1 | SystemPackageV1) {
   const images = systemImages(document); if (!images.length) return;

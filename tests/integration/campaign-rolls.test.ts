@@ -1,4 +1,7 @@
 import {namedDicePoolDocument} from "../../src/systems/implementation/package/fixtures/named-dice-pool.js";
+import { createPhysicalDiceStreams } from "../../src/campaigns/physical-dice-stream.js";
+import { createSceneEventHub, notifySceneEvent } from "../../src/campaigns/scene-events.js";
+import { bridgeContestDocument } from "../../src/systems/implementation/package/fixtures/opposed.js";
 import { randomUUID } from "node:crypto";
 
 import type { PoolClient } from "pg";
@@ -18,7 +21,7 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
   let unassigned: TestActor;
 
   beforeAll(async () => {
-    h = await buildI6Harness();
+    h = await buildI6Harness({ physicalDiceEnabled: true });
     // The fixture versions are private by default; shared-table rolls need
     // the campaign version usable by every member.
     await h.pool.query(`UPDATE systems SET access = 'public'`);
@@ -218,6 +221,38 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
   // ------------------------------------------------------------------
   // audience visibility across two controllers and multiple GMs
   // ------------------------------------------------------------------
+
+  it("returns only authorized popup summaries and watches events outside the first page", async () => {
+    const s = await setup();
+    const key = randomUUID();
+    const first = await roll(h.users.player, s.sharedId, 1, { audience: "gm_only", key });
+    const replay = await roll(h.users.player, s.sharedId, 1, { audience: "gm_only", key });
+    if (!first.ok || !replay.ok) throw new Error("roll failed");
+    const path = `/campaigns/${s.campaignId}/activity`;
+    const activity = await h.app.inject({ url: path, headers: { cookie: h.users.gm.cookie } });
+    const body = activity.json();
+    const rollId = body.events[0].sourceRollId;
+    expect(first.value).toHaveProperty("rollId", rollId);
+    expect(replay.value).toHaveProperty("rollId", rollId);
+    expect(body.serverTime).toEqual(expect.any(String));
+    expect(body.events[0].summary).toEqual({ kind: "roll", total: first.value.roll?.total, audience: "gm_only" });
+    const shared = await roll(h.users.player, s.sharedId, 1, { audience: "campaign" });
+    if (!shared.ok) throw new Error("shared roll failed");
+    for (const [actor, allowed] of [[h.users.gm, [`roll:${rollId}`]], [h.users.other, [`roll:${rollId}`]]] as const) {
+      const watched = await h.app.inject({
+        url: `${path}?limit=1&watch=roll:${rollId}`,
+        headers: { cookie: actor.cookie },
+      });
+      expect(watched.json()).toMatchObject({ events: [{ summary: { audience: "campaign" } }], visibleWatch: allowed });
+    }
+    await h.pool.query("UPDATE campaign_members SET role = 'player' WHERE campaign_id = $1 AND user_id = $2", [s.campaignId, h.users.other.actorId]);
+    const denied = await h.app.inject({
+      url: `${path}?watch=roll:${rollId}`,
+      headers: { cookie: h.users.other.cookie },
+    });
+    expect(denied.json()).toMatchObject({ events: [{ summary: { audience: "campaign" } }], visibleWatch: [] });
+    expect(denied.json().events).toHaveLength(1);
+  });
 
   it("keeps actor-private rolls visible only to the roller", async () => {
     const s = await setup();
@@ -773,13 +808,233 @@ describeWithDatabase("campaign roll audiences and atomic activity (Task 8)", () 
   });
 
   async function setupPushCampaign(){
-    const headers={cookie:h.users.gm.cookie};const doc=namedDicePoolDocument();doc.schemaVersion="1.2";
+    const headers={cookie:h.users.gm.cookie};const doc=namedDicePoolDocument();
     const action=doc.actions.find(a=>a.kind==="roll")!;if(action.kind!=="roll")throw Error("fixture");action.pushPolicy={version:"1.0",maxAttempts:2,successThreshold:1,allowOnSuccess:true,groups:[{groupId:"attribute",lockedFaces:[],reportedFaces:[1]}]};
     const created=await h.app.inject({method:"POST",url:"/systems",headers,payload:{source:{kind:"blank",name:"Push campaign"},idempotencyKey:randomUUID()}});expect(created.statusCode,created.body).toBe(201);const w=created.json().workspace;
     const saved=await h.app.inject({method:"PUT",url:`/systems/${w.system.systemId}/draft`,headers,payload:{expectedRevision:w.draft.revision,document:doc}});expect(saved.statusCode,saved.body).toBe(200);
     const published=await h.app.inject({method:"POST",url:`/systems/${w.system.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.0.0",releaseNotes:"",acknowledgeBreaking:true,idempotencyKey:randomUUID()}});expect(published.statusCode,published.body).toBe(200);
     await h.pool.query("UPDATE systems SET access='public' WHERE id=$1",[w.system.systemId]);return setup(published.json().version.versionId);
   }
+  it("commits a personal physical Check once and keeps it private to the owner", async () => {
+    const created = await h.characters.create(ctxFor(h.users.player), {
+      systemVersionId: h.versionId, entityDefinitionId: "character", name: "Personal physical Check",
+      idempotencyKey: randomUUID(),
+    });
+    if (!created.ok) throw Error(JSON.stringify(created.error));
+    const id = created.value.characterId;
+    const url = `/characters/${id}/physical-rolls`;
+    const post = (path: string, payload: object, actor = h.users.player) =>
+      h.app.inject({ method: "POST", url: path, headers: { cookie: actor.cookie }, payload });
+    const command = { kind: "executeAction", actionId: "check", inputs: { bonus: 2 },
+      expectedRevision: created.value.revision, idempotencyKey: randomUUID() };
+    expect((await post(url, command, h.users.other)).statusCode).toBe(404);
+    expect((await post(url, { ...command, audience: "campaign" })).statusCode).toBe(400);
+    const prepared = await post(url, command);
+    expect(prepared.statusCode, prepared.body).toBe(200);
+    const { attempt } = prepared.json();
+    expect(attempt.audience).toBe("owner_only");
+    expect((await post(url, command)).json().attempt).toEqual(attempt);
+    expect(await rollCount(id)).toBe(0);
+    const settlement = { tick: 100, dice: attempt.dice.map((die: { id: string }) => ({
+      id: die.id, value: 1, position: { x: 0, y: 0, z: 1 },
+      orientation: { x: Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 },
+    })) };
+    const complete = `${url}/${attempt.attemptId}/complete`;
+    expect((await post(complete, settlement, h.users.other)).statusCode).toBe(404);
+    const finished = await post(complete, settlement);
+    expect(finished.statusCode, finished.body).toBe(200);
+    const result = finished.json().result;
+    expect(result.roll).toMatchObject({ audience: "owner_only", dice: [{ value: 1 }] });
+    const replay = await post(complete, settlement);
+    expect(replay.statusCode, replay.body).toBe(200);
+    expect(replay.json().result).toMatchObject({ rollId: result.rollId, roll: result.roll,
+      character: { reconciliation: { replayed: true } } });
+    expect(await rollCount(id)).toBe(1);
+    expect((await h.pool.query("SELECT scope_campaign_id FROM character_rolls WHERE character_id=$1", [id])).rows)
+      .toEqual([{ scope_campaign_id: null }]);
+
+    const pendingResponse = await post(url, { ...command, idempotencyKey: randomUUID() });
+    expect(pendingResponse.statusCode, pendingResponse.body).toBe(200);
+    const pending = pendingResponse.json().attempt;
+    const { campaignId } = await setup();
+    const adoption = await inPlacementTxn(async (client) => h.placement.adopt(client, ctxFor(h.users.player), {
+      campaignId, characterId: id, expectedCharacterRevision: result.character.revision,
+      expectedCampaignRevision: await campaignRevision(campaignId), membershipGeneration: 1, acknowledgedDisclosure: true,
+      idempotencyKey: randomUUID(),
+    }));
+    expect(adoption.ok).toBe(true);
+    expect((await post(`${url}/${pending.attemptId}/complete`, { ...settlement,
+      dice: pending.dice.map((die: { id: string }) => ({ ...settlement.dice[0], id: die.id })) })).statusCode).toBe(404);
+    expect(await rollCount(id)).toBe(1);
+  });
+
+  it("streams a private physical roll only to the roller and recovers a pending start on reconnect", async () => {
+    const { sharedId, campaignId } = await setup();
+    const hub = createSceneEventHub({connection:{connectionString:databaseUrl!}});
+    const live = createPhysicalDiceStreams({pool:h.pool,hub,refreshMs:60000});
+    try {
+      await hub.start();
+      const sessionFor = async (actor:TestActor) => (await h.pool.query<{id:string}>(
+        "SELECT id FROM sessions WHERE user_id=$1 AND revoked_at IS NULL",[actor.actorId])).rows[0]!.id;
+      const playerSession = await sessionFor(h.users.player);
+      const roller = await live.open(campaignId,h.users.player.actorId,playerSession);
+      const observer = await live.open(campaignId,h.users.gm.actorId,await sessionFor(h.users.gm));
+      expect(await live.open(campaignId,h.users.outsider.actorId,await sessionFor(h.users.outsider)))
+        .toMatchObject({ok:false,status:404});
+      if (!roller.ok || !observer.ok) throw Error("failed to open campaign streams");
+      const events:string[] = [];
+      const unseen:string[] = [];
+      let drain = () => { throw Error("The stream did not apply backpressure."); };
+      roller.value.attach({
+        write:chunk=>{events.push(chunk);return !chunk.startsWith("event: roll.started");},
+        onDrain(callback){drain=callback;},
+        end(){},
+      });
+      observer.value.attach({write:chunk=>{unseen.push(chunk);return true;},onDrain(){},end(){}});
+      const headers = {cookie:h.users.player.cookie};
+      const url = `/characters/${sharedId}/physical-rolls`;
+      const state = {kind:"executeAction",actionId:"check",inputs:{bonus:2},expectedRevision:1,
+        audience:"owner_only",idempotencyKey:randomUUID()};
+      const updateColor = (dice_color:string) => h.app.inject({method:"PATCH",url:"/me/preferences",headers,payload:{dice_color}});
+      expect((await updateColor("#f26849")).statusCode).toBe(200);
+      const prepared = await h.app.inject({method:"POST",url,headers,payload:state});
+      expect(prepared.statusCode,prepared.body).toBe(200);
+      const {attempt} = prepared.json();
+      expect(attempt.color).toBe("#f26849");
+      expect((await updateColor("#335599")).statusCode).toBe(200);
+      await expect.poll(()=>events.filter(line=>line.startsWith("event: roll.started")).length).toBe(1);
+      const again = await live.open(campaignId,h.users.player.actorId,playerSession);
+      if (!again.ok) throw Error("failed to reopen campaign stream");
+      const recovered:string[]=[];
+      again.value.attach({write:chunk=>{recovered.push(chunk);return true;},onDrain(){},end(){}});
+      expect(recovered.join("")).toContain(attempt.attemptId);
+      expect(recovered.join("")).toContain("#f26849");
+      const settle = {tick:100,dice:attempt.dice.map((die:{id:string})=>({id:die.id,value:1,
+        position:{x:1,y:0,z:1},orientation:{x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2}}))};
+      const finish = await h.app.inject({method:"POST",url:`${url}/${attempt.attemptId}/complete`,headers,payload:settle});
+      expect(finish.statusCode,finish.body).toBe(200);
+      drain();
+      await expect.poll(()=>events.filter(line=>line.startsWith("event: roll.finished")).length).toBe(1);
+      expect(events.join("")).toContain(finish.json().result.rollId);
+      expect(unseen.join("")).not.toContain(attempt.attemptId);
+      expect(events.filter(line=>line.startsWith("event: roll.started"))).toHaveLength(1);
+      await h.pool.query("UPDATE campaign_members SET status='removed' WHERE campaign_id=$1 AND user_id=$2",[campaignId,h.users.player.actorId]);
+      await notifySceneEvent(h.pool,{kind:"campaign",campaignId});
+      await expect.poll(()=>events.some(line=>line.startsWith("event: revoked"))).toBe(true);
+    } finally { live.close(); await hub.close(); }
+  });
+
+  it("commits a physical campaign pool once and pushes only eligible dice", async () => {
+    const { sharedId } = await setupPushCampaign();
+    const url = `/characters/${sharedId}/physical-rolls`;
+    const post = (path: string, payload: object, actor = h.users.player) =>
+      h.app.inject({ method: "POST", url: path, headers: { cookie: actor.cookie }, payload });
+    const command = { kind: "executeAction", actionId: "test_pool", inputs: { bonus_dice: 1 },
+      expectedRevision: 1, idempotencyKey: randomUUID(), audience: "campaign" };
+    const prepare = await post(url, command);
+    expect(prepare.statusCode, prepare.body).toBe(200);
+    const attempt = prepare.json().attempt;
+    expect(attempt.launch).toMatchObject({ version: "rapier-v2", seed: expect.any(Number), startsAt: expect.any(String) });
+    expect(attempt.launch.bodies).toHaveLength(attempt.dice.length);
+    expect(Date.parse(attempt.launch.startsAt)).toBeLessThan(Date.parse(attempt.expiresAt));
+    expect((await post(url, command)).json().attempt).toEqual(attempt);
+    expect(await rollCount(sharedId)).toBe(0);
+    const poses = attempt.dice.map((die: { id: string; sides: number }) => ({
+      id: die.id, value: die.sides === 6 ? 3 : 1,
+      orientation: die.sides === 6 ? {x:0,y:0,z:0,w:1} : {x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2},
+      position: { x: 0, y: 1, z: 1 },
+    }));
+    const settled = { tick: 140, dice: poses };
+    const complete = `${url}/${attempt.attemptId}/complete`;
+    expect((await post(complete, settled, h.users.gm)).statusCode).toBe(404);
+    expect((await post(complete, { ...settled, dice: poses.slice(1) })).statusCode).toBe(400);
+    expect((await post(complete, { ...settled, dice: [...poses, poses[0]] })).statusCode).toBe(400);
+    const concurrent = await Promise.all([post(complete, settled), post(complete, settled)]);
+    expect(concurrent.some(r => r.statusCode === 200)).toBe(true);
+    await h.pool.query("UPDATE physical_roll_attempts SET expires_at=now() WHERE id=$1",[attempt.attemptId]);
+    const replay = await post(complete, settled);
+    expect(replay.statusCode, replay.body).toBe(200);
+    const root = replay.json().result.roll;
+    expect(root.total).toBe(0);
+    expect(root.dice.map((d: {value:number}) => d.value)).toEqual(poses.map((p: {value:number}) => p.value));
+    expect((await post(complete, { ...settled, tick: 141 })).statusCode).toBe(409);
+    expect(await rollCount(sharedId)).toBe(1);
+    expect(await count("character_command_executions","actor_id=$1 AND idempotency_key=$2",
+      [h.users.player.actorId,command.idempotencyKey])).toBe(1);
+    expect(await count("campaign_activity_events","kind='roll_executed' AND source_roll_id=$1",
+      [replay.json().result.rollId])).toBe(1);
+    const push = await post(url, {kind:"pushRoll",parentRollId:root.push.rollId,
+      expectedRevision:1,idempotencyKey:randomUUID()});
+    expect(push.statusCode, push.body).toBe(200);
+    const child = push.json().attempt;
+    expect(child.dice.map((d: {id:string}) => d.id)).toEqual(root.dice.filter((d: {groupId:string}) =>
+      d.groupId === "attribute").map((d: {id:string}) => d.id));
+    const rerolled = child.dice.map((d: {id:string}) => ({...poses[0],id:d.id,value:6,
+      orientation:{x:-Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2}}));
+    const finish = await post(`${url}/${child.attemptId}/complete`, {tick: 160, dice: rerolled});
+    expect(finish.statusCode, finish.body).toBe(200);
+    expect(finish.json().result.roll.total).toBe(child.dice.length);
+    expect(await rollCount(sharedId)).toBe(2);
+  });
+
+  it("prepares and commits a targeted physical roll against another campaign character", async () => {
+    const headers={cookie:h.users.gm.cookie};
+    const created=await h.app.inject({method:"POST",url:"/systems",headers,payload:{source:{kind:"blank",name:"Physical bridge"},idempotencyKey:randomUUID()}});expect(created.statusCode,created.body).toBe(201);const w=created.json().workspace;
+    const saved=await h.app.inject({method:"PUT",url:`/systems/${w.system.systemId}/draft`,headers,payload:{expectedRevision:w.draft.revision,document:bridgeContestDocument}});expect(saved.statusCode,saved.body).toBe(200);
+    const published=await h.app.inject({method:"POST",url:`/systems/${w.system.systemId}/publish`,headers,payload:{expectedRevision:saved.json().workspace.draft.revision,semanticVersion:"1.0.0",releaseNotes:"",acknowledgeBreaking:true,idempotencyKey:randomUUID()}});expect(published.statusCode,published.body).toBe(200);
+    await h.pool.query("UPDATE systems SET access='public' WHERE id=$1",[w.system.systemId]);
+    const {sharedId,adoptedId}=await setup(published.json().version.versionId);
+    const url=`/characters/${sharedId}/physical-rolls`;
+    const prepare=await h.app.inject({method:"POST",url,headers:{cookie:h.users.player.cookie},payload:{kind:"executeAction",actionId:"attack",inputs:{},
+      targetCharacterId:adoptedId,expectedRevision:1,idempotencyKey:randomUUID(),audience:"campaign"}});
+    expect(prepare.statusCode,prepare.body).toBe(200);
+    const attempt=prepare.json().attempt;
+    expect(attempt?.dice).toEqual([expect.objectContaining({sides:20})]);
+    const finish=await h.app.inject({method:"POST",url:`${url}/${attempt.attemptId}/complete`,headers:{cookie:h.users.player.cookie},payload:{tick:90,
+      dice:[{id:attempt.dice[0].id,value:1,position:{x:0,y:0,z:1},orientation:{x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2}}]}});
+    expect(finish.statusCode,finish.body).toBe(200);
+    expect(finish.json().result.roll).toMatchObject({targetCharacterId:adoptedId,dice:[expect.objectContaining({value:1})],
+      bindings:[expect.objectContaining({scope:"target",definitionId:"defense"})]});
+  });
+
+  it("accepts the ordinary roll with the same key when a prepared physical throw cannot settle", async () => {
+    const { sharedId } = await setup();
+    const headers = { cookie: h.users.player.cookie };
+    const command = { actionId: "check", inputs: { bonus: 2 }, expectedRevision: 1, idempotencyKey: randomUUID() };
+    const prepared = await h.app.inject({ method: "POST", url: `/characters/${sharedId}/physical-rolls`, headers,
+      payload: { kind: "executeAction", ...command } });
+    expect(prepared.statusCode, prepared.body).toBe(200);
+    expect(prepared.json().attempt).toBeTruthy();
+    const ordinary = await h.app.inject({ method: "POST", url: `/characters/${sharedId}/actions/check`, headers,
+      payload: { inputs: command.inputs, expectedRevision: 1, idempotencyKey: command.idempotencyKey } });
+    expect(ordinary.statusCode, ordinary.body).toBe(200);
+    expect(ordinary.json().result.roll).toBeTruthy();
+    expect(await rollCount(sharedId)).toBe(1);
+    const late = await h.app.inject({ method: "POST", url: `/characters/${sharedId}/physical-rolls/${prepared.json().attempt.attemptId}/complete`, headers,
+      payload: { tick: 100, dice: prepared.json().attempt.dice.map((die: { id: string }) => ({ id: die.id, value: 1, position: { x: 1, y: 0, z: 1 },
+        orientation: { x: Math.SQRT1_2, y: 0, z: 0, w: Math.SQRT1_2 } })) } });
+    expect(late.statusCode, late.body).not.toBe(200);
+    expect(await rollCount(sharedId)).toBe(1);
+  });
+
+  it.each(["expired", "revision", "membership"] as const)("rejects a physical settlement after %s changes", async (change) => {
+    const {sharedId,campaignId} = await setup();
+    const url = `/characters/${sharedId}/physical-rolls`;
+    const headers = {cookie:h.users.player.cookie};
+    const prepare = await h.app.inject({method:"POST",url,headers,payload:{kind:"executeAction",actionId:"check",
+      inputs:{bonus:2},expectedRevision:1,idempotencyKey:randomUUID()}});
+    expect(prepare.statusCode,prepare.body).toBe(200);
+    const attempt = prepare.json().attempt;
+    if (change === "expired") await h.pool.query("UPDATE physical_roll_attempts SET expires_at=now() WHERE id=$1",[attempt.attemptId]);
+    if (change === "revision") await h.pool.query("UPDATE characters SET revision=revision+1 WHERE id=$1",[sharedId]);
+    if (change === "membership") await h.pool.query("UPDATE campaign_members SET generation=generation+1 WHERE campaign_id=$1 AND user_id=$2",[campaignId,h.users.player.actorId]);
+    const result = await h.app.inject({method:"POST",url:`${url}/${attempt.attemptId}/complete`,headers,payload:{
+      tick:100,dice:attempt.dice.map((die:{id:string})=>({id:die.id,value:1,position:{x:1,y:0,z:1},
+        orientation:{x:Math.SQRT1_2,y:0,z:0,w:Math.SQRT1_2}}))}});
+    expect(result.statusCode,result.body).toBe(change==="membership"?404:409);
+    expect(await rollCount(sharedId)).toBe(0);
+  });
+
   async function pushRoot(s:Setup,audience:RollAudience="gm_only"){
     const r=await h.characters.apply(ctxFor(h.users.player),{kind:"executeAction",characterId:s.sharedId,actionId:"test_pool",inputs:{bonus_dice:1},expectedRevision:1,idempotencyKey:randomUUID(),audience});expect(r.ok).toBe(true);if(!r.ok)throw Error(JSON.stringify(r.error));return r.value.roll!;
   }

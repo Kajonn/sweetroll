@@ -21,6 +21,8 @@ const DDL = `
     name text NOT NULL,
     access text NOT NULL DEFAULT 'private',
     lifecycle text NOT NULL DEFAULT 'active',
+    kind text NOT NULL DEFAULT 'system',
+    base_system_id uuid REFERENCES systems(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   );
@@ -32,6 +34,7 @@ const DDL = `
     package_json jsonb NOT NULL,
     release_notes text NOT NULL DEFAULT '',
     lifecycle text NOT NULL DEFAULT 'published',
+    built_against_version_id uuid,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (system_id, semantic_version)
   );

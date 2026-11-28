@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 import { signIn, workspace, pushDocument, publish, createCharacter, json, key, cleanup, resultOf, assertChild } from "../fixtures/configurablePush.js";
 
 test("locked, empty and successful saved pools explain why pushing is unavailable", async ({ page }, info) => {

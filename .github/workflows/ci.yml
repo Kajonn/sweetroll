@@ -60,6 +60,13 @@ jobs:
       - run: npm run build
         working-directory: web
 
+      - name: Bound physics browser dependency downloads
+        run: sudo bash scripts/ci-browser-deps.sh
+      - run: npx playwright install --with-deps chromium webkit
+        working-directory: web
+      - run: npm run test:physics
+        working-directory: web
+
   web-e2e:
     name: web-e2e (${{ matrix.name }})
     runs-on: ubuntu-latest
@@ -118,6 +125,12 @@ jobs:
         working-directory: web
       - run: npm run test:e2e -- --suite=${{ matrix.suite }} ${{ matrix.shard }}
         working-directory: web
+      - name: Verify shared physical dice in a live campaign
+        if: matrix.suite == 'visual'
+        run: npm run test:e2e -- --suite=journeys physicalDice.spec.ts physicalDiceAcceptance.spec.ts
+        working-directory: web
+        env:
+          SWEETROLL_PHYSICAL_DICE: "true"
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -145,6 +158,7 @@ jobs:
       DATABASE_URL: postgres://sweetroll:sweetroll@localhost:5432/sweetroll_offline
       AUTHORITATIVE_ROLL_SECRET: development-only-roll-secret-32-bytes
       SWEETROLL_TEST_AUTH: "1"
+      SWEETROLL_E2E_EPHEMERAL_DB: "1"
       CI: "1"
     steps:
       - uses: actions/checkout@v4
@@ -175,20 +189,3 @@ jobs:
             web/test-results/
             web/tests/offline/evidence/
           retention-days: 7
-
-  deploy:
-    name: Deploy production
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [verify, web, web-e2e, web-offline]
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    concurrency:
-      group: railway-production
-      cancel-in-progress: false
-    container: ghcr.io/railwayapp/cli:latest
-    env:
-      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-    steps:
-      - uses: actions/checkout@v4
-      - name: Deploy to Railway
-        run: railway up --service sweetroll --environment production --detach

@@ -66,4 +66,14 @@ describe("success-count operand agreement", () => {
   ])("retains supported roll: %s", (source) => {
     expect(compileExpression(source, numberOpts).ok).toBe(true);
   });
+
+  it("rejects a roll expression that does not produce a number", () => {
+    const r = compileExpression("d20 >= 10", {
+      env: { fields: {}, inputs: {} }, resultType: "boolean", context: "roll", fallback: false,
+    });
+    expect(r).toEqual({
+      ok: false,
+      diagnostics: [{ code: "invalid_expression", path: "", message: "a roll expression must produce a number" }],
+    });
+  });
 });

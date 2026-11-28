@@ -6,6 +6,7 @@ export type ReferenceOption = {
   kind: "field" | "resource" | "action" | "slot";
   id: string;
   label: string;
+  ownerId?: string;
 };
 
 export function DefinitionReferenceSelect({
@@ -36,7 +37,7 @@ export function DefinitionReferenceSelect({
           <option value={value} disabled>Missing definition ({value})</option>
         ) : null}
         {options.map((option) => (
-          <option key={option.id} value={option.id}>{option.label}{debug || options.filter(candidate => candidate.label === option.label).length > 1 ? ` (${option.id})` : ""}</option>
+          <option key={option.id} value={option.id}>{option.label}{option.ownerId ? ` (${option.ownerId}.${option.id})` : debug || options.filter(candidate => candidate.label === option.label).length > 1 ? ` (${option.id})` : ""}</option>
         ))}
       </select>
       {value && !found ? <p role="alert">Reference not found: {value}</p> : null}

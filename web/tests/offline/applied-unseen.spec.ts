@@ -1,4 +1,4 @@
-import { test, expect, type BrowserContext, type Page } from "@playwright/test";
+import { test, expect, type BrowserContext, type Page } from "../fixtures/browserTest";
 
 import {
   D20_REFERENCE_SYSTEM,
@@ -13,6 +13,7 @@ import {
   testSignIn,
   uid,
 } from "./test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * Task 8 critical proof: applied-but-unseen responses. Each test forwards the
@@ -86,7 +87,7 @@ test.describe("applied-but-unseen mutations", () => {
       await page.getByRole("button", { name: system.decreaseButton }).click();
       // While the outcome is uncertain, export must stay blocked.
       await expect(page.getByRole("button", { name: "Export" })).toBeDisabled();
-      await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
+      await expectSheetSaved(page);
       expect(withheldOnce).toBe(true);
       await page.unrouteAll({ behavior: "wait" });
 
@@ -132,6 +133,7 @@ test.describe("applied-but-unseen mutations", () => {
 
       const archiveAttempts: Captured[] = [];
       let withheldOnce = false;
+      let archiveResponseLost = false;
       // Withhold the first response (applied, unseen), then hold every
       // replay aborted so the attempt stays uncertain until the restart.
       await page.route("**/api/characters/*", async route => {
@@ -149,6 +151,7 @@ test.describe("applied-but-unseen mutations", () => {
           const response = await route.fetch();
           expect(response.ok()).toBe(true);
           await route.abort("failed");
+          archiveResponseLost = true;
           return;
         }
         await route.abort("failed");
@@ -163,6 +166,10 @@ test.describe("applied-but-unseen mutations", () => {
 
       await page.getByRole("button", { name: "Archive" }).click();
       await page.getByRole("button", { name: "Confirm archive" }).click();
+      // The click schedules an asynchronous save. Wait until the original
+      // archive has reached the server and its response has been withheld.
+      await expect.poll(() => archiveResponseLost).toBe(true);
+      await expect(page.getByRole("button", { name: "Export" })).toBeDisabled();
 
       // A newer mutation attempt must not be sent while the outcome is unknown.
       // Record the control state first so the evidence says which gate held:

@@ -8,8 +8,8 @@
 
 | Document         | Product and technical design                         |
 |------------------|------------------------------------------------------|
-| Status           | Draft v0.4; GUI delivery added                       |
-| Date             | 8 September 2026                                     |
+| Status           | Draft v0.4; GUI delivery added; reconciled with the implementation 2026-11-08 |
+| Date             | 8 September 2026 (last reconciled 8 November 2026)   |
 | Primary audience | Product owner, UX designer, implementation team      |
 | Planning horizon | MVP followed by collaboration and marketplace phases |
 
@@ -24,7 +24,7 @@ The core strength versus existing VTTs is:
 - **System-agnostic.** Unlike D&D Beyond, it supports any rules system. Because copyrighted systems cannot be shipped, the MVP ships **pre-built open-license templates** plus a **minimal no-code creator**.
 - **Not a simulation.** It captures the basics to make rolls and show results, then hands freedom back to the GM and players to update stats.
 
-The MVP is a modular monolith backed by PostgreSQL and object storage. System definitions are declarative, versioned documents. Math and dice expressions are parsed into a lightweight AST and evaluated by the platform; creator-supplied executable code is never run. Published system versions are immutable; campaigns and characters pin to an immutable published version. Version upgrades are excluded by the development policy in Sections 6.7 and 12.4.
+The MVP is a modular monolith backed by PostgreSQL and object storage. System definitions are declarative, versioned documents. Math and dice expressions are parsed into a lightweight AST and evaluated by the platform; creator-supplied executable code is never run. Published system versions are immutable; campaigns and characters pin to an immutable published version. A character or campaign may move forward to a later, non-breaking version of the same system after its state verifies against that version (Section 6.7); this is unrelated to application-version migration (Sections 12.4 and 17.0).
 
 > **MVP scope.** Build a trustworthy shared-character-sheet and campaign platform — not a full virtual tabletop and not an auto-applying rules simulator. The first Player and GM applications are mobile-first web apps delivered as an installable PWA. Native binaries and app-store distribution are post-MVP. Simple background images, manually edited fog, GM-positioned tokens, and a restricted player display are included in I7b. Video, voice, tactical movement, dynamic lighting, marketplace payments, and arbitrary scripting are excluded from the first release tag.
 
@@ -74,7 +74,7 @@ Roles are contextual capabilities, not account types. The same user can create a
 
 | **Workspace**  | **Primary navigation**                                                      | **Responsive intent**                                                                             |
 |----------------|-----------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
-| System Creator | Overview; Data Model; Sheet; Rules; Preview; Versions; Settings            | Desktop-first. Tablet supported. Mobile offers review and small edits, not full layout authoring. |
+| System Creator | Basics; Attributes; Dice; Templates; Sections; Advanced (Preview, Diagnostics and Versions are header actions) | Desktop-first. Tablet supported. Mobile offers review and small edits, not full layout authoring. |
 | Game Master    | Session; Content; Characters; Members; Campaign Settings                     | Mobile-first quick actions plus richer desktop organization.                                      |
 | Player         | Characters; Activity; Account; Campaigns after I6                            | Mobile-first with platform-owned bottom navigation and thumb-reachable controls.                   |
 | Account        | Home; Systems; Campaigns; Characters; Profile                               | Responsive launcher that reflects all roles.                                                      |
@@ -101,7 +101,7 @@ A GM may use **multiple devices in the same session simultaneously**, with each 
 - e.g. an **iPad or second screen for showing images/handouts to players**, while a **phone shows monster/stat sheets** for the GM's own reference.
 - Concurrency between the GM's devices is handled by the standard revision/`409` mechanism; single-writer per resource means the GM cannot corrupt their own data by editing from two screens, though they will see a conflict and refresh prompt if both attempt to mutate the same field at once.
 - Each authenticated GM device runs the normal responsive surface, with no artificial single-session lock. A tablet handed to players instead uses the dedicated restricted Display surface introduced in I7b; it must not retain the GM session or private cached data.
-- Updates are scoped to the campaign and actor, initially through authorized polling/revision refresh. In I7b, paired player displays receive only the permitted scene projection using revocable, display-scoped credentials; they never receive GM originals or secret payloads.
+- Updates are scoped to the campaign and actor, initially through authorized polling/revision refresh. In I7b, paired player displays receive only the permitted scene projection using revocable, display-scoped credentials; they never receive GM originals or secret payloads. Since 2026-11-07 the paired display receives committed scene snapshots over a credential-scoped server-sent-event stream instead of polling (Section 7.7); other campaign views keep their refresh behavior.
 
 # 5. Core user journeys
 
@@ -135,7 +135,7 @@ A GM may use **multiple devices in the same session simultaneously**, with each 
 
 **D1 implementation (PR #26; hosted acceptance passed):** [Player proposal contract](docs/superpowers/specs/2026-10-31-player-template-proposals.md) and [execution plan](docs/superpowers/plans/2026-10-31-player-template-proposals.md) specify private player submissions and one atomic GM approval that publishes a data-only catalog template. The source personal entry remains unchanged. C is merged as `455f967`. Proposal routes, private generation-bound reads, atomic approval/rejection and online-only scoped GUI are implemented; Passing hosted journeys, exact served-asset verification, private recovery and independent cleanup are tracked in [D1 acceptance](docs/acceptance/player-template-proposals-2026-10-31.md). Restricted catalog audiences are implemented separately in D2 ([PR #27 acceptance](docs/acceptance/restricted-template-audiences-2026-11-01.md)).
 
-**Implemented and accepted on the isolated preview (2026-10-31):** [Campaign templates with inherited actions — adventure slice C](docs/superpowers/plans/2026-10-31-campaign-inherited-actions.md), planned against `main` `ba8200b`. A derived template uses a server-validated base from the campaign's pinned published package; only presentation, typed field defaults and item quantity are editable. Placed copies keep their exact catalog revision, reuse existing roll/nominal/entry-resource actions and push policies, and remain usable after catalog archive or authorized character return without a live catalog lookup. Personal/blank campaign entries remain data-only. Base changes, instance conversion and character/campaign version upgrades are excluded; follow Section 17.0. The implementation is published in PR #25. Application `58c71a1` passes all CI #158 verification jobs and both isolated hosted journeys, including offline/returned-sheet recovery. Deployment `5a090554-1e7d-4a06-98e2-3a6e1f0a886d`, served asset identity and independent cleanup are verified. C7 is complete; unperformed G9 release gates remain open.
+**Implemented and accepted on the isolated preview (2026-10-31):** [Campaign templates with inherited actions — adventure slice C](docs/superpowers/plans/2026-10-31-campaign-inherited-actions.md), planned against `main` `ba8200b`. A derived template uses a server-validated base from the campaign's pinned published package; only presentation, typed field defaults and item quantity are editable. Placed copies keep their exact catalog revision, reuse existing roll/nominal/entry-resource actions and push policies, and remain usable after catalog archive or authorized character return without a live catalog lookup. Personal/blank campaign entries remain data-only. Base changes and instance conversion are excluded; non-breaking rules-version upgrades follow Section 6.7. The implementation is published in PR #25. Application `58c71a1` passes all CI #158 verification jobs and both isolated hosted journeys, including offline/returned-sheet recovery. Deployment `5a090554-1e7d-4a06-98e2-3a6e1f0a886d`, served asset identity and independent cleanup are verified. C7 is complete; unperformed G9 release gates remain open.
 
 1. A player or authorized GM adds a personal custom entry to a character's compatible sheet slot and records its name, description, quantity and notes without changing the published system.
 2. A GM or co-GM may create a reusable campaign template for an item, spell, ability or effect. Data-only templates can start blank; a template based on the campaign's pinned system version may inherit that system item's validated actions.
@@ -161,13 +161,26 @@ A system version is a validated declarative package with stable identifiers for 
 | Rule             | Validation or simple conditional behavior     | condition, severity, message, targetId                       |
 | Reference data   | Reusable system content                       | skills, items, conditions, lookup tables                     |
 
+**Presets, reference data and non-player entities (2026-11-21, SRD gaps S2, S3, S10).**
+An entity may name a dataset in `presetsFrom`; each row is a ready-made character
+whose values are copied when a character is created with `presetId`, then
+`initialValues` apply. A row value is keyed by field ID; a number fills a
+resource's current value and maximum. The copy is not linked to the row.
+Publishing rejects rows that set unknown, computed, image or multi-choice
+fields or values of the wrong type. Creation options list an entity's presets.
+Every reference table of a version is readable by anyone who may use the
+version (`GET /system-versions/{id}/reference-data`) or read a character pinned
+to it (`GET /characters/{id}/reference-data`); the character sheet has a Rules
+panel over the same read. An entity of kind `npc` is created only inside a
+campaign; standalone creation rejects it.
+
 ## 6.2 Supported field types
 
 | **Category** | **MVP types**                              | **Notes**                                         |
 |--------------|--------------------------------------------|---------------------------------------------------|
 | Scalar       | text, integer, decimal, boolean            | movable; numeric constraints and step supported   |
-| Choice       | single choice, multi-choice                | Static options only; reference-data source        |
-| Resource     | current/max pair                           | Optional min/max and reset action                 |
+| Choice       | single choice, multi-choice                | Manual options or options from dataset rows        |
+| Resource     | current/max pair                           | Bounded current and a manual or computed maximum                 |
 | Computed     | number, text, boolean                      | Read-only result of a math-only expression        |
 | Media        | image attachment reference                 | Reserved image field; character portraits and item art delivered in M1/M2 (Section 7.8) |
 
@@ -182,27 +195,77 @@ A sheet is a **single-column linear scroll** (predictable collapse to one column
 - Resource bars (current/max) with step controls and direct input
 - A flat list of **action buttons** (rolls and simple stat bumps)
 
+**Resource editing (rules coverage R1, 2026-11-10, implemented):** besides the one-step controls, a resource row has an amount field with **Subtract** and **Add** (one `adjustResource` command; the result stops at the resource's minimum and the character's stored maximum, and the amount must be a non-zero multiple of the step) and a **Set** editor for the current value and the character's maximum (one `setResource` command; lowering only the maximum lowers a higher current value with it; values outside the field's bounds or step are rejected). Both are revision-checked idempotent server commands like `bumpResource`, available to the same actors, queued offline with a sequential estimate, and recorded as `character_resource_adjusted` and `character_resource_set`. Browser routes are `POST /characters/{id}/resources/{resourceId}/adjust` and `/set`; `/api/v1` exposes `POST …/adjust` and `PUT /characters/{id}/resources/{resourceId}`. The GM session board keeps its one-tap step controls.
+
 **Removed from MVP:** tabs, multi-column grid layouts, drag-drop element palette, manual binding inspector, reusable fragments, conditional display, viewport authoring beyond preview. Keep only a simple section/order editor with move-up/down controls and keyboard authoring.
 
 The basic builder exposes an explicit “not on this character sheet” list for the sheet's target entity and global actions. The creator selects a target section for one-action placement (initially the first section); when none exists, placement creates the first section. Each placed item receives a generated document-wide element ID. Manual target-ID editing remains an advanced repair path, not the expected creation flow. The creator Sheets tab presents entity and element-binding reference IDs as labeled dropdowns sourced from compatible document definitions; sheet, section, and element identity IDs remain automatically assigned and read-only in the basic builder. Unresolved legacy bindings are shown explicitly without silent replacement.
+
+**Applying a roll (owner decision 2026-11-21, G5; SRD gaps S6).** Rolls still
+never change characters on their own. A person who may edit a character can
+apply a saved roll's total to one of its resources, subtracting it (damage,
+spending) or adding it (healing), with a revision-checked, idempotent command.
+The roll must be one that person can see, from the character's campaign, or
+for a standalone character one of its own rolls; only positive totals apply.
+The change is recorded as `character_roll_applied`. The sheet lists up to 20
+applicable rolls per resource; the control is online only.
 
 ## 6.4 Rules and expression engine
 
 > **Security invariant.** System packages contain data and simple expressions only. They cannot execute JavaScript, make network requests, access files, or run server commands.
 
-Expressions are **math plus basic dice** only, parsed into a lightweight typed AST and evaluated by the platform with hard budgets:
+Expressions are declarative math, conditionals, and dice, parsed into a lightweight typed AST and evaluated by the platform with hard budgets:
 
-- Arithmetic, comparison, and boolean composition: `+ - * /`, `== != < <= > >=`, `&& ||`, `min`, `max`, and `round`; division-by-zero fallback
-- Field access: stable identifiers of sibling fields and current action inputs only
+- Arithmetic, comparison, and boolean composition: `+ - * / %`, `== != < <= > >=`, `&& ||`, `min`, `max`, `round`, `floor`, `ceil`, and `abs`
+- Field access: stable identifiers of sibling fields and current action inputs. Resources expose `.current` and `.max`. Double-quoted choice IDs work with equality and multi-choice fields use `has`.
+- Conditionals: `if(condition, a, b)` requires two branches of the same scalar type and evaluates only the selected branch.
 - Dice: standard notation (`2d6`, `d20 + 2`), keep-high/low (`4d6kh3`), advantage-style helpers, field-derived pools, and counted successes at a threshold; server-side deterministic dice
-- **No** chained derived-field dependency graphs
-- **No** lookup/aggregation over collections (`equipped.armor.bonus` is out)
+- Computed fields may depend on other computed fields of the same owner; dependency cycles are rejected at publish
+- Typed dataset lookups and bounded single-slot aggregates read reference data and equipped or carried items.
 - **No** effect engine (set/increment/append) — resource changes are simple built-in "bump" actions
 - **No** `against target.defense` action chains
 
-Grammar v0.1 is fixed by `docs/superpowers/specs/2026-09-04-system-package-contract-design.md`. It excludes rerolls, exploding dice, push mechanics, custom faces, arbitrary property traversal, and executable extension points. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 dice per roll, and 1,000 sides per die.
+[Grammar 1.0](docs/contracts/grammar-v1.0.md) is the current contract for system and extension document/package 2.0. It supports dynamic dice parameters, reroll-once and bounded explosion modifiers, one reducer per pool, and reuse of a previously evaluated named group. All rolls share a saved breakdown graph. It records the original and replacement faces, explosion chains, reductions, and group reuse. Character activity and campaign export preserve those details. Push policies explicitly opt into modified pools and reroll eligible chains from their starting die. The platform ceilings are 1,024 expression bytes, 256 AST nodes, depth 32, 100 draws per roll including rerolls and explosions, 1,000 sides per die, and ten explosions per starting die.
 
 **Rolls** are a button press → server evaluates → result shows normalized expression, individual dice, modifiers, total, and audience. Rolls are factual; the platform does **not** auto-apply outcomes to state.
+
+**Custom dice (rules coverage R6, 2026-11-11):** systems can define up to 16 custom dice with up to 20 equally likely faces each. Each face has a numeric value, an optional label and optional symbol counts. `dice(4, "fudge")` sums four custom draws. `countSymbol` counts a named symbol across the final faces in a pool, including previously rolled named pools. The creator manages definitions in the Dice tab. Creator previews, the player sheet, the GM board, activity and exports use the saved face labels and symbols. Configurable push policies apply to standard dice.
+
+**Card decks (rules coverage R8, 2026-11-12, implemented):** a system can
+define up to 4 decks. A deck names one dataset, and that dataset's records (1 to
+200) are its cards. The only stored state of a deck is its remaining order. A
+campaign shares one state per deck between all its characters. A character
+outside a campaign has its own. Two entity action kinds use a deck: `draw`
+takes a fixed number of cards (1 to 10) from the top, and `shuffle` returns all
+cards and reorders them. The order follows from the roll secret and a shuffle
+ID, which is the server-generated ID of the shuffle command, or of the first
+draw from a deck that was never shuffled. Both commands are online-only,
+idempotent, and resolve inside the command transaction after the deck state is
+locked, so concurrent draws never deal the same card. They leave the character
+revision unchanged. A draw is saved like a roll, with the same audiences,
+activity, GM board and export; its result lists each card's label and columns
+and the number of cards left. A draw from a deck with fewer cards than asked
+deals what is left. A draw from an empty deck is refused with a readable
+message until the deck is shuffled. A shuffle is recorded in the character's
+activity. Cards that a later rules version removes are skipped, and new cards
+enter at the next shuffle. `GET /characters/{id}/decks` (browser API and
+`/api/v1`) returns the cards left per deck. The creator edits decks and their
+cards in the Dice tab on top of the dataset editor. There are no hands, discard
+piles, peeking, dealing to other players or returning single cards, formulas
+cannot read drawn cards, and templates and extensions cannot grant deck actions.
+
+**Targeted and opposed rolls (rules coverage R7, 2026-11-11):** a roll action
+can declare a target entity and use its fields through `target.<fieldId>`.
+A response action can read `opposed.total` from a saved roll visible to the
+responder. These actions run on active campaign sheets. The server locks the
+campaign before reading the actor and target sheets and requires the target to
+use the same pinned rules composition. Each account can respond once per source
+roll. Responses and pushes share stored roll lineage, with distinct links for
+the source of a response and the parent of a push. Rolls leave sheet state to
+the players to update. The creator configures both action types, and players
+select targets and recent rolls from the sheet or GM board.
+
+**Roll outcomes (rules coverage R5, 2026-11-11, implemented):** a roll action can list ordered outcome bands and named details, each an `outcome` expression evaluated after the roll with `roll.total`, the action's values and its named groups (`rolled("group")`), never new dice. The first true band names the result (a PbtA miss / weak hit / strong hit, or a d100 critical / success / fumble / failure); details are numbers such as a margin or success level. The command result carries `outcome { id, label }` and `details`; the output template accepts `{outcome}`, `{detail.id}`, `{fields.id}` and `{inputs.id}` (and `{item.id}` for granted actions), checked at publish, and the outcome label is appended when the template omits it, so saved rolls, activity and exports show it through their output text. Pushed rolls are described again. The creator edits bands (ordered) and details per action; the sheet and the GM session board show the outcome. Players still apply effects by hand (owner decision 2026-11-10). Extensions cannot define outcomes yet.
 
 **Dice-pool reliability, slice A (2026-10-23 CI and isolated deployed acceptance):** success counts require direct dice operands; valid zero pools remain legal. Entity and item-granted roll actions reject arithmetic failures with a reviewable HTTP 422 error, without recording a fallback or partial roll. Error receipts preserve retry identity. Computed/validation scalar fallbacks remain unchanged. Custom pool formulas retain their expression editor; previews show their sample bindings and omit modifiers where the AST cannot prove an additive interpretation. See [slice A acceptance](docs/acceptance/dice-pool-reliability-2026-10-22.md) for verification and remaining release gates.
 
@@ -215,7 +278,105 @@ Slice A was merged as PR #21; B was merged as PR #22 (`759323a`). B passed all s
 
 The [2026-10-27 scoped acceptance](docs/acceptance/configurable-push-rolls-2026-10-27.md) passed nine fresh-system journeys on isolated deployment `90462834-5fbd-4aea-865c-2f9cdc9680b5`, exact application `dfae37f`, including two independent authors, current permission/scope changes, early Activity and durable offline recovery. All five served artifacts matched the source rebuild; CI 135 passed. The report distinguishes PostgreSQL default-policy evidence from the unperformed live internal setting change.
 
-**Pre-release scope decision (2026-10-27):** The owner confirms there has been no release and there are no existing users. Character/campaign version upgrades have been removed. Application/database migration and historical-client compatibility are deferred until after the first release tag under Section 17.0. Fresh system authoring/publishing, play, permissions, saved-pool pushes and offline recovery remain in scope. Existing version checks remain defensive constraints; no upgrade workflow is added by this decision.
+**Pre-release scope decision (2026-10-27):** The owner confirms there has been no release and there are no existing users. Character/campaign version upgrades were removed on that date and reinstated for non-breaking system versions on 2026-11-07 (Section 6.7). Application/database migration and historical-client compatibility are deferred until after the first release tag under Section 17.0. Fresh system authoring/publishing, play, permissions, saved-pool pushes and offline recovery remain in scope. Existing version checks remain defensive constraints; no upgrade workflow is added by this decision.
+
+**Rules coverage (owner request 2026-11-10):** the
+[rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md) records
+the 2026-11-10 review defects and a staged widening of this contract. Because no system is published yet (owner statement
+2026-11-10), R2 replaces the contract in place with document/package 2.0 and grammar 1.0. Later stages cover d20 with tables and equipment, banded outcomes, d100
+roll-under, variable-target and exploding pools, roll-and-keep, custom dice, cards
+and opposed rolls. The owner confirmed all decisions C1–C13 on
+2026-11-10. Stages R3–R8 change the exclusions listed above. Each stage updates
+this section when it is delivered.
+
+**Rules defects, stage R0 (2026-11-10, implemented):** `adv(d20)`/`dis(d20)` roll
+two dice and keep one. A roll expression must produce a number; pass/fail results
+are a later stage (R5). All computed fields and validations of one sheet share a
+separate `sheetEvaluationNodes` limit of 8,192 AST nodes, recorded in the
+package's effective limits; publishing rejects a sheet above it with a
+`limit_exceeded` diagnostic at the entity, so a published system can no longer
+fail every character with `budget_exceeded`. The 256-node ceiling remains per
+expression. The sheet's increase control stops at the character's stored maximum.
+
+**Grammar core, stage R2:** creator previews and the server compile the same
+grammar. Choice sets and resource parts are recorded in roll bindings for saved
+push replay. Changes to an expression remain non-breaking when its context and
+declared result type stay the same.
+
+**Data-driven rules, stage R3.** Fields are scoped to an entity or item template.
+Option IDs are local to their choice field, inputs are local to their action,
+and granted action IDs are local to their template. Sheet and validation
+pickers identify a field by its owner and field ID. A granted roll reads common
+character fields through `fields.` and its own entry through `item.`. A
+template formula reads its own fields through `item.`.
+
+Tables can declare a key column and typed columns. `lookup` finds an exact
+key and `lookupBand` finds the highest numeric key at or below its argument.
+A choice field can populate its options from the IDs and labels of dataset rows.
+Slot aggregates read one slot and charge its maximum capacity against the sheet
+evaluation budget. A template lists its per-unit number fields (`quantityFields`, such as
+weight); sums multiply only those by the entry's quantity, so two carried armors
+weigh double but grant their bonus once. Counts count entries. `maxOf` selects the largest individual value. Compose checks the
+field types of all templates accepted by a referenced slot, including extensions.
+
+A resource's calculated maximum is rounded down to its step within its bounds.
+The sheet permits edits to the current value and clamps it when the maximum
+decreases. Version dry runs evaluate the target version's data and formulas
+before saving the new pin.
+
+**Size and entry formulas (owner decision 2026-11-16).** An encoded system
+document may be 5 MiB (was 1 MiB), and so may the package compiled from it.
+Validation and publishing reject a larger package with `limit_exceeded`, so a
+version that publishes can always be exported and imported again. Draft saves
+in the browser API accept the same body size as the public API.
+
+A computed template field reads its own entry and reference data. Slot
+aggregates may read computed number fields, and computed boolean fields as the
+filter of `sumWhere` and `countWhere`. Each such read is charged to the sheet
+evaluation budget for every entry the slot can hold: the field's formula plus
+the computed fields it depends on. Quantity never multiplies a computed field.
+The sheet and `/api/v1` return an entry's computed fields with the entry
+(`derived` in the projection, `derivedValues` in v1), read-only.
+
+These two rules make "one entry per class" possible: a class entry computes what
+the class contributes at its level and the character sums the slot. The
+Ember Trail test system (`tests/integration/fixtures/ember-trail/`) adds paths
+this way. Third-party rules content such as the 5e SRD system lives outside this
+repository (owner decision 2026-11-21), so no game licence applies to Sweetroll.
+
+**SRD gap stages S1–S11 (owner instruction "Implement plan", 2026-11-21).** The
+[plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md) records
+the decisions; the owner chose to add the apply-roll command (G5), and the other
+decisions take the plan's recommended options.
+
+- *Shared formulas (S1).* Several templates may use one computed or roll
+  expression. It compiles against the fields every owning template defines with
+  the same type. Granted actions that share a roll formula must declare the same
+  inputs, target, outcomes and details; their labels may differ. Entity
+  expressions and extension templates keep one owner.
+- *Template formulas (S11).* Template computed fields and template resource
+  maxima may read the character's stored fields through `fields.` (never its
+  computed values), for fields every entity showing the template's slot defines.
+  A template resource may have a calculated maximum; it is normalized for each
+  entry before the sheet is evaluated.
+- *Start full (S4).* A resource with `startFull` starts at its maximum on a new
+  character, and fills when its calculated maximum first rises from 0. Later
+  rises leave the current value alone.
+- *Batch resource actions (S5).* `resourceBatch` applies ordered resets and
+  amounts to the entity's own resources in one revision; amounts stop at the
+  bounds. Entry resources are not part of a batch.
+- *Branch groups (S8).* Each branch of an `if` may name the same dice group; a
+  group named on every branch can be read afterwards with `rolled`.
+- *Targets (S7).* `target.otherEntityIds` lets a target be a character of
+  several entities (formulas read their common fields); `target.optional` lets
+  the action run without one. The roll formula then cannot read `target.`;
+  outcomes and details that read it are skipped when no target is chosen.
+- *Conditional layout (S9).* Sections and sheet elements take `visibleWhen`, a
+  true/false field of the sheet's entity. Hidden parts are left out of the sheet
+  projection; their values stay in the API.
+
+Section 6.1 has presets (S3), reference data reads (S2) and the `npc` rule (S10);
+Section 6.3 has applying a roll (S6).
 
 ## 6.5 Draft, validation, and publishing
 
@@ -244,29 +405,176 @@ Templates are exported declarative packages that users can clone and customize w
 
 I1 contract validation uses three original, license-neutral reference fixtures: a d20 ability/check family, a 2d6 PbtA-style move family, and a d6 counted-success pool family. These fixtures define the capability ceiling without being represented as reviewed launch templates. Shipping any named open-license template still requires the separate license review.
 
-## 6.7 Pinned rules; no version upgrades (2026-10-27)
+## 6.7 Pinned rules and non-breaking version upgrades (owner decision 2026-11-07)
 
-Campaigns and characters retain the exact published rules snapshot chosen at
-creation. Publishing a new snapshot does not change existing play. The owner has
-removed version migration from the current scope: there are no mapping/default
-previews, upgrade commits, rollback commands, lineage tables or upgrade UI.
-Create a new test character/campaign to use a different snapshot. Existing
-publication, immutable version IDs, character saves and dice history remain.
+This section is about **system (rules) versions**. It is independent of
+application/database versions, which follow Sections 12.4 and 17.0.
+
+Campaigns and characters store the exact published system version they use.
+Publishing a new version never changes existing play by itself. Systems are
+expected to grow: new items, spells, talents and other templates are common, and
+so are stat changes on existing templates. An owner can therefore move a
+character or campaign **forward** to a later published version of the **same
+system** when the change is non-breaking for that character:
+
+1. **Package check.** The publish-time comparison (Section 6.5) runs between the
+   current pin and the target. Adding entities, fields with defaults, templates,
+   slots, actions or granted actions and changing template stats, labels,
+   expressions with the same context and result type, or presentation are
+   non-breaking. A breaking finding blocks only when it touches this character
+   (owner decision 2026-11-07): its own character type, an action on its sheet, a
+   template or slot used by one of its entries, or an expression behind its
+   computed fields or those actions. Breaking changes elsewhere, such as a removed
+   item nobody on this sheet has, are listed in the preview but do not block.
+2. **Character check (dry run).** The server decodes the character's stored state
+   and every entry against the target package, using the existing write-time
+   validators. Field values, entry values, slot acceptance and limits, system-base
+   references of campaign-derived entries and validations must all pass. New
+   non-computed fields receive their declared defaults. The result is a preview
+   listing the fields added or dropped, stats updated or kept on this character's
+   entries, the target's validation messages and any blocking problems.
+3. **Commit.** The upgrade stores the target version ID, the defaulted state and a
+   revision bump in one revision-checked, idempotent transaction, and records an
+   activity/audit event with the source and target versions. Rolls, activity and
+   history are retained unchanged. Nothing is converted or remapped: stable
+   definition identifiers carry the values across.
+
+Stored values are kept by identifier. Granted actions and expressions come from
+the pinned package. Placing an item copies its template field defaults (its
+stats) into the entry, so a version change moves each entry value that still
+equals the old template default to the new default, and keeps values the player
+or campaign changed; the preview lists both. New template fields receive their
+default, and the item's art follows the template unless it was changed.
+Campaign-derived entries re-pin their system base to the target version.
+
+**Campaigns.** A campaign and its attached characters share one pin. An active GM
+or co-GM upgrades the campaign; the dry run covers every attached character and
+every campaign template with a system base, and the commit moves all of them
+together or none. Campaign template bases are re-pinned to the target version and
+checksum. Any character that fails the dry run blocks the whole campaign upgrade; derived entries already placed on sheets keep their copied defaults.
+A standalone or returned character is upgraded by its owner. A standalone
+character can be adopted only at the campaign's exact version, so its owner may
+first upgrade it to that version.
+
+**Revert (owner decision 2026-11-07).** A character or campaign can return to
+the version it used before its most recent upgrade. The upgrade stores that
+composition (Section 6.8) as `previous_system_version_id` plus the
+`character_previous_extensions` or `campaign_previous_extensions` rows; a revert
+clears it, so a second revert is not possible until the next change. Revert uses the same dry run and commit as an
+upgrade, but against the previous version and without the package-level check,
+because undoing additions always reads as removals. Current values are kept by
+identifier, so play since the upgrade (damage, resources, notes) is not lost.
+Values of fields that do not exist in the previous version are dropped and listed
+in the preview. An entry whose template or slot does not exist in the previous
+version, or whose values no longer verify, blocks the revert; the owner removes or
+edits it first. A campaign reverts with all attached characters and template bases
+or not at all, and any blocker blocks the campaign.
+
+**Excluded.** Breaking upgrades, field mapping or renaming, reverting to any
+version other than the recorded previous one, moving between different systems,
+automatic upgrades on publish and lineage tables. A blocked character stays on its
+version; create a new character to use a breaking version. Version selection lists
+later authorized versions and the revert target; choosing one runs the check for
+this character before anything is saved. A target is a composition
+`{ systemVersionId, extensions: [{ extensionId, versionId }] }` (Section 6.8).
+Standalone characters use `GET /characters/:id/composition-options`,
+`POST /characters/:id/composition-check` (`{ target }`) and
+`POST /characters/:id/composition` (`{ target, expectedRevision, idempotencyKey }`);
+attached characters move only with their campaign, through the GM/co-GM routes
+`GET /campaigns/:id/composition-options`, `POST /campaigns/:id/composition-check`
+and `POST /campaigns/:id/composition` (`{ target, expectedCampaignRevision, idempotencyKey }`).
+The campaign check lists every attached character and every system-based campaign
+template with its blockers; the commit locks the campaign, then its characters and
+templates, re-verifies them and writes the campaign pin, each character and a new
+template content revision with the re-pinned base in one transaction. A campaign
+records its previous composition like a character. A blocked change returns 409,
+and activity records `system_version_upgraded`, `system_version_reverted`,
+`extension_added`, `extension_removed` or `extension_upgraded` with version,
+extension and definition identifiers only; the campaign feed shows the same kinds
+to all members. In the GUI, **Rules and extensions** sits in the character tools
+(standalone characters) and in campaign Settings (GM/co-GM). Both run the check before offering
+**Upgrade** or **Revert**, and the character change uses the session's durable
+online-attempt ordering like archive/recover. The [system version upgrade plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)
+defines the delivery stages.
 
 Character activity uses readable action names and local date/time formatting.
 A published system version updates the open editor's status immediately.
+
+## 6.8 System extensions (owner-approved 2026-11-07)
+
+Systems can be extended with new items and abilities through separately published
+**extensions**: immutable packages of templates (item, spell, talent, effect) with
+their granted actions and expressions, owned and shared like systems. A character
+or campaign is built on a system version plus a set of extension versions (its
+composition). A campaign's composition is the union of the extensions it chose and
+those used by its attached characters. Scope, access, ID scoping, campaign-union,
+removal and upgrade rules are decisions X1–X13 in the
+[system extensions plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
+which also tracks implementation stages E1–E8. E1 (package contract), E2
+(authoring and publishing under `/systems/:systemId/extensions` and
+`/extensions/:extensionId`), E3 (standalone characters) and E4 (campaigns) are
+implemented; an extension is a `systems` row of kind `extension` whose versions
+record the base version they were built against. A character stores its
+extension versions in `character_extensions`; entries from extension templates
+carry `extensionId`. A campaign stores its set in `campaign_extensions`
+(GM-added or brought by an adopted character) and every attached character
+uses exactly that set. Changing a campaign's composition (a GM add or remove,
+or an adoption that brings new extensions) is a change to every attached
+character whose extension set changes: each gets a new revision and an
+`extensions_changed` activity event carrying only extension and version
+identifiers, so commands prepared against the earlier revision are refused
+with 409 and clients reconciling by revision refetch. The campaign is locked
+before its characters, and an entry naming an extension is rechecked against
+the locked character's composition before commit (X9; issue #60). Campaign
+templates based on extension templates are a deferred follow-up (E4b).
+
+**Composition changes (E5, X11).** Section 6.7 applies to whole compositions.
+One change is made at a time: upgrade the base version, add an extension, remove
+one, or upgrade one to a later published version of the same extension; or revert
+to the composition recorded before the most recent change, whatever it changed.
+A request that changes more than one part is refused with 400. An upgrade must
+name a later version the actor may use; an added extension must be usable by the
+actor and extend the same system; removal and revert need no use authorization.
+The dry run compares the effective packages (base plus extensions, extension
+templates keyed by extension), so an entry from a removed extension, or a breaking
+change to an extension template the character uses, blocks the change, and
+unchanged template defaults follow the new extension version. A campaign change
+covers every attached character and blocks on any one; kept and upgraded campaign
+extensions keep their origin (`added_by`), and the GM add and remove extension
+commands also record the previous composition, so a revert undoes the most recent
+GM change. Adoptions that bring extensions do not record one.
+
+**GUI (E6).** The system library shows a system's extensions and creates one
+on a published base version. The creator opens an extension at
+`/extensions/:extensionId` with Overview, Templates and Publish only; formulas
+are written against the base version's character fields, and template art is
+uploaded as for system templates. Character creation
+offers the system's extensions that fit the chosen version; campaigns add them
+in Settings. The item picker groups templates by origin (rules, each extension,
+campaign, your own). Cached item templates are keyed by the composed rules.
+
+**Public API (E7, owner-approved 2026-11-21).** `/api/v1` offers the same
+extension authoring, creation with extensions, extension items and composition
+options, check and change for characters and campaigns, under the systems,
+characters and campaigns scopes (docs/api/v1.md).
+
+**Future feature (recorded 2026-11-07, not authorized):** an extension catalog for
+discovering and previewing published extensions. It depends on OD-07 and needs its
+own plan and approval.
 
 # 7. Campaign and play specification
 
 ## 7.1 Campaign workspace
 
-The campaign workspace combines member management, content, characters, and an in-session activity feed. The **Session view** is a curated mobile surface: pinned content, recent rolls, quick character access, and reveal/hide controls.
+The campaign workspace combines member management, content, characters, and an in-session activity feed. The **Session view** is a curated mobile surface: recent content, recent rolls, quick character access, and reveal/hide controls. Content pinning is not implemented (reconciled 2026-11-08); the Session view shows the ten most recent permitted content items instead.
 
 Campaign creation distinguishes versions with the same display name and semantic version by showing their publication date and a short version identifier. The campaign's pinned version supplies character creation choices automatically; players and GMs should not need to enter an internal version ID. A GM's roster access is labelled as GM access when they do not control a character. Member, sharing and content-preview controls use existing roster display names. Duplicate or absent names have an identifying suffix; short-ID collisions use full IDs, and debug mode shows full IDs. Requests retain exact user IDs and membership generations. Campaign and Session activity show local dates and readable actor labels; the exact actor identifier remains available for identification. Sheet previews show a section title once when its first heading repeats that title.
 
 ## 7.2 GM session board
 
 A dedicated **GM Session board** lists all characters with their key resources at a glance (health, stress, ammo, etc.). The GM can one-tap a bump control on any resource without opening each sheet. Designed for the GM at a physical table, and works across the GM's multiple devices (Section 4.2).
+
+The board and the campaign Characters tab load every attached character by following the paged `GET /campaigns/:id/characters` list at the maximum page size (100), up to a 20-page safety cap, and show a notice when the cap cuts the list short (issue #57). Each listed character's sheet is read separately through the Characters route; there is no dedicated `GET /campaigns/{id}/session` endpoint. Content and the character list refresh every 15 seconds while online. The board shares the foreground campaign activity refresh described in Section 7.5. If an operator lowers `CAMPAIGN_PAGE_MAX` below 100, the server rejects that page size with 400 and the client retries once without `limit`, reading at the server's default page size (issue #71).
 
 ## 7.3 Content model and visibility
 
@@ -277,6 +585,8 @@ A dedicated **GM Session board** lists all characters with their key resources a
 | Selected players | Explicit member allow-list plus GMs                 | Dreams, secret clues, private correspondence          |
 | Owner only       | Creating player plus GMs if campaign policy permits | Personal notes or hidden character information        |
 | Public link      | Anyone with link, only if explicitly enabled        | Post-session handouts; excluded from default behavior |
+
+**Public link is post-MVP (owner decision 2026-11-08):** it would be the first unauthenticated content route and needs its own plan for link tokens, revocation, rate limits and caching. The implemented audiences are GM only, all players, selected players and owner only.
 
 Visibility is enforced in server queries and storage access, never only by hiding UI. Changing visibility writes an audit event.
 
@@ -290,7 +600,11 @@ Visibility is enforced in server queries and storage access, never only by hidin
 
 ## 7.5 Dice and activity
 
-Actions may produce private, GM-only, or campaign-visible rolls according to campaign policy and per-roll choice. Authoritative rolls are evaluated by the server and include normalized expression, individual dice, modifiers, result, actor, character, visibility, timestamp, and a request id for idempotency. Manual or physical-dice results can be logged distinctly rather than presented as verified platform rolls.
+Actions may produce private, GM-only, or campaign-visible rolls according to campaign policy and per-roll choice. Authoritative rolls are evaluated by the server and include normalized expression, individual dice, modifiers, result, actor, character, visibility, timestamp, and a request id for idempotency. Logging manual or physical-dice results distinctly from verified platform rolls is post-MVP (owner decision 2026-11-08); players announce physical rolls at the table.
+
+The [shared physical dice plan](docs/superpowers/plans/2026-11-20-physical-dice.md) adds an optional simulated throw for online character rolls. The same physical roll pipeline serves personal and campaign character sheets and the Session board. A personal throw animates locally for the owner. Campaign placement and the roll audience determine which other clients can see a shared throw. The server controls availability with `SWEETROLL_PHYSICAL_DICE`, defaulting to `false`. Each player can hide the animation when the server enables the feature. The initiating player supplies settled dice and the server applies the system rules. Slice 1 provides calibrated numbered models, collision hulls and pose-to-face reading for d4, d6, d8, d10, d12 and d20. Browser clients can prepare an ordered throw and submit the initiating player’s settled poses through the browser character API. The existing command transaction checks the poses and applies the rules once. Preparation persists the versioned float32 launch state. A dedicated browser worker replays it in a fixed Z-up tray at 60 physics ticks per second. Clients request absolute ticks independently of rendering. The campaign member stream sends authorized start and finish events across server replicas. Account preferences store the 3D viewing choice and the thrower’s color. Character sheets and the Session board initiate throws. The initiating client runs physics with the animation shown or hidden, and a character session saves the exact settlement before sending it. A die that still rests tilted after its rethrows is read by the face closest to up. If the throw still cannot finish, for example because the worker fails, the client sends the ordinary roll command for the whole action instead, so the player still gets one roll. Viewers render the numbered models in a fixed camera tray that fits the viewport. The existing result overlay and campaign history use the committed roll.
+
+The authenticated play-event overlay shows committed rolls, pushes, card draws and visible campaign content changes. The roller sees the acknowledged result immediately. Other participants on the active campaign page or an attached character sheet receive audience-filtered summaries through a shared three-second foreground activity refresh. The browser uses the persisted roll ID to combine command and activity deliveries. The activity projection returns safe summaries and checks displayed event IDs separately from pagination so a role or grant change can remove a card immediately on the next refresh.
 
 ## 7.6 Content types (narrowed)
 
@@ -301,6 +615,8 @@ I6/I7 deliver **text notes** with visibility levels and basic tags. I7b adds aut
 A scene consists of a background image, a manually edited fog mask, and GM-positioned tokens with simple labels/images and visibility. Provide fit/pan/zoom, reveal/conceal, local undo, and drag or tap-to-place/move controls, with keyboard alternatives. Use normalized scene coordinates and revision-checked edits. There are no tactical grids, movement rules, initiative, automatic vision, or combat automation.
 
 **Delivery status (2026-11-06):** Background upload/create/replace, numeric fog/token operations and restricted display are delivered. V1 uploaded token-image selection/rendering is implemented in PR #34 and accepted through hosted/redeploy verification ([evidence](docs/acceptance/scene-image-tokens-2026-11-05.md)). PR #36 implements V2 direct drag/tap token placement/movement with explicit pan/placement modes, cancellable local previews and shared revision/idempotency recovery; numeric controls remain available. Local and hosted mouse/touch browser acceptance passed on `84c23fd`; see [V2 evidence](docs/acceptance/scene-token-gestures-2026-11-06.md). V3 on-image Reveal/Conceal brushing is implemented with bounded local drafts, stroke undo, explicit commit and revision/idempotency recovery; local and hosted mouse/touch acceptance passed on `637a60f` ([V3 evidence](docs/acceptance/scene-fog-brush-2026-11-06.md)). These are existing I7b/G8 requirements; follow the [scene visual-controls completion plan](docs/superpowers/plans/2026-11-05-scene-visual-controls.md). Numeric controls remain accessible precision alternatives and do not satisfy the direct visual controls gate. M3 background acceptance alone does not close these gaps. V4 combined acceptance now passes in PR #38 on deployed `3a35a5f` ([combined evidence](docs/acceptance/scene-visual-controls-2026-11-06.md)); the I7b/G8 visual-controls feature gate is complete. G9 physical-device, provider-login, human and table/remote gates remain open.
+
+**Scene streaming (2026-11-07, implemented):** the paired display no longer polls. It opens `GET /api/displays/:id/scenes/:sceneId/events` (`text/event-stream`, `Cache-Control: no-store`) with the `X-Display-Secret` header through `fetch()` with `credentials: "omit"`. Each `event: scene` message is a complete, credential-scoped projection (`sceneRevision`, `imageRevision`, map URL and the filtered token list); `event: revoked` ends the stream; `: hb` heartbeats never query PostgreSQL. Scene-write transactions issue `pg_notify` with internal IDs and the revision only, so rolled-back writes produce no event; each process holds one dedicated `LISTEN` connection separate from its request pool, subscribes before loading a stream's first snapshot, coalesces reloads, keeps only the latest pending snapshot for a slow client and disconnects a stalled one. Credential revocation and campaign media deletion also notify. On listener loss every local stream closes and new streams answer `503` until listening resumes; displays reconnect with jittered backoff and start from a fresh snapshot, and stop retrying a revoked credential until paired again. The former polled `GET /displays/:id/scenes/:sceneId/projection` route was removed. `scenes.image_revision` (schema baseline) changes only with fog edits or a different background; token-only edits keep it, so they neither download nor render a map. PNG generation happens on the image route, keyed by `(sceneId, imageRevision)`, with one in-flight render per key per process, atomic writes, removal of older image revisions and a credential/image-revision recheck after a render before bytes are sent. Token art URLs are keyed by the token's image file (`?file=`) so they stay stable across moves. Token art is served as a PNG derivative capped at 1024 px on its longest side and cached per `(fileId, media revision)` with one in-flight render per key and atomic writes; token visibility and fog are checked before cached bytes are read and rechecked after a render, and deleting the media file removes its derivative (issue #69); display image bytes are `private, no-store`. The display clears its frame immediately on an image-revision change and shows the new map (and its tokens) only once the new bytes arrive; superseded image loads are cancelled. A disconnect or lost authorization blanks the frame. GM gestures already send one command per completed drag or committed brush (at most 512 dabs, enforced server-side), each applied in one transaction with one revision bump; the GM view adopts the command response and reads again only on conflict or uncertain outcomes. See the [scene streaming plan](docs/superpowers/plans/2026-11-07-scene-streaming.md) for remaining hosted and load gates.
 
 A separate tablet or remote player receives only an authorized display projection. Fog-covered pixels must be removed from server-generated display imagery (or safe tiles); sending the original image under a client-only overlay does not protect secrets. Filter hidden tokens and GM metadata before delivery. Pairing credentials are revocable and cannot read campaign administration, GM notes, or originals. Clear privileged browser state when entering display mode, and blank the display when authorization is uncertain or revoked. Previously revealed information cannot be retracted from screenshots. See the GUI plan G8 for acceptance cases.
 
@@ -320,6 +636,11 @@ Because play happens at physical tables with unreliable venue connectivity, **of
 - Reads are cached at request time; the sheet renders from cache when offline.
 - Writes queue locally and sync when reconnected, using an **idempotency key** (already required) to avoid double-spend on retry.
 - Conflicts surface through the existing **revision + 409** mechanism rather than silently overwriting.
+- An open sheet is refreshed from the server through one read path: on open, on reconnect, when the page becomes visible, after commands (the command response or an explicit refresh) and, for a view that is not saved locally, every 30 seconds while visible. The tab that holds the editing lock saves the refreshed view; other tabs show it without writing local storage. A refresh that reports revoked access purges the cached copy and hides the sheet.
+- The character session reports three separate facts, and the sheet derives its state from them: the view and its source (`stored`, a copy this browser keeps, or `live`, an authorized server view that is not saved locally), whether local storage is available, and whether this tab edits or why it cannot (`storage`, no Web Locks, or another tab holds the lock). The saved (confirmed) copy stays internal to the write path.
+- The saved copy and the newest view are kept apart. The saved copy is exactly what local storage holds; commands, queued edits, pending estimates and reconciliation use only it. A tab without the editing lock also keeps the newest server view it fetched and did not save, and shows it while its revision is greater than the saved copy's, or equal and fetched after the saved copy last changed (the newest observed view wins, so a same-revision change is shown even where no tab ever saves), also offline. Rereading local storage, for example after another tab queues an edit, never replaces that newer view with an older saved copy. Purge, sign-out, an account change, a saved copy that disappears and gaining the editing lock drop it; the tab that then holds the lock saves the newest view on its next refresh. The view's source stays `stored` while a saved copy exists.
+- Editing is derived from those facts: a tab may edit only while it holds the editing lock and shows a `stored` view. The session's commands check the same predicate as the controls, so a command in a `live` view or in a tab without the lock is refused without queuing, writing local storage or sending a request. A tab that holds the lock but cannot save locally releases the lock, so a tab or browser profile that can save is able to take over; it edits again only after editing is requested again, which first retries saving. Storage availability is its own state: a failed local read or write marks storage unavailable until that retry reads local storage again under the lock, and no other error (offline, a failed refresh, sign-in, conflict or other review) clears or replaces it. The read-only messages (Section 10.2) are distinct from the not-found or revoked message.
+- The session's error reports review and pause events only (conflict, invalid value, expired attempt, protocol stop, not found, purged, sign-in expired, latest state not available), as a code: a kind, an optional reason where one kind covers situations that need different text, the server's own message when it sent one, and an English diagnostic for logs and tests that is never shown. A storage failure is not an error; it is the storage state above, so it neither hides nor clears an open review. The interface maps each code to a translated message through one shared helper. Each condition has one message: storage shows the read-only status and the sync line, `purged`/not-found without a sheet the "unavailable" text, and the review kinds the review panel; only a sign-in that expired, a refresh that failed, a protocol stop and a not-found while the sheet is still shown add an alert next to the sheet. The campaign session board, which has none of those surfaces, shows each error and a storage failure as one translated alert. Server diagnostics and messages for rejected values are server data and are shown as before.
 
 # 9. Authorization model
 
@@ -367,20 +688,23 @@ into several rows. Navigation and viewport changes preserve the active view's
 state; Escape closes the disclosure and restores focus to its trigger.
 
 - Character identity, save/offline status and resource sections scroll with the rest of the sheet; the character header must not stick over fields or actions on small screens.
+- An authorized online sheet can open read-only when the browser cannot acquire the editing lock or save the initial local copy. This `live` view (Section 8) is available only while signed in and connected. It is fetched again after reconnecting, when the page becomes visible and every 30 seconds while visible, so other devices' edits appear and revoked access hides it at the next refresh. Editing still requires the lock and a saved local copy; a tab whose local save fails gives up the lock and stays read-only (Section 8). The status names the reason a tab is read-only: "Can't save this character in this browser, so it is read-only." when local storage fails (with a "Try saving again" control that requests editing again and retries saving, when the browser has Web Locks), "Read-only in this browser." when the browser has no Web Locks, and "Read-only in this tab. Another tab is editing this character." when another tab holds the lock. "This character is unavailable." is kept for a character that is not found or whose access was revoked. A `live` view's sync status reads "Available online only"; a storage failure's reads "Local storage unavailable — changes are not saved". A storage failure adds no alert; an expired sign-in, a failed refresh and a protocol stop add one translated alert each (Section 8).
 - Platform-owned bottom navigation for Characters, Activity, and Account; Campaigns is added in I6. System creators cannot add navigation destinations or divide the linear sheet into tabs.
 - Prominent action buttons and resource controls; numeric entry supports direct input and step controls.
 - Optimistic updates with visible pending/error state and automatic retry only when idempotent (offline-safe).
-- A roll result opens as a compact sheet showing dice, modifiers, total, and audience.
+- A roll popup appears below the app header and leaves the sheet controls usable. Detailed dice, modifiers, total, audience and push controls are available on the sheet and in character history.
 - Roll expressions and field bindings use character attribute labels when available, retaining the field identifier for unresolved references. The creator presents the `talent` template kind as “ability” while preserving its stored kind value.
 
 ## 10.3 GM mobile session view
 
-- Pinned handouts and notes, recent activity, member status, quick character access, and the **GM session board**.
+- Recent handouts and notes (pinning is not implemented; see Section 7.1), recent activity, member status, quick character access, and the **GM session board**.
 - One-tap reveal/hide with audience confirmation; items remain visibly marked after sharing.
 - Works simultaneously across multiple GM devices (Section 4.2).
 - Conflicts between co-GMs and the GM's own devices resolve via revision/`409` and an immediate refresh prompt.
 
 ## 10.4 Accessibility and localization
+
+The play overlay shows up to three cards with an overflow count. Each event stays visible for six seconds after receipt, then fades for 240 ms independently. Reduced-motion mode removes the fade. A polite announcement region groups bursts without moving keyboard focus, and Activity gives readers time to revisit outcomes.
 
 Target WCAG 2.2 AA for the authored application. The builder must flag missing labels, low contrast, ambiguous names, and controls available only by drag. Store display strings separately from stable IDs and design all UI for localization, plural rules, time zones, and longer translated labels. Bidirectional layout is a post-MVP validation item unless required at launch.
 
@@ -475,7 +799,7 @@ interface SystemRuntime {
 
 `CreateDraft` uses a source union for blank creation, cloning a version, or importing bounded bytes. `AuthoringWorkspace` returns metadata, current draft and revision, version summaries, and one package assessment. Saving a draft therefore returns validation and compatibility information without requiring callers to coordinate separate operations. A semantically invalid but structurally safe draft may be saved; preview and publication require a valid assessment.
 
-`RuntimeRequest` contains an immutable `versionId`, optional current state, and exactly one intent: `observe`, `initialize`, `set`, `bump`, or `action`. `RuntimeResolution` contains the complete validated next state, derived values, validation messages, normalized roll details when relevant, changed definition IDs, and a versioned render projection. Callers never receive AST nodes, apply runtime-generated patches, or order derived calculations themselves.
+`RuntimeRequest` contains an immutable `versionId`, optional current state, and exactly one intent: `observe`, `initialize`, `set`, `bump`, `adjust`, `setResource`, `action`, or `push`. `RuntimeResolution` contains the complete validated next state, derived values, validation messages, normalized roll details when relevant, changed definition IDs, and a versioned render projection. Callers never receive AST nodes, apply runtime-generated patches, or order derived calculations themselves.
 
 ## 11.4 Interface invariants and errors
 
@@ -503,7 +827,7 @@ Authoritative dice derive from a server-secret HMAC of a server-generated comman
 
 **Future character command:** the Characters Module reads a character revision, calls `SystemRuntime.resolve`, then locks and rechecks the character revision in a short transaction before storing state, roll, activity, and idempotency result. Publishing a system version can never start this flow or mutate a character or campaign.
 
-**Real-time read:** use poll-on-view plus server revision. Clients refresh permitted data when a view becomes active. Add authorized asynchronous notifications only when user research or measured polling load justifies them; secret payloads are never sent to a mixed-audience channel.
+**Real-time read:** use poll-on-view plus server revision. Clients refresh permitted data when a view becomes active; the GM Session view refreshes roster/content reads on a 15-second interval while online (Section 7.2), and campaign activity shares one three-second foreground refresh per active tab (Section 7.5), and the scene-streaming load comparison should cover those reads. Add authorized asynchronous notifications only when user research or measured polling load justifies them; secret payloads are never sent to a mixed-audience channel. The owner-approved exception (2026-11-07) is the paired scene display, which receives complete credential-scoped snapshots over server-sent events driven by PostgreSQL `LISTEN`/`NOTIFY` change signals (Section 7.7); notifications carry only internal IDs and revisions.
 
 ## 11.6 I1 source layout
 
@@ -529,21 +853,33 @@ Use Node.js LTS, TypeScript, Fastify, a thin PostgreSQL driver, explicit current
 | **Aggregate/table** | **Key relationships**                        | **Important fields**                                                |
 |---------------------|----------------------------------------------|---------------------------------------------------------------------|
 | users               | external_identities, owned resources         | id, display_name, locale, status, created_at                        |
-| systems             | creator; drafts; versions; collaborators     | id, owner_id, name, access, lifecycle                               |
+| systems             | creator; drafts; versions; collaborators     | id, owner_id, name, access, lifecycle, kind, base_system_id (6.8)   |
 | system_drafts       | one current draft per system                 | system_id, revision, document_json, source_checksum, updated_by     |
 | system_versions     | immutable child of system                    | version_id, semantic_version, checksum, package_json, release_notes |
 | preview_snapshots   | immutable expiring draft preview             | snapshot_id, system_id, source_revision, package_json, expires_at   |
 | idempotency_receipts| user and command scope                       | actor_id, command_kind, key, input_hash, result_json, expires_at    |
 | system_audit_records| system authoring changes                      | system_id, actor_id, kind, summary, occurred_at, request_id         |
-| campaigns           | pinned version; members; characters; content | id, system_version_id, owner_id, settings_json, status              |
+| campaigns           | pinned version; members; characters; content | id, system_version_id, previous_system_version_id, owner_id, roll_audience_default, status, revision |
 | campaign_members    | user in campaign                             | role, membership_status, joined_at, permissions_override            |
 | characters          | owner(s); optional campaign; pinned version  | id, revision, state_json, visibility, archived_at                   |
-| content_items       | campaign; creator; optional file             | kind, title, body, audience, revision                               |
-| content_grants      | content to selected member                   | content_id, member_id                                               |
-| file_objects        | content/avatar/system asset                  | storage_key, media_type, size, scan_status, checksum                |
-| activity_events     | actor and campaign/resource                  | type, audience, payload, occurred_at, request_id                    |
-| outbox_events       | Deferred with invitation email to I6 follow-up; absent from token-only backend slice | topic, payload, attempt_count, available_at, published_at |
-| invitations         | campaign and inviter                         | token_hash, intended_role, expires_at, accepted_by                  |
+| character_extensions| character; extension; extension version (6.8)| character_id, extension_id, extension_version_id                   |
+| campaign_extensions | campaign; extension; extension version (6.8) | campaign_id, extension_id, extension_version_id, added_by           |
+| campaign_content_items | campaign; creator                         | title, body, audience, status, deleted_at, revision                 |
+| campaign_content_grants | content to selected member               | content_id, campaign_id, user_id                                    |
+| media_files         | campaign scene/token images                  | storage_key, media_type, size_bytes, width, height, checksum        |
+| character_image_assets, item_image_assets | portraits and item art (Section 7.8) | storage_key, media_type, checksum              |
+| character_activity_events, campaign_activity_events | character or campaign scope | kind, payload, occurred_at, request_id         |
+| character_rolls     | character; command execution                 | audience, result, push lineage                                      |
+| deck_states         | campaign or standalone character             | deck_id, shuffle_id, remaining card order (Section 6.4)             |
+| character_controllers, character_claim_designations, character_placements | campaign custody (Section 17.8) | character_id, campaign_id, user_id |
+| scenes, display_codes, display_credentials | campaign scenes and paired displays (Section 7.7) | revision, image_revision, fog, tokens; code/secret hashes |
+| campaign_item_templates, campaign_item_proposals (+ revisions, grants, images) | campaign catalog (Section 5.4) | content revision, audience |
+| personal_access_tokens, public_api_rate_limits | public API (Section 13.3) | token_hash, scopes, expires_at; per-user minute counters |
+| character_command_executions, campaign_command_executions | idempotent command results | status, lease, result_json, expires_at |
+| outbox_events       | Deferred with invitation email to I6 follow-up; not present in the schema | topic, payload, attempt_count, available_at, published_at |
+| campaign_invitations | campaign and inviter                        | token_hash, intended_role, status, expires_at, accepted membership generation |
+
+`database/schema.sql` is the authoritative list (reconciled 2026-11-08).
 
 ## 12.1 JSON document placement
 
@@ -556,7 +892,8 @@ Mutable aggregates carry an integer revision. Update requests include the expect
 ## 12.3 Retention and recovery
 
 - Daily encrypted backups with point-in-time database recovery; restoration drills at least quarterly.
-- Soft deletion for systems, campaigns, characters, and content during a configurable recovery window.
+- Archive and recover for systems, campaigns, characters, and content. A configurable recovery window with permanent purge is post-MVP (owner decision 2026-11-08); until then archived data is kept indefinitely. Permanent deletion must be planned before real users for privacy requests.
+- Expired operational records (idempotency, command and image receipts; preview snapshots; expired or revoked sessions and personal tokens; unconsumed invitations past expiry; display codes) are deleted 7 days after they become unusable. Deletion runs in bounded batches, by one replica at a time under an advisory lock, every `SWEETROLL_PRUNE_INTERVAL_MS` (default 1 h, 0 disables). Consumed and revoked invitations, audit, activity, rolls and user content are outside this policy (issue #62).
 - Immutable published packages retained while referenced by active or retained campaign data.
 - Audit/activity payloads minimize sensitive content and have an explicit retention policy.
 
@@ -569,7 +906,8 @@ There is no migration history/checksum ledger, incremental migration runner,
 backfill, repair, old-client conversion or automatic reset. Edit the current schema
 and recreate disposable test databases when it changes. Seed missing reference
 templates without rewriting existing immutable versions. Character/campaign
-rules-version upgrades and rollback are also excluded. See [database policy](database/README.md).
+rules-version upgrades are a separate, supported feature (Section 6.7) and need no
+database migration. See [database policy](database/README.md).
 
 Application-version migrations and compatibility with older app builds become
 requirements only after the first application release tag. Before then, update the
@@ -588,12 +926,15 @@ Expose a versioned REST HTTP interface described by OpenAPI. Use resource-orient
 | Systems    | POST/GET /systems; GET /systems/{id}; GET /systems/{id}/versions; PUT /systems/{id}/draft; POST /systems/{id}/preview; POST /systems/{id}/publish; PATCH /systems/{id}; DELETE /systems/{id} |
 | Versions   | GET/PATCH /system-versions/{id}; GET /system-versions/{id}/export                                                                        |
 | Templates  | GET /templates; create a system with a version source to clone a template                                                               |
-| Campaigns  | POST /campaigns; GET/PATCH /campaigns/{id}; POST /campaigns/{id}/invitations; DELETE /campaigns/{id}/members/{memberId}                 |
-| Characters | POST /characters; GET /characters/creation-options; GET /characters/creation-versions; POST /campaigns/{id}/characters; GET/PATCH /characters/{id}; POST /characters/{id}/actions/{actionId} |
-| Content    | POST /campaigns/{id}/content; PATCH /content/{id}; POST /content/{id}/grants                                                            |
-| Session    | GET /campaigns/{id}/session (GM session board); POST /characters/{id}/resources/{resourceId}/bump                                        |
+| Campaigns  | POST/GET /campaigns; GET/PATCH /campaigns/{id}; POST /campaigns/{id}/archive, /recover; GET/POST /campaigns/{id}/invitations (+ /rotate, /revoke); GET /campaigns/{id}/members; PATCH/DELETE /campaigns/{id}/members/{userId}; GET /campaigns/{id}/version-options, /version-check; POST /campaigns/{id}/version; GET/POST /campaigns/{id}/extensions; DELETE /campaigns/{id}/extensions/{extensionId} |
+| Characters | POST/GET /characters; GET /characters/creation-options; GET /characters/creation-versions; GET/POST /campaigns/{id}/characters; POST /campaigns/{id}/characters/{characterId}/assign, /claim, /adopt; GET /campaigns/{id}/claimable-characters; GET/PATCH /characters/{id} (metadata); POST /characters/{id}/fields/{fieldId}/set; POST /characters/{id}/actions/{actionId}; entries, portrait, rolls/push, duplicate, ownership-transfer and version routes |
+| Content    | GET/POST /campaigns/{id}/content; GET /campaigns/{id}/content-preview; GET/PATCH/DELETE /content/{id}; POST /content/{id}/grants, /recover; campaign item templates and proposals |
+| Session    | The GM session board composes the campaign character, content and activity lists with per-character sheet reads (Section 7.2); POST /characters/{id}/resources/{resourceId}/bump |
+| Scenes     | campaign images and scenes; display codes, credentials and revoke; display SSE stream and image routes (Section 7.7) |
 | Activity   | GET /campaigns/{id}/activity; GET /characters/{id}/activity                                                                             |
-| Exports    | POST /characters/{id}/exports; POST /campaigns/{id}/exports; GET /exports/{id}                                                          |
+| Exports    | POST /characters/{id}/exports; POST /campaigns/{id}/exports (bounded synchronous responses; there is no GET /exports/{id}) |
+
+The generated OpenAPI document is the authoritative route list (reconciled 2026-11-08).
 
 `GET /characters/creation-versions` enumerates only systems owned by the actor plus explicitly discoverable (`public`) systems (OD-01 option A, unlisted/link-only). Character creation and metadata lookup from a KNOWN version ID keep their existing authorization unchanged: permission to use a version (owner or `public`/`link` access, published version, active system) never implies permission to discover it, and link-access systems remain usable when the exact version ID is known. The `/characters/new` page opened without a version shows a "Choose a system version" picker from this endpoint; the manual system-version-ID box remains as fallback, and picking a version loads its creation metadata through the unchanged lookup path.
 
@@ -603,13 +944,13 @@ System sharing (owner-approved 2026-09-14): a system owner may set system access
 
 ## 13.1 Idempotency
 
-Create, roll, action, invitation, and export commands accept an idempotency key scoped to user and endpoint. The server stores the completed result for a bounded interval. This prevents duplicated damage, resource spending, rolls, and invitations after mobile or offline retries.
+Create, roll, action, invitation, and export commands accept an idempotency key scoped to user and endpoint. The server stores the completed result for a bounded interval. This prevents duplicated damage, resource spending, rolls, and invitations after mobile or offline retries. Completed results are kept until the receipt expires (30 days for character and campaign commands, 1 day for system authoring) and for a further 7-day grace period, during which a retry receives replay-expired/result-unavailable. A background job then deletes the receipt; a retry with the same key is treated as a new command, still subject to revision and semantic-version checks (Section 12.3).
 
 ## 13.2 Approved pre-upgrade remediation contracts (2026-09-12)
 
 The owner approved the recommended [pre-upgrade remediation](docs/superpowers/plans/2026-09-12-remediation-index.md), including the two narrow discovery contracts below. Approval is not implementation or acceptance evidence. Campaigns owns authorization and pagination; existing Characters sheet authorization, placement commands, content recovery, revision/idempotency rules and standalone offline behavior remain intact. Production authentication remains owner-deferred. Campaign upgrades and scenes/display are excluded from this remediation.
 
-- **Claim discovery:** `GET /campaigns/{id}/claimable-characters` maps to `Campaigns.listClaimableCharacters(ctx, { campaignId, limit?, cursor? })`, operation ID `get_campaigns_id_claimable_characters`. It returns `{ characters, nextCursor }` plus HTTP `requestId`; each row contains exactly `characterId`, `name`, `revision`, and `lifecycle: 'active' | 'archived'`. Require active membership and an outstanding designation for the current actor, excluding sheets that actor already controls. Match campaign/character scope on every predicate, filter before bounded pagination, use stable timestamp/ID ordering, bind cursors to actor/campaign/query family, and reauthorize each page and claim. No controller IDs, other designees, sheet state/projection, inventory, rolls, audit, placement metadata or system/version details are disclosed. Discovery grants no sheet read/export/activity/mutation access; the existing roster endpoint and GM/controller sheet permissions are unchanged. Claim consumes only the caller's designation and preserves other designations/controllers. Archived rows remain explanatory with no UI Claim action; the existing command's missing character-lifecycle check is a known discrepancy, not silently changed here.
+- **Claim discovery:** `GET /campaigns/{id}/claimable-characters` maps to `Campaigns.listClaimableCharacters(ctx, { campaignId, limit?, cursor? })`, operation ID `get_campaigns_id_claimable_characters`. It returns `{ characters, nextCursor }` plus HTTP `requestId`; each row contains exactly `characterId`, `name`, `revision`, and `lifecycle: 'active' | 'archived'`. Require active membership and an outstanding designation for the current actor, excluding sheets that actor already controls. Match campaign/character scope on every predicate, filter before bounded pagination, use stable timestamp/ID ordering, bind cursors to actor/campaign/query family, and reauthorize each page and claim. No controller IDs, other designees, sheet state/projection, inventory, rolls, audit, placement metadata or system/version details are disclosed. Discovery grants no sheet read/export/activity/mutation access; the existing roster endpoint and GM/controller sheet permissions are unchanged. Claim consumes only the caller's designation and preserves other designations/controllers. Archived rows remain explanatory with no UI Claim action. The claim command rejects an archived character with `409 conflict` ("Recover the character before claiming it.", no `latestRevision`) before consuming anything; the rejection stores no idempotency result and leaves the designation, controllers, activity and revisions unchanged, so the designee can claim once a GM recovers the character (owner decision 2026-11-08, issue #58).
 - **Deleted-summary recovery:** `GET /campaigns/{id}/content` gains optional `status=active|deleted`, normalized to `active`; `ContentSummary` gains required `status`, while the result envelope and operation ID remain unchanged. Active lists retain existing readership. Deleted lists require active membership and existing management authority: creator OR a GM who may read the note, not any former recipient. Another creator's owner-only note remains inaccessible to GMs. Return existing summaries with current `revision`/`accessRevision` and status, never deleted bodies or grant lists. Filter before bounded pagination and bind normalized status, actor, campaign and query family into cursors. Ordinary `GET /content/{id}` remains active-only and returns generic 404 for deleted content. The GM Active/Hidden view supports paginated recovery after reload/new browser sessions using the listed revision and existing `POST /content/{id}/recover`; Hide means soft-delete, not GM-only audience. No deleted preview, permanent delete, retention change or player-note management UI is added. Preserve player-creator server authority and retained-editor receipt recovery. Archived campaigns still deny recovery mutations even if summaries are readable.
 - **Privacy and lifecycle:** inaccessible resources retain generic 404 collapse and protected responses remain `Cache-Control: no-store`; no campaign payload service-worker persistence is added. Scope browser queries and in-flight results by actor/generation, distinguish claim and active/deleted list families, and purge them on sign-out, account switch, leave, revocation or visibility loss. Cancel/reject late responses so private data cannot repopulate a later lifetime. Revalidate authorization on reconnect; do not claim offline erasure of information already received. Successful mutations refresh relevant summaries/roster/campaign revisions before further commands; a definite 409 requires fresh reads and explicit fresh-key retry, never guessed revisions or automatic replay of a known success.
 
@@ -617,17 +958,25 @@ Detailed contracts and required regression matrices are in the [I6 backend spec]
 
 ## 13.3 Public API v1 (2026-11-07)
 
-The separate `/api/v1` contract covers system authoring and standalone
-character setup. Users can create, clone or import a draft, validate and preview
-it, attach template artwork, publish a version, export it, and set its sharing.
-Character setup includes version and inventory discovery, creation or duplication,
-field and resource edits, slot placement and moves, portraits and entry artwork.
+The separate `/api/v1` contract covers everything the signed-in web app can do
+outside browser sessions and token management. Users can create, clone or import
+a draft, validate and preview it, attach template artwork, publish, deprecate,
+export and share versions, and archive or delete systems. Characters can be
+created, duplicated, edited, equipped, renamed, archived, exported and
+transferred; they roll and push with the same server-side dice and audiences as
+the browser. Campaign scripts manage campaigns, members, invitations, attached
+characters, content, item templates and proposals, media, scenes with fog and
+tokens, and display pairing and revocation.
 Both local and combined HTTP serving expose the same prefix and public OpenAPI
 document.
 Browser routes keep cookie authentication. The API uses scoped personal
 access tokens and checks current resource permissions for every request,
-including receipt replay. Characters owns the standalone-only policy and
-checks custody at the write boundary. Character pins are immutable.
+including receipt replay. Each operation calls the same module command as the
+browser route, so attached characters follow the browser Characters policy
+(controllers, GM visibility, roll audiences) and campaign data follows the
+Campaigns policy. Inaccessible IDs read as `404`; a member whose role does not
+permit a command receives `403 forbidden`, distinct from `403 insufficient_scope`.
+Character and campaign pins are immutable.
 
 Identity stores token digests and handles issuance, expiration and revocation
 through the signed-in Account surface. Hosted issuance depends on a real
@@ -636,6 +985,20 @@ Authenticated request quotas use PostgreSQL counters shared across replicas.
 The [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md) defines the
 scope and hosted acceptance. The [quickstart](docs/api/v1.md) documents the
 wire contract and retry windows.
+
+**Completion implemented (owner-approved 2026-11-07):** Part B of the API plan
+is implemented for local testing. Scopes are `systems:*`, `characters:*` and
+`campaigns:read`/`campaigns:write`; commands that change both a character and
+its campaign (campaign character creation, assign, claim and adopt) need both
+write scopes. A write scope includes read for the same area (owner decision
+2026-11-07); read never implies write. Tokens hold up to six scopes, and earlier four-scope tokens keep
+their scopes. Uploads share an `upload` quota of 30 per minute. Binary art and
+media reads accept Bearer tokens and are `private, no-store`. Each successful
+v1 command writes an audit log line with operation, account and request ID,
+never request bodies. Browser session routes, token management,
+display-credential routes (including the scene event stream), webhooks and SDKs
+stay outside v1. Responses are never wider than the browser shows the same
+caller. Hosted acceptance still depends on real provider sign-in.
 
 # 14. Security, privacy, and abuse prevention
 
@@ -650,12 +1013,52 @@ wire contract and retry windows.
 | Privilege abuse              | Audited admin tooling; least privilege; support access requires reason and time-bounded grant       |
 | Sensitive logs               | Structured allow-list logging; redact tokens, content bodies, character state, and signed URLs      |
 
+Browser sessions use one fixed expiry in PostgreSQL and the session cookie.
+Re-authentication atomically replaces the previous session, and only active
+users resolve to a browser identity. Cookie-authenticated writes require an
+exact allowed origin or browser same-origin Fetch Metadata when Origin is
+absent. Bearer-token operations authenticate independently. If the session
+lookup itself fails, for example because no database connection is free, the
+request gets `503 temporarily_unavailable` with `Retry-After` and the cookie is
+kept; only an unknown, revoked or expired session clears it.
+
+API and web responses deny framing and referrer disclosure. The content
+security policy limits resources to the app origin, allows local image
+previews and authorizes the pre-paint theme script by hash. HTTPS deployments
+send HSTS. Metrics require a separate scraper token and are off by default.
+
+The browser and public API share account request and image-upload budgets
+in PostgreSQL. The general budget allows up to 120 writes or public API
+requests, or 600 browser reads per minute. Browser reads spend one fifth of
+the budget used by a write. Upload, validate and publish requests also have
+their own bucket, which is checked first: a request it rejects spends nothing
+from the general budget, and a request the general budget rejects is refunded
+to its bucket (issue #67). `POST /displays/redeem` (unauthenticated) allows 10 attempts per client IP per
+minute, counting every attempt, and 120 failed redemptions (wrong, expired or
+unknown code) per process per minute. A correct code always redeems, so
+attackers cannot block pairing; when the failure budget is spent, invalid codes
+receive 429 instead of 404, which reveals nothing more. Because the global
+budget no longer limits guessing, pairing codes are 8 characters drawn
+uniformly (rejection sampling) from a 36-character alphabet, live 5 minutes and
+are single-use (owner decision 2026-11-08, issue #61). The per-IP tracker is
+bounded at 10,000 addresses. Client IPs come from `X-Forwarded-For` only for
+proxies listed in `TRUSTED_PROXY_CIDRS`; if the header arrives while none are
+configured, the server logs one warning. Each campaign can have five live
+pairing codes, and each display credential can open two scene streams per
+process.
+
 ## 14.1 Privacy defaults
 
 - Systems are private until explicitly shared; campaigns are never discoverable by default.
 - Campaign content uploads default to GM only; player notes default to owner only.
 - Do not use private campaign or character content for model training or recommendation features without explicit consent and a separate design review.
 - Provide account, character, system, and campaign export in documented formats.
+- A targeted roll shows the target field values it read to the roll's normal
+  audience. The target picker shows eligible character names, and direct sheet
+  access follows the existing controller and GM permissions.
+- A response can use the recorded roll's audience or a narrower one. The
+  responder must be able to see the source roll under current campaign membership.
+
 - Publish a clear ownership model for system definitions, user uploads, and copies derived from shared systems.
 
 # 15. Non-functional requirements
@@ -690,12 +1093,13 @@ wire contract and retry windows.
 - Responsive visual regression at 360 and 1280 px for platform UI primitives and reference systems.
 - Browser journeys run in isolated, ephemeral databases and may be sharded across CI jobs; the visual suite remains isolated from journeys. Ordinary UI waits fail within 15 seconds, complete journeys within two minutes, and the browser job within ten minutes so broken selectors cannot serialize into long CI stalls.
 - Load and soak tests shaped like session bursts: many resource updates, rolls, and views in a short window.
+- Replay scripted, multi-account API sessions with the [scenario runner](tests/integration/scenarios/README.md). Each run gets a fresh PostgreSQL schema, scoped credentials, and a request timeline for diagnosing failures.
 
 ## 16.2 Reference systems
 
 Maintain three internal reference systems as acceptance fixtures: a minimal rules-light system, a class-and-level fantasy system with derived statistics and inventory, and a dice-pool system with resources. They must exercise every supported field, sheet element, formula feature, action, visibility path and mobile breakpoint. Where an open license permits, the shipped templates correspond to these fixtures.
 
-> **Current scope (2026-10-27):** character/campaign version migration, upgrade previews/commits and rollback have been removed at the owner's request. Historical implementation/acceptance notes below do not reintroduce them. See Sections 6.7 and 12.4.
+> **Current scope (2026-11-07):** non-breaking character/campaign system-version upgrades and revert to the previous version, each with a dry-run preview, are in scope (Section 6.7). Breaking upgrades and field mapping remain excluded. Application/database migration is separate (Sections 12.4 and 17.0).
 
 # 17. Delivery plan
 
@@ -737,9 +1141,8 @@ Current-version schema validation, unsupported-input rejection, authorization,
 transactional integrity, exact-request retry/reload recovery and offline behavior
 remain required. Supported browser vendors/versions are a separate platform
 requirement. Creator-published rules snapshots and pinning remain supported.
-The owner also removed character/campaign upgrade previews, commits and rollback
-from the current app scope (Section 6.7); recreate test characters/campaigns when
-changing their published rules snapshot.
+System (rules) version upgrades of characters and campaigns are a product feature,
+not application migration, and are allowed before the tag (Section 6.7).
 The [post-tag migration plan](docs/superpowers/plans/2026-10-27-application-migration-policy.md) defines the strategy now: a frozen tagged baseline, ordered migrations for later changes, released-data/client compatibility, validation and recovery. Implement no transition code or tests before the first release tag. Dated verification records are evidence, not tasks to repeat.
 
 ## 17.1 Increment definition of done
@@ -932,7 +1335,7 @@ The first GM app is a responsive web surface within the shared PWA. Native packa
 6. Build one-tap authorized resource bumps across characters with optimistic status, idempotent retry, and immediate revision-conflict recovery.
 7. Implement disclosed GM character visibility, character oversight, roll-audience controls, and audit views without granting system creators campaign access.
 8. Support simultaneous GM devices and co-GMs through polling/revision refresh, authorized activity updates, and clear conflict handling without a single-session lock.
-9. Campaign version upgrades are excluded by the current owner decision in Section 6.7.
+9. Non-breaking campaign version upgrades follow Section 6.7.
 10. Complete WCAG 2.2 AA review, responsive testing, cross-campaign authorization tests, session load/soak tests, SLO dashboards, alerting, backup restoration drill, and incident runbook exercise.
 
 **Acceptance demonstration:** A GM creates a campaign without direct HTTP tools, invites four players, manages visibility, previews each player's view, runs the session board from a phone while showing content on a second device, resolves a concurrent edit, and verifies that publishing preserves every campaign pin.
@@ -989,7 +1392,7 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 - **I7:** A GM can use the mobile-first web app to create a campaign from a shipped open-license template, invite four players, manage content visibility, verify each player's view, and run a session across two devices.
 - **I7b (visual-controls feature gate accepted):** A GM phone supports uploaded image tokens, direct drag/tap placement/movement and on-image reveal/conceal brushing, with numeric/keyboard alternatives; a restricted tablet/remote display receives only revealed pixels and permitted tokens. The V4 combined hosted journey passes ([evidence](docs/acceptance/scene-visual-controls-2026-11-06.md)); G9 physical-device/provider/human/playtest gates remain separate.
 - **GUI release:** Apply G9 to each migrated view and final release: actual routed visual review, real phone/iPad checks, built frontend/API deployment, and physical-table/remote playtests.
-- Publishing a new system version never changes an existing character or campaign; using a different snapshot requires creating a new test character/campaign.
+- Publishing a new system version never changes an existing character or campaign by itself; an owner may upgrade to a later non-breaking version after a passing dry run (Section 6.7).
 - Users can export system, character, and campaign data in documented formats.
 - Backup restoration, monitoring, alerting, load testing, and an incident runbook have been exercised before public beta.
 
@@ -1003,7 +1406,8 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 | OD-02 (resolved 2026-09-09) | GM visibility | Do campaign GMs always see full character state? | Yes for attached sheet state, disclosed; no I6 toggle. Owner-only notes and actor-private rolls have separate policies. See Section 17.8. |
 | OD-03 (deferred 2026-09-09) | Collaboration | Can several creators edit one system draft concurrently? | Named collaborators and multi-creator editing are deferred. Retain current creator ownership and revision-safe saves; campaign membership/co-GM roles confer no system-authoring permissions. Not a blocker for the I6 backend-only slice. |
 | OD-04  | Rules ceiling (resolved) | Grammar v0.1 covers d20, 2d6, keep-high/low, advantage helpers, and threshold-counted dynamic d6 pools. | Defer reroll, explode, push, custom faces, lookups, and effects. |
-| OD-05 (planning reopened 2026-11-05) | Authentication | Which first real OIDC provider, with email login now or later? | Proposed: Google OIDC first; passwordless email later. Provider choice remains open. See the [real-login plan](docs/superpowers/plans/2026-11-05-real-login.md). |
+| OD-09 (resolved 2026-11-10) | Rules coverage | Which parts of the wider rules contract are approved? | All of C1–C13 in the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md): the contract is replaced in place, rolls never change characters, opposed rolls have no privacy layer, cards are simple draw/shuffle decks. Supersedes the OD-04 deferrals stage by stage. |
+| OD-05  | Authentication | Passwordless email, social sign-in, or both?                                      | OIDC social plus email magic link.                                |
 | OD-06  | Business model | Free, subscription, paid storage, or marketplace?                                 | Do not couple MVP data ownership to an unvalidated payment model. |
 | OD-07  | Public content | What moderation/takedown is required before public discovery?                     | Keep discovery out of MVP unless staffing and process exist.      |
 | OD-08 (launch decision deferred 2026-09-09) | Templates | Which open-license systems to ship as launch templates? | Use existing license-neutral reference fixtures for I6 backend development/tests and accessible published versions for campaigns; no launch catalog is required for this slice. Template selection/license review remains open before shipped-template claims or acceptance requiring licensed launch templates. |
@@ -1011,6 +1415,16 @@ The two tracks are independent; preserve their internal stage order. T1 builds o
 > **Note.** Offline support is now a requirement (Section 8), not an open decision.
 
 ## 18.2 Immediate next actions
+
+**Public API completion implemented locally (2026-11-07):** Part B stages B1–B5
+of the [API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md) and the
+local parts of B6 (campaign quickstart, documented limits and audit lines) are
+implemented. Unit, contract and PostgreSQL integration suites pass, including
+two-token campaign journeys and an API-edited scene reaching a paired display
+stream. The hosted B6 journey still depends on real provider sign-in and has
+not run.
+
+**Scene streaming implemented (2026-11-07; owner-approved):** stages 1–3 of the [scene streaming plan](docs/superpowers/plans/2026-11-07-scene-streaming.md) are implemented on branch `claude/repo-next-steps-pzi9kv`: image revisions, SSE display stream with `LISTEN`/`NOTIFY`, removal of the polled projection route, and response-adopting single-command gestures (Section 7.7). Unit, integration (including two application instances on one database and listener loss) and local browser scene journeys pass. The isolated hosted journey and the 200-table load comparison in plan stage 4 have not been run; this does not close any G9 gate.
 
 **Visual scene controls complete (2026-11-06; PR #38):** V4 combines image-token
 authoring, direct mouse/touch movement and on-image fog in one hosted ordered
@@ -1020,7 +1434,7 @@ PR #36 includes #37; merge #36 before #38. The existing G9 release-readiness
 gates and proposed real-login plan remain separate; this completion selects no
 new feature or authentication provider.
 
-**Real-login planning (2026-11-05):** The owner requested a concrete [real-login implementation and acceptance plan](docs/superpowers/plans/2026-11-05-real-login.md). This reopens planning for OD-05 after its earlier deferral. Google-first is a recommendation awaiting the provider decision, not implemented authentication. Reuse Identity/session ownership, add server-side one-use OIDC transactions and PKCE validation, then validate real accounts on acceptance before enabling the normal app. Email magic links remain a later proposed increment; existing provider/device/playtest gates remain open.
+**Real-login planning (2026-11-05):** The [real-login implementation and acceptance plan](docs/superpowers/plans/2026-11-05-real-login.md) stages the owner’s OD-05 decision (OIDC social plus email magic link). Google-first remains a recommendation for the first social provider, not an approved issuer or implemented authentication. Reuse Identity/session ownership, add server-side one-use OIDC transactions and PKCE validation, then validate real accounts on acceptance before enabling the normal app. Email magic links are a later implementation increment; existing provider/device/playtest gates remain open.
 
 **New planned feature tracks (2026-11-03):** [System themes and image uploads](docs/superpowers/plans/2026-11-03-system-themes-and-images.md) records the owner's additions: T1 system color presets followed by T2 themed GUI elements; M0 durable, authorized media followed by M1 character portraits, M2 item images and M3 adventure backgrounds. T1/T2 and the M0 foundation are implemented and verified; M1 portraits and M2 item art are accepted; M3 scene upload/select and safe replacement passed hosted, redeploy and CI acceptance. Reuse existing theme tokens and campaign scenes, and keep unfinished G9 release evidence separate from feature delivery.
 
@@ -1030,7 +1444,7 @@ new feature or authentication provider.
 
 **Current feature track (2026-11-01):** [Campaign templates with inherited actions (adventure slice C)](docs/superpowers/plans/2026-10-31-campaign-inherited-actions.md) passed CI #158 and isolated deployed acceptance on `58c71a1`. C is merged, and PR #26 implements D1 data-only player proposals with passing isolated hosted acceptance ([evidence](docs/acceptance/player-template-proposals-2026-10-31.md)). D1 is merged as `90b053d`; PR #27 implements D2 restricted drafts, actual-player preview and explicit reveal, with CI #174 and both hosted journeys passing ([evidence](docs/acceptance/restricted-template-audiences-2026-11-01.md)). The release-readiness work below remains open in parallel; deployment or core browser verification does not close every G9 gate. No version migration or upgrade work precedes the first release tag.
 
-**Release-readiness track (recorded 2026-09-24):** Continue the open [G9 release and acceptance gates](docs/superpowers/plans/2026-09-08-gui-integration.md#g9--release-and-acceptance-gates): archive the source mockup reference, validate real Android/iPad interactions and light/dark accessibility across the migrated routes, test a deployed frontend/API including direct links, authentication return and offline reopening, then conduct physical-table and remote playtests. Production authentication (OD-05) and launch-template licensing (OD-08) still need owner decisions and evidence before a public-release claim. Retain the recorded hardening/scenes limitations rather than rerunning completed increments; character/campaign upgrades were subsequently removed under Section 17.0. T1 system color presets, T2 component styles and the M0 storage foundation have passed their recorded automated acceptance. M1–M3 also passed their recorded feature acceptance (Section 17.9c and the linked plan).
+**Release-readiness track (recorded 2026-09-24):** Continue the open [G9 release and acceptance gates](docs/superpowers/plans/2026-09-08-gui-integration.md#g9--release-and-acceptance-gates): archive the source mockup reference, validate real Android/iPad interactions and light/dark accessibility across the migrated routes, test a deployed frontend/API including direct links, authentication return and offline reopening, then conduct physical-table and remote playtests. Production authentication (OD-05) still needs implementation and acceptance evidence; launch-template licensing (OD-08) still needs owner decisions and evidence before a public-release claim. Retain the recorded hardening/scenes limitations rather than rerunning completed increments; character/campaign upgrades were subsequently removed under Section 17.0. T1 system color presets, T2 component styles and the M0 storage foundation have passed their recorded automated acceptance. M1–M3 also passed their recorded feature acceptance (Section 17.9c and the linked plan).
 
 **Historical 2026-09-12 handoff (superseded for sequencing):** The owner-approved [pre-upgrade remediation](docs/superpowers/plans/2026-09-12-remediation-index.md) then called for runtime/readiness and browser isolation fixes, narrow claim discovery, deleted-summary recovery, real-player visibility evidence and automated acceptance coverage. This paragraph preserves the original handoff context; its remediation and later feature sequence have since progressed. Preserve I1-I4 historical records and every unchecked G7/G9 gate. The numbered foundation actions below retain their original increment context; they are not instructions to redo completed work.
 
@@ -1097,3 +1511,10 @@ The frontend detects the server-owned test-auth route instead of baking the
 mode into the bundle. The button is absent when the route is disabled. This is
 an acceptance shortcut and does not satisfy the real production-authentication
 gate.
+
+The deployment split uses one Railway project with separate acceptance and
+production environments. GitHub Actions deploys verified `main` commits to
+acceptance and can temporarily deploy a reviewed PR there. Production takes an
+explicitly selected, verified `main` commit and can run locked before real
+sign-in ships. Each environment owns its own database, media and scanner.
+See the [deployment and cutover runbook](docs/operations/railway-deployment-split.md).

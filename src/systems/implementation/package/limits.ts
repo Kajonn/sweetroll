@@ -1,12 +1,21 @@
 export const PACKAGE_LIMITS = {
   actions: 256,
+  cardsPerDeck: 200,
+  cardsPerDraw: 10,
+  customDice: 16,
+  decks: 4,
   dicePerRoll: 100,
-  encodedBytes: 1024 * 1024,
+  facesPerCustomDie: 20,
+  symbolCountPerFace: 100,
+  symbolsPerFace: 16,
+  // Applies to an encoded document and to the package compiled from it.
+  encodedBytes: 5 * 1024 * 1024,
   entities: 32,
   expressionAstDepth: 32,
   expressionAstNodes: 256,
   expressionBytes: 1024,
   expressions: 1024,
+  extensionsPerComposition: 16,
   fields: 512,
   grantedActions: 256,
   referenceDataSets: 64,
@@ -14,6 +23,9 @@ export const PACKAGE_LIMITS = {
   referenceRecordsPerSet: 1000,
   sectionsPerSheet: 64,
   sheetElements: 1024,
+  // Total AST nodes for all computed fields and validations of one sheet
+  // (design 6.4); `expressionAstNodes` stays the per-expression ceiling.
+  sheetEvaluationNodes: 8192,
   sheets: 32,
   sidesPerDie: 1000,
   slots: 64,

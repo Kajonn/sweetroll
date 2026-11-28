@@ -1,8 +1,9 @@
 import { createImageEditorApi, type ImageEditorApi } from "../ui/imageEditorApi.js";
 import { ApiError, type ApiClient } from "../api/client.js";
 import { createCharacterImagesApi, type CharacterImagesApi } from "./imageApi.js";
+import type { Composition } from "./compositionChoices.js";
 import type {
-  PushOptionsResponse,ReadRollResponse,
+  CharacterDecksResponse,PushOptionsResponse,ReadRollResponse,RollOptionsResponse,
   ActivityResponse,
   AddCharacterEntryBody,
   AddCharacterEntryResponse,
@@ -24,6 +25,8 @@ import type {
   RemoveCharacterEntryResponse,
   UpdateCharacterEntryBody,
   UpdateCharacterEntryResponse,
+  VersionCheckResponse,
+  VersionOptionsResponse,
 } from "./types.js";
 
 export type VersionCatalogQuery = {
@@ -41,6 +44,15 @@ export type CharacterListQuery = {
 export type CharactersApi = {
   images?: CharacterImagesApi;
   entryImages?: (characterId: string, entryId: string) => ImageEditorApi;
+  rollOptions?(characterId: string, actionId: string, entryId?: string): Promise<RollOptionsResponse>;
+  /** Design 6.4: cards left in each deck of the character's system. */
+  decks?(characterId: string): Promise<CharacterDecksResponse>;
+  /** Design 6.3 (S6). */
+  applicableRolls?(characterId: string): Promise<{ rolls: Array<{ rollId: string; output: string; total: number }> }>;
+  applyRoll?(characterId: string, resourceId: string, body: { rollId: string; direction: "subtract" | "add"; expectedRevision: number; idempotencyKey: string }): Promise<unknown>;
+  /** Design 6.1 (S2): reference tables of the character's system. */
+  referenceData?(characterId: string): Promise<{ datasets: Array<{ datasetId: string; label: string; records: number }> }>;
+  referenceDataset?(characterId: string, datasetId: string): Promise<{ dataset: { datasetId: string; label: string; records: Array<{ id: string; label: string; values: Record<string, string | number | boolean | null> }> } }>;
   pushOptions(characterId:string,rollId:string):Promise<PushOptionsResponse>;
   readRoll(characterId:string,rollId:string):Promise<ReadRollResponse>;
   open(characterId: string): Promise<OpenCharacterResponse>;
@@ -73,6 +85,9 @@ export type CharactersApi = {
   activity(characterId: string, cursor: string | null): Promise<ActivityResponse>;
   send(request: FrozenRequest): Promise<CommandResultResponse>;
   export(characterId: string): Promise<CharacterExport>;
+  /** Design 6.7 read-only version choices and dry run; the change itself goes through the session. */
+  versionOptions?(characterId: string): Promise<VersionOptionsResponse>;
+  versionCheck?(characterId: string, target: Composition): Promise<VersionCheckResponse>;
 };
 
 export function createCharactersApi(client: ApiClient): CharactersApi {
@@ -97,6 +112,17 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
   return {
     images: createCharacterImagesApi(client),
     entryImages: (characterId, entryId) => createImageEditorApi(client, `/characters/${encodeURIComponent(characterId)}/entries/${encodeURIComponent(entryId)}/image`, "entry"),
+    rollOptions: (characterId, actionId, entryId) => client.fetch<RollOptionsResponse>(
+      "GET", `/characters/${encodeURIComponent(characterId)}/actions/${encodeURIComponent(actionId)}/roll-options`,
+      entryId === undefined ? undefined : { query: { entryId } },
+    ),
+    decks: (characterId) => client.fetch<CharacterDecksResponse>("GET", `/characters/${encodeURIComponent(characterId)}/decks`),
+    applicableRolls: (characterId) => client.fetch("GET", `/characters/${encodeURIComponent(characterId)}/applicable-rolls`),
+    applyRoll: (characterId, resourceId, body) => client.fetch("POST",
+      `/characters/${encodeURIComponent(characterId)}/resources/${encodeURIComponent(resourceId)}/apply-roll`, { body }),
+    referenceData: (characterId) => client.fetch("GET", `/characters/${encodeURIComponent(characterId)}/reference-data`),
+    referenceDataset: (characterId, datasetId) =>
+      client.fetch("GET", `/characters/${encodeURIComponent(characterId)}/reference-data/${encodeURIComponent(datasetId)}`),
     pushOptions:(characterId,rollId)=>client.fetch<PushOptionsResponse>("GET",`/characters/${characterId}/rolls/${rollId}/push-options`),
     readRoll:(characterId,rollId)=>client.fetch<ReadRollResponse>("GET",`/characters/${characterId}/rolls/${rollId}`),
     open: (characterId) => client.fetch<OpenCharacterResponse>("GET", `/characters/${characterId}`),
@@ -153,9 +179,17 @@ export function createCharactersApi(client: ApiClient): CharactersApi {
       }),
     send: async (request) =>
       expectJsonObject<CommandResultResponse>(
-        await client.fetch(request.method, request.path, { body: request.body }),
+        await client.fetch(request.method, request.physical?.path ?? request.path, {
+          body: request.physical?.settlement ?? request.body,
+        }),
       ),
     export: (characterId) =>
       client.fetch<CharacterExport>("POST", `/characters/${characterId}/exports`),
+    versionOptions: (characterId) =>
+      client.fetch<VersionOptionsResponse>("GET", `/characters/${encodeURIComponent(characterId)}/composition-options`),
+    versionCheck: (characterId, target) =>
+      client.fetch<VersionCheckResponse>("POST", `/characters/${encodeURIComponent(characterId)}/composition-check`, {
+        body: { target },
+      }),
   };
 }

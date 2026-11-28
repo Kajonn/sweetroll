@@ -3,7 +3,9 @@
   "mediaType": "application/vnd.sweetroll.system+json;version=1",
   "exportedAt": "2026-09-04T12:00:00Z",
   "package": {
-    "schemaVersion": "1.0",
+    "schemaVersion": "2.0",
+    "templates": [],
+    "slots": [],
     "systemId": "c0000000-0000-5000-8000-000000000001",
     "versionId": "c0000000-0000-5000-8000-000000000002",
     "semanticVersion": "1.0.0",
@@ -174,6 +176,7 @@
       {
         "id": "pool_size_expr",
         "context": "computed",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
@@ -200,6 +203,7 @@
       {
         "id": "pool_roll_expr",
         "context": "roll",
+        "languageVersion": "1.0",
         "resultType": "number",
         "inferredType": "number",
         "fallback": 0,
@@ -208,10 +212,10 @@
           "skill",
           "bonus_dice"
         ],
-        "cost": 7,
+        "cost": 8,
         "ast": {
-          "kind": "successCount",
-          "dice": {
+          "kind": "pool",
+          "source": {
             "kind": "dice",
             "count": {
               "kind": "binary",
@@ -236,14 +240,25 @@
                 "id": "bonus_dice"
               }
             },
-            "sides": 6
+            "sides": {
+              "kind": "numberLiteral",
+              "value": 6
+            }
           },
-          "threshold": 6
+          "modifiers": [],
+          "reducer": {
+            "kind": "countAtLeast",
+            "amount": {
+              "kind": "numberLiteral",
+              "value": 6
+            }
+          }
         }
       },
       {
         "id": "pool_valid_expr",
         "context": "validation",
+        "languageVersion": "1.0",
         "resultType": "boolean",
         "inferredType": "boolean",
         "fallback": false,
@@ -326,6 +341,7 @@
         "expressionId": "pool_valid_expr",
         "severity": "error",
         "message": "Pool size must be between 1 and 10",
+        "targetEntityId": "character",
         "targetId": "pool_size"
       }
     ],
@@ -333,11 +349,12 @@
       "expressionBytes": 1024,
       "expressionAstNodes": 256,
       "expressionAstDepth": 32,
+      "sheetEvaluationNodes": 8192,
       "dicePerRoll": 100,
       "sidesPerDie": 1000
     },
     "integrity": {
-      "checksum": "sha256:bc4089b844a94d2526267c9510fba0abd79c4343799f8953512722ccd59190d9"
+      "checksum": "sha256:83462b8bdff2deed7128c7d9e4b91fc8851078e6377d68aa291c2323857596d8"
     }
   }
 }

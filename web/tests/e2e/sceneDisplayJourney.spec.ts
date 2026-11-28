@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { test, expect, type APIRequestContext, type Browser, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext, type Browser, type Page } from "../fixtures/browserTest";
 
 import { publishOwnedClone, uid } from "../offline/test-auth.js";
 
@@ -199,7 +199,7 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
     const dialog = page.getByRole("dialog");
     await expect(dialog.getByText("Share this display code now")).toBeVisible({ timeout: STEP_TIMEOUT });
     const pairCode = ((await dialog.locator("strong").last().textContent()) ?? "").trim();
-    expect(pairCode).toMatch(/^[A-Z0-9]{6}$/);
+    expect(pairCode).toMatch(/^[A-Z0-9]{8}$/);
     await dialog.getByRole("button", { name: "Done" }).click({ timeout: STEP_TIMEOUT });
 
     // 4. Display side in a second, never-signed-in context with an explicit
@@ -208,7 +208,6 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
     const displayContext = await browser.newContext({ baseURL: origin });
     const seenRequests: string[] = [];
     const seenResponses: { url: string; status: number }[] = [];
-    const projectionTextReads: Promise<string>[] = [];
     try {
       const displayPage = await displayContext.newPage();
       displayPage.on("request", (request) => {
@@ -217,9 +216,6 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
       displayPage.on("response", (response) => {
         if (!response.url().startsWith(origin)) return;
         seenResponses.push({ url: response.url(), status: response.status() });
-        if (response.url().includes("/projection")) {
-          projectionTextReads.push(response.text());
-        }
       });
 
       await displayPage.goto(`/display?sceneId=${encodeURIComponent(sceneId)}`);
@@ -244,10 +240,18 @@ test("I7b exit: restricted scene display shows only revealed areas and visible t
       for (const path of gmPaths) {
         expect(seenRequests.filter((url) => url.includes(path)), `display fetched GM path ${path}`).toEqual([]);
       }
-      // Await the settled response texts before asserting: the handler
-      // above only queues the reads, so asserting on the array directly
-      // would race the body promises.
-      const projectionBodies = await Promise.all(projectionTextReads);
+      // The display only reads its credential-scoped scene stream: read one
+      // streamed snapshot with the stored credential and check it for leaks.
+      const streamCredential = await displayPage.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!) as { displayId: string; secret: string });
+      expect(seenRequests.some((url) => url.includes(`/api/displays/${streamCredential.displayId}/scenes/${sceneId}/events`))).toBe(true);
+      const projectionBodies = [await displayPage.evaluate(async ({ path, secret }: { path: string; secret: string }) => {
+        // First complete `event: scene` message of the live stream, then abort.
+        const controller = new AbortController();
+        const response = await fetch(path, { headers: { "x-display-secret": secret }, credentials: "omit", signal: controller.signal });
+        const reader = response.body!.getReader(); const decoder = new TextDecoder(); let text = "";
+        for (;;) { const at = text.indexOf("event: scene"); if (at >= 0 && text.indexOf("\n\n", at) >= 0) break; const { value, done } = await reader.read(); if (done) break; text += decoder.decode(value, { stream: true }); }
+        controller.abort(); return text;
+      }, { path: `/api/displays/${streamCredential.displayId}/scenes/${sceneId}/events`, secret: streamCredential.secret })];
       expect(projectionBodies.length).toBeGreaterThan(0);
       for (const body of projectionBodies) {
         expect(body).not.toContain("Ghost");

@@ -21,7 +21,7 @@ import type {
 import type { CharactersApi } from "./api.js";
 import { openCharacterStore, type CharacterStore } from "./store.js";
 import { makeEntry, makeView, makePushRoll, PUSH_ROOT_ID } from "./testing.js";
-import { createCharacterSession } from "./session.js";
+import { canEdit, createCharacterSession } from "./session.js";
 import type { CharacterSession, CoordinationEvent, CoordinationPort, IdentityPort } from "./session.js";
 
 let counter = 0;
@@ -74,11 +74,11 @@ it("does not restore an older sheet when clearing a revoked roll races a fresh s
   // One refresh must finish reconciliation even if clearing the roll
   // advanced the cache generation while its earlier read is held.
   await session.refresh();
-  expect(session.getSnapshot().confirmed?.revision).toBe(2);
+  expect(session.getSnapshot().view?.character.revision).toBe(2);
   release();
   await forgetting;
-  expect(session.getSnapshot().confirmed?.revision).toBe(2);
-  expect(session.getSnapshot().confirmed?.campaignId).toBeNull();
+  expect(session.getSnapshot().view?.character.revision).toBe(2);
+  expect(session.getSnapshot().view?.character.campaignId).toBeNull();
   api.setSendFallback(async () => successEnvelope(returned));
   await session.executeGrantedAction("sword-copy", "sword_pool");
   await session.whenIdle();
@@ -116,12 +116,12 @@ it("finishes startup reconciliation when clearing an old roll changes the cache 
   await observedRead;
   const readyRevisions: number[] = [];
   const unsubscribe = session.subscribe(snapshot => {
-    if (snapshot.phase === "ready" && snapshot.confirmed) readyRevisions.push(snapshot.confirmed.revision);
+    if (snapshot.phase === "ready" && snapshot.view) readyRevisions.push(snapshot.view.character.revision);
   });
   try {
     releaseOpen();
     await opening;
-    expect(session.getSnapshot().confirmed?.revision).toBe(2);
+    expect(session.getSnapshot().view?.character.revision).toBe(2);
     expect(readyRevisions).not.toContain(1);
     releaseRead();
     await clearing;
@@ -149,11 +149,11 @@ it.each(["roll clear", "access purge"] as const)("handles a %s between reading a
     await session.open();
     if (change === "roll clear") {
       expect(session.getSnapshot().phase).toBe("ready");
-      expect(session.getSnapshot().confirmed?.revision).toBe(2);
+      expect(session.getSnapshot().view?.character.revision).toBe(2);
       expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(2);
     } else {
       expect(session.getSnapshot().phase).toBe("purged");
-      expect(session.getSnapshot().confirmed).toBeNull();
+      expect(session.getSnapshot().view).toBeNull();
       expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
     }
     expect(api.sent).toEqual([]);
@@ -175,7 +175,7 @@ it("keeps actions blocked when reconciliation re-fetches a revision behind one a
     await session.open();
     expect(session.getSnapshot().phase).toBe("offline");
     expect(session.getSnapshot().error?.kind).toBe("network-unavailable");
-    expect(session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(session.getSnapshot().view?.character.revision).toBe(1);
     expect(api.sent).toEqual([]);
   } finally { session.dispose(); await store.close(); }
 });
@@ -205,7 +205,7 @@ it("rejects an already accepted edit whose enqueue arrives after another tab's l
   await store.clearAccount(ARM);
   finish(); await edit; await session.whenIdle();
   expect(await store.read(ARM, "char-1")).toMatchObject({ confirmed: null, entries: [] });
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   expect(api.sent).toEqual([]);
   session.dispose(); await store.close();
 });
@@ -250,7 +250,7 @@ it("retries a denied initial acquisition so a releasing predecessor does not wed
   await session.open();
   await vi.waitFor(() => expect(session.getSnapshot().editing.owned).toBe(true));
   expect(calls).toBeGreaterThanOrEqual(3);
-  await vi.waitFor(() => expect(session.getSnapshot().confirmed?.revision).toBe(1));
+  await vi.waitFor(() => expect(session.getSnapshot().view?.character.revision).toBe(1));
   session.dispose(); await store.close();
 });
 
@@ -262,7 +262,7 @@ it("keeps snapshots stable and hides cached data on account switch", async () =>
   identity.actorId = "other";
   identity.generationCounter++;
   identity.signal();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   await expect(session.setField("name", "leak")).rejects.toThrow();
   session.dispose(); await store.close();
 });
@@ -272,7 +272,7 @@ it("hides private validation details when the account changes", async () => {
   api.scriptOpenView(viewFor("char-1", 1)); await session.open();
   api.scriptSend(async () => ({ error: new ApiError({ status: 422, code: "invalid_value", message: "private character detail", requestId: "r", latestRevision: null, diagnostics: [] }) }));
   await session.setField("name", "Briar"); await session.whenIdle();
-  expect(session.getSnapshot().error?.message).toBe("private character detail");
+  expect(session.getSnapshot().error?.serverMessage).toBe("private character detail");
   identity.actorId = "other"; identity.generationCounter++; identity.signal();
   expect(session.getSnapshot().error).toBeNull();
   session.dispose(); await store.close();
@@ -291,7 +291,7 @@ it("ignores late success after identity changes without modifying the frozen att
   pending.release(viewFor("char-1", 2));
   await session.whenIdle();
   expect(await store.read(ARM, "char-1")).toEqual(before);
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   session.dispose(); await store.close();
 });
 
@@ -306,7 +306,7 @@ it("checks identity again after persisting a frozen attempt, before sending", as
   await session.setField("name", "Briar"); await session.whenIdle();
   expect(api.sent).toEqual([]);
   expect((await store.read(ARM, "char-1")).entries[0]?.attempt).not.toBeNull();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   session.dispose(); await store.close();
 });
 
@@ -324,7 +324,7 @@ it.each([401, 404, 409])("ignores late %s errors after account switch without pu
   await session.whenIdle();
   expect(await store.read(ARM, "char-1")).toEqual(before);
   expect(open).not.toHaveBeenCalled();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   session.dispose(); await store.close();
 });
 
@@ -338,7 +338,7 @@ it("ignores a late initial GET after account switch", async () => {
   finish({ character: viewFor("char-1", 1), requestId: "r" });
   await opening;
   expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
-  expect(session.getSnapshot().confirmed).toBeNull();
+  expect(session.getSnapshot().view).toBeNull();
   session.dispose(); await store.close();
 });
 
@@ -620,6 +620,7 @@ describe("CharacterSession", () => {
     };
     // The prior tab already sent this exact request and crashed before acking.
     api.sent.push(frozen);
+    await seedConfirmed(store, "char-1", viewFor("char-1", 1));
     await seedQueue(store, "char-1", [
       { id: "e1", intent: { kind: "setField", fieldId: "name", value: "Briar" }, request: frozen },
     ]);
@@ -635,7 +636,7 @@ describe("CharacterSession", () => {
     expect(api.sent[1]?.body).toEqual(frozen.body);
     expect(api.sent[1]?.body.idempotencyKey).toBe("frozen-key");
     const snap = session.getSnapshot();
-    expect(snap.confirmed?.revision).toBe(2);
+    expect(snap.view?.character.revision).toBe(2);
     expect(snap.entries).toEqual([]);
     expect(snap.phase).toBe("ready");
     const stored = await store.read(ARM, "char-1");
@@ -658,7 +659,7 @@ describe("CharacterSession", () => {
 
     expect(api.sent[0]?.body.expectedRevision).toBe(1);
     expect(api.sent[1]?.body.expectedRevision).toBe(2);
-    expect(session.getSnapshot().confirmed?.revision).toBe(3);
+    expect(session.getSnapshot().view?.character.revision).toBe(3);
     expect(session.getSnapshot().entries).toEqual([]);
     await store.close();
   });
@@ -669,7 +670,7 @@ describe("CharacterSession", () => {
     api.scriptOpenView(viewFor("char-1", 5));
     await session.open();
 
-    expect(session.getSnapshot().confirmed?.revision).toBe(5);
+    expect(session.getSnapshot().view?.character.revision).toBe(5);
     expect(session.getSnapshot().phase).toBe("ready");
     expect(session.getSnapshot().entries).toEqual([]);
     const stored = await store.read(ARM, "char-1");
@@ -687,7 +688,7 @@ describe("CharacterSession", () => {
     await session.executeAction("ironclad", { difficulty: 10 });
     await session.whenIdle();
 
-    expect(session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(session.getSnapshot().view?.character.revision).toBe(1);
     expect(session.getSnapshot().entries).toEqual([]);
     const stored = await store.read(ARM, "char-1");
     expect(stored.entries).toEqual([]);
@@ -771,7 +772,7 @@ describe("CharacterSession", () => {
     // selection keeps the remainder paused (see selection-safe tests below).
     const selected = session.getSnapshot().entries.map((e) => e.id);
     expect(selected).toHaveLength(3);
-    expect(session.getSnapshot().confirmed?.revision).toBe(7);
+    expect(session.getSnapshot().view?.character.revision).toBe(7);
     expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(7);
     expect(session.getSnapshot().tentative).toEqual({ health: 11, gold: 20, name: "Ivy" });
 
@@ -853,8 +854,8 @@ describe("CharacterSession", () => {
     const snap = session.getSnapshot();
     expect(snap.phase).toBe("purged");
     expect(snap.error?.kind).toBe("purged");
-    expect(String(snap.error?.message)).not.toContain("private payload");
-    expect(String(snap.error?.message)).not.toContain("health");
+    expect(JSON.stringify(snap.error)).not.toContain("private payload");
+    expect(JSON.stringify(snap.error)).not.toContain("health");
     const stored = await store.read(ARM, "char-1");
     expect(stored.confirmed).toBeNull();
     expect(stored.entries).toEqual([]);
@@ -908,7 +909,8 @@ describe("CharacterSession", () => {
 
     const snap = session.getSnapshot();
     expect(snap.phase).toBe("storage-error");
-    expect(snap.error?.kind).toBe("storage-error");
+    expect(snap.storage).toBe("unavailable");
+    expect(snap.error).toBeNull();
     expect(snap.entries).toEqual([]);
     await expect(session.setField("gold", 10)).rejects.toThrow();
     await store.close();
@@ -936,7 +938,8 @@ describe("CharacterSession", () => {
     spy.mockRestore();
 
     expect(session.getSnapshot().phase).toBe("storage-error");
-    expect(session.getSnapshot().error?.kind).toBe("storage-error");
+    expect(session.getSnapshot().storage).toBe("unavailable");
+    expect(session.getSnapshot().error).toBeNull();
     expect(session.getSnapshot().entries).toHaveLength(1);
     expect(session.getSnapshot().entries[0]?.attempt).toBeNull();
     const stored = await store.read(ARM, "char-1");
@@ -964,7 +967,7 @@ describe("CharacterSession", () => {
     const snap = session.getSnapshot();
     expect(snap.phase).toBe("purged");
     expect(snap.entries).toEqual([]);
-    expect(snap.confirmed).toBeNull();
+    expect(snap.view).toBeNull();
     const stored = await store.read(ARM, "char-1");
     expect(stored.entries).toEqual([]);
     expect(stored.confirmed).toBeNull();
@@ -986,6 +989,30 @@ describe("CharacterSession", () => {
     expect(session.getSnapshot().entries).toHaveLength(1);
     expect(session.getSnapshot().phase).toBe("offline");
     await store.close();
+  });
+
+  it("queues an offline item edit while a failed refresh pauses synchronization", async () => {
+    const { api, identity, store, session } = await makeHarness();
+    try {
+      await seedConfirmed(store, "char-1", viewFor("char-1", 1));
+      api.scriptOpenError(new TypeError("Connectivity dropped during refresh"));
+      await session.open();
+      expect(session.getSnapshot().error?.kind).toBe("network-unavailable");
+      identity.online = false;
+      identity.signal();
+      await session.updateEntryValues("entry-9", { name: "Stone" });
+      await session.whenIdle();
+      expect((await store.read(ARM,"char-1")).entries).toHaveLength(1);
+      expect(api.sent).toEqual([]);
+
+      api.scriptOpenView(viewFor("char-1", 1));
+      api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+      identity.online = true;
+      identity.signal();
+      await session.whenIdle();
+      expect(api.sent).toHaveLength(1);
+      expect((await store.read(ARM,"char-1")).entries).toHaveLength(0);
+    } finally { session.dispose(); await store.close(); }
   });
 
   it("queues entry intents offline and drains them to the entry routes on reconnect", async () => {
@@ -1071,7 +1098,7 @@ describe("CharacterSession", () => {
     await session.open();
 
     const snap = session.getSnapshot();
-    expect(snap.confirmed?.projection.completionFields).toBeDefined();
+    expect(snap.view?.character.projection.completionFields).toBeDefined();
     expect(snap.phase).toBe("invalid");
     expect(snap.tentative).toEqual({ origin: "Feywild" });
     expect((await store.read(ARM, "char-1")).entries[0]?.id).toBe("legacy-pending");
@@ -1164,7 +1191,7 @@ describe("CharacterSession serialization", () => {
     first.api.scriptOpenView(viewFor("char-1", 1));
     first.api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
     first.session.subscribe(snapshot => {
-      if (snapshot.confirmed?.revision === 2 && snapshot.entries.length === 1) first.session.dispose();
+      if (snapshot.view?.character.revision === 2 && snapshot.entries.length === 1) first.session.dispose();
     });
     await first.session.open();
     expect(first.api.sent).toHaveLength(1);
@@ -1213,7 +1240,8 @@ describe("CharacterSession serialization", () => {
     const confirm = vi.spyOn(store, "confirmSnapshot").mockRejectedValue(new Error("quota"));
     await session.setField("name", "Briar");
     await session.whenIdle();
-    expect(session.getSnapshot().error?.kind).toBe("storage-error");
+    expect(session.getSnapshot().storage).toBe("unavailable");
+    expect(session.getSnapshot().error).toBeNull();
     expect((await store.read(ARM, "char-1")).confirmed?.revision).toBe(1);
     await expect(session.resolveConflict({ mode: "reapply", selectedIds: session.getSnapshot().entries.map(e => e.id) })).rejects.toThrow();
     confirm.mockRestore();
@@ -1265,7 +1293,7 @@ describe("CharacterSession serialization", () => {
     api.scriptOpenError(new TypeError("offline"));
     await session.open();
     expect(session.getSnapshot().phase).toBe("offline");
-    expect(session.getSnapshot().confirmed?.revision).toBe(1);
+    expect(session.getSnapshot().view?.character.revision).toBe(1);
     expect(api.sent).toEqual([]);
     expect((await store.read(ARM, "char-1")).entries[0]?.attempt).toBeNull();
     session.dispose();
@@ -1286,7 +1314,7 @@ describe("CharacterSession serialization", () => {
       await session.open();
       expect(api.sent).toEqual([request]);
       expect(get).not.toHaveBeenCalled();
-      expect(session.getSnapshot().confirmed?.revision).toBe(1);
+      expect(session.getSnapshot().view?.character.revision).toBe(1);
       expect(session.getSnapshot().phase).toBe("uncertain");
       expect((await store.read(ARM, "char-1")).entries[0]?.attempt).toEqual(request);
     } finally { session.dispose(); await store.close(); }
@@ -1327,7 +1355,7 @@ describe("CharacterSession serialization", () => {
     d.release(viewFor("char-1", 2));
     await opening;
     expect(api.sent).toHaveLength(1);
-    expect(session.getSnapshot().confirmed?.revision).toBe(7);
+    expect(session.getSnapshot().view?.character.revision).toBe(7);
     expect(session.getSnapshot().phase).toBe("conflict");
     session.dispose();
     await store.close();
@@ -1347,7 +1375,7 @@ describe("CharacterSession serialization", () => {
     await session.setField("name", "Briar");
     await session.whenIdle();
     expect(session.getSnapshot().error?.kind).toBe(kind);
-    expect(session.getSnapshot().confirmed?.revision).toBe(kind === "purged" ? undefined : 1);
+    expect(session.getSnapshot().view?.character.revision).toBe(kind === "purged" ? undefined : 1);
     await expect(session.resolveConflict({ mode: "reapply", selectedIds: session.getSnapshot().entries.map(e => e.id) })).rejects.toThrow();
     expect(api.sent).toHaveLength(1);
     if (kind === "purged") expect((await store.read(ARM, "char-1")).entries).toEqual([]);
@@ -1418,7 +1446,26 @@ describe("CharacterSession online operations", () => {
     expect(api.sent[0]?.path).toBe("/characters/char-1");
     expect(api.sent[0]?.body).toMatchObject({ command: "archive", expectedRevision: 3 });
     expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
+    expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
+    session.dispose();
+    await store.close();
+  });
+
+  it("changes the rules version through POST with the confirmed revision and adopts the new pin", async () => {
+    const target = "11111111-1111-4000-8000-0000000000aa";
+    const { api, store, session } = await makeHarness();
+    api.scriptOpenView(viewFor("char-1", 3));
+    await session.open();
+    api.setOpenFallback(async () => ({ character: viewFor("char-1", 3), requestId: "req-open" }));
+    api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4, { systemVersionId: target })));
+    await session.changeVersion({ systemVersionId: target, extensions: [] });
+    expect(api.sent).toHaveLength(1);
+    expect(api.sent[0]?.method).toBe("POST");
+    expect(api.sent[0]?.path).toBe("/characters/char-1/composition");
+    expect(api.sent[0]?.body).toMatchObject({ target: { systemVersionId: target, extensions: [] }, expectedRevision: 3 });
+    expect(typeof api.sent[0]?.body.idempotencyKey).toBe("string");
+    expect(session.getSnapshot().view?.character.systemVersionId).toBe(target);
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     session.dispose();
     await store.close();
@@ -1432,7 +1479,7 @@ describe("CharacterSession online operations", () => {
     api.setSendFallback(async () => successEnvelope(viewFor("char-1", 5, { lifecycle: "active" })));
     await session.recover();
     expect(api.sent[0]?.body).toMatchObject({ command: "recover", expectedRevision: 4 });
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("active");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("active");
     session.dispose();
     await store.close();
   });
@@ -1729,7 +1776,7 @@ describe("CharacterSession selection-safe conflict recovery", () => {
     ).rejects.toThrow(/stale/);
     expect((await h.store.read(ARM, "char-1")).entries).toEqual([]);
     expect(h.api.sent).toHaveLength(h.sentBefore);
-    expect(h.session.getSnapshot().confirmed).toBeNull();
+    expect(h.session.getSnapshot().view).toBeNull();
     h.session.dispose();
     await h.store.close();
     h.pending1.catch(() => {});
@@ -1786,7 +1833,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     releaseReplay(successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
     await opening;
     await session.whenIdle();
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     expect(api.sent).toHaveLength(1);
     // The acknowledgment itself is authoritative: no extra fresh-state
@@ -1818,7 +1865,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     expect(api.sent[1]?.path).toBe(first.path);
     expect(api.sent[1]?.body).toEqual(first.body);
     expect(api.sent[1]?.firstAttemptAt).toBe(first.firstAttemptAt);
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     session.dispose();
     await store.close();
@@ -1841,7 +1888,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
       expect(api.sent[1]?.path).toBe(api.sent[0]?.path);
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       session.dispose();
       await store.close();
     },
@@ -1871,7 +1918,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await session.whenIdle();
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     } finally {
       session.dispose();
       await store.close();
@@ -1913,7 +1960,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     identity.signal();
     await session.whenIdle();
     expect(api.sent).toHaveLength(1);
-    expect(session.getSnapshot().confirmed).toBeNull();
+    expect(session.getSnapshot().view).toBeNull();
     // The same account resumes with the identical body.
     identity.actorId = ARM;
     identity.signal();
@@ -1921,7 +1968,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     await session.whenIdle();
     expect(api.sent).toHaveLength(2);
     expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     session.dispose();
     await store.close();
   });
@@ -1958,13 +2005,13 @@ describe("CharacterSession uncertain online outcomes", () => {
     await expect(session.archive()).rejects.toThrow();
     const snap = session.getSnapshot();
     expect(snap.error?.kind).toBe("purged");
-    expect(String(snap.error?.message)).not.toContain("private");
-    expect(String(snap.error?.message)).not.toContain("private-key");
+    expect(JSON.stringify(snap.error)).not.toContain("private");
+    expect(JSON.stringify(snap.error)).not.toContain("private-key");
     expect(await store.readOnlineAttempts(ARM)).toEqual([]);
     const stored = await store.read(ARM, "char-1");
     expect(stored.confirmed).toBeNull();
     expect(stored.entries).toEqual([]);
-    expect(snap.confirmed).toBeNull();
+    expect(snap.view).toBeNull();
     session.dispose();
     await store.close();
   });
@@ -2003,7 +2050,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     const retained = await store.readOnlineAttempts(ARM);
     expect(retained).toHaveLength(1);
     expect(retained[0]?.request.body).toEqual({ command: "archive", expectedRevision: 3, idempotencyKey: "archive-key" });
-    expect(session.getSnapshot().confirmed?.revision).toBe(3);
+    expect(session.getSnapshot().view?.character.revision).toBe(3);
     // Ordinary recovery and newer sends stay blocked.
     await expect(session.resolveConflict({ mode: "discard", selectedIds: [] })).rejects.toThrow(/uncertain/i);
     await expect(session.archive()).rejects.toThrow(/replay window|manual review|expired/i);
@@ -2034,11 +2081,15 @@ describe("CharacterSession uncertain online outcomes", () => {
     spy.mockRestore();
     expect(acknowledge).toBeDefined();
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(1);
+    // D3: the failed save released the lock; this tab edits again only after requesting it.
+    expect(session.getSnapshot().editing.blockedBy).toBe("storage");
+    // Requesting editing replays the retained attempt verbatim.
     api.scriptSend(async () => successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
-    await session.archive();
+    expect(await session.requestEditing()).toBe(true);
+    await session.whenIdle();
     expect(api.sent).toHaveLength(2);
     expect(api.sent[1]?.body).toEqual(api.sent[0]?.body);
-    expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+    expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
     expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
     session.dispose();
     await store.close();
@@ -2059,7 +2110,7 @@ describe("CharacterSession uncertain online outcomes", () => {
     await session.whenIdle();
     const snap = session.getSnapshot();
     expect(snap.phase).toBe("purged");
-    expect(snap.confirmed).toBeNull();
+    expect(snap.view).toBeNull();
     expect((await store.read(ARM, "char-1")).confirmed).toBeNull();
     expect(await store.readOnlineAttempts(ARM)).toEqual([]);
     session.dispose();
@@ -2131,7 +2182,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await session.archive();
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body.idempotencyKey).not.toBe(retiredKey);
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       session.dispose();
       await store.close();
     });
@@ -2154,7 +2205,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await session.archive();
       expect(api.sent).toHaveLength(2);
       expect(api.sent[1]?.body.idempotencyKey).not.toBe(api.sent[0]?.body.idempotencyKey);
-      expect(session.getSnapshot().confirmed?.revision).toBe(4);
+      expect(session.getSnapshot().view?.character.revision).toBe(4);
       session.dispose();
       await store.close();
     });
@@ -2211,7 +2262,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await first;
       await second;
       await session.whenIdle();
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       expect(session.getSnapshot().error).toBeNull();
       expect(session.getSnapshot().phase).toBe("ready");
       expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
@@ -2262,7 +2313,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       release(successEnvelope(viewFor("char-1", 4, { lifecycle: "archived" })));
       await sending;
       await reviewing;
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
       session.dispose();
       await store.close();
@@ -2296,7 +2347,7 @@ describe("CharacterSession uncertain online outcomes", () => {
       await sending;
       // The send resolved the outcome first: there is nothing left to review.
       await expect(reviewing).rejects.toThrow(/no longer pending/);
-      expect(session.getSnapshot().confirmed?.lifecycle).toBe("archived");
+      expect(session.getSnapshot().view?.character.lifecycle).toBe("archived");
       expect(await store.readOnlineAttempts(ARM)).toHaveLength(0);
       session.dispose();
       await store.close();
@@ -2549,6 +2600,44 @@ describe("ordered resource estimates", () => {
     await store.close();
   });
 
+  it("estimates amounts and direct input in order, stopping at the pending maximum", async () => {
+    const { session, store } = await offlineHarnessWith([
+      { resourceId: "health", label: "Health", current: 6, min: 0, max: 10, step: 1 },
+    ]);
+    await session.adjustResource("health", -17);
+    expect(session.getSnapshot().tentative).toEqual({ health: 0 });
+    await session.setResource("health", { max: 4 });
+    await session.adjustResource("health", 9);
+    // Damage stops at the minimum; healing stops at the pending maximum of 4.
+    expect(session.getSnapshot().tentative).toEqual({ health: 4, "health.max": 4 });
+    await session.setResource("health", { current: 2 });
+    expect(session.getSnapshot().tentative).toEqual({ health: 2, "health.max": 4 });
+    session.dispose();
+    await store.close();
+  });
+
+  it("sends queued amounts and direct input to their own routes", async () => {
+    const harness = await makeHarness();
+    await seedConfirmed(harness.store, "char-1", resourceView("char-1", 1, [
+      { resourceId: "health", label: "Health", current: 6, min: 0, max: 10, step: 1 },
+    ]));
+    harness.api.scriptOpenView(viewFor("char-1", 1));
+    harness.api.scriptSend(async () => successEnvelope(viewFor("char-1", 2)));
+    harness.api.scriptSend(async () => successEnvelope(viewFor("char-1", 3)));
+    await harness.session.open();
+    await harness.session.adjustResource("health", -3);
+    await harness.session.whenIdle();
+    await harness.session.setResource("health", { max: 8 });
+    await harness.session.whenIdle();
+    expect(harness.api.sent.map((request) => [request.path, request.body])).toEqual([
+      ["/characters/char-1/resources/health/adjust", expect.objectContaining({ delta: -3, expectedRevision: 1 })],
+      ["/characters/char-1/resources/health/set", expect.objectContaining({ max: 8, expectedRevision: 2 })],
+    ]);
+    expect(harness.api.sent[1]?.body).not.toHaveProperty("current");
+    harness.session.dispose();
+    await harness.store.close();
+  });
+
   it("mixes field sets with resource estimates and derives no value from action intentions", async () => {
     const harness = await offlineHarnessWith([
       { resourceId: "health", label: "Health", current: 1, min: 0, max: 10, step: 2 },
@@ -2700,7 +2789,7 @@ it('retains a campaign selection and explains stale catalog revisions during con
  const {api,identity,store,session}=await makeHarness();api.scriptOpenView(viewFor('char-1',1));await session.open();identity.online=false;identity.signal();
  const source={kind:'campaign' as const,campaignId:ARM,templateId:ARM,templateRevision:2,contentRevision:1};await session.addEntry('inventory',null,{},undefined,source);await session.whenIdle();
  api.setOpenFallback(async()=>({character:viewFor('char-1',1),requestId:'reconnect'}));api.scriptSend(async()=>({error:new ApiError({code:'conflict',message:'The campaign template has changed. Refresh and explicitly review the selected revision.',status:409,requestId:'req-1',latestRevision:null,diagnostics:[]})}));
- identity.online=true;identity.signal();await vi.waitFor(()=>expect(session.getSnapshot().phase).toBe('conflict'));await session.whenIdle();expect(session.getSnapshot().error?.message).toContain('campaign template has changed');
+ identity.online=true;identity.signal();await vi.waitFor(()=>expect(session.getSnapshot().phase).toBe('conflict'));await session.whenIdle();expect(session.getSnapshot().error?.serverMessage).toContain('campaign template has changed');
  expect((await store.read(ARM,'char-1')).entries[0]?.intent).toMatchObject({entry:{source}});session.dispose();await store.close();
 });
 
@@ -2809,4 +2898,627 @@ describe("durable online push recovery",()=>{
   const offline=await makeHarness();offline.identity.online=false;offline.identity.signal();await offline.session.open();expect(offline.session.getSnapshot().lastRoll).toEqual(child);expect(offline.api.sent).toEqual([]);offline.session.dispose();await offline.store.close();
  });
  it("never creates a new push while offline",async()=>{const h=await makeHarness();h.api.scriptOpenView(viewFor("char-1",1));await h.session.open();h.identity.online=false;h.identity.signal();await expect(h.session.pushRoll("root")).rejects.toThrow(/connectivity|offline/);expect(await h.store.readOnlineAttempts(ARM)).toEqual([]);expect(h.api.sent).toEqual([]);h.session.dispose();await h.store.close();});
+});
+
+describe("CharacterSession read path", () => {
+  const purgeError = () => new ApiError({ status: 404, code: "not_found", message: "Not found",
+    cacheDisposition: "purge", requestId: "r", latestRevision: null, diagnostics: [] });
+
+  async function openLive(h: Harness) {
+    vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+    h.api.scriptOpenView(viewFor("char-1", 1));
+    await h.session.open();
+    await h.session.whenIdle();
+    expect(h.session.getSnapshot().view?.source).toBe("live");
+    expect(h.session.getSnapshot().view?.character.revision).toBe(1);
+  }
+
+  it("refreshes a live view every 30 seconds while visible and stops on dispose", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const h = await makeHarness();
+    try {
+      await openLive(h);
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2, { name: "Edited elsewhere" }), requestId: "r" }));
+      await vi.advanceTimersByTimeAsync(29_000);
+      expect(h.session.getSnapshot().view?.character.revision).toBe(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(2));
+      expect(h.session.getSnapshot().view?.character.name).toBe("Edited elsewhere");
+      expect(h.session.getSnapshot().view?.source).toBe("live");
+      expect((await h.store.read(ARM, "char-1")).confirmed).toBeNull();
+      h.session.dispose();
+      expect(vi.getTimerCount()).toBe(0);
+      expect(h.api.sent).toEqual([]);
+    } finally {
+      vi.useRealTimers(); h.session.dispose(); await h.store.close();
+    }
+  });
+
+  it("does not poll while the page is hidden and refreshes when it becomes visible", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const h = await makeHarness();
+    try {
+      await openLive(h);
+      let opens = 0;
+      h.api.setOpenFallback(async () => { opens += 1; return { character: viewFor("char-1", 3), requestId: "r" }; });
+      await vi.advanceTimersByTimeAsync(90_000);
+      expect(opens).toBe(0);
+      visibility.mockReturnValue("visible");
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(3));
+      expect(opens).toBe(1);
+    } finally {
+      visibility.mockRestore(); vi.useRealTimers(); h.session.dispose(); await h.store.close();
+    }
+  });
+
+  it("hides a live view and purges at the next refresh after access is revoked", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const h = await makeHarness();
+    try {
+      await openLive(h);
+      h.api.setOpenFallback(async () => { throw purgeError(); });
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.waitFor(() => expect(h.session.getSnapshot().phase).toBe("purged"));
+      const snap = h.session.getSnapshot();
+      expect(snap.view).toBeNull();
+      expect(snap.error?.kind).toBe("purged");
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers(); h.session.dispose(); await h.store.close();
+    }
+  });
+
+  it("refreshes a stored view in a tab without the editing lock without writing the store", async () => {
+    const h = await makeHarness("char-1", false);
+    h.coordination.requestEditing = async () => false;
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      await h.session.open();
+      expect(h.session.getSnapshot().view?.character.revision).toBe(1);
+      expect(h.session.getSnapshot().view?.source).toBe("stored");
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2, { name: "Other device" }), requestId: "r" }));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(2));
+      expect(h.session.getSnapshot().editing.owned).toBe(false);
+      expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(1);
+      expect(h.api.sent).toEqual([]);
+    } finally {
+      h.session.dispose(); await h.store.close();
+    }
+  });
+});
+
+describe("CharacterSession derived editing (S3)", () => {
+  async function openLive(h: Harness) {
+    const confirm = vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+    h.api.scriptOpenView(viewFor("char-1", 1));
+    await h.session.open();
+    await h.session.whenIdle();
+    expect(h.session.getSnapshot().view?.source).toBe("live");
+    return confirm;
+  }
+
+  /** Every send must happen with a stored view and the editing lock. */
+  function guardSends(h: Harness): Array<{ canEdit: boolean; owner: boolean }> {
+    const calls: Array<{ canEdit: boolean; owner: boolean }> = [];
+    const send = h.api.send.bind(h.api);
+    h.api.send = async (request: FrozenRequest) => {
+      calls.push({ canEdit: canEdit(h.session.getSnapshot()), owner: h.coordination.isOwner() });
+      return send(request);
+    };
+    return calls;
+  }
+
+  async function expectCommandsRefused(h: Harness) {
+    const sends = guardSends(h);
+    const enqueue = vi.spyOn(h.store, "enqueue");
+    const freeze = vi.spyOn(h.store, "freeze");
+    const saveAttempt = vi.spyOn(h.store, "saveOnlineAttempt");
+    const s = h.session;
+    const commands: Array<[string, () => Promise<unknown>]> = [
+      ["setField", () => s.setField("name", "Briar")],
+      ["bumpResource", () => s.bumpResource("hp", "up")],
+      ["adjustResource", () => s.adjustResource("hp", -1)],
+      ["setResource", () => s.setResource("hp", { current: 3 })],
+      ["executeAction", () => s.executeAction("strike")],
+      ["executeGrantedAction", () => s.executeGrantedAction("sword-copy", "sword_pool")],
+      ["addEntry", () => s.addEntry("inventory", null, {})],
+      ["removeEntry", () => s.removeEntry("sword-copy")],
+      ["updateEntryValues", () => s.updateEntryValues("sword-copy", {})],
+      ["refresh", () => s.refresh()],
+      ["pushRoll", () => s.pushRoll(PUSH_ROOT_ID)],
+      ["archive", () => s.archive()],
+      ["recover", () => s.recover()],
+      ["changeVersion", () => s.changeVersion({} as never)],
+      ["resolveConflict", () => s.resolveConflict({ mode: "discard", selectedIds: [] } as never)],
+    ];
+    for (const [name, command] of commands) {
+      await expect(command(), name).rejects.toThrow();
+    }
+    await s.whenIdle();
+    expect(enqueue).not.toHaveBeenCalled();
+    expect(freeze).not.toHaveBeenCalled();
+    expect(saveAttempt).not.toHaveBeenCalled();
+    expect(h.api.sent).toEqual([]);
+    expect(sends).toEqual([]);
+    expect((await h.store.read(ARM, "char-1")).entries).toEqual([]);
+    expect(await h.store.readOnlineAttempts(ARM)).toEqual([]);
+  }
+
+  it("refuses every command in a live view and releases the lock after a snapshot write failure (D3)", async () => {
+    const h = await makeHarness();
+    try {
+      await openLive(h);
+      const snap = h.session.getSnapshot();
+      expect(canEdit(snap)).toBe(false);
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.editing.owned).toBe(false);
+      expect(snap.editing.blockedBy).toBe("storage");
+      expect(h.coordination.isOwner()).toBe(false);
+      await expectCommandsRefused(h);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("refuses every command in a tab without the lock", async () => {
+    const h = await makeHarness("char-1", false);
+    h.coordination.requestEditing = async () => false;
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1), requestId: "r" }));
+      await h.session.open();
+      const snap = h.session.getSnapshot();
+      expect(snap.view?.source).toBe("stored");
+      expect(snap.editing.blockedBy).toBe("other-tab");
+      expect(canEdit(snap)).toBe(false);
+      await expectCommandsRefused(h);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("releases the lock when a stored view cannot be saved again and keeps showing it read-only (D3)", async () => {
+    const h = await makeHarness();
+    try {
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      expect(canEdit(h.session.getSnapshot())).toBe(true);
+      vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2), requestId: "r" }));
+      await h.session.refresh();
+      await h.session.whenIdle();
+      const snap = h.session.getSnapshot();
+      expect(snap.view?.source).toBe("stored");
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.editing.owned).toBe(false);
+      expect(snap.editing.blockedBy).toBe("storage");
+      expect(canEdit(snap)).toBe(false);
+      expect(h.coordination.isOwner()).toBe(false);
+      await expectCommandsRefused(h);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("edits again only after editing is requested once storage works (D3)", async () => {
+    const h = await makeHarness();
+    try {
+      const confirm = await openLive(h);
+      confirm.mockRestore();
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1), requestId: "r" }));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await h.session.whenIdle();
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.source).toBe("live"));
+      // No automatic reacquisition: the lock stays free for another tab.
+      expect(h.coordination.isOwner()).toBe(false);
+      expect(canEdit(h.session.getSnapshot())).toBe(false);
+      expect(await h.session.requestEditing()).toBe(true);
+      await h.session.whenIdle();
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.source).toBe("stored"));
+      const snap = h.session.getSnapshot();
+      expect(snap.storage).toBe("available");
+      expect(snap.error).toBeNull();
+      expect(canEdit(snap)).toBe(true);
+      const sends = guardSends(h);
+      h.api.setSendFallback(async () => successEnvelope(viewFor("char-1", 2)));
+      await h.session.setField("name", "Briar");
+      await h.session.whenIdle();
+      expect(h.api.sent).toHaveLength(1);
+      expect(sends).toEqual([{ canEdit: true, owner: true }]);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("does not save or send an online command when the lock is lost while it refreshes", async () => {
+    const h = await makeHarness();
+    try {
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      const sends = guardSends(h);
+      h.api.setOpenFallback(async () => {
+        h.coordination.signalOwnership(false, "other-tab");
+        return { character: viewFor("char-1", 1), requestId: "r" };
+      });
+      await expect(h.session.archive()).rejects.toThrow();
+      await h.session.whenIdle();
+      expect(h.api.sent).toEqual([]);
+      expect(sends).toEqual([]);
+      expect(await h.store.readOnlineAttempts(ARM)).toEqual([]);
+      expect(canEdit(h.session.getSnapshot())).toBe(false);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+});
+
+describe("CharacterSession storage state (V1)", () => {
+  const writeFailed = () => new DOMException("Write failed", "QuotaExceededError");
+
+  it("keeps a storage failure through offline, a failed reconnect fetch and a later reconnect", async () => {
+    const h = await makeHarness();
+    try {
+      vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(writeFailed());
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+      expect(h.coordination.isOwner()).toBe(false);
+
+      h.identity.online = false;
+      h.identity.signal();
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+
+      h.api.setOpenFallback(async () => { throw new TypeError("Failed to fetch"); });
+      h.identity.online = true;
+      h.identity.signal();
+      await vi.waitFor(() => expect(h.session.getSnapshot().error?.kind).toBe("network-unavailable"));
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 2), requestId: "r" }));
+      h.identity.signal();
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(2));
+      const snap = h.session.getSnapshot();
+      expect(snap.view?.source).toBe("live");
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.editing.owned).toBe(false);
+      expect(snap.editing.blockedBy).toBe("storage");
+      expect(snap.error).toBeNull();
+      expect(snap.phase).toBe("storage-error");
+      expect(canEdit(snap)).toBe(false);
+      expect(h.coordination.isOwner()).toBe(false);
+      await expect(h.session.setField("name", "Briar")).rejects.toThrow();
+      expect(h.api.sent).toEqual([]);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("does not clear a storage failure when a conflict review completes", async () => {
+    const h = await makeHarness();
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      h.api.scriptSend(async () => ({ error: conflictError() }));
+      h.api.scriptOpenView(viewFor("char-1", 7));
+      const pending = h.session.setField("name", "Ivy").catch(() => {});
+      await h.session.whenIdle();
+      expect(h.session.getSnapshot().phase).toBe("conflict");
+      const selected = h.session.getSnapshot().entries.map((e) => e.id);
+
+      // Storage fails while the review is being saved: another tab's change
+      // makes this tab reread the store, and that read fails.
+      const resolve = h.store.resolveEntries.bind(h.store);
+      vi.spyOn(h.store, "resolveEntries").mockImplementation(async (...args) => {
+        await resolve(...args);
+        vi.spyOn(h.store, "read").mockRejectedValueOnce(new DOMException("Read failed", "UnknownError"));
+        h.coordination.signalInvalidation("char-1");
+        await vi.waitFor(() => expect(h.session.getSnapshot().storage).toBe("unavailable"));
+      });
+      await h.session.resolveConflict({ mode: "discard", selectedIds: selected });
+      await h.session.whenIdle();
+      await pending;
+
+      const snap = h.session.getSnapshot();
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.editing.blockedBy).toBe("storage");
+      expect(snap.error).toBeNull();
+      expect(snap.phase).toBe("storage-error");
+      expect(canEdit(snap)).toBe(false);
+      expect(h.coordination.isOwner()).toBe(false);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("clears a storage failure only after editing is requested and the store works", async () => {
+    const h = await makeHarness();
+    try {
+      const write = vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(writeFailed());
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      // Another kind of error comes and goes: storage stays unavailable.
+      h.api.setOpenFallback(async () => { throw new ApiError({ status: 401, code: "unauthenticated", message: "x",
+        requestId: "r", latestRevision: null, diagnostics: [] }); });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().error?.kind).toBe("reauthenticate"));
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1), requestId: "r" }));
+      h.identity.signal();
+      await vi.waitFor(() => expect(h.session.getSnapshot().error).toBeNull());
+      expect(h.session.getSnapshot().phase).toBe("storage-error");
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+
+      // A retry that fails again releases the lock again.
+      expect(await h.session.requestEditing()).toBe(true);
+      await h.session.whenIdle();
+      await vi.waitFor(() => expect(h.coordination.isOwner()).toBe(false));
+      expect(h.session.getSnapshot().storage).toBe("unavailable");
+      expect(h.session.getSnapshot().editing.blockedBy).toBe("storage");
+
+      write.mockRestore();
+      expect(await h.session.requestEditing()).toBe(true);
+      await h.session.whenIdle();
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.source).toBe("stored"));
+      const snap = h.session.getSnapshot();
+      expect(snap.storage).toBe("available");
+      expect(snap.error).toBeNull();
+      expect(canEdit(snap)).toBe(true);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+});
+
+describe("CharacterSession saved copy and newest view (V2)", () => {
+  const purgeError = () => new ApiError({ status: 404, code: "not_found", message: "Not found",
+    cacheDisposition: "purge", requestId: "r", latestRevision: null, diagnostics: [] });
+
+  /** A tab without the lock: the store holds revision 2, its refresh fetched revision 3. */
+  async function openNewer(h: Harness, newer = viewFor("char-1", 3, { name: "Newer" })) {
+    h.coordination.requestEditing = async () => false;
+    await seedConfirmed(h.store, "char-1", viewFor("char-1", 2, { name: "Saved" }));
+    h.api.setOpenFallback(async () => ({ character: newer, requestId: "r" }));
+    await h.session.open();
+    await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(3));
+    const snap = h.session.getSnapshot();
+    expect(snap.view?.source).toBe("stored");
+    expect(snap.editing.owned).toBe(false);
+    expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(2);
+  }
+
+  /** What the owner tab does for an edit: enqueue (the generation stays) and broadcast. */
+  async function ownerEnqueues(h: Harness, id = "owner-edit") {
+    const stored = await h.store.read(ARM, "char-1");
+    await h.store.enqueue(makeEntry({ id, actorId: ARM, characterId: "char-1", sequence: 10, baseRevision: 2 }), stored);
+    h.coordination.signalInvalidation("char-1");
+    await vi.waitFor(() => expect(h.session.getSnapshot().entries.map((e) => e.id)).toContain(id));
+  }
+
+  function expectNewer(h: Harness) {
+    const snap = h.session.getSnapshot();
+    expect(snap.view?.character.revision).toBe(3);
+    expect(snap.view?.character.name).toBe("Newer");
+    expect(snap.view?.source).toBe("stored");
+    expect(canEdit(snap)).toBe(false);
+  }
+
+  it("keeps the newer view when the owner tab enqueues an edit and broadcasts invalidate", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      await ownerEnqueues(h);
+      expectNewer(h);
+      // The saved copy and its queue are adopted; nothing is written or sent.
+      expect(h.session.getSnapshot().entries.map((e) => e.baseRevision)).toEqual([2]);
+      expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(2);
+      await expect(h.session.setField("name", "Briar")).rejects.toThrow();
+      expect(h.api.sent).toEqual([]);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("keeps the newer view when clearing a roll rereads the store", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      await h.session.forgetRoll(PUSH_ROOT_ID);
+      expectNewer(h);
+      expect(h.session.getSnapshot().error).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("does not bring back a saved roll from another scope with the saved copy", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      h.coordination.requestEditing = async () => false;
+      const saved = viewFor("char-1", 2, { name: "Saved", campaignId: "campaign-a" });
+      await seedConfirmed(h.store, "char-1", saved);
+      const roll = makePushRoll();
+      await h.store.acknowledge(ARM, "char-1", "none", saved, (await h.store.read(ARM, "char-1")).generation, roll);
+      h.api.setOpenFallback(async () => ({ character: saved, requestId: "r" }));
+      await h.session.open();
+      expect(h.session.getSnapshot().lastRoll).toEqual(roll);
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 3, { name: "Newer", campaignId: null, placementGeneration: 2 }), requestId: "r" }));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.revision).toBe(3));
+      expect(h.session.getSnapshot().lastRoll).toBeNull();
+      await ownerEnqueues(h);
+      expectNewer(h);
+      expect(h.session.getSnapshot().lastRoll).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("keeps showing the newer view offline, also after the owner queues an offline edit (E2)", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      h.identity.online = false;
+      h.identity.signal();
+      expectNewer(h);
+      await ownerEnqueues(h);
+      expectNewer(h);
+      expect(h.session.getSnapshot().connected).toBe(false);
+      h.identity.online = true;
+      h.identity.signal();
+      await h.session.whenIdle();
+      expectNewer(h);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("shows a same-revision fetched view until the store saves a new copy", async () => {
+    const h = await makeHarness("char-1", false);
+    const withLabel = (name: string, label: string) => {
+      const view = viewFor("char-1", 2, { name });
+      view.projection = { ...view.projection, entityLabel: label };
+      return view;
+    };
+    try {
+      h.coordination.requestEditing = async () => false;
+      await seedConfirmed(h.store, "char-1", withLabel("Saved A", "A"));
+      h.api.setOpenFallback(async () => ({ character: withLabel("Fetched B", "B"), requestId: "r" }));
+      await h.session.open();
+      // Newest observed wins at an equal revision (no tab may ever save it).
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.name).toBe("Fetched B"));
+      expect(h.session.getSnapshot().view?.source).toBe("stored");
+      expect(canEdit(h.session.getSnapshot())).toBe(false);
+      // An enqueue keeps the same saved copy: the fetched view stays.
+      const stored = await h.store.read(ARM, "char-1");
+      await h.store.enqueue(makeEntry({ id: "owner-edit", actorId: ARM, characterId: "char-1", sequence: 10, baseRevision: 2 }), stored);
+      h.coordination.signalInvalidation("char-1");
+      await vi.waitFor(() => expect(h.session.getSnapshot().entries.map((e) => e.id)).toContain("owner-edit"));
+      expect(h.session.getSnapshot().view?.character.name).toBe("Fetched B");
+      // The owner saves a new copy at the same revision: it is shown.
+      await h.store.confirmSnapshot(ARM, "char-1", withLabel("Saved C", "C"), (await h.store.read(ARM, "char-1")).generation);
+      h.coordination.signalInvalidation("char-1");
+      await vi.waitFor(() => expect(h.session.getSnapshot().view?.character.name).toBe("Saved C"));
+      // A lagging fetch of an older revision never replaces it.
+      h.api.setOpenFallback(async () => ({ character: viewFor("char-1", 1, { name: "Older" }), requestId: "r" }));
+      document.dispatchEvent(new Event("visibilitychange"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(h.session.getSnapshot().view?.character.name).toBe("Saved C");
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("clears the newer view when another tab purges the saved copy", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      await h.store.purgeCharacter(ARM, "char-1");
+      h.coordination.signalInvalidation("char-1");
+      await vi.waitFor(() => expect(h.session.getSnapshot().phase).toBe("purged"));
+      expect(h.session.getSnapshot().view).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("clears the newer view when a refresh purges access", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      h.api.setOpenFallback(async () => { throw purgeError(); });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().phase).toBe("purged"));
+      expect(h.session.getSnapshot().view).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("clears the newer view on sign-out", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      h.identity.actorId = null;
+      h.identity.signal();
+      expect(h.session.getSnapshot().view).toBeNull();
+      // Signed in again: nothing from before is shown while the fetch is pending.
+      h.api.setOpenFallback(() => new Promise(() => {}));
+      h.identity.actorId = ARM;
+      h.identity.signal();
+      expect(h.session.getSnapshot().view).toBeNull();
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("drops the newer view on gaining the lock and the owner's refresh saves it", async () => {
+    const h = await makeHarness("char-1", false);
+    try {
+      await openNewer(h);
+      h.coordination.requestEditing = async () => { h.coordination.owner = true; return true; };
+      expect(await h.session.requestEditing()).toBe(true);
+      await h.session.whenIdle();
+      await vi.waitFor(async () => expect((await h.store.read(ARM, "char-1")).confirmed?.reconciliation.revision).toBe(3));
+      const snap = h.session.getSnapshot();
+      expect(snap.view?.character.revision).toBe(3);
+      expect(canEdit(snap)).toBe(true);
+      h.api.setSendFallback(async () => successEnvelope(viewFor("char-1", 4)));
+      await h.session.setField("name", "Briar");
+      await h.session.whenIdle();
+      expect(h.api.sent[0]?.body.expectedRevision).toBe(3);
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+});
+
+// V3: `error` holds review and pause events only, as codes. A storage failure
+// is reported by `storage` and the phase, so it no longer hides a review.
+describe("CharacterSession error codes (V3)", () => {
+  const writeFailed = () => new DOMException("Write failed", "QuotaExceededError");
+
+  it("reports a storage failure through storage and the phase, not the error", async () => {
+    const h = await makeHarness();
+    try {
+      vi.spyOn(h.store, "confirmSnapshot").mockRejectedValue(writeFailed());
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      const snap = h.session.getSnapshot();
+      expect(snap.storage).toBe("unavailable");
+      expect(snap.phase).toBe("storage-error");
+      expect(snap.error).toBeNull();
+      await expect(h.session.setField("name", "Briar")).rejects.toMatchObject({ kind: "storage-error" });
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("keeps an open conflict's kind when storage also fails", async () => {
+    const h = await makeHarness();
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      h.api.scriptSend(async () => ({ error: conflictError() }));
+      h.api.scriptOpenView(viewFor("char-1", 7));
+      await h.session.setField("name", "Ivy").catch(() => {});
+      await h.session.whenIdle();
+      expect(h.session.getSnapshot().error?.kind).toBe("conflict");
+
+      vi.spyOn(h.store, "read").mockRejectedValueOnce(new DOMException("Read failed", "UnknownError"));
+      h.coordination.signalInvalidation("char-1");
+      await vi.waitFor(() => expect(h.session.getSnapshot().storage).toBe("unavailable"));
+      const snap = h.session.getSnapshot();
+      expect(snap.error?.kind).toBe("conflict");
+      expect(snap.phase).toBe("conflict");
+      expect(snap.editing.blockedBy).toBe("storage");
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("reports a code, a reason and a non-rendered diagnostic instead of a sentence", async () => {
+    const h = await makeHarness();
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      await h.session.whenIdle();
+      h.api.setOpenFallback(async () => { throw new TypeError("Failed to fetch"); });
+      document.dispatchEvent(new Event("visibilitychange"));
+      await vi.waitFor(() => expect(h.session.getSnapshot().error?.kind).toBe("network-unavailable"));
+      const error = h.session.getSnapshot().error!;
+      expect(error).not.toHaveProperty("message");
+      expect(error.reason).toBeUndefined();
+      expect(typeof error.diagnostic).toBe("string");
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
+
+  it("keeps a server's conflict message as server data", async () => {
+    const h = await makeHarness();
+    try {
+      await seedConfirmed(h.store, "char-1", viewFor("char-1", 1));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.open();
+      h.api.scriptSend(async () => ({ error: new ApiError({ status: 409, code: "conflict", message: "The character is archived.",
+        requestId: "r", latestRevision: 1, diagnostics: [] }) }));
+      h.api.scriptOpenView(viewFor("char-1", 1));
+      await h.session.setField("name", "Ivy").catch(() => {});
+      await h.session.whenIdle();
+      const error = h.session.getSnapshot().error!;
+      expect(error.kind).toBe("conflict");
+      expect(error.serverMessage).toBe("The character is archived.");
+      expect(error).not.toHaveProperty("message");
+    } finally { h.session.dispose(); await h.store.close(); }
+  });
 });

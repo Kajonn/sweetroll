@@ -31,14 +31,18 @@ CREATE TABLE sessions (
 );
 
 CREATE INDEX sessions_user_id_idx ON sessions (user_id);
+-- Expired-row pruning (src/platform/prune.ts): when a session stopped working.
+CREATE INDEX sessions_unusable_at_idx
+  ON sessions ((LEAST(expires_at, COALESCE(revoked_at, 'infinity'::timestamptz))));
 
 CREATE TABLE personal_access_tokens (
   id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id    uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash text NOT NULL UNIQUE,
   label      text NOT NULL CHECK (char_length(label) BETWEEN 1 AND 80),
-  scopes     text[] NOT NULL CHECK (cardinality(scopes) BETWEEN 1 AND 4
-    AND scopes <@ ARRAY['systems:read', 'systems:write', 'characters:read', 'characters:write']),
+  scopes     text[] NOT NULL CHECK (cardinality(scopes) BETWEEN 1 AND 6
+    AND scopes <@ ARRAY['systems:read', 'systems:write', 'characters:read', 'characters:write',
+                        'campaigns:read', 'campaigns:write']),
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   revoked_at timestamptz
@@ -46,10 +50,12 @@ CREATE TABLE personal_access_tokens (
 
 CREATE INDEX personal_access_tokens_user_active_idx
   ON personal_access_tokens (user_id) WHERE revoked_at IS NULL;
+CREATE INDEX personal_access_tokens_unusable_at_idx
+  ON personal_access_tokens ((LEAST(expires_at, COALESCE(revoked_at, 'infinity'::timestamptz))));
 
 CREATE TABLE public_api_rate_limits (
   user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  bucket      text NOT NULL CHECK (bucket IN ('general', 'validate', 'publish')),
+  bucket      text NOT NULL CHECK (bucket IN ('general', 'validate', 'publish', 'upload')),
   window_at   timestamptz NOT NULL,
   hits        integer NOT NULL CHECK (hits > 0),
   PRIMARY KEY (user_id, bucket)
@@ -63,9 +69,16 @@ CREATE TABLE systems (
   name       text NOT NULL,
   access     text NOT NULL DEFAULT 'private',
   lifecycle  text NOT NULL DEFAULT 'active',
+  -- System extensions (design 6.8): an extension is a systems row of kind
+  -- 'extension' that adds templates to exactly one base system.
+  kind       text NOT NULL DEFAULT 'system' CHECK (kind IN ('system', 'extension')),
+  base_system_id uuid REFERENCES systems(id) ON DELETE RESTRICT,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CHECK ((kind = 'extension') = (base_system_id IS NOT NULL))
 );
+CREATE INDEX systems_extensions_by_base ON systems (base_system_id, created_at DESC, id DESC)
+  WHERE kind = 'extension';
 
 CREATE TABLE system_drafts (
   system_id       uuid PRIMARY KEY REFERENCES systems(id) ON DELETE CASCADE,
@@ -85,9 +98,15 @@ CREATE TABLE system_versions (
   release_notes    text NOT NULL DEFAULT '',
   lifecycle        text NOT NULL DEFAULT 'published',
   compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
+  -- Extension versions: the base system version they were compiled against.
+  built_against_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   created_at       timestamptz NOT NULL DEFAULT now(),
   UNIQUE (system_id, semantic_version)
 );
+
+-- Extension drafts: the base system version used for preview and validation.
+ALTER TABLE system_drafts
+  ADD COLUMN base_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT;
 
 CREATE TABLE idempotency_receipts (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -100,6 +119,7 @@ CREATE TABLE idempotency_receipts (
   expires_at   timestamptz NOT NULL,
   UNIQUE (actor_id, command_kind, key)
 );
+CREATE INDEX idempotency_receipts_expiry_idx ON idempotency_receipts (expires_at);
 
 CREATE TABLE system_audit_records (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -127,6 +147,7 @@ CREATE TABLE preview_snapshots (
 
 CREATE INDEX preview_snapshots_system_id_idx
   ON preview_snapshots (system_id, created_at DESC);
+CREATE INDEX preview_snapshots_expiry_idx ON preview_snapshots (expires_at);
 
 CREATE FUNCTION system_versions_prevent_mutation() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -148,6 +169,8 @@ CREATE TRIGGER system_versions_immutable
 CREATE TABLE user_preferences (
   user_id       uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   theme_default text CHECK (theme_default IN ('light', 'dark', 'system')),
+  show_3d_dice  boolean NOT NULL DEFAULT true,
+  dice_color    text NOT NULL DEFAULT '#4c79c9' CHECK (dice_color ~ '^#[0-9A-Fa-f]{6}$'),
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
@@ -156,6 +179,9 @@ CREATE TABLE campaigns (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id          uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   system_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  -- Design 6.7/6.8: base version of the composition used before the most recent
+  -- change; with campaign_previous_extensions, the only revert target.
+  previous_system_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   title             text NOT NULL,
   description       text NOT NULL DEFAULT '',
   status            text NOT NULL DEFAULT 'active',
@@ -173,6 +199,28 @@ CREATE TABLE campaigns (
 
 CREATE INDEX campaigns_owner_page_idx
   ON campaigns (owner_id, created_at DESC, id DESC);
+
+-- Design 6.8 (decision X7): the campaign composition. Attached characters'
+-- character_extensions always equal this set. `added_by` records whether the
+-- GM chose the extension or an adopted character brought it.
+CREATE TABLE campaign_extensions (
+  campaign_id           uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  extension_id          uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id  uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  added_by              text NOT NULL CHECK (added_by IN ('campaign', 'character')),
+  added_by_character_id uuid, -- informational; the character may later leave or be purged
+  added_at              timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (campaign_id, extension_id)
+);
+
+-- Design 6.8 (E5): extensions of the previous campaign composition (revert target).
+CREATE TABLE campaign_previous_extensions (
+  campaign_id          uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  extension_id         uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  added_by             text NOT NULL CHECK (added_by IN ('campaign', 'character')),
+  PRIMARY KEY (campaign_id, extension_id)
+);
 
 CREATE TABLE campaign_members (
   campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
@@ -227,6 +275,9 @@ CREATE TABLE characters (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_id             uuid REFERENCES users(id) ON DELETE RESTRICT,
   system_version_id    uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  -- Design 6.7/6.8: base version of the composition used before the most recent
+  -- change; with character_previous_extensions, the only revert target.
+  previous_system_version_id uuid REFERENCES system_versions(id) ON DELETE RESTRICT,
   entity_definition_id text NOT NULL,
   name                 text NOT NULL,
   revision             integer NOT NULL DEFAULT 1 CHECK (revision >= 1),
@@ -248,6 +299,24 @@ CREATE INDEX characters_owner_page_idx
   ON characters (owner_id, lifecycle, updated_at DESC, id DESC);
 
 -- Character-owned immutable safe art; authorization always follows a parent link.
+-- Design 6.8: extension versions a character is built on (one version per
+-- extension). Published versions are immutable; RESTRICT keeps used versions.
+CREATE TABLE character_extensions (
+  character_id         uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  extension_id         uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (character_id, extension_id)
+);
+CREATE INDEX character_extensions_by_version ON character_extensions (extension_version_id);
+
+-- Design 6.8 (E5): extensions of the previous composition (revert target).
+CREATE TABLE character_previous_extensions (
+  character_id         uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  extension_id         uuid NOT NULL REFERENCES systems(id) ON DELETE RESTRICT,
+  extension_version_id uuid NOT NULL REFERENCES system_versions(id) ON DELETE RESTRICT,
+  PRIMARY KEY (character_id, extension_id)
+);
+
 CREATE TABLE character_image_assets (
   id uuid PRIMARY KEY,
   created_by uuid NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
@@ -278,6 +347,7 @@ CREATE TABLE character_image_receipts (
   expires_at timestamptz NOT NULL,
   PRIMARY KEY(actor_id,idempotency_key)
 );
+CREATE INDEX character_image_receipts_expiry_idx ON character_image_receipts (expires_at);
 
 -- Immutable item art is retained across published systems, campaign catalogs
 -- and disclosed character copies. Owning Modules authorize their parent links.
@@ -310,6 +380,7 @@ CREATE TABLE item_image_receipts (
   expires_at timestamptz NOT NULL,
   PRIMARY KEY(actor_id,idempotency_key)
 );
+CREATE INDEX item_image_receipts_expiry_idx ON item_image_receipts (expires_at);
 CREATE TABLE character_entry_images (
   character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
   entry_id uuid NOT NULL,
@@ -350,8 +421,8 @@ CREATE TABLE character_rolls (
   execution_id       uuid NOT NULL UNIQUE,
   expression         text NOT NULL,
   dice_json          jsonb NOT NULL,
-  breakdown_json jsonb,
-  CONSTRAINT character_roll_breakdown_object CHECK (breakdown_json IS NULL OR jsonb_typeof(breakdown_json) = 'object'),
+  breakdown_json jsonb NOT NULL,
+  CONSTRAINT character_roll_breakdown_object CHECK (jsonb_typeof(breakdown_json) = 'object'),
   bindings_json      jsonb NOT NULL,
   total              double precision NOT NULL,
   rendered_output    text NOT NULL,
@@ -359,6 +430,8 @@ CREATE TABLE character_rolls (
   request_id         text NOT NULL,
   occurred_at        timestamptz NOT NULL DEFAULT now(),
   scope_campaign_id uuid REFERENCES campaigns(id) ON DELETE RESTRICT,
+  target_character_id uuid REFERENCES characters(id) ON DELETE RESTRICT,
+  responds_to_roll_id uuid,
   parent_roll_id uuid,
   root_roll_id uuid,
   push_attempt integer,
@@ -366,6 +439,13 @@ CREATE TABLE character_rolls (
   push_result_json jsonb,
   audience_actor_id uuid REFERENCES users(id) ON DELETE RESTRICT,
   CONSTRAINT character_rolls_character_identity UNIQUE (character_id,id),
+  CONSTRAINT character_rolls_campaign_identity UNIQUE (scope_campaign_id,id),
+  CONSTRAINT character_rolls_response_parent FOREIGN KEY (scope_campaign_id,responds_to_roll_id)
+    REFERENCES character_rolls(scope_campaign_id,id) ON DELETE RESTRICT,
+  CONSTRAINT character_rolls_campaign_context CHECK (
+    (target_character_id IS NULL AND responds_to_roll_id IS NULL)
+    OR (scope_campaign_id IS NOT NULL AND responds_to_roll_id IS DISTINCT FROM id)
+  ),
   CONSTRAINT character_rolls_push_parent FOREIGN KEY (character_id,parent_roll_id) REFERENCES character_rolls(character_id,id) ON DELETE RESTRICT,
   CONSTRAINT character_rolls_push_root FOREIGN KEY (character_id,root_roll_id) REFERENCES character_rolls(character_id,id) ON DELETE RESTRICT,
   CONSTRAINT character_rolls_push_shape CHECK (
@@ -376,6 +456,11 @@ CREATE TABLE character_rolls (
   )
 );
 
+CREATE INDEX character_rolls_recent_campaign
+  ON character_rolls(scope_campaign_id, occurred_at DESC, id DESC) WHERE scope_campaign_id IS NOT NULL;
+CREATE UNIQUE INDEX character_rolls_one_response_per_actor
+  ON character_rolls(responds_to_roll_id,actor_id)
+  WHERE responds_to_roll_id IS NOT NULL AND COALESCE(push_attempt, 0) = 0;
 CREATE UNIQUE INDEX character_rolls_one_push_child ON character_rolls(parent_roll_id) WHERE parent_roll_id IS NOT NULL;
 CREATE UNIQUE INDEX character_rolls_push_attempt ON character_rolls(root_roll_id,push_attempt) WHERE root_roll_id IS NOT NULL;
 CREATE FUNCTION character_push_rolls_prevent_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -413,6 +498,22 @@ CREATE TABLE character_audit_records (
   request_id   text NOT NULL,
   occurred_at  timestamptz NOT NULL DEFAULT now()
 );
+
+-- Card decks (design Section 6.4): the remaining order of one deck, shared by a
+-- campaign or owned by a standalone character.
+CREATE TABLE deck_states (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id    uuid REFERENCES campaigns(id) ON DELETE CASCADE,
+  character_id   uuid REFERENCES characters(id) ON DELETE CASCADE,
+  deck_id        text NOT NULL,
+  shuffle_id     uuid NOT NULL,
+  remaining_json jsonb NOT NULL,
+  updated_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT deck_states_one_owner CHECK ((campaign_id IS NULL) <> (character_id IS NULL)),
+  CONSTRAINT deck_states_remaining_array CHECK (jsonb_typeof(remaining_json) = 'array')
+);
+CREATE UNIQUE INDEX deck_states_campaign_deck ON deck_states(campaign_id, deck_id) WHERE campaign_id IS NOT NULL;
+CREATE UNIQUE INDEX deck_states_character_deck ON deck_states(character_id, deck_id) WHERE character_id IS NOT NULL;
 
 -- Campaign character placement
 CREATE TABLE character_placements (
@@ -478,6 +579,8 @@ CREATE TABLE campaign_invitations (
 
 CREATE INDEX campaign_invitations_campaign_page_idx
   ON campaign_invitations (campaign_id, created_at DESC, id DESC);
+CREATE INDEX campaign_invitations_pending_expiry_idx
+  ON campaign_invitations (expires_at) WHERE status = 'pending';
 
 -- Content and activity
 -- Activity stores source references; authorization is evaluated at read time.
@@ -536,7 +639,12 @@ CREATE TABLE campaign_activity_events (
     'template_create',
     'template_update',
     'template_archive',
-    'template_recover'
+    'template_recover',
+    'system_version_upgraded',
+    'system_version_reverted',
+    'extension_added',
+    'extension_removed',
+    'extension_upgraded'
   ))
 );
 
@@ -578,10 +686,13 @@ CREATE TABLE scenes (
   campaign_id uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
   background_file_id uuid NOT NULL,
   revision integer NOT NULL DEFAULT 1,
+  -- Player-safe map version: changes only with fog or a different background.
+  image_revision integer NOT NULL DEFAULT 1,
   fog_jsonb jsonb NOT NULL DEFAULT '[]'::jsonb,
   tokens_jsonb jsonb NOT NULL DEFAULT '[]'::jsonb,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CHECK (revision > 0)
+  CHECK (revision > 0),
+  CHECK (image_revision > 0)
 );
 
 CREATE INDEX scenes_page_idx
@@ -594,6 +705,7 @@ CREATE TABLE display_codes (
   expires_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE INDEX display_codes_expiry_idx ON display_codes (expires_at);
 
 CREATE TABLE display_credentials (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -701,3 +813,36 @@ BEGIN
 END;
 $$;
 CREATE TRIGGER campaign_proposal_immutable BEFORE UPDATE ON campaign_item_proposals FOR EACH ROW EXECUTE FUNCTION guard_campaign_proposal();
+
+CREATE TABLE physical_roll_attempts (
+  id uuid PRIMARY KEY,
+  actor_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  character_id uuid NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+  campaign_id uuid REFERENCES campaigns(id) ON DELETE CASCADE,
+  idempotency_key text NOT NULL,
+  input_hash text NOT NULL,
+  preparation jsonb NOT NULL,
+  launch jsonb NOT NULL,
+  color text NOT NULL CHECK (color ~ '^#[0-9A-Fa-f]{6}$'),
+  expires_at timestamptz NOT NULL,
+  settled jsonb,
+  execution_id uuid,
+  UNIQUE (actor_id, idempotency_key)
+);
+CREATE INDEX physical_roll_attempts_expiry ON physical_roll_attempts (expires_at);
+CREATE INDEX physical_roll_attempts_campaign_expiry ON physical_roll_attempts (campaign_id, expires_at DESC);
+
+-- The notification carries no audience data. Each server reads the current
+-- authorized projection. PostgreSQL delivers it only if the write commits.
+CREATE FUNCTION announce_physical_roll() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.campaign_id IS NOT NULL THEN
+    PERFORM pg_notify('sweetroll_scene_events',
+      json_build_object('k', 'physicalRoll', 'c', NEW.campaign_id)::text);
+  END IF;
+  RETURN NEW;
+END;
+$$;
+CREATE TRIGGER physical_roll_changed
+  AFTER INSERT OR UPDATE OF execution_id ON physical_roll_attempts
+  FOR EACH ROW EXECUTE FUNCTION announce_physical_roll();

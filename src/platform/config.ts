@@ -143,17 +143,27 @@ export function loadCampaignLimits(env: NodeJS.ProcessEnv = process.env): Campai
 }
 
 export type AppConfig = {
+  physicalDiceEnabled: boolean;
   allowedOrigins: string[];
   authoritativeRollSecret: string;
   cookieSecure: boolean;
   databaseUrl: string;
   host: string;
   logLevel: LogLevel;
+  metricsToken?: string;
+  trustedProxyCidrs?: string[];
   nodeEnv: NodeEnv;
   port: number;
+  /** Expired-row prune interval (SWEETROLL_PRUNE_INTERVAL_MS); 0 disables pruning. */
+  pruneIntervalMs: number;
   sessionCookieName: string;
   sessionTtlDays: number;
 };
+
+/** Default expired-row prune interval: one hour. */
+export const DEFAULT_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+// setTimeout() delays above 2^31-1 ms overflow and fire immediately.
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const databaseUrl = env.DATABASE_URL;
@@ -176,7 +186,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("SESSION_TTL_DAYS must be an integer from 1 through 365");
   }
 
-  const cookieSecure = env.COOKIE_SECURE === "true";
+  const pruneIntervalRaw = env.SWEETROLL_PRUNE_INTERVAL_MS;
+  const pruneIntervalMs =
+    pruneIntervalRaw === undefined || pruneIntervalRaw.length === 0
+      ? DEFAULT_PRUNE_INTERVAL_MS
+      : Number(pruneIntervalRaw);
+  if (
+    !Number.isInteger(pruneIntervalMs) ||
+    (pruneIntervalMs !== 0 && (pruneIntervalMs < 1000 || pruneIntervalMs > MAX_TIMER_DELAY_MS))
+  ) {
+    throw new Error(
+      `SWEETROLL_PRUNE_INTERVAL_MS must be 0 (disabled) or an integer from 1000 through ${MAX_TIMER_DELAY_MS}`,
+    );
+  }
 
   const allowedOrigins = (env.ALLOWED_ORIGINS ?? "")
     .split(",")
@@ -188,6 +210,22 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     throw new Error("NODE_ENV must be development, production, or test");
   }
 
+  const physicalDice = env.SWEETROLL_PHYSICAL_DICE ?? "false";
+  if (physicalDice !== "true" && physicalDice !== "false") {
+    throw new Error("SWEETROLL_PHYSICAL_DICE must be true or false");
+  }
+
+  const cookieSecureSetting = env.COOKIE_SECURE;
+  if (cookieSecureSetting !== undefined && cookieSecureSetting !== "true" && cookieSecureSetting !== "false") {
+    throw new Error("COOKIE_SECURE must be true or false");
+  }
+  const cookieSecure = cookieSecureSetting === undefined ? nodeEnvRaw === "production" : cookieSecureSetting === "true";
+  const metricsToken = env.METRICS_TOKEN;
+  if (metricsToken && !/^[^\s,]+$/.test(metricsToken)) {
+    throw new Error("METRICS_TOKEN must be a single bearer token");
+  }
+  const trustedProxyCidrs = (env.TRUSTED_PROXY_CIDRS ?? "").split(",").map((value) => value.trim()).filter(Boolean);
+
   const authoritativeRollSecret = env.AUTHORITATIVE_ROLL_SECRET ?? "";
   if (nodeEnvRaw !== "test" && authoritativeRollSecret.length === 0) {
     throw new Error("AUTHORITATIVE_ROLL_SECRET is required outside tests");
@@ -197,14 +235,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   return {
+    physicalDiceEnabled: physicalDice === "true",
     allowedOrigins,
     authoritativeRollSecret,
     cookieSecure,
     databaseUrl,
     host: env.HOST ?? "0.0.0.0",
     logLevel: logLevel as LogLevel,
+    ...(metricsToken ? { metricsToken } : {}),
+    ...(trustedProxyCidrs.length > 0 ? { trustedProxyCidrs } : {}),
     nodeEnv: nodeEnvRaw,
     port,
+    pruneIntervalMs,
     sessionCookieName: env.SESSION_COOKIE_NAME ?? "session",
     sessionTtlDays,
   };

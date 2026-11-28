@@ -1,3 +1,5 @@
+import type { ReferenceDataV1 } from "./referenceData/ReferenceDataEditor.js";
+import { entityFieldTypes, type FieldBindingType, type SlotEnvironment } from "@sweetroll/rules";
 import { DebugOnly } from "../ui/debugMode.js";
 import { SystemDialogContent, SystemDialogOverlay } from "../theme/SystemPresentation.js";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -30,6 +32,10 @@ export type EntityListProps = {
   /** Expression source by expression id (lives in document.expressions). When
    * provided, computed fields render the formula editor; otherwise they
    * render the preserved notice. */
+  datasets?: readonly ReferenceDataV1[] | undefined;
+  slotsFor?: ((entityId: string) => SlotEnvironment) | undefined;
+  createNumericExpression?: ((initial: number) => string) | undefined;
+  maximumExpressions?: readonly { id: string; source: string }[] | undefined;
   expressionSourceFor?: ((expressionId: string) => string) | undefined;
   expressionFallbackFor?: ((expressionId: string) => unknown) | undefined;
   onExpressionSourceChange?: ((expressionId: string, next: string) => void) | undefined;
@@ -147,6 +153,10 @@ function FieldEditorRouter({
   field,
   onChange,
   siblings,
+  datasets,
+  slots,
+  createNumericExpression,
+  maximumExpressions,
   expressionSourceFor,
   expressionFallbackFor,
   onExpressionSourceChange,
@@ -154,7 +164,11 @@ function FieldEditorRouter({
 }: {
   field: FieldV1;
   onChange: (next: FieldV1) => void;
-  siblings: ReadonlyArray<{ id: string; valueType: "number" | "text" | "boolean" }>;
+  siblings: ReadonlyArray<{ id: string; valueType: FieldBindingType }>;
+  datasets?: readonly ReferenceDataV1[] | undefined;
+  slots?: SlotEnvironment | undefined;
+  createNumericExpression?: ((initial: number) => string) | undefined;
+  maximumExpressions?: readonly { id: string; source: string }[] | undefined;
   expressionSourceFor?: ((expressionId: string) => string) | undefined;
   expressionFallbackFor?: ((expressionId: string) => unknown) | undefined;
   onExpressionSourceChange?: ((expressionId: string, next: string) => void) | undefined;
@@ -169,11 +183,11 @@ function FieldEditorRouter({
       return <BooleanFieldEditor field={field} onChange={onChange} />;
     case "singleChoice":
     case "multiChoice":
-      return <ChoiceFieldEditor field={field} onChange={onChange} />;
+      return <ChoiceFieldEditor field={field} onChange={onChange} datasets={datasets} />;
     case "image":
       return <ImageFieldEditor field={field} onChange={onChange} />;
     case "resource":
-      return <ResourceFieldEditor field={field} onChange={onChange} />;
+      return <ResourceFieldEditor field={field} onChange={onChange} maximumExpressions={maximumExpressions} createNumericExpression={createNumericExpression} expressionSourceFor={expressionSourceFor} onExpressionSourceChange={onExpressionSourceChange} />;
     case "computed":
       if (expressionSourceFor === undefined) {
         return (
@@ -198,6 +212,8 @@ function FieldEditorRouter({
           onExpressionSourceChange={(next) => onExpressionSourceChange?.(field.expressionId, next)}
           fallback={expressionFallbackFor?.(field.expressionId)}
           onFallbackChange={(next) => onExpressionFallbackChange?.(field.expressionId, next)}
+          datasets={datasets}
+          slots={slots}
           siblingFields={siblings.filter((s) => s.id !== field.id)}
         />
       );
@@ -209,6 +225,10 @@ export function EntityList({
   onChange,
   selectedEntityId,
   onSelectEntity,
+  datasets,
+  slotsFor,
+  createNumericExpression,
+  maximumExpressions,
   expressionSourceFor,
   expressionFallbackFor,
   onExpressionSourceChange,
@@ -245,6 +265,7 @@ export function EntityList({
     for (let i = 1; entity.fields.some((f) => f.id === id); i++) id = `${baseId}_${i}`;
     const field = defaultField(kind);
     field.id = id;
+    if (field.kind === "computed" && createNumericExpression) field.expressionId = createNumericExpression(0);
     field.label = t("editor.entity.newFieldLabel");
     replaceEntity(entityId, { fields: [...entity.fields, field] });
   };
@@ -313,6 +334,10 @@ export function EntityList({
             }
             onAddField={(kind) => addField(selected.id, kind)}
             onRemove={(id) => removeEntity(id)}
+            datasets={datasets}
+            slotsFor={slotsFor}
+            createNumericExpression={createNumericExpression}
+            maximumExpressions={maximumExpressions}
             expressionSourceFor={expressionSourceFor}
             expressionFallbackFor={expressionFallbackFor}
             onExpressionSourceChange={onExpressionSourceChange}
@@ -330,6 +355,10 @@ function EntityDetail({
   onFieldChange,
   onAddField,
   onRemove,
+  datasets,
+  slotsFor,
+  createNumericExpression,
+  maximumExpressions,
   expressionSourceFor,
   expressionFallbackFor,
   onExpressionSourceChange,
@@ -340,6 +369,10 @@ function EntityDetail({
   onFieldChange: (originalFieldId: string, field: FieldV1) => void;
   onAddField: (kind: FieldV1["kind"]) => void;
   onRemove: (id: string) => void;
+  datasets?: readonly ReferenceDataV1[] | undefined;
+  slotsFor?: ((entityId: string) => SlotEnvironment) | undefined;
+  createNumericExpression?: ((initial: number) => string) | undefined;
+  maximumExpressions?: readonly { id: string; source: string }[] | undefined;
   expressionSourceFor?: ((expressionId: string) => string) | undefined;
   expressionFallbackFor?: ((expressionId: string) => unknown) | undefined;
   onExpressionSourceChange?: ((expressionId: string, next: string) => void) | undefined;
@@ -351,27 +384,7 @@ function EntityDetail({
   const [fieldKind, setFieldKind] = useState<FieldV1["kind"]>("text");
   // Sibling fields available for formula references (fields.<id>), typed
   // for the expression environment.
-  type Sibling = { id: string; valueType: "number" | "text" | "boolean" };
-  const siblings: Sibling[] = [];
-  for (const f of entity.fields) {
-    switch (f.kind) {
-      case "integer":
-      case "decimal":
-      case "resource":
-        siblings.push({ id: f.id, valueType: "number" });
-        break;
-      case "boolean":
-        siblings.push({ id: f.id, valueType: "boolean" });
-        break;
-      case "text":
-      case "singleChoice":
-      case "multiChoice":
-        siblings.push({ id: f.id, valueType: "text" });
-        break;
-      default:
-        break;
-    }
-  }
+  const siblings = Object.entries(entityFieldTypes(entity.fields)).map(([id, valueType]) => ({ id, valueType }));
   return (
     <div className={styles.detailInner}>
       <header className={styles.detailHeader}>
@@ -443,6 +456,10 @@ function EntityDetail({
                 field={field}
                 onChange={(next) => onFieldChange(field.id, next)}
                 siblings={siblings}
+                datasets={datasets}
+                slots={slotsFor?.(entity.id)}
+                createNumericExpression={createNumericExpression}
+                maximumExpressions={maximumExpressions}
                 expressionSourceFor={expressionSourceFor}
                 expressionFallbackFor={expressionFallbackFor}
                 onExpressionSourceChange={onExpressionSourceChange}

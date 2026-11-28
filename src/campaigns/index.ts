@@ -3,6 +3,32 @@ import { createSceneLibraryCommands, type SceneLibraryCommands } from "./scene-l
 import { createProposalCommands, type ProposalCommands } from "./proposals.js";
 import { createCampaignItemImages, type CampaignItemImages } from "./item-images.js";
 import { createTemplateCommands, type TemplateCommands } from "./templates.js";
+import { createCampaignExtensionCommands, type CampaignExtensionCommands } from "./extensions.js";
+import { createTemplateRepository } from "./templatePersistence.js";
+import {
+  applyCampaignVersionPlan,
+  loadCampaignComposition,
+  loadPreviousCampaignComposition,
+  planCampaignVersionChange,
+  recordPreviousCampaignComposition,
+  writeCampaignExtensions,
+} from "./version-change.js";
+import {
+  authorizeCompositionChange,
+  classifyCompositionChange,
+  compositionActivityKind,
+  compositionActivitySummary,
+  parseComposition,
+  type CompositionChange,
+  type CompositionError,
+  type CompositionOptions,
+} from "../systems/composition-change.js";
+import { sameComposition, type Composition } from "../systems/runtime.js";
+import { createEffectivePackageLoader } from "../systems/implementation/runtime/composition-loader.js";
+import {
+  createPostgresPublishedExtensionLoader,
+  createPostgresPublishedPackageLoader,
+} from "../systems/implementation/runtime/package-loader.js";
 import { randomUUID } from "node:crypto";
 
 import type { Pool, PoolClient } from "pg";
@@ -92,7 +118,7 @@ import {
   type DisplayCredentialMetadata,
   type DisplayImageBytes,
   type DisplayProjection,
-  type GetDisplayProjectionInput,
+  type DisplaySceneInput,
   type GetDisplaySceneImageInput,
   type GetDisplayTokenImageInput,
   type ListDisplayCredentialsInput,
@@ -102,7 +128,10 @@ import {
   type RedeemDisplayCodeSuccess,
   type RevokeDisplayInput,
   type RevokeDisplaySuccess,
+  type DisplayObserver,
 } from "./display.js";
+import { createDisplayStreams, type OpenDisplayStreamResult } from "./display-stream.js";
+import type { SceneEventHub } from "./scene-events.js";
 import {
   authorizeRemoval,
   authorizeRoleChange,
@@ -314,7 +343,24 @@ export type AssignCampaignControllersInput = Omit<AssignControllersInput, "membe
 export type ClaimCampaignCharacterInput = Omit<ClaimCharacterInput, "membershipGeneration">;
 export type AdoptCampaignCharacterInput = Omit<AdoptCharacterInput, "membershipGeneration">;
 
-export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignItemImages, SceneLibraryCommands {
+/** Design 6.7/6.8: campaign composition choices (current, revert target, upgrades, extensions). */
+export type CampaignVersionOptions = CompositionOptions;
+export type { CampaignVersionCheck } from "./version-change.js";
+export type ChangeCampaignVersionInput = {
+  campaignId: CampaignId;
+  target: unknown;
+  expectedCampaignRevision: number;
+  idempotencyKey: string;
+};
+
+export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignItemImages, SceneLibraryCommands, CampaignExtensionCommands {
+  listVersionOptions(ctx: RequestContext, input: { campaignId: CampaignId }): Promise<CampaignResult<CampaignVersionOptions>>;
+  checkVersionChange(
+    ctx: RequestContext,
+    input: { campaignId: CampaignId; target: unknown },
+  ): Promise<CampaignResult<import("./version-change.js").CampaignVersionCheck>>;
+  /** Moves the campaign, every attached character and template base together, or nothing. */
+  changeVersion(ctx: RequestContext, input: ChangeCampaignVersionInput): Promise<CampaignResult<CampaignView>>;
   create(ctx: RequestContext, input: CreateCampaignInput): Promise<CampaignResult<CampaignView>>;
   open(ctx: RequestContext, input: OpenCampaignInput): Promise<CampaignResult<CampaignView>>;
   list(ctx: RequestContext, input: ListCampaignsInput): Promise<CampaignResult<ListCampaignsResult>>;
@@ -441,20 +487,20 @@ export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignI
    * I7b Task 3: restricted display pairing + redacted projection. `pairDisplay`
    * (GM only) mints a single-use 6-char code (5-min TTL, hash stored);
    * `redeemDisplayCode` (unauthenticated, display-side) consumes the code for
-   * a revocable credential; `getDisplayProjection` (credential-scoped, no GM
-   * session) returns the visible-and-revealed projection with fog-concealed
-   * pixels removed server-side; `revokeDisplay` (GM only) kills the
+   * a revocable credential; `openDisplayStream` (credential-scoped, no GM
+   * session) streams the visible-and-revealed projection, whose map image has
+   * fog-concealed pixels removed server-side; `revokeDisplay` (GM only) kills the
    * credential. Unknown/expired/used/revoked credentials collapse to generic
    * `not_found`.
    */
   pairDisplay(ctx: RequestContext, input: PairDisplayInput): Promise<CampaignResult<PairDisplaySuccess>>;
   redeemDisplayCode(input: RedeemDisplayCodeInput): Promise<CampaignResult<RedeemDisplayCodeSuccess>>;
-  getDisplayProjection(input: GetDisplayProjectionInput): Promise<CampaignResult<DisplayProjection>>;
   revokeDisplay(ctx: RequestContext, input: RevokeDisplayInput): Promise<CampaignResult<RevokeDisplaySuccess>>;
   /**
    * I7b Task 4: GM Settings credential list (metadata without secrets) plus
    * the display-credential binary image reads backing the projection's
-   * `imageUrl` shapes (`.../image?rev=N` and `.../tokens/:tokenId/image?rev=N`).
+   * `imageUrl` shapes (`.../image?rev=<imageRevision>` and
+   * `.../tokens/:tokenId/image?file=<imageFileId>`).
    */
   listDisplayCredentials(
     ctx: RequestContext,
@@ -462,6 +508,14 @@ export interface Campaigns extends TemplateCommands, ProposalCommands, CampaignI
   ): Promise<CampaignResult<DisplayCredentialMetadata[]>>;
   getDisplaySceneImage(input: GetDisplaySceneImageInput): Promise<CampaignResult<DisplayImageBytes>>;
   getDisplayTokenImage(input: GetDisplayTokenImageInput): Promise<CampaignResult<DisplayImageBytes>>;
+  /**
+   * Scene streaming: open a credential-scoped live stream of complete scene
+   * snapshots for one paired display. Fails with not_found for any
+   * credential/scene failure and `unavailable` while change delivery is down.
+   */
+  openDisplayStream(input: DisplaySceneInput): Promise<OpenDisplayStreamResult>;
+  /** Close every open display stream (process shutdown). */
+  closeDisplayStreams(): void;
 }
 
 export type {
@@ -480,7 +534,7 @@ export type {
   DisplayProjection,
   ExportCampaignInput,
   FogOp,
-  GetDisplayProjectionInput,
+  DisplaySceneInput,
   GetDisplaySceneImageInput,
   GetDisplayTokenImageInput,
   InvitationAcceptSuccess,
@@ -530,8 +584,20 @@ export type {
 };
 
 export type CreateCampaignsModuleInput = {
+  /** Per-process scene change hub (LISTEN connection). Absent: display streams answer `unavailable`. */
+  sceneEvents?: SceneEventHub | null | undefined;
+  displayObserver?: DisplayObserver | undefined;
+  displayStream?: { heartbeatMs?: number; stallTimeoutMs?: number } | undefined;
   scanImage?: import("../platform/image-processing.js").ImageScanner;
   loadTemplatePackage?: import("../systems/templates.js").PublishedPackageLoader;
+  /** Design 6.8; GMs cannot add extensions without it. */
+  authorizeExtensionUse?: import("../systems/extensions.js").ExtensionAuthoring["authorizeExtensionUse"];
+  /** Design 6.7 version choices; campaign version changes are unavailable without them. */
+  listUpgradeTargets?: import("../systems/authoring.js").SystemAuthoring["listUpgradeTargets"];
+  describeVersionChoices?: import("../systems/authoring.js").SystemAuthoring["describeVersionChoices"];
+  /** Design 6.8 (E5): extension upgrades and names for composition changes. */
+  listExtensionUpgradeTargets?: import("../systems/extensions.js").ExtensionAuthoring["listUpgradeTargets"];
+  describeCompositionChoices?: import("../systems/extensions.js").ExtensionAuthoring["describeCompositionChoices"];
   pool: Pool;
   limits: CampaignLimits;
   /**
@@ -596,6 +662,7 @@ const ARCHIVE_KIND = "campaign_archive";
 const RECOVER_KIND = "campaign_recover";
 const CHANGE_ROLE_KIND = "campaign_change_role";
 const REMOVE_MEMBER_KIND = "campaign_remove_member";
+const CHANGE_VERSION_KIND = "campaign_change_version";
 
 type ListCursor = { createdAt: string; id: string; scope: string };
 
@@ -812,6 +879,61 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     }
   }
 
+  const templateCatalog = createTemplateRepository(input.pool);
+
+  const loadEffective = createEffectivePackageLoader({
+    loadPackage: createPostgresPublishedPackageLoader(input.pool),
+    loadExtensionPackage: createPostgresPublishedExtensionLoader(input.pool),
+  });
+
+  function compositionFailure(error: CompositionError): CampaignError {
+    switch (error.code) {
+      case "invalid_value":
+      case "bad_request": return errors.bad_request(error.message);
+      case "not_found": return errors.not_found(error.message);
+      case "internal": return errors.internal();
+    }
+  }
+
+  /**
+   * Design 6.7/6.8: classify and authorize a composition change outside any
+   * transaction (authorizers read through the pool). The command re-reads the
+   * composition under the campaign lock and refuses if it moved meanwhile.
+   */
+  async function prepareCompositionChange(
+    ctx: RequestContext,
+    campaignId: string,
+    target: Composition,
+  ): Promise<{ campaign: CampaignRecord; current: Composition; change: CompositionChange } | { failure: CampaignError }> {
+    if (input.listUpgradeTargets === undefined || input.loadTemplatePackage === undefined) {
+      return { failure: errors.internal() };
+    }
+    const loaded = await withClient(async (client) => {
+      const campaign = await repo.openCampaign(client, campaignId);
+      const membership = campaign === null ? null : await repo.loadMembership(client, campaignId, ctx.actorId);
+      if (campaign === null || !isGameMaster(membership)) return null;
+      const systemId = await client.query<{ system_id: string }>("SELECT system_id FROM system_versions WHERE id = $1", [campaign.systemVersionId]);
+      return {
+        campaign,
+        systemId: systemId.rows[0]?.system_id ?? "",
+        current: (await loadCampaignComposition(client, campaign)).composition,
+        previous: (await loadPreviousCampaignComposition(client, campaign.campaignId))?.composition ?? null,
+      };
+    });
+    if (loaded === null) return { failure: errors.not_found() };
+    const classified = classifyCompositionChange(loaded.current, target, loaded.previous);
+    if (!classified.ok) return { failure: compositionFailure(classified.error) };
+    const listExtensionUpgrades = input.listExtensionUpgradeTargets;
+    const authorizeUse = input.authorizeExtensionUse;
+    const allowed = await authorizeCompositionChange(ctx, classified.value, loaded.systemId, {
+      listSystemUpgrades: input.listUpgradeTargets,
+      listExtensionUpgrades: listExtensionUpgrades ?? (async () => ({ ok: true, value: [] })),
+      authorizeExtensionUse: authorizeUse ?? (async () => ({ ok: false, error: { code: "not_found", message: "" } })),
+    });
+    if (!allowed.ok) return { failure: compositionFailure(allowed.error) };
+    return { campaign: loaded.campaign, current: loaded.current, change: classified.value };
+  }
+
   async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
     const client = await input.pool.connect();
     try {
@@ -901,7 +1023,13 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
   // dependencies; the commands own code minting (hash-only storage),
   // single-use redeem, credential validation and the sharp redaction
   // composite Tasks 4-5 and 7 serve and poll.
-  const display = createDisplayCommands({ pool: input.pool, repo, now, newId });
+  const display = createDisplayCommands({ pool: input.pool, repo, now, newId, observer: input.displayObserver });
+  const displayStreams = createDisplayStreams({
+    hub: input.sceneEvents ?? null,
+    loadSnapshot: display.getDisplaySnapshot,
+    heartbeatMs: input.displayStream?.heartbeatMs,
+    stallTimeoutMs: input.displayStream?.stallTimeoutMs,
+  });
 
   /**
    * I6 Task 9 fix: module-owned placement transaction. Resolves the caller's
@@ -940,8 +1068,14 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     }
   }
 
+  const extensions = createCampaignExtensionCommands({
+    pool: input.pool, repo, now, newId,
+    ...(input.authorizeExtensionUse === undefined ? {} : { authorizeExtensionUse: input.authorizeExtensionUse }),
+  });
+
   return {
     ...templates,
+    ...extensions,
     ...createCampaignItemImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     ...createProposalCommands({ pool: input.pool, now, newId }),
     issueInvitation: invitations.issueInvitation,
@@ -974,11 +1108,12 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
     removeToken: scenes.removeToken,
     pairDisplay: display.pairDisplay,
     redeemDisplayCode: display.redeemDisplayCode,
-    getDisplayProjection: display.getDisplayProjection,
     revokeDisplay: display.revokeDisplay,
     listDisplayCredentials: display.listDisplayCredentials,
     getDisplaySceneImage: display.getDisplaySceneImage,
     getDisplayTokenImage: display.getDisplayTokenImage,
+    openDisplayStream: displayStreams.open,
+    closeDisplayStreams: displayStreams.closeAll,
     async create(ctx, createInput) {
       try {
         const keyError = checkIdempotencyKey(createInput.idempotencyKey);
@@ -1287,6 +1422,215 @@ export function createCampaignsModule(input: CreateCampaignsModuleInput): Campai
           deserialize: deserializeView,
           reauthorize: (id) => reauthorizeMember(ctx, id),
         });
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async listVersionOptions(ctx, request) {
+      try {
+        if (input.listUpgradeTargets === undefined || input.describeVersionChoices === undefined) {
+          return { ok: false, error: errors.internal() };
+        }
+        const loaded = await withTransaction(async (client) => {
+          const campaign = await repo.openCampaign(client, request.campaignId);
+          const membership = campaign === null ? null : await repo.loadMembership(client, request.campaignId, ctx.actorId);
+          if (campaign === null || !isGameMaster(membership)) return null;
+          return {
+            campaign,
+            current: (await loadCampaignComposition(client, campaign)).composition,
+            previous: (await loadPreviousCampaignComposition(client, campaign.campaignId))?.composition ?? null,
+          };
+        });
+        if (loaded === null) return { ok: false, error: errors.not_found() };
+        const { current, previous } = loaded;
+        const described = await input.describeVersionChoices(
+          previous === null ? [current.systemVersionId] : [current.systemVersionId, previous.systemVersionId],
+        );
+        const upgrades = await input.listUpgradeTargets(ctx, current.systemVersionId);
+        if (!described.ok || !upgrades.ok) return { ok: false, error: errors.internal() };
+        const currentVersion = described.value.find((choice) => choice.versionId === current.systemVersionId);
+        if (currentVersion === undefined) return { ok: false, error: errors.internal() };
+        const pinned = [...current.extensions, ...(previous?.extensions ?? [])]
+          .filter((ref, index, all) => all.findIndex((other) => other.versionId === ref.versionId) === index);
+        const choices = input.describeCompositionChoices === undefined
+          ? { ok: true as const, value: { pinned: [], available: [] } }
+          : await input.describeCompositionChoices(ctx, { systemId: currentVersion.systemId, pinned });
+        if (!choices.ok) return { ok: false, error: errors.internal() };
+        const extensionsOf = (refs: readonly { versionId: string }[]) => refs.flatMap((ref) => {
+          const choice = choices.value.pinned.find((candidate) => candidate.version.versionId === ref.versionId);
+          return choice === undefined ? [] : [choice];
+        });
+        const previousVersion = previous === null
+          ? undefined
+          : described.value.find((choice) => choice.versionId === previous.systemVersionId);
+        return {
+          ok: true,
+          value: {
+            current: { systemVersion: currentVersion, extensions: extensionsOf(current.extensions) },
+            revertTo: previous === null || previousVersion === undefined
+              ? null
+              : { systemVersion: previousVersion, extensions: extensionsOf(previous.extensions).map((choice) => ({ ...choice, upgrades: [] })) },
+            systemUpgrades: upgrades.value,
+            available: choices.value.available,
+          },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async checkVersionChange(ctx, request) {
+      try {
+        const target = parseComposition(request.target);
+        if (typeof target === "string") return { ok: false, error: errors.bad_request(target) };
+        const prepared = await prepareCompositionChange(ctx, request.campaignId, target);
+        if ("failure" in prepared) return { ok: false, error: prepared.failure };
+        const outcome = await withTransaction(async (client) => {
+          const campaign = await repo.openCampaign(client, request.campaignId);
+          if (campaign === null) return { failure: errors.not_found() };
+          const current = (await loadCampaignComposition(client, campaign)).composition;
+          if (!sameComposition(current, prepared.current)) {
+            return { failure: errors.conflict("The campaign rules changed meanwhile. Check again.", campaign.revision) };
+          }
+          const plan = await planCampaignVersionChange(client, {
+            campaign, current, target, change: prepared.change,
+            direction: prepared.change.kind === "revert" ? "revert" : "upgrade",
+            loadPackage: input.loadTemplatePackage!, loadEffective, catalog: templateCatalog, lock: false,
+          });
+          if (plan === null) return { failure: errors.internal() };
+          if ("problem" in plan) return { failure: { code: "unprocessable" as const, message: plan.problem } };
+          return { value: plan.check };
+        });
+        if ("failure" in outcome) return { ok: false, error: outcome.failure };
+        return { ok: true, value: outcome.value };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async changeVersion(ctx, changeInput) {
+      try {
+        const keyError = checkIdempotencyKey(changeInput.idempotencyKey);
+        if (keyError !== null) return { ok: false, error: keyError };
+        const revisionError = checkRevision(changeInput.expectedCampaignRevision);
+        if (revisionError !== null) return { ok: false, error: revisionError };
+        const target = parseComposition(changeInput.target);
+        if (typeof target === "string") return { ok: false, error: errors.bad_request(target) };
+        const inputHash = hashInput({
+          campaignId: changeInput.campaignId,
+          target,
+          expectedCampaignRevision: changeInput.expectedCampaignRevision,
+        });
+        const receiptKey = { actorId: ctx.actorId, commandKind: CHANGE_VERSION_KIND, idempotencyKey: changeInput.idempotencyKey };
+        const replay = (receipt: { inputHash: string; resultJson: unknown; expiresAt: Date } | null) =>
+          resolveReplay<CampaignView>({
+            commandKind: CHANGE_VERSION_KIND,
+            idempotencyKey: changeInput.idempotencyKey,
+            inputHash,
+            receipt,
+            deserialize: deserializeView,
+            reauthorize: (id) => reauthorizeMember(ctx, id),
+          });
+        const preExisting = await repo.loadReceiptWithExpiry(input.pool, receiptKey);
+        if (preExisting !== null) return await replay(preExisting);
+        const prepared = await prepareCompositionChange(ctx, changeInput.campaignId, target);
+        if ("failure" in prepared) return { ok: false, error: prepared.failure };
+
+        const outcome = await withTransaction(async (client) => {
+          // Lock order: campaign, then its characters and templates (as placement does).
+          const campaign = await repo.lockCampaign(client, changeInput.campaignId);
+          const membership = campaign === null ? null : await repo.loadMembership(client, changeInput.campaignId, ctx.actorId);
+          const raced = await repo.loadReceiptWithExpiry(client, receiptKey);
+          if (raced !== null) return { committed: false as const, receipt: raced };
+          if (campaign === null || !isGameMaster(membership)) {
+            return { committed: false as const, failure: errors.not_found() as CampaignError };
+          }
+          if (campaign.status !== "active") {
+            return { committed: false as const, failure: errors.conflict("Recover the campaign before changing its rules version.", campaign.revision) };
+          }
+          if (campaign.revision !== changeInput.expectedCampaignRevision) {
+            return {
+              committed: false as const,
+              failure: errors.conflict("The campaign has a newer revision. Retry with the latest revision and a new idempotency key.", campaign.revision),
+            };
+          }
+          const currentState = await loadCampaignComposition(client, campaign);
+          const current = currentState.composition;
+          if (!sameComposition(current, prepared.current)) {
+            return { committed: false as const, failure: errors.conflict("The campaign rules changed meanwhile. Check again.", campaign.revision) };
+          }
+          const change = prepared.change;
+          const direction = { value: change.kind === "revert" ? "revert" as const : "upgrade" as const };
+          const previousState = change.kind === "revert" ? await loadPreviousCampaignComposition(client, campaign.campaignId) : null;
+          const plan = await planCampaignVersionChange(client, {
+            campaign, current, target, change, direction: direction.value,
+            loadPackage: input.loadTemplatePackage!, loadEffective, catalog: templateCatalog, lock: true,
+          });
+          if (plan === null) return { committed: false as const, failure: errors.internal() as CampaignError };
+          if ("problem" in plan) {
+            return { committed: false as const, failure: { code: "unprocessable", message: plan.problem } as CampaignError };
+          }
+          if (!plan.check.ok) {
+            const blocked = plan.check.characters.filter((c) => !c.ok).length + plan.check.templates.filter((t) => !t.ok).length;
+            return {
+              committed: false as const,
+              failure: errors.conflict(
+                `The campaign cannot move to these rules: ${blocked} character(s) or template(s) are blocked. Check the change first for every blocker.`,
+                campaign.revision,
+              ),
+            };
+          }
+          await applyCampaignVersionPlan(client, {
+            plan, campaignId: campaign.campaignId, actorId: ctx.actorId, requestId: ctx.requestId, catalog: templateCatalog,
+          });
+          await writeCampaignExtensions(client, campaign.campaignId, target, previousState?.addedBy ?? currentState.addedBy);
+          await recordPreviousCampaignComposition(client, campaign.campaignId, direction.value === "upgrade" ? currentState : null);
+          const updated = await repo.updateCampaignVersion(client, {
+            campaignId: campaign.campaignId,
+            fromVersionId: campaign.systemVersionId,
+            toVersionId: target.systemVersionId,
+            expectedRevision: changeInput.expectedCampaignRevision,
+            now: now(),
+          });
+          if (updated === null) throw new Error("changeVersion: campaign changed under lock");
+          await repo.appendAudit(client, {
+            campaignId: campaign.campaignId,
+            actorId: ctx.actorId,
+            kind: `campaign_${compositionActivityKind(change)}`,
+            summary: `Campaign ${compositionActivitySummary(change).toLowerCase()} with ${plan.characters.length} character(s) and ${plan.templates.length} template base(s)`,
+            requestId: ctx.requestId,
+          });
+          await repo.appendActivity(client, {
+            eventId: newId(),
+            campaignId: campaign.campaignId,
+            actorId: ctx.actorId,
+            kind: compositionActivityKind(change),
+            sourceContentId: null,
+            requestId: ctx.requestId,
+            occurredAt: now(),
+          });
+          const value = toView(updated);
+          const inserted = await repo.tryInsertReceipt(client, {
+            actorId: ctx.actorId,
+            commandKind: CHANGE_VERSION_KIND,
+            idempotencyKey: changeInput.idempotencyKey,
+            inputHash,
+            campaignId: campaign.campaignId,
+            resultJson: { campaignId: campaign.campaignId, value: serializeView(value), idempotencyKey: changeInput.idempotencyKey },
+            expiresAt: new Date(now().getTime() + RECEIPT_TTL_MS),
+          });
+          if (!inserted) throw new ReceiptRace();
+          return { committed: true as const, value };
+        }).catch(async (error) => {
+          if (error instanceof ReceiptRace) {
+            return { committed: false as const, receipt: await repo.loadReceiptWithExpiry(input.pool, receiptKey) };
+          }
+          throw error;
+        });
+        if ("failure" in outcome) return { ok: false, error: outcome.failure };
+        if (outcome.committed) return { ok: true, value: outcome.value };
+        return await replay(outcome.receipt ?? null);
       } catch {
         return { ok: false, error: errors.internal() };
       }

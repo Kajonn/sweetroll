@@ -29,7 +29,7 @@ describe("campaign placement scope helpers (no database)", () => {
         updatedAt: new Date("2026-02-01T00:00:00.000Z"),
         systemVersionId: "v1",
         revision: 3,
-        state: { schemaVersion: "1.0", values: { ability: 12 } },
+        state: { schemaVersion: "1.0", entries: {}, values: { ability: 12 } },
       },
       "checksum-1",
     );
@@ -37,7 +37,7 @@ describe("campaign placement scope helpers (no database)", () => {
       schemaVersion: "1.0",
       characterId: "char-1",
       revision: 3,
-      state: { schemaVersion: "1.0", values: { ability: 12 } },
+      state: { schemaVersion: "1.0", entries: {}, values: { ability: 12 } },
     });
     expect(document).not.toHaveProperty("ownerId");
     expect(document).not.toHaveProperty("actorId");

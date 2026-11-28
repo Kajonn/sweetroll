@@ -1,3 +1,4 @@
+import { defaultPreferences } from "../../identity/repository.js";
 import { randomUUID } from "node:crypto";
 
 import cookiePlugin from "@fastify/cookie";
@@ -30,10 +31,10 @@ function makeStatefulIdentity() {
       return { ok: true, value: undefined };
     },
     getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: themeDefault }),
-    setThemeDefault: async (_actorId, value) => {
-      themeDefault = value;
-      return { ok: true, value: themeDefault };
+    getPreferences: async () => ({ ok: true, value: { ...defaultPreferences, theme_default: themeDefault } }),
+    patchPreferences: async (_actorId, patch) => {
+      themeDefault = patch.theme_default ?? null;
+      return { ok: true, value: { ...defaultPreferences, theme_default: themeDefault } };
     },
   };
   return { identity, validToken, revoked, getRevoked: () => revoked };
@@ -48,15 +49,15 @@ function makeAnonymousIdentity() {
     resolveSession: async () => ({ state: "anonymous" }),
     signOut: async () => ({ ok: true, value: undefined }),
     getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: null }),
-    setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    getPreferences: async () => ({ ok: true, value: defaultPreferences }),
+    patchPreferences: async (_actorId, patch) => ({ ok: true, value: { ...defaultPreferences, ...patch } }),
   };
   return { identity };
 }
 
 const apps: ReturnType<typeof Fastify>[] = [];
 
-async function build(identity: Identity, allowedOrigins: string[] = []): Promise<ReturnType<typeof Fastify>> {
+async function build(identity: Identity, allowedOrigins: string[] = [], physicalDiceEnabled = false): Promise<ReturnType<typeof Fastify>> {
   const app = Fastify({ genReqId: () => randomUUID(), loggerInstance: pino({ enabled: false }) });
   await app.register(cookiePlugin);
   await app.register(
@@ -64,10 +65,10 @@ async function build(identity: Identity, allowedOrigins: string[] = []): Promise
       identity,
       cookieName: COOKIE_NAME,
       secure: true,
-      maxAgeSeconds: 3600,
+      allowedOrigins,
     }),
   );
-  await app.register(buildIdentityRoutes({ identity, cookieName: COOKIE_NAME, secure: true, allowedOrigins }));
+  await app.register(buildIdentityRoutes({ identity, cookieName: COOKIE_NAME, secure: true, physicalDiceEnabled }));
   await app.ready();
   apps.push(app);
   return app;
@@ -94,6 +95,14 @@ describe("identity HTTP routes", () => {
     expect(response.json().userId).toBeTypeOf("string");
   });
 
+  it.each([false, true])("advertises physical dice only when enabled and signed in (%s)", async enabled => {
+    const { identity, validToken } = makeStatefulIdentity();
+    const app = await build(identity, [], enabled);
+    const signedIn = await app.inject({ url: "/me", headers: cookie(validToken) });
+    expect(signedIn.json().physicalDiceEnabled).toBe(enabled ? true : undefined);
+    expect((await app.inject("/me")).json()).toEqual({ state: "anonymous" });
+  });
+
   it("GET /me returns session_expired distinctly while preferences stay 401", async () => {
     const expired: Identity = {
       personalTokens: {} as Identity["personalTokens"],
@@ -103,8 +112,8 @@ describe("identity HTTP routes", () => {
       resolveSession: async () => ({ state: "session_expired" }),
       signOut: async () => ({ ok: true, value: undefined }),
       getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: null }),
-      setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    getPreferences: async () => ({ ok: true, value: defaultPreferences }),
+      patchPreferences: async (_actorId, patch) => ({ ok: true, value: { ...defaultPreferences, ...patch } }),
     };
     const app = await build(expired);
     const me = await app.inject({ method: "GET", url: "/me", headers: cookie("expired-token") });
@@ -191,7 +200,7 @@ describe("identity HTTP routes", () => {
       headers: {
         ...cookie(validToken),
         host: "localhost:4173",
-        origin: "http://localhost:4173",
+        origin: "https://localhost:4173",
       },
     });
     expect(response.statusCode).toBe(204);

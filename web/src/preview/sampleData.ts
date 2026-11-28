@@ -1,3 +1,4 @@
+import { entityFieldTypes, resolveDependencies, type BindingValue, type RulesDataset, type SlotEnvironment } from "@sweetroll/rules";
 import type {
   ExpressionAstV1,
   ScalarValue,
@@ -82,6 +83,7 @@ export type ResourceFieldV1 = {
   max: number;
   step: number;
   resetTo: "min" | "max";
+  maxExpressionId?: DefinitionId;
 };
 
 export type ComputedFieldV1 = {
@@ -118,7 +120,7 @@ export type EntityDefinitionV1 = {
 
 export type CompiledExpressionSummary = {
   id: DefinitionId;
-  context: "computed" | "roll" | "validation";
+  context: "computed" | "roll" | "validation" | "outcome";
   resultType: ValueType;
   fallback: ScalarValue;
   ast: ExpressionAstV1;
@@ -137,6 +139,9 @@ export type SystemPackageV1 = {
   presentation?: import("../theme/SystemPresentation.js").SystemPresentation;
   entities: EntityDefinitionV1[];
   expressions: CompiledExpressionSummary[];
+  dice?: readonly import("@sweetroll/rules").CustomDie[];
+  datasets?: readonly RulesDataset[];
+  slotsByEntity?: Record<string, SlotEnvironment>;
 };
 
 export type SampleScalarValue = number | string | boolean | null;
@@ -189,37 +194,15 @@ function initialSampleValue(field: FieldV1): SampleFieldValue {
   }
 }
 
-function fieldValueType(field: FieldV1): ValueType | undefined {
-  switch (field.kind) {
-    case "text":
-      return "text";
-    case "integer":
-    case "decimal":
-    case "resource":
-      return "number";
-    case "boolean":
-      return "boolean";
-    case "singleChoice":
-    case "multiChoice":
-      return "text";
-    case "computed":
-      return field.valueType;
-    case "image":
-      return undefined;
-  }
-}
-
-function buildSampleBindings(
+export function buildSampleBindings(
   fields: Record<DefinitionId, SampleFieldValue>,
-): Record<string, ScalarValue> {
-  const bindings: Record<string, ScalarValue> = {};
+): Record<string, BindingValue> {
+  const bindings: Record<string, BindingValue> = {};
   for (const [id, value] of Object.entries(fields)) {
-    if (value === null) continue;
-    if (Array.isArray(value)) {
-      continue;
-    }
-    if (typeof value === "object") {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
       bindings[id] = value.current;
+      bindings[`${id}.current`] = value.current;
+      bindings[`${id}.max`] = value.max;
     } else {
       bindings[id] = value;
     }
@@ -256,34 +239,35 @@ export function generateSample(pkg: SystemPackageV1): SampleData {
         applyComputedFallback(field, pkg.expressions, fields);
       }
     }
-    const env: { fields: Record<string, ValueType>; inputs: Record<string, ValueType> } = {
-      fields: {},
-      inputs: {},
+    const slots = pkg.slotsByEntity?.[entity.id];
+    const env = { fields: entityFieldTypes(entity.fields), inputs: {},
+      ...(pkg.datasets && { datasets: pkg.datasets }), ...(slots && { slots }),
     };
-    for (const field of entity.fields) {
-      const vt = fieldValueType(field);
-      if (vt !== undefined) {
-        env.fields[field.id] = vt;
-      }
-    }
-    for (const field of entity.fields) {
-      if (field.kind !== "computed") continue;
-      const expr = pkg.expressions.find((e) => e.id === field.expressionId);
-      if (!expr || expr.context !== "computed") continue;
-      const bindings = buildSampleBindings(fields);
-      const safeFallback = normalizeFallback(expr.fallback);
+    const completed = new Set<string>();
+    const visited = new Set<string>();
+    const evaluateField = (id: string) => {
+      if (completed.has(id) || visited.has(id)) return;
+      const field = entity.fields.find(candidate => candidate.id === id);
+      const expressionId = field?.kind === "computed" ? field.expressionId : field?.kind === "resource" ? field.maxExpressionId : undefined;
+      const expr = pkg.expressions.find(candidate => candidate.id === expressionId && candidate.context === "computed");
+      if (field === undefined || expr === undefined) return;
+      visited.add(id);
+      resolveDependencies(expr.ast).forEach(evaluateField);
       const result = evaluateExpression({
-        source: renderExpression(expr.ast),
-        env,
-        resultType: expr.resultType,
-        fallback: safeFallback,
-        bindings,
-        rng: FIXED_RNG,
+        source: renderExpression(expr.ast), env, resultType: expr.resultType,
+        fallback: normalizeFallback(expr.fallback), bindings: buildSampleBindings(fields), rng: FIXED_RNG, context: "computed",
       });
       if (result.ok) {
-        fields[field.id] = result.value;
+        if (field.kind === "resource" && typeof result.value === "number") {
+          const bounded = Math.min(field.max, Math.max(field.min, result.value));
+          const max = field.min + Math.floor((bounded - field.min) / field.step + 1e-8) * field.step;
+          fields[id] = { max, current: Math.min(field.default.current, max) };
+        } else if (field.kind === "computed") fields[id] = result.value;
       }
-    }
+      visited.delete(id);
+      completed.add(id);
+    };
+    entity.fields.forEach(field => evaluateField(field.id));
     sample[entity.id] = { fields };
   }
   return sample;

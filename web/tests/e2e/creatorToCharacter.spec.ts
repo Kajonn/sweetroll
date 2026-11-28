@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 
 /**
  * G5 exit demonstration (Task 6): blank → simple system without writing an

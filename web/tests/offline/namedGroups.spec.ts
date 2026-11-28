@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 import { namedDicePoolDocument } from "../../../src/systems/implementation/package/fixtures/named-dice-pool.js";
 import {
   testSignIn,
@@ -7,6 +7,7 @@ import {
   createCharacter,
   expectOfflineAvailable,
 } from "./test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 test("grouped roll history reopens offline from the production build", async ({
   page,
@@ -56,7 +57,7 @@ test("grouped roll history reopens offline from the production build", async ({
     await expect(page.getByTestId("roll-group-gear")).toContainText(
       "Empty group",
     );
-    await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+    await expectSheetSaved(page);
     await page.getByRole("button", { name: "Activity", exact: true }).click();
     await expect(
       page

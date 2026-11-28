@@ -1,6 +1,10 @@
+import type { CampaignPlayFeed } from "../playEvents/CampaignPlayFeed.js";
+import type { PublishCommand } from "../playEvents/PlayEvents.js";
 import {PushPanel,type PushApi} from "../rolls/PushPanel.js";
-import type {CharacterSession} from "../characters/session.js";
+import {canEdit, type CharacterSession} from "../characters/session.js";
 import {useCharacterSession} from "../characters/useCharacterSession.js";
+import { hasRollSelection, RollContextFields } from "../rolls/RollContextFields.js";
+import type { CampaignRollSelection } from "../characters/types.js";
 import {RollBreakdown} from "../rolls/RollBreakdown.js";
 // SessionBoard: GM session tab body. Read-only latest content (limit 10)
 // + recent activity (limit 20) + character directory with inline resource
@@ -15,9 +19,10 @@ import { useQuery } from "@tanstack/react-query";
 import type { CharactersApi } from "../characters/api.js";
 import type { CommandResultResponse, CharacterView } from "../characters/types.js";
 import { t } from "../i18n/index.js";
+import { sessionErrorText } from "../characters/sessionErrors.js";
 import { Button, EmptyState, FormField, Select } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
-import { campaignCharactersKey } from "./campaignQueries.js";
+import { campaignCharactersKey, listAllCampaignCharacters } from "./campaignQueries.js";
 import { audienceLabel } from "./CampaignContent.js";
 import { CampaignActivityLine } from "./CampaignActivity.js";
 import type { CampaignCharacterSummary } from "./types.js";
@@ -25,8 +30,10 @@ import { randomUUID } from "../utils/uuid";
 
 export type SessionBoardProps = {
   campaignsApi: Pick<CampaignsApi, "listContent" | "listActivity" | "listCampaignCharacters">;
-  charactersApi: Pick<CharactersApi, "open" | "bumpCharacterResource" | "executeCharacterAction"> & Partial<PushApi>;
-  createSession?:((characterId:string)=>CharacterSession)|undefined;
+  charactersApi: Pick<CharactersApi, "open" | "bumpCharacterResource" | "executeCharacterAction"> & Partial<PushApi> & Pick<CharactersApi, "rollOptions">;
+  createSession?: ((characterId: string, publishRoll?: PublishCommand) => CharacterSession) | undefined;
+  publishRoll?: PublishCommand | undefined;
+  sharedActivity?: CampaignPlayFeed | undefined;
   campaignId: string;
   actorId: string;
   generation: number;
@@ -172,8 +179,10 @@ function SessionRollRow(props: {
   onCommandEnd: () => void;
   onOpenCharacter: (characterId: string) => void;
   onRolled: () => Promise<void>;
+  publishRoll?: PublishCommand | undefined;
   onRollResult?:(roll:CommandResultResponse["result"]["roll"])=>void;
 }) {
+  const [selection, setSelection] = useState<CampaignRollSelection>({});
   const [audience, setAudience] = useState<RollAudience>("campaign");
   const [lastRoll,setLastRoll]=useState<CommandResultResponse["result"]["roll"]>(null);
   const [resultText, setResultText] = useState<string | null>(null);
@@ -189,7 +198,7 @@ function SessionRollRow(props: {
 
   // Actions with required inputs never execute from the board: the board
   // must not fabricate inputs, so it links to the sheet instead.
-  if (props.element.inputs.some((input) => input.required)) {
+  if ((props.element.entryId !== undefined && (props.element.target || props.element.respondsTo)) || props.element.inputs.some((input) => input.required)) {
     return (
       <div>
         <span>{props.element.label}</span>{" "}
@@ -201,19 +210,21 @@ function SessionRollRow(props: {
   }
 
   const execute = async (): Promise<void> => {
-    if (props.commandPending || props.refreshPending || props.refreshFailed) return;
+    if (props.commandPending || props.refreshPending || props.refreshFailed || !hasRollSelection(props.element, selection)) return;
     props.onCommandStart();
     if (mountedRef.current) {
       setFailed(false);
       setUncertain(false);
     }
     // Caller-minted idempotency key, fresh on every attempt.
+    const startedAt = new Date().toISOString();
     try {
       const response = await props.charactersApi.executeCharacterAction(
         props.characterId,
         props.element.actionId,
         {
           audience,
+          ...selection,
           expectedRevision: props.revision,
           idempotencyKey: randomUUID(),
         },
@@ -223,12 +234,24 @@ function SessionRollRow(props: {
       // uncertain-outcome text (malformed_response discipline).
       const raw = (response.result as { roll?: unknown }).roll ?? response.result;
       if (mountedRef.current) {
-        if (typeof raw === "string" || typeof raw === "number") {
+        if (response.result.rollId) props.publishRoll?.(response, startedAt, props.element.label);
+        if (props.element.actionKind === "shuffle") {
+          setLastRoll(null);
+          setResultText(t("campaign.detail.session.deck.shuffled", { deck: props.element.deck?.label ?? props.element.label }));
+        } else if (props.element.actionKind === "draw" && response.result.roll) {
+          setResultText(response.result.roll.output);
+          setLastRoll(response.result.roll);
+          props.onRollResult?.(response.result.roll);
+        } else if (typeof raw === "string" || typeof raw === "number") {
           setResultText(String(raw));
         } else if (raw !== null && typeof raw === "object" &&
           typeof (raw as { total?: unknown }).total === "number") {
-          setResultText(String((raw as { total: number }).total));
+          // Design 6.4: an outcome label, when the action defines bands, reads with the total.
+          const outcome = (raw as { outcome?: { label?: unknown } }).outcome?.label;
+          const total = String((raw as { total: number }).total);
+          setResultText(typeof outcome === "string" && outcome.length > 0 ? `${total} — ${outcome}` : total);
           setLastRoll(response.result.roll);
+          if (props.element.respondsTo) setSelection({});
           props.onRollResult?.(response.result.roll);
         } else {
           setUncertain(true);
@@ -275,32 +298,37 @@ function SessionRollRow(props: {
         disabled={controlsDisabled}
         onChange={(event) => setAudience(event.target.value as RollAudience)}
       />{" "}
+      <RollContextFields requirements={props.element} selection={selection} onChange={setSelection} disabled={controlsDisabled}
+        characterId={props.characterId} actionId={props.element.actionId} loadOptions={props.charactersApi.rollOptions} />
       <Button
         variant="secondary"
-        disabled={controlsDisabled}
+        disabled={controlsDisabled || !hasRollSelection(props.element, selection)}
         onClick={() => void execute()}
       >
-        {t("campaign.detail.session.roll.execute", { label: props.element.label })}
+        {props.element.deck ? props.element.label : t("campaign.detail.session.roll.execute", { label: props.element.label })}
       </Button>
       {lastRoll===null||lastRoll.push?null:<RollBreakdown roll={lastRoll}/>}
-      {resultText !== null ? <p role="status">{resultText}</p> : null}
+      {resultText !== null ? <p role={lastRoll && props.publishRoll ? undefined : "status"}>{resultText}</p> : null}
       {uncertain ? <p role="status">{t("campaign.detail.session.roll.uncertain")}</p> : null}
       {failed ? <p role="alert">{t("campaign.detail.session.roll.error")}</p> : null}
     </div>
   );
 }
 
-function SessionPushPanel({factory,characterId,api,roll,onBlocked}:{factory:(id:string)=>CharacterSession;characterId:string;api:PushApi;roll:CommandResultResponse["result"]["roll"];onBlocked:(blocked:boolean)=>void}){
- const create=useMemo(()=>()=>factory(characterId),[factory,characterId]);const {session,snapshot}=useCharacterSession(create);
- const blocked=snapshot.phase!=="ready"||!snapshot.editing.owned||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0;
+function SessionPushPanel({factory,characterId,api,roll,onBlocked,publishRoll}:{factory:NonNullable<SessionBoardProps["createSession"]>;publishRoll?: PublishCommand | undefined;characterId:string;api:PushApi;roll:CommandResultResponse["result"]["roll"];onBlocked:(blocked:boolean)=>void}){
+ const create=useMemo(() => () => publishRoll ? factory(characterId, publishRoll) : factory(characterId), [factory, characterId, publishRoll]);const {session,snapshot}=useCharacterSession(create);
+ const blocked=snapshot.phase!=="ready"||!canEdit(snapshot)||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0;
  useEffect(()=>{onBlocked(blocked);return()=>onBlocked(false);},[blocked,onBlocked]);
  const retained=snapshot.lastRoll;
  const current=retained?.push&&(!roll?.push||(retained.push.rootRollId===roll.push.rootRollId&&retained.push.attempt>=roll.push.attempt))?retained:roll;
- return <div>{snapshot.error?<p role="alert">{snapshot.error.message}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={blocked||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:null}</div>;
+ // V3: the board has no read-only status, sync line or review panel, so it shows
+ // every session error and a storage failure as one translated alert each.
+ return <div>{snapshot.error?<p role="alert">{sessionErrorText(snapshot.error)}</p>:null}{snapshot.storage==="unavailable"?<p role="alert">{t("character.detail.storageUnavailable")}</p>:null}{current?.push&&session?<PushPanel roll={current} characterId={characterId} api={api} online={snapshot.connected} revision={snapshot.view?.character.revision} disabled={blocked||snapshot.view?.character.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:null}</div>;
 }
 
 function SessionCharacterRow(props: {
   createSession?:SessionBoardProps["createSession"];
+  publishRoll?: PublishCommand | undefined;
   charactersApi: SessionBoardProps["charactersApi"];
   campaignId: string;
   actorId: string;
@@ -415,9 +443,10 @@ function SessionCharacterRow(props: {
               onOpenCharacter={props.onOpenCharacter}
               onRolled={reloadSheet}
               onRollResult={setBoardRoll}
+              publishRoll={props.publishRoll}
             />
           ))}
-          {props.createSession&&props.charactersApi.pushOptions&&props.charactersApi.readRoll?<SessionPushPanel factory={props.createSession} characterId={props.character.characterId} api={props.charactersApi as PushApi} roll={boardRoll} onBlocked={setPushBlocked}/>:null}
+          {props.createSession&&props.charactersApi.pushOptions&&props.charactersApi.readRoll?<SessionPushPanel factory={props.createSession} characterId={props.character.characterId} api={props.charactersApi as PushApi} roll={boardRoll} onBlocked={setPushBlocked} publishRoll={props.publishRoll}/>:null}
         </div>
       );
     }
@@ -442,14 +471,17 @@ export function SessionBoard(props: SessionBoardProps) {
     queryFn: () => props.campaignsApi.listContent(props.campaignId, { limit: 10 }),
     refetchInterval,
   });
-  const activity = useQuery({
+  const sharedActivity = props.sharedActivity;
+  const fallbackActivity = useQuery({
+    enabled: sharedActivity === undefined,
     queryKey: ["campaigns", "session", props.campaignId, props.actorId, props.generation, "activity"],
     queryFn: () => props.campaignsApi.listActivity(props.campaignId, { limit: 20 }),
-    refetchInterval,
+    refetchInterval: sharedActivity === undefined ? refetchInterval : false,
   });
+  const activity = sharedActivity ?? fallbackActivity;
   const characters = useQuery({
     queryKey: campaignCharactersKey(props.campaignId, props.actorId, props.generation),
-    queryFn: () => props.campaignsApi.listCampaignCharacters(props.campaignId),
+    queryFn: () => listAllCampaignCharacters(props.campaignsApi, props.campaignId),
     refetchInterval,
   });
   const [filter, setFilter] = useState("");
@@ -524,6 +556,7 @@ export function SessionBoard(props: SessionBoardProps) {
         ))}
       </ul>
       <h3>{t("campaign.detail.session.charactersHeading")}</h3>
+      {characters.data.nextCursor ? <p role="status">{t("campaign.detail.session.charactersTruncated", { count: characters.data.characters.length })}</p> : null}
       <FormField label={t("campaign.detail.session.search.label")}>
         <input
           type="text"
@@ -536,6 +569,7 @@ export function SessionBoard(props: SessionBoardProps) {
         {visible.map((character) => (
           <SessionCharacterRow
             createSession={props.createSession}
+            publishRoll={props.publishRoll}
             key={character.characterId}
             charactersApi={props.charactersApi}
             campaignId={props.campaignId}

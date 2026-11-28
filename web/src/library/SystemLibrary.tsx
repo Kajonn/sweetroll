@@ -8,11 +8,14 @@ import { Button } from "../ui/index.js";
 
 import { CreateDraftDialog } from "./CreateDraftDialog.js";
 import { SystemSharing } from "./SystemSharing.js";
+import { ExtensionsPanel } from "../extensions/ExtensionsPanel.js";
 import styles from "./SystemLibrary.module.css";
 
 export function SystemLibrary({ client }: { client: ApiClient }) {
   const { data, fetchNextPage, hasNextPage } = useSystemLibrary(client);
   const [createOpen, setCreateOpen] = useState(false);
+  // Design 6.8 (E6): one system's extensions are shown at a time.
+  const [extensionsOf, setExtensionsOf] = useState<string | null>(null);
   const ref = useRef<HTMLUListElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -41,6 +44,15 @@ export function SystemLibrary({ client }: { client: ApiClient }) {
             <AppLink href={`/systems/${s.systemId}`}>{s.name}</AppLink>
             <span>{s.lifecycle}</span>
             <SystemSharing client={client} system={s} />
+            <Button
+              variant="secondary"
+              aria-expanded={extensionsOf === s.systemId}
+              onClick={() => setExtensionsOf((current) => current === s.systemId ? null : s.systemId)}
+              data-testid={`system-extensions-${i}`}
+            >
+              {t("extensions.open")}
+            </Button>
+            {extensionsOf === s.systemId ? <ExtensionsPanel client={client} systemId={s.systemId} systemName={s.name} /> : null}
           </li>
         ))}
         {hasNextPage === true && <li><Button variant="secondary" onClick={() => fetchNextPage()}>{t("library.loadMore")}</Button></li>}

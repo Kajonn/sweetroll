@@ -14,6 +14,7 @@ import { Button, Dialog, EmptyState, FormField, Panel, Select } from "../ui/inde
 import type { CampaignsApi } from "./api.js";
 import {
   campaignCharactersKey,
+  listAllCampaignCharacters,
   campaignClaimableCharactersKey,
   useClaimableCharacters,
 } from "./campaignQueries.js";
@@ -120,7 +121,8 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
   const [name, setName] = useState("");
   const [systemVersionId, setSystemVersionId] = useState("");
   const [entityDefinitionId, setEntityDefinitionId] = useState("");
-  const [entityOptions, setEntityOptions] = useState<{ id: string; label: string }[] | null>(null);
+  const [presetId, setPresetId] = useState("");
+  const [entityOptions, setEntityOptions] = useState<{ id: string; label: string; presets?: { id: string; label: string }[] }[] | null>(null);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [optionsError, setOptionsError] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
@@ -203,10 +205,12 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
       const response = await props.api.createCampaignCharacter(props.campaignId, {
         name: trimmedName,
         entityDefinitionId: trimmedEntity,
+        ...(presetId === "" ? {} : { presetId }),
         expectedCampaignRevision: props.campaignRevision,
         idempotencyKey,
       });
       setName("");
+      setPresetId("");
       props.onChanged?.();
       props.onOpenCharacter(response.character.characterId);
     } catch (cause) {
@@ -270,7 +274,11 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
                   {t("campaign.detail.characters.claim.button", { name: row.name })}
                 </Button>
               )}
-              {conflictIds[row.characterId] === true ? (
+              {conflictIds[row.characterId] === true && row.lifecycle === "archived" ? (
+                // The reloaded row shows the claim failed because a GM
+                // archived the character meanwhile; retrying cannot help.
+                <p role="alert">{t("campaign.detail.characters.claim.conflict.archived", { name: row.name })}</p>
+              ) : conflictIds[row.characterId] === true ? (
                 <p role="alert">
                   {t("campaign.detail.characters.claim.conflict", { name: row.name })}
                   <Button
@@ -423,7 +431,7 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
             options={resolvedOptions.map((entity) => ({ value: entity.id, label: entity.label }))}
             placeholder={t("campaign.detail.characters.create.entity.label")}
             value={entityDefinitionId}
-            onChange={(event) => setEntityDefinitionId(event.target.value)}
+            onChange={(event) => { setEntityDefinitionId(event.target.value); setPresetId(""); }}
           />
         ) : props.pinnedVersionId === undefined ? (
           <FormField label={t("campaign.detail.characters.create.entity.label")}>
@@ -436,6 +444,25 @@ export function CampaignCharactersView(props: CampaignCharactersViewProps) {
             />
           </FormField>
         ) : null}
+        {(() => {
+          // Design 6.1: start from a ready-made character, such as a monster stat block.
+          const presets = resolvedOptions?.find((entity) => entity.id === entityDefinitionId)?.presets ?? [];
+          if (presets.length === 0) return null;
+          return (
+            <Select
+              label={t("campaign.detail.characters.create.preset.label")}
+              options={[{ value: "", label: t("campaign.detail.characters.create.preset.none") },
+                ...presets.map((preset) => ({ value: preset.id, label: preset.label }))]}
+              value={presetId}
+              data-testid="campaign-character-preset"
+              onChange={(event) => {
+                setPresetId(event.target.value);
+                const chosen = presets.find((preset) => preset.id === event.target.value);
+                if (chosen !== undefined && name.trim() === "") setName(chosen.label);
+              }}
+            />
+          );
+        })()}
         {createConflict ? <p role="alert">{t("campaign.detail.characters.create.conflict")}</p> : null}
         {createError !== null ? <p role="alert">{createError}</p> : null}
         <Button
@@ -473,7 +500,7 @@ export function CampaignCharactersTab(props: {
   const online = props.online ?? true;
   const characters = useQuery({
     queryKey: campaignCharactersKey(props.campaignId, props.actorId ?? null, generation),
-    queryFn: () => props.api.listCampaignCharacters(props.campaignId),
+    queryFn: () => listAllCampaignCharacters(props.api, props.campaignId),
     enabled: props.actorId !== null && props.actorId !== undefined,
   });
   const claimable = useClaimableCharacters(

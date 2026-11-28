@@ -1,3 +1,5 @@
+import type { PhysicalCommand, Settlement } from "../../characters/physical-rolls.js";
+import { BindingValueSchema } from "../../systems/implementation/rules/result.js";
 import { SystemPresentationSchema } from "../../systems/implementation/package/schema/document.js";
 import { characterImageHandlers, characterImageRoutes } from "./characterImages.js";
 import { ImageDescriptorSchema } from "../../platform/image-attachment.js";
@@ -5,14 +7,17 @@ import { characterEntryImageHandlers, characterEntryImageRoutes } from "./charac
 import {DieResultSchema, RollBreakdownSchema, PushResultSchema} from "../../systems/implementation/rules/result.js";
 import { strictInputCompiler } from "./strictValidation.js";
 import {EntrySourceSchema, EntrySnapshotSchema, type EntrySource} from "../../systems/implementation/package/schema/dynamic.js";
+import { ApplicableRollsSchema, CharacterDecksSchema, ReferenceDataListSchema, ReferenceDatasetSchema, RollOptionsQuery, RollOptionsSchema } from "./roll-options.js";
 import { Type, type TSchema } from "@sinclair/typebox";
 import type { FastifyPluginCallback, FastifyReply, FastifyRequest } from "fastify";
 import { FieldV1Schema } from "../../systems/implementation/package/schema/document.js";
 
+import type { Composition } from "../../systems/runtime.js";
 import type {
   CharacterCommand,
   CharacterError,
   CharacterManagementCommand,
+  VersionChoice,
   CharacterView,
   Characters,
   CharacterCommandResult,
@@ -56,17 +61,16 @@ const RuntimeValidationDto = Type.Object({
 const RuntimeStateDto = Type.Object({
   schemaVersion: Type.Literal("1.0"),
   values: Type.Object({}, { additionalProperties: true }),
-  // Task 7: entries ride the state over the wire (plain values, same as
-  // offline snapshots). Optional so pre-entry clients keep validating.
-  entries: Type.Optional(Type.Record(Type.String(), Type.Object({
+  entries: Type.Record(Type.String(), Type.Object({
     entryId: Type.String(),
     image: Type.Optional(ImageDescriptorSchema),
     slotId: Type.String(),
     templateId: Type.Union([Type.String(), Type.Null()]),
+    extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
     source:Type.Optional(EntrySourceSchema),snapshot:Type.Optional(EntrySnapshotSchema),
     values: Type.Object({}, { additionalProperties: true }),
     quantity: Type.Optional(Type.Integer({ minimum: 1 })),
-  }))),
+  })),
 });
 const RecordDto = Type.Record(Type.String(), RuntimeScalarDto);
 
@@ -135,7 +139,7 @@ const TemplateKindDto = Type.Union([
 const ProjectedEntryDefinitionDto=Type.Object({
  id:Type.String(),label:Type.String(),kind:TemplateKindDto,
  fields:Type.Array(Type.Object({...ProjectionFieldConstraintsDto.properties,id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("text"),Type.Literal("integer"),Type.Literal("decimal"),Type.Literal("boolean"),Type.Literal("singleChoice"),Type.Literal("multiChoice"),Type.Literal("resource")]),default:Type.Unknown()}),{maxItems:64}),
- grantedActions:Type.Array(Type.Object({id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("roll"),Type.Literal("resourceBump")]),inputs:Type.Array(ProjectionActionInputDto)}),{maxItems:16}),
+ grantedActions:Type.Array(Type.Object({id:Type.String(),label:Type.String(),kind:Type.Union([Type.Literal("roll"),Type.Literal("resourceBump")]),target:Type.Optional(Type.Object({ entityId: Type.String(), otherEntityIds: Type.Optional(Type.Array(Type.String(), { maxItems: 8 })), optional: Type.Optional(Type.Literal(true)) })),respondsTo:Type.Optional(Type.Literal(true)),inputs:Type.Array(ProjectionActionInputDto)}),{maxItems:16}),
 });
 const ProjectionSlotEntryDto = Type.Object({
   definition:Type.Optional(ProjectedEntryDefinitionDto),
@@ -143,8 +147,12 @@ const ProjectionSlotEntryDto = Type.Object({
   source:Type.Optional(EntrySourceSchema),
   entryId: Type.String(),
   templateId: Type.Union([Type.String(), Type.Null()]),
+  extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   label: Type.String(),
   values: Type.Object({}, { additionalProperties: true }),
+  derived: Type.Optional(Type.Array(Type.Object({
+    id: Type.String(), label: Type.String(), value: Type.Union([Type.String(), Type.Number(), Type.Boolean()]),
+  }), { maxItems: 64 })),
   quantity: Type.Optional(Type.Integer({ minimum: 1 })),
 });
 const ProjectionElementDto = Type.Union([
@@ -165,6 +173,7 @@ const ProjectionElementDto = Type.Union([
     max: Type.Number(),
     step: Type.Number(),
     resetTo: Type.Union([Type.Literal("min"), Type.Literal("max")]),
+    computedMaximum: Type.Optional(Type.Boolean()),
     validations: Type.Array(RuntimeValidationDto),
   }),
   Type.Object({
@@ -172,7 +181,14 @@ const ProjectionElementDto = Type.Union([
     id: Type.String(),
     actionId: Type.String(),
     label: Type.String(),
-    actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
+    actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump"), Type.Literal("resourceBatch"), Type.Literal("draw"), Type.Literal("shuffle")]),
+    deck: Type.Optional(Type.Object({
+      deckId: Type.String(),
+      label: Type.String(),
+      count: Type.Optional(Type.Integer({ minimum: 1, maximum: 10 })),
+    })),
+    target: Type.Optional(Type.Object({ entityId: Type.String(), otherEntityIds: Type.Optional(Type.Array(Type.String(), { maxItems: 8 })), optional: Type.Optional(Type.Literal(true)) })),
+    respondsTo: Type.Optional(Type.Literal(true)),
     inputs: Type.Array(ProjectionActionInputDto),
     validations: Type.Array(RuntimeValidationDto),
     // Task 7: set on synthetic granted-action elements projected after
@@ -218,6 +234,12 @@ const ProjectionDto = Type.Object({
  * I6 Task 9: shared with the Campaigns adapter so placement responses reuse
  * the exact standalone wire shape (single source of truth, no DTO drift).
  */
+// Design 6.8: extension versions a character is built on (identity only).
+export const ExtensionRefsDto = Type.Array(Type.Object({
+  extensionId: Type.String({ format: UUID_FORMAT }),
+  versionId: Type.String({ format: UUID_FORMAT }),
+}, { additionalProperties: false }), { maxItems: 16 });
+
 export const CharacterViewDto = Type.Object({
   characterId: Type.String({ format: UUID_FORMAT }),
   // I6 Task 5 ownership union: standalone views populate ownerId with NULL
@@ -231,6 +253,7 @@ export const CharacterViewDto = Type.Object({
   returnOwnerId: Type.Union([Type.String({ format: UUID_FORMAT }), Type.Null()]),
   name: Type.String(),
   systemVersionId: Type.String({ format: UUID_FORMAT }),
+  extensions: ExtensionRefsDto,
   entityDefinitionId: Type.String(),
   revision: Type.Integer(),
   lifecycle: Type.Union([Type.Literal("active"), Type.Literal("archived")]),
@@ -262,8 +285,15 @@ const CharacterCreationOptionsDto = Type.Object({
       id: Type.String({ minLength: 1 }),
       label: Type.String({ minLength: 1 }),
       kind: Type.Union([Type.Literal("playable"), Type.Literal("npc")]),
+      presets: Type.Optional(Type.Array(Type.Object({ id: Type.String(), label: Type.String() }), { maxItems: 1000 })),
     }),
   ),
+  extensions: Type.Optional(Type.Array(Type.Object({
+    extensionId: Type.String({ format: UUID_FORMAT }),
+    name: Type.String(),
+    versionId: Type.String({ format: UUID_FORMAT }),
+    semanticVersion: Type.String(),
+  }), { maxItems: 100 })),
 });
 
 const CharacterCreationVersionsDto = Type.Object({
@@ -281,9 +311,9 @@ const CharacterCreationVersionsDto = Type.Object({
 
 const DiceDto = DieResultSchema;
 const RollBindingDto = Type.Object({
-  scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs")]),
+  scope: Type.Union([Type.Literal("fields"), Type.Literal("inputs"), Type.Literal("item"), Type.Literal("aggregates"), Type.Literal("target"), Type.Literal("opposed")]),
   definitionId: Type.String(),
-  value: RuntimeScalarDto,
+  value: BindingValueSchema,
 });
 const RollAudienceDto = Type.Union([
   Type.Literal("owner_only"),
@@ -291,13 +321,17 @@ const RollAudienceDto = Type.Union([
   Type.Literal("campaign"),
 ]);
 const RollDto = Type.Object({
+  targetCharacterId: Type.Optional(Type.String({ format: "uuid" })),
+  respondsTo: Type.Optional(Type.String({ format: "uuid" })),
   push:Type.Optional(PushResultSchema),
-  breakdown: Type.Optional(RollBreakdownSchema),
+  breakdown: RollBreakdownSchema,
   actionId: Type.String(),
   expression: Type.String(),
   dice: Type.Array(DiceDto),
   bindings: Type.Array(RollBindingDto),
   total: Type.Number(),
+  outcome: Type.Optional(Type.Object({ id: Type.String(), label: Type.String() })),
+  details: Type.Optional(Type.Array(Type.Object({ id: Type.String(), label: Type.String(), value: Type.Number() }), { maxItems: 8 })),
   output: Type.String(),
   audience: RollAudienceDto,
 });
@@ -310,6 +344,7 @@ const NominalActionResultDto = Type.Object({
 const CharacterCommandResultDto = Type.Object({
   character: CharacterViewDto,
   roll: Type.Union([RollDto, Type.Null()]),
+  rollId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   nominal: Type.Union([NominalActionResultDto, Type.Null()]),
 });
 
@@ -334,6 +369,7 @@ const CharacterExportDto = Type.Object({
   createdAt: Type.String({ format: DATE_TIME_FORMAT }),
   updatedAt: Type.String({ format: DATE_TIME_FORMAT }),
   systemVersionId: Type.String({ format: UUID_FORMAT }),
+  extensions: Type.Optional(ExtensionRefsDto),
   packageChecksum: Type.String(),
   revision: Type.Integer(),
   state: RuntimeStateDto,
@@ -385,9 +421,11 @@ const ErrorResponses = {
 
 const CreateCharacterBody = Type.Object({
   systemVersionId: Type.String({ format: UUID_FORMAT }),
+  extensions: Type.Optional(ExtensionRefsDto),
   entityDefinitionId: Type.String({ minLength: 1 }),
   name: Type.String({ minLength: 1 }),
   initialValues: Type.Optional(Type.Object({}, { additionalProperties: true })),
+  presetId: Type.Optional(Type.String({ minLength: 1 })),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
 
@@ -435,10 +473,48 @@ const BumpResourceBody = Type.Object({
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
 });
+const AdjustResourceBody = Type.Object({
+  delta: Type.Number(),
+  expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
+const SetResourceBody = Type.Object({
+  current: Type.Optional(Type.Number()),
+  max: Type.Optional(Type.Number()),
+  expectedRevision: Type.Integer(),
+  idempotencyKey: Type.String({ minLength: 1 }),
+});
 const PushParams=Type.Object({characterId:Type.String({format:"uuid"}),rollId:Type.String({format:"uuid"})},{additionalProperties:false});
 const PushBody=Type.Object({expectedRevision:Type.Integer({minimum:1}),idempotencyKey:Type.String({minLength:1,maxLength:200})},{additionalProperties:false});
 const PushOptionsDto=Type.Object({canPush:Type.Boolean(),reason:Type.Union([Type.String({maxLength:120}),Type.Null()]),eligibleDiceIds:Type.Array(Type.String({maxLength:256}),{maxItems:100}),revision:Type.Integer({minimum:1}),nextAttempt:Type.Integer({minimum:1,maximum:11}),maxAttempts:Type.Integer({minimum:1,maximum:10})});
+const physicalId = Type.String({format:"uuid"});
+const physicalKey = Type.String({minLength:1,maxLength:200});
+const physicalRevision = Type.Integer({minimum:1});
+const strict = {additionalProperties:false} as const;
+const physicalPrepareBody = Type.Union([
+  Type.Object({ kind:Type.Literal("executeAction"), actionId:Type.String({minLength:1}),
+    inputs:Type.Object({}, {additionalProperties:true}), expectedRevision:physicalRevision, idempotencyKey:physicalKey,
+    entryId:Type.Optional(Type.String({minLength:1})), audience:Type.Optional(RollAudienceDto),
+    targetCharacterId:Type.Optional(physicalId), respondsTo:Type.Optional(physicalId) }, strict),
+  Type.Object({kind:Type.Literal("pushRoll"), parentRollId:physicalId, expectedRevision:physicalRevision,
+    idempotencyKey:physicalKey}, strict),
+]);
+const xyz = {x:Type.Number(), y:Type.Number(), z:Type.Number()};
+const physicalSettlementBody = Type.Object({
+  tick:Type.Integer({minimum:1,maximum:3600}),
+  dice:Type.Array(Type.Object({id:Type.String({minLength:1,maxLength:256}), value:Type.Integer({minimum:1,maximum:20}),
+    position:Type.Object(xyz,strict), orientation:Type.Object({...xyz,w:Type.Number()},strict)},strict),{minItems:1,maxItems:100}),
+},strict);
+const physicalLaunchDto = Type.Object({
+  version: Type.Literal("rapier-v2"), seed: Type.Integer({minimum:0,maximum:4294967295}), startsAt: Type.String({format:"date-time"}),
+  bodies: Type.Array(Type.Object({position:Type.Object(xyz),orientation:Type.Object({...xyz,w:Type.Number()}),
+    linearVelocity:Type.Object(xyz),angularVelocity:Type.Object(xyz)}),{minItems:1,maxItems:100}),
+});
+const physicalAttemptDto = Type.Object({launch:physicalLaunchDto,color:Type.String({pattern:"^#[0-9A-Fa-f]{6}$"}),attemptId:physicalId,expiresAt:Type.String({format:"date-time"}),
+  audience:RollAudienceDto,dice:Type.Array(Type.Object({id:Type.String(),groupId:Type.String(),sides:Type.Integer()}))});
 const ExecuteActionBody = Type.Object({
+  targetCharacterId: Type.Optional(Type.String({ format: "uuid" })),
+  respondsTo: Type.Optional(Type.String({ format: "uuid" })),
   // Outcomes and randomness belong to the server; never admit replacement
   // dice/group/calculation data, even when another JSON field is tolerated.
   push:Type.Optional(Type.Never()),pushContext:Type.Optional(Type.Never()),pushPolicy:Type.Optional(Type.Never()),
@@ -462,6 +538,7 @@ const CharacterEntryBody = Type.Object({
   entryId: Type.String({ format: UUID_FORMAT }),
   slotId: Type.String({ minLength: 1 }),
   templateId: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
   values: Type.Object({}, { additionalProperties: true }),
   quantity: Type.Optional(Type.Integer({ minimum: 1 })),
 },{additionalProperties:false});
@@ -494,6 +571,8 @@ const EntryGrantedActionInputDto = Type.Object({
 });
 const EntryTemplateDto = Type.Object({
   source:Type.Optional(EntrySourceSchema),
+  extensionId: Type.Optional(Type.String({ format: UUID_FORMAT })),
+  extensionName: Type.Optional(Type.String()),
   defaultQuantity:Type.Optional(Type.Integer()),
   id: Type.String(),
   label: Type.String(),
@@ -503,6 +582,8 @@ const EntryTemplateDto = Type.Object({
     id: Type.String(),
     label: Type.String(),
     actionKind: Type.Union([Type.Literal("roll"), Type.Literal("resourceBump")]),
+    target: Type.Optional(Type.Object({ entityId: Type.String(), otherEntityIds: Type.Optional(Type.Array(Type.String(), { maxItems: 8 })), optional: Type.Optional(Type.Literal(true)) })),
+    respondsTo: Type.Optional(Type.Literal(true)),
     inputs: Type.Array(EntryGrantedActionInputDto),
   })),
 });
@@ -528,6 +609,127 @@ const TransferOwnershipBody = Type.Object({
   toUserId: Type.String({ format: UUID_FORMAT }),
   expectedRevision: Type.Integer(),
   idempotencyKey: Type.String({ minLength: 1 }),
+});
+// Design 6.7: system version upgrade and revert.
+export const VersionChoiceDto = Type.Object({
+  versionId: Type.String({ format: UUID_FORMAT }),
+  systemId: Type.String({ format: UUID_FORMAT }),
+  semanticVersion: Type.String(),
+  releaseNotes: Type.String(),
+  createdAt: Type.String({ format: DATE_TIME_FORMAT }),
+});
+// Design 6.8 (extensions plan E5): compositions are a base version plus extensions.
+export const CompositionDto = Type.Object(
+  {
+    systemVersionId: Type.String({ format: UUID_FORMAT }),
+    extensions: Type.Array(
+      Type.Object(
+        { extensionId: Type.String({ format: UUID_FORMAT }), versionId: Type.String({ format: UUID_FORMAT }) },
+        { additionalProperties: false },
+      ),
+      { maxItems: 16 },
+    ),
+  },
+  { additionalProperties: false },
+);
+export const ExtensionChoiceDto = Type.Object({
+  extensionId: Type.String({ format: UUID_FORMAT }),
+  name: Type.String(),
+  version: VersionChoiceDto,
+  upgrades: Type.Array(VersionChoiceDto),
+});
+export const CompositionDescriptionDto = Type.Object({
+  systemVersion: VersionChoiceDto,
+  extensions: Type.Array(ExtensionChoiceDto),
+});
+export const CompositionOptionsDto = Type.Object({
+  current: CompositionDescriptionDto,
+  revertTo: Type.Union([CompositionDescriptionDto, Type.Null()]),
+  systemUpgrades: Type.Array(VersionChoiceDto),
+  available: Type.Array(ExtensionChoiceDto),
+});
+export const CompositionChangeDto = Type.Union([
+  Type.Object({ kind: Type.Literal("revert") }),
+  Type.Object({ kind: Type.Literal("system_upgrade"), fromVersionId: Type.String(), toVersionId: Type.String() }),
+  Type.Object({ kind: Type.Literal("extension_add"), extensionId: Type.String(), versionId: Type.String() }),
+  Type.Object({ kind: Type.Literal("extension_remove"), extensionId: Type.String(), versionId: Type.String() }),
+  Type.Object({
+    kind: Type.Literal("extension_upgrade"),
+    extensionId: Type.String(),
+    fromVersionId: Type.String(),
+    toVersionId: Type.String(),
+  }),
+]);
+export const CompositionCheckBody = Type.Object({ target: CompositionDto }, { additionalProperties: false });
+export const ChangeCompositionBody = Type.Object(
+  {
+    target: CompositionDto,
+    expectedRevision: Type.Integer({ minimum: 1 }),
+    idempotencyKey: Type.String({ minLength: 1, maxLength: 200 }),
+  },
+  { additionalProperties: false },
+);
+
+type CompositionOptionsValue = import("../../systems/composition-change.js").CompositionOptions;
+type ExtensionChoiceValue = import("../../systems/extensions.js").ExtensionChoice;
+
+export function toVersionChoiceDto(choice: VersionChoice) {
+  return { ...choice, createdAt: choice.createdAt.toISOString() };
+}
+
+export function toCompositionOptionsDto(options: CompositionOptionsValue) {
+  const extension = (choice: ExtensionChoiceValue) => ({
+    ...choice,
+    version: toVersionChoiceDto(choice.version),
+    upgrades: choice.upgrades.map(toVersionChoiceDto),
+  });
+  const description = (value: CompositionOptionsValue["current"]) => ({
+    systemVersion: toVersionChoiceDto(value.systemVersion),
+    extensions: value.extensions.map(extension),
+  });
+  return {
+    current: description(options.current),
+    revertTo: options.revertTo === null ? null : description(options.revertTo),
+    systemUpgrades: options.systemUpgrades.map(toVersionChoiceDto),
+    available: options.available.map(extension),
+  };
+}
+export const VersionChangeDirectionDto = Type.Union([Type.Literal("upgrade"), Type.Literal("revert")]);
+export const VersionChangeReportDto = Type.Object({
+  ok: Type.Boolean(),
+  direction: VersionChangeDirectionDto,
+  fromVersionId: Type.String(),
+  toVersionId: Type.String(),
+  packageFindings: Type.Array(Type.Object({
+    code: Type.String(),
+    path: Type.String(),
+    message: Type.String(),
+    affectsCharacter: Type.Boolean(),
+  })),
+  blockers: Type.Array(Type.Object({
+    code: Type.String(),
+    message: Type.String(),
+    definitionId: Type.Optional(Type.String()),
+    entryId: Type.Optional(Type.String()),
+  })),
+  addedFields: Type.Array(Type.String()),
+  droppedFields: Type.Array(Type.String()),
+  changedEntries: Type.Array(Type.Object({
+    entryId: Type.String(),
+    templateId: Type.String(),
+    updatedFields: Type.Array(Type.String()),
+    keptFields: Type.Array(Type.String()),
+    addedFields: Type.Array(Type.String()),
+    droppedFields: Type.Array(Type.String()),
+    imageUpdated: Type.Boolean(),
+  })),
+  validations: Type.Array(RuntimeValidationDto),
+});
+export const CharacterVersionCheckDto = Type.Object({
+  revision: Type.Integer(),
+  direction: VersionChangeDirectionDto,
+  change: CompositionChangeDto,
+  report: VersionChangeReportDto,
 });
 const DuplicateCharacterBody = Type.Object({
   idempotencyKey: Type.String({ minLength: 1 }),
@@ -655,6 +857,97 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
       },
     },
   },
+  {
+    method: "post",
+    path: "/characters/:characterId/resources/:resourceId/adjust",
+    operationId: "post_characters_characterId_resources_resourceId_adjust",
+    schema: {
+      params: ResourceBumpParams,
+      body: AdjustResourceBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/resources/:resourceId/apply-roll",
+    operationId: "post_characters_characterId_resources_resourceId_apply_roll",
+    schema: {
+      params: ResourceBumpParams,
+      body: Type.Object({
+        rollId: Type.String({ format: UUID_FORMAT }),
+        direction: Type.Union([Type.Literal("subtract"), Type.Literal("add")]),
+        expectedRevision: Type.Integer({ minimum: 1 }),
+        idempotencyKey: Type.String({ minLength: 1 }),
+      }),
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/resources/:resourceId/set",
+    operationId: "post_characters_characterId_resources_resourceId_set",
+    schema: {
+      params: ResourceBumpParams,
+      body: SetResourceBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/applicable-rolls",
+    operationId: "get_characters_characterId_applicable_rolls",
+    schema: {
+      params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) }),
+      response: { "200": Type.Object({ rolls: ApplicableRollsSchema, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/reference-data",
+    operationId: "get_characters_characterId_reference_data",
+    schema: {
+      params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) }),
+      response: { "200": Type.Object({ datasets: ReferenceDataListSchema, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/reference-data/:datasetId",
+    operationId: "get_characters_characterId_reference_data_datasetId",
+    schema: {
+      params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }), datasetId: Type.String({ minLength: 1, maxLength: 64 }) }),
+      response: { "200": Type.Object({ dataset: ReferenceDatasetSchema, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/decks",
+    operationId: "get_characters_characterId_decks",
+    schema: {
+      params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }) }),
+      response: { "200": Type.Object({ decks: CharacterDecksSchema, requestId: Type.String() }), ...ErrorResponses },
+    },
+  },
+  {method:"get",path:"/characters/:characterId/actions/:actionId/roll-options",operationId:"get_character_roll_options",schema:{
+    params: Type.Object({ characterId: Type.String({ format: UUID_FORMAT }), actionId: Type.String() }),
+    querystring: RollOptionsQuery,
+    response: { "200": RollOptionsSchema, ...ErrorResponses },
+  }},
+  {method:"post",path:"/characters/:characterId/physical-rolls",operationId:"prepare_character_physical_roll",
+    schema:{params:CharacterIdParams,body:physicalPrepareBody,
+      response:{"200":Type.Object({attempt:Type.Union([physicalAttemptDto,Type.Null()]),serverTime:Type.String({format:"date-time"}),requestId:Type.String()}),...ErrorResponses}}},
+  {method:"post",path:"/characters/:characterId/physical-rolls/:attemptId/complete",operationId:"complete_character_physical_roll",
+    schema:{params:Type.Object({characterId:physicalId,attemptId:physicalId}),body:physicalSettlementBody,
+      response:{"200":Type.Object({result:CharacterCommandResultDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"get",path:"/characters/:characterId/rolls/:rollId",operationId:"get_characters_characterId_rolls_rollId",schema:{params:PushParams,response:{"200":Type.Object({roll:RollDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"get",path:"/characters/:characterId/rolls/:rollId/push-options",operationId:"get_characters_characterId_rolls_rollId_push_options",schema:{params:PushParams,response:{"200":Type.Object({options:PushOptionsDto,requestId:Type.String()}),...ErrorResponses}}},
   {method:"post",path:"/characters/:characterId/rolls/:rollId/push",operationId:"post_characters_characterId_rolls_rollId_push",schema:{params:PushParams,body:PushBody,response:{"200":Type.Object({result:CharacterCommandResultDto,requestId:Type.String()}),...ErrorResponses}}},
@@ -749,6 +1042,44 @@ export const charactersRouteDefinitions: readonly CharactersRouteDefinition[] = 
     schema: {
       params: CharacterIdParams,
       body: TransferOwnershipBody,
+      response: {
+        "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "get",
+    path: "/characters/:characterId/composition-options",
+    operationId: "get_characters_characterId_composition_options",
+    schema: {
+      params: CharacterIdParams,
+      response: {
+        "200": Type.Object({ options: CompositionOptionsDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/composition-check",
+    operationId: "post_characters_characterId_composition_check",
+    schema: {
+      params: CharacterIdParams,
+      body: CompositionCheckBody,
+      response: {
+        "200": Type.Object({ check: CharacterVersionCheckDto, requestId: Type.String() }),
+        ...ErrorResponses,
+      },
+    },
+  },
+  {
+    method: "post",
+    path: "/characters/:characterId/composition",
+    operationId: "post_characters_characterId_composition",
+    schema: {
+      params: CharacterIdParams,
+      body: ChangeCompositionBody,
       response: {
         "200": Type.Object({ result: CharacterCommandResultDto, requestId: Type.String() }),
         ...ErrorResponses,
@@ -919,6 +1250,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
     const toCommandResultDto = (result: CharacterCommandResult): unknown => ({
       character: toCharacterDto(result.character),
       roll: result.roll,
+      ...(result.rollId ? { rollId: result.rollId } : {}),
       nominal: result.nominal ?? null,
     });
 
@@ -934,13 +1266,17 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       post_characters: async (request, reply) => {
         const body = request.body as {
           systemVersionId: string;
+          extensions?: Array<{ extensionId: string; versionId: string }>;
           entityDefinitionId: string;
           name: string;
           initialValues?: Record<string, unknown>;
+          presetId?: string;
           idempotencyKey: string;
         };
         const result = await characters.create(ctxOf(request), {
+          ...(body.presetId === undefined ? {} : { presetId: body.presetId }),
           systemVersionId: body.systemVersionId,
+          ...(body.extensions === undefined ? {} : { extensions: body.extensions }),
           entityDefinitionId: body.entityDefinitionId,
           name: body.name,
           ...(body.initialValues === undefined ? {} : { initialValues: body.initialValues }),
@@ -1045,6 +1381,99 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },
 
+      post_characters_characterId_resources_resourceId_apply_roll: async (request, reply) => {
+        const params = request.params as { characterId: string; resourceId: string };
+        const body = request.body as { rollId: string; direction: "subtract" | "add"; expectedRevision: number; idempotencyKey: string };
+        const result = await characters.apply(ctxOf(request), {
+          kind: "applyRoll", characterId: params.characterId, resourceId: params.resourceId,
+          rollId: body.rollId, direction: body.direction, expectedRevision: body.expectedRevision, idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      post_characters_characterId_resources_resourceId_adjust: async (request, reply) => {
+        const params = request.params as { characterId: string; resourceId: string };
+        const body = request.body as { delta: number; expectedRevision: number; idempotencyKey: string };
+        const result = await characters.apply(ctxOf(request), {
+          kind: "adjustResource",
+          characterId: params.characterId,
+          resourceId: params.resourceId,
+          delta: body.delta,
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      post_characters_characterId_resources_resourceId_set: async (request, reply) => {
+        const params = request.params as { characterId: string; resourceId: string };
+        const body = request.body as { current?: number; max?: number; expectedRevision: number; idempotencyKey: string };
+        const result = await characters.apply(ctxOf(request), {
+          kind: "setResource",
+          characterId: params.characterId,
+          resourceId: params.resourceId,
+          ...(body.current === undefined ? {} : { current: body.current }),
+          ...(body.max === undefined ? {} : { max: body.max }),
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
+      get_characters_characterId_applicable_rolls: async (request, reply) => {
+        const result = await characters.listApplicableRolls(ctxOf(request), request.params as { characterId: string });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "no-store");
+        return { rolls: result.value, requestId: request.id };
+      },
+
+      get_characters_characterId_reference_data: async (request, reply) => {
+        const result = await characters.readReferenceData(ctxOf(request), request.params as { characterId: string });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { ...result.value, requestId: request.id };
+      },
+
+      get_characters_characterId_reference_data_datasetId: async (request, reply) => {
+        const result = await characters.readReferenceData(ctxOf(request), request.params as { characterId: string; datasetId: string });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { ...result.value, requestId: request.id };
+      },
+
+      get_characters_characterId_decks: async (request, reply) => {
+        const result = await characters.listDecks(ctxOf(request), request.params as { characterId: string });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "no-store");
+        return { decks: result.value, requestId: request.id };
+      },
+
+      get_character_roll_options: async (request, reply) => {
+        const params = request.params as { characterId: string; actionId: string };
+        const query = request.query as { entryId?: string };
+        const result = await characters.rollOptions(ctxOf(request), { ...params, ...query });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "no-store");
+        return result.value;
+      },
+      prepare_character_physical_roll: async (request, reply) => {
+        if (!characters.physicalRolls) return sendError(reply, {code:"not_found",message:"Physical dice are disabled."}, request.id);
+        const {characterId} = request.params as {characterId:string};
+        const command = {...request.body as PhysicalCommand, characterId};
+        const result = await characters.physicalRolls.prepare(ctxOf(request), command);
+        if (!result.ok) return sendError(reply,result.error,request.id);
+        return {attempt:result.value,serverTime:new Date().toISOString(),requestId:request.id};
+      },
+      complete_character_physical_roll: async (request, reply) => {
+        if (!characters.physicalRolls) return sendError(reply, {code:"not_found",message:"Physical dice are disabled."}, request.id);
+        const {characterId,attemptId} = request.params as {characterId:string;attemptId:string};
+        const result = await characters.physicalRolls.complete(ctxOf(request), characterId, attemptId, request.body as Settlement);
+        if (!result.ok) return sendError(reply,result.error,request.id);
+        return {result:toCommandResultDto(result.value),requestId:request.id};
+      },
       get_characters_characterId_rolls_rollId:async(request,reply)=>{
         const result=await characters.readRoll(ctxOf(request),request.params as {characterId:string;rollId:string});
         if(!result.ok)return sendError(reply,result.error,request.id);reply.header("cache-control","no-store");return {roll:result.value,requestId:request.id};
@@ -1062,6 +1491,8 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         const params = request.params as { characterId: string; actionId: string };
         const body = request.body as {
           inputs?: Record<string, unknown>;
+          targetCharacterId?: string;
+          respondsTo?: string;
           audience?: "owner_only" | "gm_only" | "campaign";
           entryId?: string;
           expectedRevision: number;
@@ -1072,6 +1503,8 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
           characterId: params.characterId,
           actionId: params.actionId,
           inputs: body.inputs ?? {},
+          ...(body.targetCharacterId === undefined ? {} : { targetCharacterId: body.targetCharacterId }),
+          ...(body.respondsTo === undefined ? {} : { respondsTo: body.respondsTo }),
           expectedRevision: body.expectedRevision,
           idempotencyKey: body.idempotencyKey,
           ...(body.audience === undefined ? {} : { audience: body.audience }),
@@ -1090,6 +1523,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
             entryId: string;
             slotId: string;
             templateId: string | null;
+            extensionId?: string;
             values: Record<string, unknown>;
             quantity?: number;
           };
@@ -1104,6 +1538,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
             ...(body.entry.source === undefined ? {} : {source:body.entry.source}),
             slotId: body.entry.slotId,
             templateId: body.entry.templateId,
+            ...(body.entry.extensionId === undefined ? {} : { extensionId: body.entry.extensionId }),
             values: body.entry.values,
             ...(body.entry.quantity === undefined ? {} : { quantity: body.entry.quantity }),
           },
@@ -1212,6 +1647,40 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
         return { result: toCommandResultDto(result.value), requestId: request.id };
       },
 
+      get_characters_characterId_composition_options: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const result = await characters.listVersionOptions(ctxOf(request), { characterId: params.characterId });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { options: toCompositionOptionsDto(result.value), requestId: request.id };
+      },
+
+      post_characters_characterId_composition_check: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const body = request.body as { target: unknown };
+        const result = await characters.checkVersionChange(ctxOf(request), {
+          characterId: params.characterId,
+          target: body.target,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        reply.header("cache-control", "private, no-store");
+        return { check: result.value, requestId: request.id };
+      },
+
+      post_characters_characterId_composition: async (request, reply) => {
+        const params = request.params as { characterId: string };
+        const body = request.body as { target: Composition; expectedRevision: number; idempotencyKey: string };
+        const result = await characters.manage(ctxOf(request), {
+          kind: "changeVersion",
+          characterId: params.characterId,
+          target: body.target,
+          expectedRevision: body.expectedRevision,
+          idempotencyKey: body.idempotencyKey,
+        });
+        if (!result.ok) return sendError(reply, result.error, request.id);
+        return { result: toCommandResultDto(result.value), requestId: request.id };
+      },
+
       post_characters_characterId_duplicate: async (request, reply) => {
         const params = request.params as { characterId: string };
         const body = request.body as { idempotencyKey: string };
@@ -1263,7 +1732,7 @@ export const buildCharactersRoutes: (input: BuildCharactersRoutesInput) => Fasti
       const schema = response === undefined ? route.schema : { ...route.schema, response };
       app[route.method](route.path, { schema,
         ...((route.path.includes("/portrait") || route.path.includes("/image")) ? { onRequest: async (_request: FastifyRequest, reply: FastifyReply) => { reply.header("cache-control", "private, no-store").header("x-content-type-options", "nosniff"); } } : {}),
-        ...((route.path.endsWith("/portrait") || route.path.endsWith("/image")) && route.method === "put" ? { bodyLimit: 8 * 1024 * 1024 } : {}),
-        ...((route.path.includes("/entries") || route.path.includes("/rolls/") || route.path.includes("/portrait")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
+        ...((route.path.endsWith("/portrait") || route.path.endsWith("/image")) && route.method === "put" ? { bodyLimit: 8 * 1024 * 1024, config: { browserRateBucket: "upload" } } : {}),
+        ...((route.path.includes("/physical-rolls") || route.path.includes("/entries") || route.path.includes("/rolls/") || route.path.includes("/portrait")) ? { validatorCompiler: strictInputCompiler } : {}) }, handlers[route.operationId]!);
     }
   };

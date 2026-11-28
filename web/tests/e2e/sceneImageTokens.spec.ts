@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import sharp from "sharp";
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 import AxeBuilder from "@axe-core/playwright";
 
 const retainedFixture = process.env.SCENE_TOKEN_FIXTURE;
@@ -106,7 +106,7 @@ test("V1 image tokens: GUI upload/select, relative size, retained art and restri
     await expect(dp.getByText("Label marker", { exact: true })).toBeVisible();
     displayId = await dp.evaluate(() => JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!).displayId);
     for (const token of state.tokens.filter((t: any) => ["Secret", "Fogged"].includes(t.label))) {
-      const status = await dp.evaluate(async ({ sceneId, tokenId, revision }) => { const c = JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!); return (await fetch(`/api/displays/${c.displayId}/scenes/${sceneId}/tokens/${tokenId}/image?rev=${revision}`, { credentials: "omit", headers: { "x-display-secret": c.secret } })).status; }, { sceneId, tokenId: token.tokenId, revision: state.revision });
+      const status = await dp.evaluate(async ({ sceneId, tokenId, file }) => { const c = JSON.parse(sessionStorage.getItem("sweetroll:display-credential")!); return (await fetch(`/api/displays/${c.displayId}/scenes/${sceneId}/tokens/${tokenId}/image?file=${file}`, { credentials: "omit", headers: { "x-display-secret": c.secret } })).status; }, { sceneId, tokenId: token.tokenId, file: (token.imageFileId ?? "00000000-0000-4000-8000-000000000000") as string });
       expect(status).toBe(404);
     }
     expect(seen.filter(path => /^\/api\/(campaigns|characters|systems|scenes)\//.test(path))).toEqual([]);

@@ -29,3 +29,4 @@ export * from "./expression.js";
 export * from "./package.js";
 
 export * from "./push-policy.js";
+export * from "./extension.js";

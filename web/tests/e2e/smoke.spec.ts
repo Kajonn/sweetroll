@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 
 test("smoke: app shell renders", async ({ page }) => {
   await page.goto("/");

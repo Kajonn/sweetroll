@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { test } from "../fixtures/browserTest";
 import { campaignTemplateJourney, campaignTemplateReviewJourney } from "../fixtures/campaignTemplates.js";
 test("GM publication, co-GM conflict, player snapshot, offline retry and archive/recover", async ({
   browser,

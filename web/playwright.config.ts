@@ -18,6 +18,8 @@ const scannerHealthPort = String(Number(backendPort) + 11);
 const scannerHost = process.env.SWEETROLL_CLAMD_HOST ?? "127.0.0.1";
 const scannerBackendPort = process.env.SWEETROLL_CLAMD_PORT ?? scannerPort;
 
+const baseURL = `http://localhost:${webPort}`;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -39,7 +41,12 @@ export default defineConfig({
   testIgnore:
     process.env.SWEETROLL_E2E_SUITE === "journeys" ? ["**/visual.spec.ts"] : [],
   snapshotPathTemplate: "{testDir}/../visual/__screenshots__/{testFilePath}/{arg}{ext}",
-  use: { baseURL: `http://localhost:${webPort}`, trace: "retain-on-failure" },
+  use: {
+    baseURL,
+    // Playwright's APIRequestContext sends browser cookies without Origin by default.
+    extraHTTPHeaders: { Origin: baseURL },
+    trace: "retain-on-failure",
+  },
   webServer: [
     ...(process.env.SWEETROLL_CLAMD_HOST ? [] : [{
       command: "node scripts/image-scan-fixture.mjs",

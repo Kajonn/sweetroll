@@ -1,5 +1,7 @@
-import type {RollBreakdown,PushResult} from "../systems/implementation/rules/result.js";
+import type {DieResult,RollBreakdown,PushResult} from "../systems/implementation/rules/result.js";
 import type { Pool, PoolClient } from "pg";
+
+import { notifySceneEvent } from "./scene-events.js";
 
 export type DbClient = Pool | PoolClient;
 
@@ -59,7 +61,17 @@ export type ActivityEventKind =
   | "content_deleted"
   | "content_recovered"
   | "content_grants_replaced"
-  | "roll_executed";
+  | "roll_executed"
+  | "system_version_upgraded"
+  | "system_version_reverted"
+  | "extension_upgraded"
+  | "extension_added"
+  | "extension_removed";
+
+export type ActivitySummary =
+  | { kind: "roll" | "push"; total: number; audience: RollExportRecord["audience"] }
+  | { kind: "draw"; cards: string[]; audience: RollExportRecord["audience"] }
+  | { kind: "content"; title: string };
 
 export type ActivityEventRecord = {
   eventId: string;
@@ -71,6 +83,8 @@ export type ActivityEventRecord = {
   sourceRollId: string | null;
   requestId: string;
   occurredAt: Date;
+  summary?: ActivitySummary;
+  actorName?: string;
 };
 
 /**
@@ -80,15 +94,17 @@ export type ActivityEventRecord = {
  * other members never enter the projection.
  */
 export type RollExportRecord = {
+  targetCharacterId?: string;
+  respondsTo?: string;
   rollId: string;
   characterId: string;
   actorId: string;
   actionId: string;
   audience: "owner_only" | "gm_only" | "campaign";
   expression: string;
-  breakdown?: RollBreakdown;
+  breakdown: RollBreakdown;
   push?: PushResult;
-  dice: unknown;
+  dice: DieResult[];
   bindings: unknown;
   total: number;
   output: string;
@@ -165,6 +181,8 @@ export type SceneRecord = {
   campaignId: string;
   backgroundFileId: string;
   revision: number;
+  /** Player-safe map version: bumps only with fog or a different background. */
+  imageRevision: number;
   fog: unknown;
   tokens: unknown;
   createdAt: Date;
@@ -287,16 +305,40 @@ type ActivityEventRow = {
   occurred_at: Date;
 };
 
+type ActivitySummaryRow = ActivityEventRow & {
+  total: number | null;
+  audience: RollExportRecord["audience"] | null;
+  cards: string[] | null;
+  pushed: boolean | null;
+  content_title: string | null;
+  actor_name: string | null;
+};
+
+function activitySummary(row: ActivitySummaryRow): ActivitySummary | undefined {
+  if (row.audience !== null && row.total !== null) {
+    if (row.cards?.length) return { kind: "draw", cards: row.cards, audience: row.audience };
+    return { kind: row.pushed ? "push" : "roll", total: row.total, audience: row.audience };
+  }
+  if (row.content_title !== null && (
+    row.kind === "content_created" || row.kind === "content_updated" || row.kind === "content_grants_replaced"
+  )) {
+    return { kind: "content", title: row.content_title };
+  }
+  return undefined;
+}
+
 type RollExportRow = {
+  target_character_id: string | null;
+  responds_to_roll_id: string | null;
   id: string;
   character_id: string;
   actor_id: string;
   action_id: string;
   audience: string;
   expression: string;
-  breakdown_json: RollBreakdown | null;
+  breakdown_json: RollBreakdown;
   push_result_json: PushResult | null;
-  dice_json: unknown;
+  dice_json: DieResult[];
   bindings_json: unknown;
   total: number;
   rendered_output: string;
@@ -323,6 +365,7 @@ type SceneRow = {
   campaign_id: string;
   background_file_id: string;
   revision: number;
+  image_revision: number;
   fog_jsonb: unknown;
   tokens_jsonb: unknown;
   created_at: Date;
@@ -396,7 +439,7 @@ const CONTENT_COLUMNS =
 const MEDIA_COLUMNS =
   "id, campaign_id, owner_id, name, media_type, size_bytes, width, height, checksum, storage_key, revision, created_at";
 const SCENE_COLUMNS =
-  "id, campaign_id, background_file_id, revision, fog_jsonb, tokens_jsonb, created_at";
+  "id, campaign_id, background_file_id, revision, image_revision, fog_jsonb, tokens_jsonb, created_at";
 const DISPLAY_CODE_COLUMNS = "code_hash, campaign_id, expires_at, created_at";
 const DISPLAY_CREDENTIAL_COLUMNS = "id, campaign_id, secret_hash, revoked_at, created_at";
 const ACTIVITY_COLUMNS = "id, campaign_id, actor_id, kind, source_content_id, source_roll_id, request_id, occurred_at";
@@ -439,6 +482,11 @@ function toActivityEventRecord(row: ActivityEventRow): ActivityEventRecord {
     case "content_recovered":
     case "content_grants_replaced":
     case "roll_executed":
+    case "system_version_upgraded":
+    case "system_version_reverted":
+    case "extension_added":
+    case "extension_removed":
+    case "extension_upgraded":
       break;
     default:
       throw new Error(`Unknown activity kind: ${row.kind}`);
@@ -461,13 +509,15 @@ function toRollExportRecord(row: RollExportRow): RollExportRecord {
   }
   return {
     rollId: row.id,
+    ...(row.target_character_id ? { targetCharacterId: row.target_character_id } : {}),
+    ...(row.responds_to_roll_id ? { respondsTo: row.responds_to_roll_id } : {}),
     characterId: row.character_id,
     actorId: row.actor_id,
     actionId: row.action_id,
     audience: row.audience,
     expression: row.expression,
     dice: row.dice_json,
-    ...(row.breakdown_json == null ? {} : {breakdown:row.breakdown_json}),
+    breakdown: row.breakdown_json,
     ...(row.push_result_json == null ? {} : {push:row.push_result_json}),
     bindings: row.bindings_json,
     total: row.total,
@@ -496,12 +546,29 @@ function toMediaFileRecord(row: MediaFileRow): MediaFileRecord {
   };
 }
 
+/**
+ * Scene writes run inside the caller's transaction; the queued NOTIFY is
+ * delivered only on COMMIT, so rollbacks never reach display streams.
+ */
+async function notifiedScene(client: PoolClient, row: SceneRow | undefined): Promise<SceneRecord | null> {
+  if (row === undefined) return null;
+  const record = toSceneRecord(row);
+  await notifySceneEvent(client, {
+    kind: "scene",
+    sceneId: record.sceneId,
+    campaignId: record.campaignId,
+    revision: record.revision,
+  });
+  return record;
+}
+
 function toSceneRecord(row: SceneRow): SceneRecord {
   return {
     sceneId: row.id,
     campaignId: row.campaign_id,
     backgroundFileId: row.background_file_id,
     revision: row.revision,
+    imageRevision: row.image_revision,
     fog: row.fog_jsonb,
     tokens: row.tokens_jsonb,
     createdAt: row.created_at,
@@ -549,7 +616,7 @@ const CONTENT_VISIBILITY_PREDICATE = `(
  * override); `gm_only` admits the roller plus current GMs; `campaign`
  * admits every active member (callers already require active membership).
  */
-const ROLL_VISIBILITY_PREDICATE = `(
+export const ROLL_VISIBILITY_PREDICATE = `(
   r.audience = 'campaign'
   OR (r.audience = 'gm_only' AND ($2::boolean OR COALESCE(r.audience_actor_id,r.actor_id) = $1))
   OR (r.audience = 'owner_only' AND COALESCE(r.audience_actor_id,r.actor_id) = $1)
@@ -598,6 +665,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
           WHERE v.id = $2
             AND v.lifecycle = 'published'
             AND s.lifecycle = 'active'
+            AND s.kind = 'system'
             AND (s.owner_id = $1 OR s.access IN ('public', 'link'))`,
         [actorId, versionId],
       );
@@ -649,9 +717,13 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       return row === undefined ? null : toCampaignRecord(row);
     },
 
-    async lockCampaign(client: PoolClient, campaignId: string): Promise<CampaignRecord | null> {
+    async lockCampaign(
+      client: PoolClient,
+      campaignId: string,
+      lock: "UPDATE" | "NO KEY UPDATE" = "UPDATE",
+    ): Promise<CampaignRecord | null> {
       const result = await client.query<CampaignRow>(
-        `SELECT ${CAMPAIGN_COLUMNS} FROM campaigns WHERE id = $1 FOR UPDATE`,
+        `SELECT ${CAMPAIGN_COLUMNS} FROM campaigns WHERE id = $1 FOR ${lock}`,
         [campaignId],
       );
       const row = result.rows[0];
@@ -687,6 +759,24 @@ export function createCampaignPersistenceRepository(pool: Pool) {
           WHERE id = $1 AND revision = $4
           RETURNING ${CAMPAIGN_COLUMNS}`,
         [input.campaignId, input.status, input.now.toISOString(), input.expectedRevision],
+      );
+      const row = result.rows[0];
+      return row === undefined ? null : toCampaignRecord(row);
+    },
+
+    /** Design 6.7: move the campaign pin; the caller verified and moved attached characters. */
+    async updateCampaignVersion(
+      client: PoolClient,
+      input: { campaignId: string; fromVersionId: string; toVersionId: string; expectedRevision: number; now: Date },
+    ): Promise<CampaignRecord | null> {
+      // The previous composition is written by recordPreviousCampaignComposition.
+      const result = await client.query<CampaignRow>(
+        `UPDATE campaigns
+            SET system_version_id = $2,
+                revision = revision + 1, updated_at = $3::timestamptz
+          WHERE id = $1 AND revision = $4 AND system_version_id = $5
+          RETURNING ${CAMPAIGN_COLUMNS}`,
+        [input.campaignId, input.toVersionId, input.now.toISOString(), input.expectedRevision, input.fromVersionId],
       );
       const row = result.rows[0];
       return row === undefined ? null : toCampaignRecord(row);
@@ -1485,30 +1575,72 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         limit: number;
         cursorOccurredAt: string | null;
         cursorId: string | null;
+        watch?: readonly string[];
+        includeSummary?: boolean;
       },
-    ): Promise<ActivityEventRecord[]> {
+    ): Promise<{ rows: ActivityEventRecord[]; visibleWatch: string[] }> {
+      const predicates = `
+            e.campaign_id = $3
+            AND (e.source_content_id IS NULL OR (c.campaign_id = $3 AND c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
+            AND (e.source_roll_id IS NULL OR (r.scope_campaign_id = $3 AND ${ROLL_VISIBILITY_PREDICATE}))`;
+      const sources = `FROM campaign_activity_events e
+           LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
+           LEFT JOIN character_rolls r ON r.id = e.source_roll_id`;
       const params: unknown[] = [input.actorId, input.isGm, input.campaignId];
       let cursorClause = "";
       if (input.cursorOccurredAt !== null && input.cursorId !== null) {
         params.push(input.cursorOccurredAt, input.cursorId);
-        // Millisecond-precision keyset anchor (see listCampaignsPage).
         cursorClause = `AND ((date_trunc('milliseconds', e.occurred_at), e.id) < ($4::timestamptz, $5))`;
       }
       params.push(input.limit + 1);
-      const result = await client.query<ActivityEventRow>(
-        `SELECT ${ACTIVITY_COLUMNS.split(", ").map((column) => `e.${column}`).join(", ")}
-           FROM campaign_activity_events e
-           LEFT JOIN campaign_content_items c ON c.id = e.source_content_id
-           LEFT JOIN character_rolls r ON r.id = e.source_roll_id
-          WHERE e.campaign_id = $3
-            AND (c.id IS NULL OR (c.status = 'active' AND ${CONTENT_VISIBILITY_PREDICATE}))
-            AND (r.id IS NULL OR ${ROLL_VISIBILITY_PREDICATE})
-            ${cursorClause}
-          ORDER BY date_trunc('milliseconds', e.occurred_at) DESC, e.id DESC
-          LIMIT $${params.length}`,
+      const watchKey = `CASE WHEN r.id IS NULL THEN 'event:' || e.id::text ELSE 'roll:' || r.id::text END`;
+      const watch = input.watch ?? [];
+      const watchQuery = watch.length === 0 ? "" : `,
+        watched AS (
+          SELECT ${watchKey} AS key
+          ${sources}
+          WHERE ${predicates}
+            AND (e.id = ANY($${params.length + 1}::uuid[]) OR r.id = ANY($${params.length + 2}::uuid[]))
+        )`;
+      const columnList = ACTIVITY_COLUMNS.split(", ").map(column => `e.${column}`).join(", ");
+      const selectSummary = input.includeSummary ? `, r.total, r.audience,
+        (r.parent_roll_id IS NOT NULL) AS pushed,
+        ARRAY(SELECT card->>'label' FROM jsonb_array_elements(r.breakdown_json #> '{cards,drawn}') card) AS cards,
+        c.title AS content_title, u.display_name AS actor_name` : "";
+      const actorJoin = input.includeSummary ? "LEFT JOIN users u ON u.id = e.actor_id" : "";
+      const limitParam = params.length;
+      if (watch.length > 0) {
+        params.push(watch.filter(key => key.startsWith("event:")).map(key => key.slice(6)));
+        params.push(watch.filter(key => key.startsWith("roll:")).map(key => key.slice(5)));
+      }
+      const result = await client.query<{ events: ActivitySummaryRow[]; visible_watch: string[] }>(
+        `WITH page AS (
+           SELECT ${columnList}${selectSummary}
+           ${sources}
+           ${actorJoin}
+           WHERE ${predicates}
+           ${cursorClause}
+           ORDER BY date_trunc('milliseconds', e.occurred_at) DESC, e.id DESC
+           LIMIT $${limitParam}
+         )${watchQuery}
+         SELECT COALESCE((SELECT jsonb_agg(to_jsonb(page) ORDER BY date_trunc('milliseconds', occurred_at) DESC, id DESC) FROM page), '[]') AS events,
+                ${watch.length === 0 ? "ARRAY[]::text[]" : "ARRAY(SELECT key FROM watched)"} AS visible_watch`,
         params,
       );
-      return result.rows.map(toActivityEventRecord);
+      const page = result.rows[0]!;
+      return {
+        rows: page.events.map(row => {
+          const record = toActivityEventRecord({ ...row, occurred_at: new Date(row.occurred_at) });
+          if (!input.includeSummary) return record;
+          const summary = activitySummary(row);
+          return {
+            ...record,
+            ...(summary ? { summary } : {}),
+            ...(row.actor_name ? { actorName: row.actor_name } : {}),
+          };
+        }),
+        visibleWatch: page.visible_watch,
+      };
     },
 
     /** Full roster (any status) for the export projection, ordered by user. */
@@ -1575,7 +1707,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
     ): Promise<RollExportRecord[]> {
       const result = await client.query<RollExportRow>(
         `SELECT r.id, r.character_id, r.actor_id, r.action_id, r.audience,
-                r.expression, r.dice_json, r.bindings_json, r.breakdown_json, r.push_result_json, r.total, r.rendered_output, r.occurred_at
+                r.expression, r.dice_json, r.bindings_json, r.breakdown_json, r.push_result_json, r.target_character_id, r.responds_to_roll_id, r.total, r.rendered_output, r.occurred_at
            FROM character_rolls r
           WHERE r.scope_campaign_id = $3 AND ${ROLL_VISIBILITY_PREDICATE}
           ORDER BY r.id
@@ -1695,7 +1827,12 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         [input.fileId, input.expectedRevision],
       );
       const row = result.rows[0];
-      return row === undefined ? null : toMediaFileRecord(row);
+      if (row === undefined) return null;
+      const record = toMediaFileRecord(row);
+      // Scene streams of this campaign reload: a deleted background or token
+      // image must stop being served (fail closed) without waiting for a write.
+      await notifySceneEvent(client, { kind: "campaign", campaignId: record.campaignId });
+      return record;
     },
 
     /**
@@ -1760,13 +1897,13 @@ export function createCampaignPersistenceRepository(pool: Pool) {
             SET background_file_id = $2,
                 fog_jsonb = CASE WHEN background_file_id IS DISTINCT FROM $2 THEN '[]'::jsonb ELSE fog_jsonb END,
                 tokens_jsonb = CASE WHEN background_file_id IS DISTINCT FROM $2 THEN '[]'::jsonb ELSE tokens_jsonb END,
+                image_revision = CASE WHEN background_file_id IS DISTINCT FROM $2 THEN image_revision + 1 ELSE image_revision END,
                 revision = revision + 1
           WHERE id = $1 AND revision = $3
           RETURNING ${SCENE_COLUMNS}`,
         [input.sceneId, input.backgroundFileId, input.expectedRevision],
       );
-      const row = result.rows[0];
-      return row === undefined ? null : toSceneRecord(row);
+      return await notifiedScene(client, result.rows[0]);
     },
 
     /**
@@ -1781,13 +1918,13 @@ export function createCampaignPersistenceRepository(pool: Pool) {
       const result = await client.query<SceneRow>(
         `UPDATE scenes
             SET fog_jsonb = fog_jsonb || $2::jsonb,
+                image_revision = image_revision + 1,
                 revision = revision + 1
           WHERE id = $1 AND revision = $3
           RETURNING ${SCENE_COLUMNS}`,
         [input.sceneId, JSON.stringify([input.fogOp]), input.expectedRevision],
       );
-      const row = result.rows[0];
-      return row === undefined ? null : toSceneRecord(row);
+      return await notifiedScene(client, result.rows[0]);
     },
 
     /**
@@ -1808,8 +1945,7 @@ export function createCampaignPersistenceRepository(pool: Pool) {
           RETURNING ${SCENE_COLUMNS}`,
         [input.sceneId, JSON.stringify(input.tokens), input.expectedRevision],
       );
-      const row = result.rows[0];
-      return row === undefined ? null : toSceneRecord(row);
+      return await notifiedScene(client, result.rows[0]);
     },
 
     /**
@@ -1818,6 +1954,15 @@ export function createCampaignPersistenceRepository(pool: Pool) {
      * nothing and returns null so the caller mints a fresh code; callers
      * always run this inside the pair transaction.
      */
+    async countLiveDisplayCodes(client: PoolClient, campaignId: string, now: Date): Promise<number> {
+      await client.query("DELETE FROM display_codes WHERE campaign_id = $1 AND expires_at <= $2", [campaignId, now]);
+      const result = await client.query(
+        "SELECT 1 FROM display_codes WHERE campaign_id = $1 AND expires_at > $2",
+        [campaignId, now],
+      );
+      return result.rowCount ?? 0;
+    },
+
     async insertDisplayCode(
       client: PoolClient,
       input: { codeHash: string; campaignId: string; expiresAt: Date },
@@ -1910,7 +2055,10 @@ export function createCampaignPersistenceRepository(pool: Pool) {
         [input.displayId, input.now.toISOString()],
       );
       const row = result.rows[0];
-      return row === undefined ? null : toDisplayCredentialRecord(row);
+      if (row === undefined) return null;
+      const record = toDisplayCredentialRecord(row);
+      await notifySceneEvent(client, { kind: "display", displayId: record.displayId, campaignId: record.campaignId });
+      return record;
     },
   };
 }

@@ -1,6 +1,7 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 
 import { exportCharacter, publishOwnedClone, readActivity } from "../offline/test-auth.js";
+import { expectSheetSaved } from "../fixtures/sheetSaved";
 
 /**
  * G6 Task 7 exit demonstration (dev-server E2E): onboarding -> system select
@@ -46,9 +47,7 @@ async function createViaPicker(page: Page, versionId: string, name: string): Pro
   return page.url().split("/").pop() ?? "";
 }
 
-async function expectSaved(page: Page) {
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible({ timeout: 60_000 });
-}
+const expectSaved = expectSheetSaved;
 
 /** Complete d20's native required `Proficient` field through the completion section. */
 async function completeProficient(page: Page) {
@@ -167,7 +166,14 @@ test("I5 exit: sign in on phone, select system, create+play two characters, find
   // returns), the library prompt carries no cached names, the recent rail is
   // gone, no stored value retains either name, and a reload stays clean.
   page.on("dialog", dialog => void dialog.accept());
+  const signedOut = page.waitForResponse(response =>
+    response.url().endsWith("/api/signout") && response.request().method() === "POST",
+  );
   await page.getByRole("button", { name: "Sign out" }).click();
+  // The shell hides private data immediately. Wait for the online session
+  // revocation before navigating away from that shell.
+  expect((await signedOut).ok()).toBe(true);
+  await expect(page.getByText("Signed out.", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("dev-signin")).toBeVisible({ timeout: 30_000 });
   await page.goto("/characters");
   await expect(page.getByTestId("dev-signin")).toBeVisible({ timeout: 30_000 });

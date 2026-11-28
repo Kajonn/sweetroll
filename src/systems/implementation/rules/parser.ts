@@ -1,36 +1,31 @@
 import type { ExpressionAstV1 } from "../package/schema/index.js";
-import { tokenize, type Token } from "./tokenizer.js";
+import type { PoolAst } from "../package/schema/expression.js";
+import { children } from "./groups.js";
+import { tokenize, type Token, type FunctionName } from "./tokenizer.js";
 import type { RulesDiagnostic } from "./diagnostic.js";
 
-type BinaryOp = "+" | "-" | "*" | "/" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||";
+type BinaryOp = "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<" | "<=" | ">" | ">=" | "&&" | "||";
 
 export type ParseResult =
   | { ok: true; ast: ExpressionAstV1 }
   | { ok: false; diagnostics: RulesDiagnostic[] };
 
 export function countNodes(ast: ExpressionAstV1): number {
-  switch (ast.kind) {
-    case "numberLiteral": case "stringLiteral": case "booleanLiteral": return 1;
-    case "reference": return 1;
-    case "unary": return 1 + countNodes(ast.operand);
-    case "binary": return 1 + countNodes(ast.left) + countNodes(ast.right);
-    case "call": return 1 + ast.arguments.reduce((s, a) => s + countNodes(a), 0);
-    case "dice": return 1 + countNodes(ast.count);
-    case "keep": return 1 + countNodes(ast.dice);
-    case "successCount": return 1 + countNodes(ast.dice);
-  }
+  return 1 + children(ast).reduce((sum, child) => sum + countNodes(child), 0);
 }
 
 export function depthOf(ast: ExpressionAstV1): number {
-  switch (ast.kind) {
-    case "numberLiteral": case "stringLiteral": case "booleanLiteral": case "reference": return 1;
-    case "unary": return 1 + depthOf(ast.operand);
-    case "binary": return 1 + Math.max(depthOf(ast.left), depthOf(ast.right));
-    case "call": return 1 + Math.max(0, ...ast.arguments.map(depthOf));
-    case "dice": return 1 + depthOf(ast.count);
-    case "keep": return 1 + depthOf(ast.dice);
-    case "successCount": return 1 + depthOf(ast.dice);
-  }
+  return 1 + Math.max(0, ...children(ast).map(depthOf));
+}
+
+function literal(value: number): ExpressionAstV1 {
+  return { kind: "numberLiteral", value };
+}
+
+const reducers = ["keepHighest", "keepLowest", "countAtLeast", "countAtMost", "countEqual"] as const;
+type ReducerName = typeof reducers[number];
+function isReducer(name: string): name is ReducerName {
+  return reducers.some((reducer) => reducer === name);
 }
 
 class Parser {
@@ -57,7 +52,7 @@ class Parser {
 
   private peek(): Token | undefined { return this.tokens[this.pos]; }
   private take(): Token | undefined { return this.tokens[this.pos++]; }
-  private fail(msg: string): void { this.errors.push({ code: "invalid_syntax", path: "", message: msg }); }
+  private fail(msg: string, code: RulesDiagnostic["code"] = "invalid_syntax"): void { this.errors.push({ code, path: "", message: msg }); }
 
   private at(kind: string): boolean {
     const t = this.peek(); return t !== undefined && t.kind === kind;
@@ -123,7 +118,7 @@ class Parser {
   }
   private parseMultiplicative(): ExpressionAstV1 | undefined {
     let left = this.parseUnary();
-    while (left && this.peekOpIn(["*", "/"])) {
+    while (left && this.peekOpIn(["*", "/", "%"])) {
       const op = this.take()! as Extract<Token, { kind: "operator" }>;
       const right = this.parseUnary();
       if (!right) return undefined;
@@ -149,12 +144,13 @@ class Parser {
     if (!t) { this.fail("unexpected end of input"); return undefined; }
     switch (t.kind) {
       case "number": return { kind: "numberLiteral", value: t.value };
+      case "string": return { kind: "stringLiteral", value: t.value };
       case "boolean": return { kind: "booleanLiteral", value: t.value };
-      case "id": return { kind: "reference", scope: t.scope, id: t.id };
+      case "id": return { kind: "reference", scope: t.scope, id: t.id, ...(t.part && { part: t.part }) };
       case "dice": {
-        const diceAst: ExpressionAstV1 = { kind: "dice", count: { kind: "numberLiteral", value: t.count }, sides: t.sides };
-        if (t.keep) return { kind: "keep", mode: t.keep.mode, count: t.keep.count, dice: diceAst };
-        return diceAst;
+        const pool: PoolAst = { kind: "pool", source: { kind: "dice", count: literal(t.count), sides: literal(t.sides) }, modifiers: [] };
+        if (t.keep) pool.reducer = { kind: t.keep.mode === "highest" ? "keepHighest" : "keepLowest", amount: literal(t.keep.count) };
+        return pool;
       }
       case "lparen": {
         const inner = this.parseOr();
@@ -170,53 +166,12 @@ class Parser {
         return undefined;
     }
   }
-  private parseCall(name: "min" | "max" | "round" | "dice" | "countSuccesses" | "group"): ExpressionAstV1 | undefined {
+  private parseCall(name: FunctionName): ExpressionAstV1 | undefined {
     if (!this.at("lparen")) { this.fail(`expected '(' after ${name}`); return undefined; }
     this.take();
-    if (name === "group") {
-      const id = this.take();
-      if (id?.kind !== "string" || !this.at("comma")) { this.fail("group expects an ID and label string"); return undefined; }
-      this.take();
-      const label = this.take();
-      if (label?.kind !== "string" || !this.at("comma")) { this.fail("group expects a label string and dice"); return undefined; }
-      this.take();
-      const operand = this.parseOr();
-      const dice = operand?.kind === "dice" ? operand : operand?.kind === "keep" && operand.dice.kind === "dice" ? operand.dice : undefined;
-      if (!dice || dice.group !== undefined || !this.at("rparen")) { this.fail("group expects direct dice or static kept dice"); return undefined; }
-      this.take();
-      dice.group = {id: id.value, label: label.value};
-      return operand;
-    }
-    if (name === "dice") {
-      const count = this.parseOr();
-      if (!count) return undefined;
-      if (!this.at("comma")) { this.fail("dice expects a sides literal"); return undefined; }
-      this.take();
-      const sidesTok = this.take();
-      if (!sidesTok || sidesTok.kind !== "number" || !Number.isInteger(sidesTok.value) || sidesTok.value < 1) {
-        this.fail("dice sides must be a positive integer literal"); return undefined;
-      }
-      if (!this.at("rparen")) { this.fail("missing closing paren"); return undefined; }
-      this.take();
-      return { kind: "dice", count, sides: sidesTok.value };
-    }
-    if (name === "countSuccesses") {
-      const diceExpr = this.parseOr();
-      if (!diceExpr) return undefined;
-      if (!this.at("comma")) { this.fail("countSuccesses expects a threshold"); return undefined; }
-      this.take();
-      const thTok = this.take();
-      if (!thTok || thTok.kind !== "number" || !Number.isInteger(thTok.value)) {
-        this.fail("countSuccesses threshold must be an integer"); return undefined;
-      }
-      if (!this.at("rparen")) { this.fail("missing closing paren"); return undefined; }
-      this.take();
-      return { kind: "successCount", dice: diceExpr, threshold: thTok.value };
-    }
-    if (this.at("rparen")) { this.take(); return { kind: "call", function: name, arguments: [] }; }
     const args: ExpressionAstV1[] = [];
     let roundMode: "nearest" | "down" | "up" | undefined;
-    for (;;) {
+    while (!this.at("rparen")) {
       if (name === "round" && args.length === 1 && this.at("roundMode")) {
         const rm = this.take()! as Extract<Token, { kind: "roundMode" }>;
         roundMode = rm.mode;
@@ -225,11 +180,59 @@ class Parser {
       const arg = this.parseOr();
       if (!arg) return undefined;
       args.push(arg);
-      if (this.at("comma")) { this.take(); continue; }
+      if (this.at("comma")) {
+        this.take();
+        if (this.at("rparen")) { this.fail("expected an argument after comma"); return undefined; }
+        continue;
+      }
       break;
     }
     if (!this.at("rparen")) { this.fail("missing closing paren"); return undefined; }
     this.take();
+    const [first, second, third] = args;
+    if (name === "dice" && args.length === 2) {
+      const source = second?.kind === "stringLiteral"
+        ? { kind: "custom", count: first!, dieId: second.value } as const
+        : { kind: "dice", count: first!, sides: second! } as const;
+      return { kind: "pool", source, modifiers: [] };
+    }
+    if (name === "rolled" && args.length === 1 && first?.kind === "stringLiteral") {
+      return { kind: "pool", source: { kind: "rolled", groupId: first.value }, modifiers: [] };
+    }
+    if (name === "group" && args.length === 3 && first?.kind === "stringLiteral" &&
+        second?.kind === "stringLiteral" && third?.kind === "pool" && third.source.kind !== "rolled" && !third.group) {
+      return { ...third, group: { id: first.value, label: second.value } };
+    }
+    if (name === "explode" || name === "rerollOnce") {
+      const validArity = args.length === 2 || (name === "explode" && args.length === 1);
+      if (validArity && first?.kind === "pool" && first.source.kind !== "rolled" &&
+          !first.reducer && !first.modifiers.some((modifier) => modifier.kind === name)) {
+        const modifier = name === "rerollOnce" ? { kind: name, face: second! } as const
+          : { kind: name, ...(second && { face: second }) } as const;
+        return { ...first, modifiers: [...first.modifiers, modifier] };
+      }
+      this.fail(`${name} expects an unreduced dice pool and ${name === "explode" ? "an optional" : "a"} face`);
+      return undefined;
+    }
+    if (name === "countSymbol") {
+      if (args.length === 2 && first?.kind === "pool" && !first.reducer && second?.kind === "stringLiteral") {
+        return { ...first, reducer: { kind: "countSymbol", symbol: second.value } };
+      }
+      this.fail("countSymbol expects a direct dice expression or rolled group and a quoted symbol ID", "invalid_expression");
+      return undefined;
+    }
+    if (name === "countSuccesses" || isReducer(name)) {
+      if (args.length === 2 && first?.kind === "pool" && !first.reducer) {
+        return { ...first, reducer: { kind: name === "countSuccesses" ? "countAtLeast" : name, amount: second! } };
+      }
+      this.fail(`${name} expects a direct dice expression or rolled group and a numeric argument`, "invalid_expression");
+      return undefined;
+    }
+    if (name === "dice" || name === "group" || name === "rolled") {
+      const expected = { dice: "a count and numeric sides or a quoted custom die ID", group: "an ID, label and dice pool", rolled: "a quoted group ID" };
+      this.fail(`${name} expects ${expected[name]}`);
+      return undefined;
+    }
     const call: ExpressionAstV1 = { kind: "call", function: name, arguments: args };
     if (roundMode) call.roundMode = roundMode;
     return call;
@@ -238,12 +241,15 @@ class Parser {
     if (!this.at("lparen")) { this.fail("expected '(' after " + which); return undefined; }
     this.take();
     const t = this.take();
-    if (!t || t.kind !== "dice") { this.fail(which + " expects a static dice literal"); return undefined; }
+    if (!t || t.kind !== "dice" || t.count !== 1 || t.keep) { this.fail(which + " expects a single die such as d20"); return undefined; }
     if (!this.at("rparen")) { this.fail("missing closing paren"); return undefined; }
     this.take();
-    const sides = t.sides;
-    const diceAst: ExpressionAstV1 = { kind: "dice", count: { kind: "numberLiteral", value: 2 }, sides };
-    return { kind: "keep", mode: which === "adv" ? "highest" : "lowest", count: 2, dice: diceAst };
+    return {
+      kind: "pool",
+      source: { kind: "dice", count: literal(2), sides: literal(t.sides) },
+      modifiers: [],
+      reducer: { kind: which === "adv" ? "keepHighest" : "keepLowest", amount: literal(1) },
+    };
   }
 }
 

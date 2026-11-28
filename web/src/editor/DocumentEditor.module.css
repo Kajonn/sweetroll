@@ -367,3 +367,8 @@
     transition: none;
   }
 }
+
+.customDieFace {
+  min-inline-size: 0;
+  margin-block: var(--space-2);
+}

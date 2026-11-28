@@ -10,11 +10,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node scripts/run-e2e.mjs",
+    "test:physics": "playwright test --config playwright.physics.config.ts",
     "test:offline": "playwright test --config playwright.offline.config.ts",
     "test:e2e:update": "playwright test --update-snapshots",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@dimforge/rapier3d-deterministic-compat": "0.21.0",
     "@hookform/resolvers": "3.9.0",
     "@radix-ui/react-dialog": "1.1.2",
     "@radix-ui/react-popover": "1.1.2",
@@ -25,23 +27,24 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-hook-form": "7.53.0",
-    "zod": "3.23.8"
+    "three": "0.184.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.10.0",
-    "@playwright/test": "1.48.0",
+    "@playwright/test": "1.64.1",
     "@testing-library/jest-dom": "6.5.0",
     "@testing-library/react": "16.0.1",
     "@testing-library/user-event": "14.5.2",
     "@types/react": "18.3.11",
     "@types/react-dom": "18.3.0",
-    "@vitejs/plugin-react": "4.3.2",
+    "@types/three": "0.184.0",
+    "@vitejs/plugin-react": "4.7.0",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "25.0.1",
     "msw": "2.4.9",
-    "playwright-core": "1.48.0",
+    "playwright-core": "1.64.1",
     "typescript": "5.9.2",
-    "vite": "5.4.8",
-    "vitest": "2.1.2"
+    "vite": "6.4.5",
+    "vitest": "4.1.12"
   }
 }

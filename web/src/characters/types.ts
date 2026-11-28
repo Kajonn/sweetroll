@@ -10,6 +10,9 @@ export type FrozenRequest = {
   path: string;
   body: Record<string, unknown> & { idempotencyKey: string };
   firstAttemptAt: string;
+  /** Complete this exact physical throw on every retry. The ordinary path
+   * and body still identify the underlying action to the character queue. */
+  physical?: {path:string; settlement:import("../../../src/characters/physical-rolls.js").Settlement};
 };
 
 export type EntrySource = NonNullable<AddCharacterEntryBody["entry"]["source"]>;
@@ -23,10 +26,17 @@ export type EntryInput = {
   quantity?: number;
 };
 
+export type RollOptionsResponse = operations["get_character_roll_options"]["responses"][200]["content"]["application/json"];
+export type CharacterDecksResponse = operations["get_characters_characterId_decks"]["responses"][200]["content"]["application/json"];
+export type CharacterDeck = CharacterDecksResponse["decks"][number];
+export type CampaignRollSelection = { targetCharacterId?: string; respondsTo?: string };
+
 export type EditIntent =
   | { kind: "setField"; fieldId: string; value: unknown }
   | { kind: "bumpResource"; resourceId: string; direction: "up" | "down" }
-  | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown>; entryId?: string }
+  | { kind: "adjustResource"; resourceId: string; delta: number }
+  | { kind: "setResource"; resourceId: string; current?: number; max?: number }
+  | { kind: "executeAction"; actionId: string; inputs?: Record<string, unknown>; entryId?: string; campaignRoll?: CampaignRollSelection }
   | { kind: "addEntry"; entry: EntryInput }
   | { kind: "removeEntry"; entryId: string }
   | { kind: "updateEntryValues"; entryId: string; values: Record<string, unknown>; quantity?: number };
@@ -148,3 +158,10 @@ export type CharacterExport = operations["post_characters_characterId_exports"][
 
 export type PushOptionsResponse=operations["get_characters_characterId_rolls_rollId_push_options"]["responses"]["200"]["content"]["application/json"];
 export type ReadRollResponse=operations["get_characters_characterId_rolls_rollId"]["responses"]["200"]["content"]["application/json"];
+
+// Design 6.7/6.8: composition (rules version and extensions) changes.
+export type VersionOptionsResponse = operations["get_characters_characterId_composition_options"]["responses"]["200"]["content"]["application/json"];
+export type CompositionOptions = VersionOptionsResponse["options"];
+export type VersionChoice = CompositionOptions["systemUpgrades"][number];
+export type VersionCheckResponse = operations["post_characters_characterId_composition_check"]["responses"]["200"]["content"]["application/json"];
+export type VersionChangeReport = VersionCheckResponse["check"]["report"];

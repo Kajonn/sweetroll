@@ -3,7 +3,6 @@ import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from "fastify";
 
 import type { Identity } from "../../identity/index.js";
 import { personalTokenScopes } from "../../identity/personal-tokens.js";
-import { isSameOrigin } from "./identity.js";
 import { strictInputCompiler } from "./strictValidation.js";
 
 const path = "/me/personal-tokens";
@@ -23,8 +22,8 @@ const issueBody = Type.Object({
 const tokenId = Type.Object({ tokenId: Type.String({ format: "uuid" }) });
 
 export function buildPersonalTokenRoutes({
-  identity, allowedOrigins = [],
-}: { identity: Identity; allowedOrigins?: readonly string[] }): FastifyPluginAsync {
+  identity,
+}: { identity: Identity }): FastifyPluginAsync {
   return async (app) => {
     const tokens = identity.personalTokens;
     app.addHook("onRequest", async (_request, reply) => {
@@ -40,10 +39,6 @@ export function buildPersonalTokenRoutes({
         return fail(request, reply, 401, "unauthorized", "Sign in to manage API tokens.");
       }
       if (request.method !== "GET" && request.method !== "HEAD") {
-        const origin = request.headers.origin;
-        if (origin === undefined || !isSameOrigin(origin, request, allowedOrigins)) {
-          return fail(request, reply, 403, "forbidden", "A same-origin request is required.");
-        }
         if (!tokens.enabled) {
           return fail(request, reply, 403, "forbidden", "Personal access tokens are unavailable.");
         }

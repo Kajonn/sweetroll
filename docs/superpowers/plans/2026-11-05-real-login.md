@@ -1,10 +1,10 @@
 # Real login — staged implementation and acceptance
 
-**Status:** Proposed, 2026-11-05. Planning authorized; no provider selected or credentials provisioned by this document. No implementation or real-provider acceptance claimed.
+**Status:** Proposed implementation plan, updated 2026-11-28. OD-05 was resolved on 2026-11-10 as OIDC social plus email magic link. This plan stages that decision, recommends Google for the first social provider, and claims no implementation or real-provider acceptance.
 
 **Goal:** A GM or player can sign into deployed Sweetroll, return to their intended page or invitation, play with their own data, and sign out safely without a test code.
 
-**Recommendation for OD-05:** Start with Google OpenID Connect, using the server-side Authorization Code flow with S256 PKCE. Keep the Identity port provider-independent. Consider passwordless email in a later, separately scoped increment; it needs a delivery provider, abuse controls and a deliberate account-linking policy. Do not build passwords or operate a new identity server for this first increment. Google is a proposed first provider, not an approved exclusive long-term choice.
+**First social provider recommendation:** Start with Google OpenID Connect, using the server-side Authorization Code flow with S256 PKCE. Keep the Identity port provider-independent. Implement passwordless email as a later increment under the resolved OD-05 decision; it needs a delivery provider, abuse controls and a deliberate account-linking policy. Do not build passwords or operate a new identity server. Google is a proposed first provider, not an approved exclusive long-term choice.
 
 ## Existing foundation and gaps
 
@@ -40,7 +40,7 @@ Every implementation task starts with failing behavior tests, then the smallest 
 
 ### L0 — Confirm provider and deployment inputs
 
-- [ ] Owner confirms Google-first or names an alternative OIDC issuer; resolve OD-05 only after this decision.
+- [ ] Confirm Google as the first social OIDC issuer, or select an alternative issuer; this provider detail does not reopen resolved OD-05.
 - [ ] Identify the Google Cloud project owner and register a Web application OAuth client for acceptance. Configure consent branding/audience/test users as required by the provider's current console. Check production publishing/verification requirements separately; do not assume testing configuration is launch-ready.
 - [ ] Record exact acceptance origin and authorized callback below. Use a separate client for production so acceptance credentials and redirect configuration are isolated.
 - [ ] Place secrets directly into service variables through the authorized connection; never commit or paste them into plans, PRs, logs or chat. Code work can proceed with a local protocol fixture while external setup is pending, but real acceptance cannot.
@@ -88,7 +88,7 @@ Derive callback from the validated configured origin plus the fixed route, or va
 
 ## Completion and exclusions
 
-The first login increment is complete when required CI passes, real Google login on acceptance creates/resolves the correct local accounts, invitation return and session/logout/privacy checks pass, and the acceptance record clearly states remaining human/device gates. Updating configuration alone or passing local issuer tests cannot close real-provider acceptance. Google access revocation is not automatic Sweetroll session revocation; sessions retain their documented local TTL unless locally revoked. Provider-wide logout/back-channel revocation, session-management UI, email magic links, additional social providers, account linking, password recovery, billing and public release are separate scope.
+The first social-login increment is complete when required CI passes, real login with the selected OIDC provider on acceptance creates/resolves the correct local accounts, invitation return and session/logout/privacy checks pass, and the acceptance record clearly states remaining human/device gates. Updating configuration alone or passing local issuer tests cannot close real-provider acceptance. Google access revocation is not automatic Sweetroll session revocation; sessions retain their documented local TTL unless locally revoked. Provider-wide logout/back-channel revocation, session-management UI, additional social providers, account linking, password recovery, billing and public release are separate scope. Email magic-link implementation remains a later increment within the resolved OD-05 decision.
 
 ## Primary implementation references
 
@@ -97,4 +97,4 @@ The first login increment is complete when required CI passes, real Google login
 - [openid-client maintained implementation and PKCE examples](https://github.com/panva/openid-client)
 - [openid-client authorization-code validation checks](https://github.com/panva/openid-client/blob/main/docs/functions/authorizationCodeGrant.md)
 
-Checked 2026-11-05. Recheck provider console requirements and the pinned library API during implementation. This plan extends design Sections 11–12, 18.1 OD-05 and 18.2; it does not mark those release gates accepted.
+Checked 2026-11-28. Recheck provider console requirements and the pinned library API during implementation. This plan extends design Sections 11–12, 18.1 OD-05 and 18.2; it does not mark those release gates accepted.

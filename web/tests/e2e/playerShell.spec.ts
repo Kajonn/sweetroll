@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "../fixtures/browserTest";
 
 /**
  * G6 Task 3 player shell (dev-server E2E): phone bottom nav,

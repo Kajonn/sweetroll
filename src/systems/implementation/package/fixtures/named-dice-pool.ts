@@ -6,7 +6,7 @@ export const namedPoolSource =
 /** License-neutral authoring fixture; never rewrites the legacy reference seed. */
 export function namedDicePoolDocument(): SystemDocumentV1 {
   const doc = structuredClone(d6SuccessPoolDocument);
-  doc.schemaVersion = "1.1";
+
   doc.metadata.name = "Named Dice Pool";
   doc.entities[0]!.fields.push({
     id: "gear",

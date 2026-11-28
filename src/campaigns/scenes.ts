@@ -74,6 +74,12 @@ const TOKEN_MOVE_KIND = "scene_token_move";
 const TOKEN_REMOVE_KIND = "scene_token_remove";
 
 const RECEIPT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * One committed brush edit carries at most this many normalized dabs (the
+ * GM client bounds its local draft to the same limit). The whole batch is
+ * applied in one transaction with one revision bump.
+ */
+export const MAX_FOG_RUNS = 512;
 const NOT_FOUND_MESSAGE = "The requested scene does not exist.";
 const MISMATCH_MESSAGE = "This idempotency key was already used with different input.";
 
@@ -188,6 +194,9 @@ export function createSceneCommands(input: CreateSceneCommandsInput): SceneComma
     }
     if (!Array.isArray(op.runs) || op.runs.length === 0) {
       return errors.bad_request("op.runs must be a non-empty array.");
+    }
+    if (op.runs.length > MAX_FOG_RUNS) {
+      return errors.bad_request(`op.runs must contain at most ${MAX_FOG_RUNS} runs.`);
     }
     for (const run of op.runs) {
       if (typeof run !== "object" || run === null) {

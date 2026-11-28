@@ -151,14 +151,4 @@ describe("createCampaignsApi display", () => {
     await api.revokeDisplay("c1", "d1");
     expect(fetch).toHaveBeenCalledWith("POST", "/campaigns/c1/displays/d1/revoke", { body: {} });
   });
-
-  it("reads the projection with the secret in the header, never the URL", async () => {
-    const fetch = vi.fn().mockResolvedValue({ projection: { sceneId: "s1" }, requestId: "r4" });
-    const api = createCampaignsApi({ fetch } as never);
-    await api.getDisplayProjection("d1", "s1", "s3cr3t");
-    expect(fetch).toHaveBeenCalledWith("GET", "/displays/d1/scenes/s1/projection", {
-      headers: { "x-display-secret": "s3cr3t" },
-    });
-    expect(fetch.mock.calls[0]?.[1]).not.toContain("s3cr3t");
-  });
 });

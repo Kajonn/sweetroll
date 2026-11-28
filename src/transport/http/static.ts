@@ -2,18 +2,35 @@ import type { FastifyInstance, FastifyPluginAsync, FastifyPluginCallback } from 
 import fastifyStatic from "@fastify/static";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import type { Pool } from "pg";
+
+import { registerBrowserRateLimits } from "./browser-rate-limit.js";
 
 export const registerStaticServing: FastifyPluginAsync<{
   distDir: string;
+  physicalDiceEnabled?: boolean;
   enabled: boolean;
 }> = async (app: FastifyInstance, opts) => {
   if (!opts.enabled) return;
   const root = path.resolve(opts.distDir);
   if (!existsSync(path.join(root, "index.html"))) return;
-  await app.register(fastifyStatic, { root, prefix: "/", decorateReply: false });
+  if (opts.physicalDiceEnabled) {
+    app.addHook("onSend", async (request, reply) => {
+      if (request.url.split("?", 1)[0] !== "/dice/v1/worker.js") return;
+      // Rapier compiles WebAssembly in this worker and fetches its hulls from this origin.
+      reply.header(
+        "content-security-policy",
+        "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; frame-ancestors 'none'",
+      );
+    });
+  }
+  await app.register(fastifyStatic, {
+    root, prefix: "/", decorateReply: false,
+    ...(opts.physicalDiceEnabled ? {} : { allowedPath: (pathname: string) => !pathname.startsWith("/dice/") }),
+  });
   app.setNotFoundHandler((request, reply) => {
     const url = request.url.split("?")[0] ?? "";
-    if (url.startsWith("/api") || url.startsWith("/metrics") || url.startsWith("/health")) {
+    if (url.startsWith("/dice/") || url.startsWith("/api") || url.startsWith("/metrics") || url.startsWith("/health")) {
       reply.code(404).send({ code: "not_found", message: "Not found" });
       return;
     }
@@ -29,8 +46,10 @@ export function registerApiRoutes(
   app: FastifyInstance,
   routes: ReadonlyArray<FastifyPluginCallback>,
   serveStatic: boolean,
+  rateLimits?: { pool: Pool },
 ): void {
   void app.register(async (api) => {
+    if (rateLimits) registerBrowserRateLimits(api, rateLimits.pool);
     for (const route of routes) void api.register(route);
   }, { prefix: serveStatic ? "/api" : "" });
 }

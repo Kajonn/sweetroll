@@ -140,13 +140,14 @@ function makeView(characterId: string, revision: number): CharacterView {
     returnOwnerId: null,
     name: "Aria",
     systemVersionId: "11111111-1111-4000-8000-000000000000",
+    extensions: [],
     entityDefinitionId: "hero",
     revision,
     lifecycle: "active",
     archivedAt: null,
     createdAt: "2026-09-06T00:00:00.000Z",
     updatedAt: "2026-09-06T00:00:00.000Z",
-    state: { schemaVersion: "1.0", values: { name: "Aria" } },
+    state: { schemaVersion: "1.0", entries: {}, values: { name: "Aria" } },
     derivedValues: {},
     validations: [],
     projection: {
@@ -971,6 +972,20 @@ it("persists fetched template choices by actor and purges them without late repo
   await store.purgeCharacter('a','char');
   expect(await store.readEntryTemplates('a','char')).toEqual([]);
   await expect(store.saveEntryTemplates('a','char',choices,guard)).rejects.toThrow(/stale/);
+  await store.close();
+});
+
+it("drops cached template choices when the composed rules change (design 6.8)", async () => {
+  const store = await openCharacterStore(crypto.randomUUID());
+  const view = makeView("char", 1);
+  await store.confirmSnapshot("a", "char", view, 0);
+  const guard = await store.read("a", "char");
+  const choices = [{ id: "frost", label: "Frost blade", kind: "item" as const, fields: [], grantedActions: [] }];
+  await store.saveEntryTemplates("a", "char", choices, guard);
+  expect(await store.readEntryTemplates("a", "char")).toEqual(choices);
+  // Same base version, another extension set: the projection checksum changes.
+  await store.confirmSnapshot("a", "char", { ...view, reconciliation: { ...view.reconciliation, revision: 2 }, projection: { ...view.projection, packageChecksum: "composition-2" } }, guard.generation);
+  expect(await store.readEntryTemplates("a", "char")).toEqual([]);
   await store.close();
 });
 

@@ -17,7 +17,7 @@ function readCssModule(file: string): string {
 function readySnapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot {
   return {
     phase: "ready",
-    confirmed: makeView({ characterId: "char-1", revision: 3 }),
+    storage: "available", view: { source: "stored" as const, character: makeView({ characterId: "char-1", revision: 3 }) },
     tentative: null,
     entries: [],
     editing: { owned: true },

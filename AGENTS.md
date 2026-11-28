@@ -8,6 +8,8 @@ Update design document if any changes is made to the design.
 
 The GUI delivery checklist is [GUI integration plan](docs/superpowers/plans/2026-09-08-gui-integration.md), linked from design Sections 10 and 17. Follow its dependencies and acceptance gates for frontend work.
 
+For scripted API sessions, start with the [scenario authoring guide](tests/integration/scenarios/README.md). It gives you a copyable test, the API contract lookup, and the command for running a single scenario. Add new scenarios as `tests/integration/scenarios/*.test.ts`.
+
 Multi-user remediation F1-F3 and test-target preflight E1 passed on the isolated
 preview on 2026-11-02. The full ordered
 [one-GM/three-player protocol](docs/acceptance/multi-user-journey-protocol.md)
@@ -32,14 +34,18 @@ retaining old test state is optional. Do not ask again solely because a
 pre-release reset would discard test state. Check release-tag status first;
 after the first release tag, follow the released-data migration/recovery policy.
 
-Character/campaign version upgrades, mapping previews and rollback are also out of scope.
-Keep published rules identifiers and immutable snapshots; do not add conversion paths.
+System (rules) versions are not application versions. Owner decision 2026-11-07:
+characters and campaigns may be upgraded forward to a later non-breaking version of
+the same system after a per-character dry run (design Section 6.7, [plan](docs/superpowers/plans/2026-11-07-system-version-upgrades.md)).
+Reverting to the version recorded before the most recent upgrade is in scope.
+Breaking upgrades, field mapping, other downgrades and cross-system moves remain
+out of scope. Keep published rules identifiers and immutable snapshots.
 Application-version migrations and support for older app/API/package/cache/client
 versions are required only after the first application release Git tag (`v*.*.*`) for supported released versions.
 Follow [design Section 17.0](design_v2.md#170-release-status-and-application-version-policy);
 older compatibility checklists must not introduce pre-release acceptance or merge gates.
 
-Before that tag, no app/database or character/campaign migration tasks or
+Before that tag, no app/database migration tasks or
 transition tests belong in implementation plans or suites. The strategy is agreed
 now in [the post-tag migration plan](docs/superpowers/plans/2026-10-27-application-migration-policy.md); implement transition code/tests only for changes after the tag.
 
@@ -64,3 +70,68 @@ The G8 visual-control feature gate is complete; physical-device/provider-login,
 human visual approval and actual table/remote G9 release gates remain open.
 Emulated touch must not be reported as physical-device acceptance. This record
 selects no new feature; final-head CI is tracked in PR #38.
+
+The owner approved the [scene streaming plan](docs/superpowers/plans/2026-11-07-scene-streaming.md)
+on 2026-11-07. Stages 1–3 are implemented: the paired display receives scene
+snapshots over SSE (`GET /displays/:id/scenes/:sceneId/events`, PostgreSQL
+`LISTEN`/`NOTIFY`), and the old polled projection route was removed with all its
+client code. Do not reintroduce display polling. The hosted journey and the
+200-table load comparison (stage 4) remain open.
+
+The owner approved Part B of the [public API plan](docs/superpowers/plans/2026-11-07-public-api-v1.md)
+on 2026-11-07. Stages B1–B5 and the local parts of B6 are implemented: six token
+scopes including `campaigns:read`/`campaigns:write`, browser-policy character
+access, rolls and pushes, and the full campaign, media, scene and display-pairing
+surface under `/api/v1`. See the plan's implementation record before changing v1.
+The hosted B6 journey depends on real provider sign-in and remains open.
+
+The owner approved the [rules coverage plan](docs/superpowers/plans/2026-11-10-rules-coverage.md)
+on 2026-11-10 with all decisions C1–C13: the rules contract is replaced in place
+(no systems are published), rolls never change characters, opposed rolls need no
+privacy layer and cards are simple draw/shuffle decks. Linter/formatter tooling is
+not part of it. Stages R0–R8 are implemented (R8: card decks, 2026-11-12). See the plan's implementation record before changing the rules engine.
+
+A [GUI test plan for the rules coverage features](docs/superpowers/plans/2026-11-12-rules-coverage-gui-testing.md)
+was decided by the owner on 2026-11-12: all stages run at three widths (D1), the
+twelve visual baselines are added (D2) and the hosted run is not required before
+PR 75 merges (D3). D4 (who performs the human checks) is open and blocks only T3.
+T1 is implemented except the visual baselines and its CI exit. The
+[2026-11-12 local record](docs/acceptance/rules-coverage-gui-2026-11-12.md) has the
+results and the list of what is left; T2 and T3 are not started.
+
+The fifth-edition SRD 5.1 system was built through public API v1 and, by owner
+decision 2026-11-21, moved out of this repository so that its licence stays out
+of Sweetroll core. It lives in [Kajonn/sweetroll-dnd5e](https://github.com/Kajonn/sweetroll-dnd5e) and is published to a server
+through `/api/v1` only; the licence confirmation is postponed. Sweetroll keeps
+the original Ember Trail test system (`tests/integration/fixtures/ember-trail/`,
+scenario `tests/integration/scenarios/ember-trail.test.ts`), which covers the
+same rules features. Do not add third-party game text to this repository.
+
+Owner instruction 2026-11-16: address the record's gaps, raise the size limit to
+5 MiB, make multiclassing "a way to add new classes to a character" and suggest
+a way to share formulas. Owner instruction 2026-11-21: "Implement plan"; the owner
+chose to add the apply-roll command (G5, a narrow reopening of C10: rolls never
+change characters on their own, a person may apply a saved roll). All stages
+S1–S11 of the [plan](docs/superpowers/plans/2026-11-16-srd-gaps-and-shared-formulas.md)
+are implemented (design Sections 6.1, 6.3 and 6.4); see its implementation record
+for what is not done.
+
+System extensions ([plan](docs/superpowers/plans/2026-11-07-system-extensions.md),
+owner-approved X1–X13): stages E1–E5 are implemented. E5 (2026-11-21) replaced
+the character and campaign `version-*` routes with `composition-options`,
+`composition-check` and `composition`: one change per command (base upgrade, or
+add/remove/upgrade one extension) or a revert to the previous composition.
+E6 (GUI) is implemented, including extension template art, a keyboard-only
+path and light/dark checks at three widths (see the plan); human visual
+sign-off is not part of it. E7 (owner-approved 2026-11-21) is
+implemented: extension authoring and composition changes through `/api/v1`.
+E4b is deferred. The E8 local journey passed on 2026-11-21
+([record](docs/acceptance/extensions-e8-local-2026-11-21.md)); the hosted E8
+journey is open.
+
+The owner approved the [session view plan](docs/superpowers/plans/2026-11-23-character-session-view-and-conditions.md)
+with decisions E1–E4 on 2026-11-24. Stages V1–V4 are implemented locally: storage
+failure is its own session state, a tab without the editing lock keeps the newer
+server view next to the saved copy, session errors are codes mapped to i18n keys,
+and a two-tab journey in `web/tests/e2e/characterReadPath.spec.ts` covers it. Its
+hosted journey is open together with the read-path S5 hosted run.

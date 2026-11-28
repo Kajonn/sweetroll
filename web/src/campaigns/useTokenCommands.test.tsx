@@ -4,6 +4,27 @@ import { useTokenCommands } from "./useTokenCommands.js";
 const draft = { label: "Wren", imageFileId: null, x: .5, y: .5, size: .1, visible: true };
 function props() { return { api: { placeToken: vi.fn().mockResolvedValue({}), moveToken: vi.fn().mockResolvedValue({}) }, sceneId: "s1", sceneRevision: 3, online: true, onChanged: vi.fn().mockResolvedValue(3) }; }
 describe("shared token command recovery", () => {
+  it("adopts the committed scene from a completed gesture's response without an extra read", async () => {
+    const p = { ...props(), onApplied: vi.fn() };
+    const scene = { sceneId: "s1", revision: 4, tokens: [] };
+    p.api.moveToken.mockResolvedValue({ scene, requestId: "r" });
+    const h = renderHook(() => useTokenCommands(p));
+    await act(async () => { h.result.current.move("t1", "Wren", { x: .4, y: .6 }); });
+    await waitFor(() => expect(h.result.current.status).toBe("applied"));
+    expect(p.api.moveToken).toHaveBeenCalledTimes(1);
+    expect(p.onApplied).toHaveBeenCalledWith(scene);
+    expect(p.onChanged).not.toHaveBeenCalled();
+  });
+  it("still reconciles a conflict through an explicit read when adopting responses", async () => {
+    const p = { ...props(), onApplied: vi.fn() };
+    p.api.moveToken.mockRejectedValueOnce({ status: 409 });
+    const h = renderHook(() => useTokenCommands(p));
+    await act(async () => { h.result.current.move("t1", "Wren", { x: .4, y: .6 }); });
+    await waitFor(() => expect(h.result.current.refreshed).toBe(true));
+    expect(h.result.current.status).toBe("conflict");
+    expect(p.onChanged).toHaveBeenCalledTimes(1);
+    expect(p.onApplied).not.toHaveBeenCalled();
+  });
   it("locks gesture and numeric submissions synchronously until the read completes", async () => {
     const p = props(); let finish!: () => void;
     p.api.moveToken.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));

@@ -107,7 +107,7 @@ function noThrow<T>(operation: () => DecodeResult<T>): DecodeResult<T> {
   }
 }
 
-function parseInput(input: unknown, maxBytes: number): DecodeResult<unknown> {
+export function parseInput(input: unknown, maxBytes: number): DecodeResult<unknown> {
   if (typeof input !== "string" && !(input instanceof Uint8Array)) {
     return { ok: true, value: input };
   }

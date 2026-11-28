@@ -178,6 +178,11 @@ export async function campaignDerivedJourney(
       await page
         .getByRole("button", { name: "Confirm discard", exact: true })
         .click();
+      // Reload only once the discard has been applied; otherwise the
+      // discarded entry stays queued and later blocks the values replay.
+      await expect(
+        page.getByText(/campaign template has changed/),
+      ).toHaveCount(0);
       await page.reload();
       await expect(
         entry().getByRole("button", { name: "Edit values", exact: true }),
@@ -215,7 +220,7 @@ export async function campaignDerivedJourney(
       ).result;
       if (action === "Hit" || action === "Damage")
         expect(result.roll.bindings).toContainEqual({
-          scope: "fields",
+          scope: "item",
           definitionId: "damage_bonus",
           value: 6,
         });

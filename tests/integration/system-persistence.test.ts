@@ -8,6 +8,8 @@ import { createSystemPersistenceRepository } from "../../src/systems/implementat
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl === undefined ? describe.skip : describe;
 
+const rulesCollections = { schemaVersion: "2.0", templates: [], slots: [] };
+
 const DDL = `
   CREATE TABLE users (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -23,6 +25,8 @@ const DDL = `
     name text NOT NULL,
     access text NOT NULL DEFAULT 'private',
     lifecycle text NOT NULL DEFAULT 'active',
+    kind text NOT NULL DEFAULT 'system',
+    base_system_id uuid REFERENCES systems(id),
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
   );
@@ -32,6 +36,7 @@ const DDL = `
     document_json jsonb NOT NULL,
     source_checksum text NOT NULL,
     updated_by uuid NOT NULL REFERENCES users(id),
+    base_version_id uuid,
     updated_at timestamptz NOT NULL DEFAULT now()
   );
   CREATE TABLE system_versions (
@@ -43,6 +48,7 @@ const DDL = `
     release_notes text NOT NULL DEFAULT '',
     lifecycle text NOT NULL DEFAULT 'published',
     compatibility_findings_json jsonb NOT NULL DEFAULT '[]'::jsonb,
+    built_against_version_id uuid,
     created_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (system_id, semantic_version)
   );
@@ -174,7 +180,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
     const first = await repo.saveDraft({
       systemId,
       expectedRevision: null,
-      document: { schemaVersion: "1.0", head: "first" },
+      document: { ...rulesCollections, head: "first" },
       sourceChecksum: "sha256:first",
       updatedBy: owner,
       requestId: "req-test",
@@ -182,12 +188,12 @@ describeWithDatabase("SystemPersistenceRepository", () => {
     expect(first.ok).toBe(true);
     if (!first.ok) throw new Error("unexpected");
     expect(first.draft.revision).toBe(1);
-    expect(first.draft.document).toEqual({ schemaVersion: "1.0", head: "first" });
+    expect(first.draft.document).toEqual({ ...rulesCollections, head: "first" });
 
     const second = await repo.saveDraft({
       systemId,
       expectedRevision: 1,
-      document: { schemaVersion: "1.0", head: "second" },
+      document: { ...rulesCollections, head: "second" },
       sourceChecksum: "sha256:second",
       updatedBy: owner,
       requestId: "req-test",
@@ -199,7 +205,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
     const stale = await repo.saveDraft({
       systemId,
       expectedRevision: 1,
-      document: { schemaVersion: "1.0", head: "stale" },
+      document: { ...rulesCollections, head: "stale" },
       sourceChecksum: "sha256:stale",
       updatedBy: owner,
       requestId: "req-test",
@@ -208,7 +214,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
 
     const loaded = await repo.loadDraft(systemId);
     expect(loaded?.revision).toBe(2);
-    expect(loaded?.document).toEqual({ schemaVersion: "1.0", head: "second" });
+    expect(loaded?.document).toEqual({ ...rulesCollections, head: "second" });
     expect(loaded?.sourceChecksum).toBe("sha256:second");
   });
 
@@ -222,7 +228,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
     const result = await createSystemPersistenceRepository(pool).saveDraft({
       systemId,
       expectedRevision: 1,
-      document: { schemaVersion: "1.0" },
+      document: { ...rulesCollections },
       sourceChecksum: "sha256:x",
       updatedBy: owner,
       requestId: "req-test",
@@ -239,14 +245,14 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       systemId,
       semanticVersion: "1.0.0",
       checksum: "sha256:aaa",
-      package: { schemaVersion: "1.0", name: "one" },
+      package: { ...rulesCollections, name: "one" },
       releaseNotes: "First",
     });
     const v2 = await repo.insertVersion({
       systemId,
       semanticVersion: "1.1.0",
       checksum: "sha256:bbb",
-      package: { schemaVersion: "1.0", name: "two" },
+      package: { ...rulesCollections, name: "two" },
       releaseNotes: "",
     });
 
@@ -261,7 +267,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
         systemId,
         semanticVersion: "1.0.0",
         checksum: "sha256:ccc",
-        package: { schemaVersion: "1.0", name: "three" },
+        package: { ...rulesCollections, name: "three" },
         releaseNotes: "",
       }),
     ).rejects.toMatchObject({ code: "23505" });
@@ -271,7 +277,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
         systemId,
         semanticVersion: "2.0.0",
         checksum: "sha256:bbb",
-        package: { schemaVersion: "1.0", name: "four" },
+        package: { ...rulesCollections, name: "four" },
         releaseNotes: "",
       }),
     ).rejects.toMatchObject({ code: "23505" });
@@ -393,19 +399,19 @@ describeWithDatabase("SystemPersistenceRepository", () => {
     const created = await repo.createPreviewSnapshot({
       systemId,
       sourceRevision: 3,
-      package: { schemaVersion: "1.0", name: "preview" },
+      package: { ...rulesCollections, name: "preview" },
       expiresAt: new Date(Date.now() + 60_000),
     });
     expect(created.sourceRevision).toBe(3);
 
     const loaded = await repo.loadPreviewSnapshot(created.snapshotId);
     expect(loaded?.systemId).toBe(systemId);
-    expect(loaded?.package).toEqual({ schemaVersion: "1.0", name: "preview" });
+    expect(loaded?.package).toEqual({ ...rulesCollections, name: "preview" });
 
     const expired = await repo.createPreviewSnapshot({
       systemId,
       sourceRevision: 4,
-      package: { schemaVersion: "1.0", name: "expired" },
+      package: { ...rulesCollections, name: "expired" },
       expiresAt: new Date(Date.now() - 1_000),
     });
     expect(await repo.loadPreviewSnapshot(expired.snapshotId)).toBeNull();
@@ -420,7 +426,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       systemId,
       semanticVersion: "1.0.0",
       checksum: "sha256:aaa",
-      package: { schemaVersion: "1.0", name: "one" },
+      package: { ...rulesCollections, name: "one" },
       releaseNotes: "",
     });
 
@@ -465,7 +471,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
     await repo.saveDraft({
       systemId,
       expectedRevision: null,
-      document: { schemaVersion: "1.0", head: "one" },
+      document: { ...rulesCollections, head: "one" },
       sourceChecksum: "sha256:one",
       updatedBy: owner,
       requestId: "req-pub",
@@ -478,7 +484,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       sourceChecksum: "sha256:one",
       semanticVersion: "1.0.0",
       checksum: "sha256:pkg",
-      package: { schemaVersion: "1.0", name: "pkg" },
+      package: { ...rulesCollections, name: "pkg" },
       releaseNotes: "First",
       compatibilityFindings: [],
       acknowledgeBreaking: false,
@@ -499,7 +505,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       sourceChecksum: "sha256:one",
       semanticVersion: "1.0.0",
       checksum: "sha256:other",
-      package: { schemaVersion: "1.0", name: "other" },
+      package: { ...rulesCollections, name: "other" },
       releaseNotes: "",
       compatibilityFindings: [],
       acknowledgeBreaking: false,
@@ -515,7 +521,7 @@ describeWithDatabase("SystemPersistenceRepository", () => {
       sourceChecksum: "sha256:one",
       semanticVersion: "1.1.0",
       checksum: "sha256:pkg2",
-      package: { schemaVersion: "1.0", name: "pkg2" },
+      package: { ...rulesCollections, name: "pkg2" },
       releaseNotes: "",
       compatibilityFindings: [],
       acknowledgeBreaking: false,

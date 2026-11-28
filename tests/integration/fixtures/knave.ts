@@ -92,7 +92,7 @@ function sheetActions(ids: string[]): SheetElementV1[] {
 }
 
 export const knaveDocument: SystemDocumentV1 = {
-  schemaVersion: "1.0",
+  schemaVersion: "2.0",
   metadata: {
     name: "Knave 1e",
     description: "Adapted for Sweetroll from Knave 1.0 by Ben Milton, Questing Beast Games (https://questingbeast.itch.io/knave), licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). This adaptation adds a digital sheet and roll actions, paraphrases table rules, and includes a sample equipment and spell catalog.",

@@ -50,25 +50,15 @@
         "expressions",
         "actions",
         "validations",
+        "templates",
+        "slots",
         "effectiveLimits",
         "integrity"
       ],
       "properties": {
         "schemaVersion": {
-          "anyOf": [
-            {
-              "const": "1.0",
-              "type": "string"
-            },
-            {
-              "const": "1.1",
-              "type": "string"
-            },
-            {
-              "const": "1.2",
-              "type": "string"
-            }
-          ]
+          "const": "2.0",
+          "type": "string"
         },
         "systemId": {
           "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
@@ -166,6 +156,10 @@
                     "type": "string"
                   }
                 ]
+              },
+              "presetsFrom": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
               },
               "fields": {
                 "maxItems": 512,
@@ -387,6 +381,10 @@
                               }
                             }
                           }
+                        },
+                        "optionsFrom": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         }
                       }
                     },
@@ -444,6 +442,10 @@
                               }
                             }
                           }
+                        },
+                        "optionsFrom": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         }
                       }
                     },
@@ -498,6 +500,10 @@
                         "step": {
                           "type": "number"
                         },
+                        "maxExpressionId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
                         "resetTo": {
                           "anyOf": [
                             {
@@ -509,6 +515,10 @@
                               "type": "string"
                             }
                           ]
+                        },
+                        "startFull": {
+                          "const": true,
+                          "type": "boolean"
                         }
                       }
                     },
@@ -590,6 +600,91 @@
             }
           }
         },
+        "dice": {
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "label",
+              "faces"
+            ],
+            "properties": {
+              "id": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              "label": {
+                "minLength": 1,
+                "maxLength": 120,
+                "type": "string"
+              },
+              "faces": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "additionalProperties": false,
+                  "type": "object",
+                  "required": [
+                    "value"
+                  ],
+                  "properties": {
+                    "value": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "minLength": 1,
+                      "maxLength": 120,
+                      "type": "string"
+                    },
+                    "symbols": {
+                      "maxProperties": 16,
+                      "additionalProperties": false,
+                      "type": "object",
+                      "patternProperties": {
+                        "^[a-z][a-z0-9_]{0,63}$": {
+                          "minimum": 1,
+                          "maximum": 100,
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "decks": {
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "id",
+              "label",
+              "datasetId"
+            ],
+            "properties": {
+              "id": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              "label": {
+                "maxLength": 120,
+                "type": "string"
+              },
+              "datasetId": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              }
+            }
+          }
+        },
         "referenceData": {
           "maxItems": 64,
           "type": "array",
@@ -609,6 +704,33 @@
               "label": {
                 "maxLength": 120,
                 "type": "string"
+              },
+              "keyColumn": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              "columns": {
+                "additionalProperties": false,
+                "maxProperties": 64,
+                "type": "object",
+                "patternProperties": {
+                  "^[a-z][a-z0-9_]{0,63}$": {
+                    "anyOf": [
+                      {
+                        "const": "number",
+                        "type": "string"
+                      },
+                      {
+                        "const": "text",
+                        "type": "string"
+                      },
+                      {
+                        "const": "boolean",
+                        "type": "string"
+                      }
+                    ]
+                  }
+                }
               },
               "records": {
                 "maxItems": 1000,
@@ -705,6 +827,10 @@
                       "maxLength": 120,
                       "type": "string"
                     },
+                    "visibleWhen": {
+                      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                      "type": "string"
+                    },
                     "elements": {
                       "maxItems": 1024,
                       "type": "array",
@@ -725,6 +851,10 @@
                                 "type": "string"
                               },
                               "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "visibleWhen": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
                               },
@@ -763,6 +893,10 @@
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
                               },
+                              "visibleWhen": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
                               "fieldId": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
@@ -783,6 +917,10 @@
                                 "type": "string"
                               },
                               "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "visibleWhen": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
                               },
@@ -809,6 +947,10 @@
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
                               },
+                              "visibleWhen": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
                               "actionId": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
@@ -829,6 +971,10 @@
                                 "type": "string"
                               },
                               "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "visibleWhen": {
                                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                                 "type": "string"
                               },
@@ -855,6 +1001,7 @@
             "type": "object",
             "required": [
               "id",
+              "languageVersion",
               "context",
               "resultType",
               "inferredType",
@@ -869,7 +1016,7 @@
                 "type": "string"
               },
               "languageVersion": {
-                "const": "0.2",
+                "const": "1.0",
                 "type": "string"
               },
               "context": {
@@ -884,6 +1031,10 @@
                   },
                   {
                     "const": "validation",
+                    "type": "string"
+                  },
+                  {
+                    "const": "outcome",
                     "type": "string"
                   }
                 ]
@@ -1025,12 +1176,40 @@
                           {
                             "const": "inputs",
                             "type": "string"
+                          },
+                          {
+                            "const": "item",
+                            "type": "string"
+                          },
+                          {
+                            "const": "roll",
+                            "type": "string"
+                          },
+                          {
+                            "const": "target",
+                            "type": "string"
+                          },
+                          {
+                            "const": "opposed",
+                            "type": "string"
                           }
                         ]
                       },
                       "id": {
                         "pattern": "^[a-z][a-z0-9_]{0,63}$",
                         "type": "string"
+                      },
+                      "part": {
+                        "anyOf": [
+                          {
+                            "const": "current",
+                            "type": "string"
+                          },
+                          {
+                            "const": "max",
+                            "type": "string"
+                          }
+                        ]
                       }
                     }
                   },
@@ -1094,6 +1273,10 @@
                           },
                           {
                             "const": "/",
+                            "type": "string"
+                          },
+                          {
+                            "const": "%",
                             "type": "string"
                           },
                           {
@@ -1164,11 +1347,59 @@
                           {
                             "const": "round",
                             "type": "string"
+                          },
+                          {
+                            "const": "floor",
+                            "type": "string"
+                          },
+                          {
+                            "const": "ceil",
+                            "type": "string"
+                          },
+                          {
+                            "const": "abs",
+                            "type": "string"
+                          },
+                          {
+                            "const": "if",
+                            "type": "string"
+                          },
+                          {
+                            "const": "has",
+                            "type": "string"
+                          },
+                          {
+                            "const": "lookup",
+                            "type": "string"
+                          },
+                          {
+                            "const": "lookupBand",
+                            "type": "string"
+                          },
+                          {
+                            "const": "sum",
+                            "type": "string"
+                          },
+                          {
+                            "const": "count",
+                            "type": "string"
+                          },
+                          {
+                            "const": "sumWhere",
+                            "type": "string"
+                          },
+                          {
+                            "const": "countWhere",
+                            "type": "string"
+                          },
+                          {
+                            "const": "maxOf",
+                            "type": "string"
                           }
                         ]
                       },
                       "arguments": {
-                        "maxItems": 2,
+                        "maxItems": 8,
                         "type": "array",
                         "items": {
                           "$ref": "ExpressionAstV1"
@@ -1197,13 +1428,78 @@
                     "type": "object",
                     "required": [
                       "kind",
-                      "count",
-                      "sides"
+                      "source",
+                      "modifiers"
                     ],
                     "properties": {
                       "kind": {
-                        "const": "dice",
+                        "const": "pool",
                         "type": "string"
+                      },
+                      "source": {
+                        "anyOf": [
+                          {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "kind",
+                              "count",
+                              "sides"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "dice",
+                                "type": "string"
+                              },
+                              "count": {
+                                "$ref": "ExpressionAstV1"
+                              },
+                              "sides": {
+                                "$ref": "ExpressionAstV1"
+                              }
+                            }
+                          },
+                          {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "kind",
+                              "count",
+                              "dieId"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "custom",
+                                "type": "string"
+                              },
+                              "count": {
+                                "$ref": "ExpressionAstV1"
+                              },
+                              "dieId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          },
+                          {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "kind",
+                              "groupId"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "rolled",
+                                "type": "string"
+                              },
+                              "groupId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        ]
                       },
                       "group": {
                         "additionalProperties": false,
@@ -1224,70 +1520,105 @@
                           }
                         }
                       },
-                      "count": {
-                        "$ref": "ExpressionAstV1"
+                      "modifiers": {
+                        "maxItems": 2,
+                        "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "kind"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "explode",
+                                  "type": "string"
+                                },
+                                "face": {
+                                  "$ref": "ExpressionAstV1"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "face"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "rerollOnce",
+                                  "type": "string"
+                                },
+                                "face": {
+                                  "$ref": "ExpressionAstV1"
+                                }
+                              }
+                            }
+                          ]
+                        }
                       },
-                      "sides": {
-                        "minimum": 1,
-                        "maximum": 1000,
-                        "type": "integer"
-                      }
-                    }
-                  },
-                  {
-                    "additionalProperties": false,
-                    "type": "object",
-                    "required": [
-                      "kind",
-                      "mode",
-                      "count",
-                      "dice"
-                    ],
-                    "properties": {
-                      "kind": {
-                        "const": "keep",
-                        "type": "string"
-                      },
-                      "mode": {
+                      "reducer": {
                         "anyOf": [
                           {
-                            "const": "highest",
-                            "type": "string"
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "kind",
+                              "amount"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "anyOf": [
+                                  {
+                                    "const": "keepHighest",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "keepLowest",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countAtLeast",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countAtMost",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "countEqual",
+                                    "type": "string"
+                                  }
+                                ]
+                              },
+                              "amount": {
+                                "$ref": "ExpressionAstV1"
+                              }
+                            }
                           },
                           {
-                            "const": "lowest",
-                            "type": "string"
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "kind",
+                              "symbol"
+                            ],
+                            "properties": {
+                              "kind": {
+                                "const": "countSymbol",
+                                "type": "string"
+                              },
+                              "symbol": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
                           }
                         ]
-                      },
-                      "count": {
-                        "minimum": 1,
-                        "maximum": 100,
-                        "type": "integer"
-                      },
-                      "dice": {
-                        "$ref": "ExpressionAstV1"
-                      }
-                    }
-                  },
-                  {
-                    "additionalProperties": false,
-                    "type": "object",
-                    "required": [
-                      "kind",
-                      "dice",
-                      "threshold"
-                    ],
-                    "properties": {
-                      "kind": {
-                        "const": "successCount",
-                        "type": "string"
-                      },
-                      "dice": {
-                        "$ref": "ExpressionAstV1"
-                      },
-                      "threshold": {
-                        "type": "integer"
                       }
                     }
                   }
@@ -1313,6 +1644,91 @@
                   "outputTemplate"
                 ],
                 "properties": {
+                  "target": {
+                    "additionalProperties": false,
+                    "type": "object",
+                    "required": [
+                      "entityId"
+                    ],
+                    "properties": {
+                      "entityId": {
+                        "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                        "type": "string"
+                      },
+                      "otherEntityIds": {
+                        "minItems": 1,
+                        "maxItems": 8,
+                        "uniqueItems": true,
+                        "type": "array",
+                        "items": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      },
+                      "optional": {
+                        "const": true,
+                        "type": "boolean"
+                      }
+                    }
+                  },
+                  "respondsTo": {
+                    "const": true,
+                    "type": "boolean"
+                  },
+                  "outcomes": {
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "label",
+                        "expressionId"
+                      ],
+                      "properties": {
+                        "id": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "expressionId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "details": {
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "label",
+                        "expressionId"
+                      ],
+                      "properties": {
+                        "id": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "label": {
+                          "maxLength": 120,
+                          "type": "string"
+                        },
+                        "expressionId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
                   "pushPolicy": {
                     "additionalProperties": false,
                     "type": "object",
@@ -1376,6 +1792,23 @@
                                 "minimum": 1,
                                 "maximum": 1000,
                                 "type": "integer"
+                              }
+                            },
+                            "modifiers": {
+                              "maxItems": 2,
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "anyOf": [
+                                  {
+                                    "const": "rerollOnce",
+                                    "type": "string"
+                                  },
+                                  {
+                                    "const": "explode",
+                                    "type": "string"
+                                  }
+                                ]
                               }
                             }
                           }
@@ -1531,6 +1964,145 @@
                     ]
                   }
                 }
+              },
+              {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "kind",
+                  "id",
+                  "label",
+                  "steps"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "resourceBatch",
+                    "type": "string"
+                  },
+                  "id": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  },
+                  "label": {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  "steps": {
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "type": "array",
+                    "items": {
+                      "additionalProperties": false,
+                      "type": "object",
+                      "required": [
+                        "resourceId",
+                        "operation"
+                      ],
+                      "properties": {
+                        "resourceId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
+                        "operation": {
+                          "anyOf": [
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "kind",
+                                "amount"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "delta",
+                                  "type": "string"
+                                },
+                                "amount": {
+                                  "type": "number"
+                                }
+                              }
+                            },
+                            {
+                              "additionalProperties": false,
+                              "type": "object",
+                              "required": [
+                                "kind"
+                              ],
+                              "properties": {
+                                "kind": {
+                                  "const": "reset",
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "kind",
+                  "id",
+                  "label",
+                  "deckId",
+                  "count"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "draw",
+                    "type": "string"
+                  },
+                  "id": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  },
+                  "label": {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  "deckId": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  },
+                  "count": {
+                    "minimum": 1,
+                    "maximum": 10,
+                    "type": "integer"
+                  }
+                }
+              },
+              {
+                "additionalProperties": false,
+                "type": "object",
+                "required": [
+                  "kind",
+                  "id",
+                  "label",
+                  "deckId"
+                ],
+                "properties": {
+                  "kind": {
+                    "const": "shuffle",
+                    "type": "string"
+                  },
+                  "id": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  },
+                  "label": {
+                    "maxLength": 120,
+                    "type": "string"
+                  },
+                  "deckId": {
+                    "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                    "type": "string"
+                  }
+                }
               }
             ]
           }
@@ -1574,6 +2146,10 @@
                 "type": "string"
               },
               "targetId": {
+                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                "type": "string"
+              },
+              "targetEntityId": {
                 "pattern": "^[a-z][a-z0-9_]{0,63}$",
                 "type": "string"
               }
@@ -1680,6 +2256,15 @@
                     "type": "string"
                   }
                 ]
+              },
+              "quantityFields": {
+                "maxItems": 64,
+                "uniqueItems": true,
+                "type": "array",
+                "items": {
+                  "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                  "type": "string"
+                }
               },
               "description": {
                 "maxLength": 2000,
@@ -1905,6 +2490,10 @@
                               }
                             }
                           }
+                        },
+                        "optionsFrom": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         }
                       }
                     },
@@ -1962,6 +2551,10 @@
                               }
                             }
                           }
+                        },
+                        "optionsFrom": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
                         }
                       }
                     },
@@ -2016,6 +2609,10 @@
                         "step": {
                           "type": "number"
                         },
+                        "maxExpressionId": {
+                          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                          "type": "string"
+                        },
                         "resetTo": {
                           "anyOf": [
                             {
@@ -2027,6 +2624,10 @@
                               "type": "string"
                             }
                           ]
+                        },
+                        "startFull": {
+                          "const": true,
+                          "type": "boolean"
                         }
                       }
                     },
@@ -2122,6 +2723,91 @@
                         "outputTemplate"
                       ],
                       "properties": {
+                        "target": {
+                          "additionalProperties": false,
+                          "type": "object",
+                          "required": [
+                            "entityId"
+                          ],
+                          "properties": {
+                            "entityId": {
+                              "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                              "type": "string"
+                            },
+                            "otherEntityIds": {
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "uniqueItems": true,
+                              "type": "array",
+                              "items": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            },
+                            "optional": {
+                              "const": true,
+                              "type": "boolean"
+                            }
+                          }
+                        },
+                        "respondsTo": {
+                          "const": true,
+                          "type": "boolean"
+                        },
+                        "outcomes": {
+                          "maxItems": 16,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "expressionId"
+                            ],
+                            "properties": {
+                              "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 120,
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
+                        "details": {
+                          "maxItems": 8,
+                          "type": "array",
+                          "items": {
+                            "additionalProperties": false,
+                            "type": "object",
+                            "required": [
+                              "id",
+                              "label",
+                              "expressionId"
+                            ],
+                            "properties": {
+                              "id": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              },
+                              "label": {
+                                "maxLength": 120,
+                                "type": "string"
+                              },
+                              "expressionId": {
+                                "pattern": "^[a-z][a-z0-9_]{0,63}$",
+                                "type": "string"
+                              }
+                            }
+                          }
+                        },
                         "pushPolicy": {
                           "additionalProperties": false,
                           "type": "object",
@@ -2185,6 +2871,23 @@
                                       "minimum": 1,
                                       "maximum": 1000,
                                       "type": "integer"
+                                    }
+                                  },
+                                  "modifiers": {
+                                    "maxItems": 2,
+                                    "uniqueItems": true,
+                                    "type": "array",
+                                    "items": {
+                                      "anyOf": [
+                                        {
+                                          "const": "rerollOnce",
+                                          "type": "string"
+                                        },
+                                        {
+                                          "const": "explode",
+                                          "type": "string"
+                                        }
+                                      ]
                                     }
                                   }
                                 }
@@ -2413,6 +3116,7 @@
             "expressionBytes",
             "expressionAstNodes",
             "expressionAstDepth",
+            "sheetEvaluationNodes",
             "dicePerRoll",
             "sidesPerDie"
           ],
@@ -2430,6 +3134,11 @@
             "expressionAstDepth": {
               "minimum": 1,
               "maximum": 32,
+              "type": "integer"
+            },
+            "sheetEvaluationNodes": {
+              "minimum": 1,
+              "maximum": 8192,
               "type": "integer"
             },
             "dicePerRoll": {

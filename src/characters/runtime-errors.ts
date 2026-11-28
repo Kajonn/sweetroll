@@ -14,6 +14,7 @@ export function mapRuntimeError(error: {
       return { code: "invalid_value", message: error.message, ...(error.pushReason === undefined ? {} : { pushReason: error.pushReason }) };
     case "action_evaluation_failed":
       return { code: "invalid_value", message: error.message, ...(error.actionDiagnostics === undefined ? {} : { actionDiagnostics: error.actionDiagnostics }) };
+    case "deck_empty":
     case "bad_request":
     case "invalid_state":
     case "unsupported_field_value":
@@ -33,6 +34,8 @@ export function mapRuntimeError(error: {
 // and safe to permanently finalize on the idempotency key (standalone path).
 const STABLE_RUNTIME_ERROR_CODES = new Set([
   "push_unavailable",
+  // The same key keeps reporting the empty deck; drawing after a shuffle is a new command.
+  "deck_empty",
   "action_evaluation_failed",
   "not_found",
   "bad_request",

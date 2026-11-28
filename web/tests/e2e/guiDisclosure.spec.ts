@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 
 for (const width of [360, 1280]) {
   test(`technical information is opt-in and preserves creator values at ${width}px`, async ({ page }) => {

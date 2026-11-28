@@ -13,7 +13,6 @@ const opts = {
   resultType: "number",
   context: "roll",
   fallback: 0,
-  languageVersion: "0.2",
 } as const;
 
 describe("grammar 0.2 named groups", () => {
@@ -45,14 +44,14 @@ describe("grammar 0.2 named groups", () => {
       {
         id: "attribute",
         count: 2,
-        operation: "successCount",
+        operation: "countAtLeast",
         threshold: 6,
         total: 1,
       },
       {
         id: "skill",
         count: 1,
-        operation: "successCount",
+        operation: "countAtLeast",
         threshold: 5,
         total: 1,
       },
@@ -99,10 +98,7 @@ describe("grammar 0.2 named groups", () => {
       value: 2,
     });
   });
-  it("rejects old grammar, duplicate IDs and non-deterministic counts", () => {
-    expect(
-      compileExpression(source, { ...opts, languageVersion: "0.1" }).ok,
-    ).toBe(false);
+  it("rejects duplicate IDs and non-deterministic counts", () => {
     expect(
       compileExpression('group("x", "X", d6) + group("x", "Again", d6)', opts)
         .ok,
@@ -128,10 +124,9 @@ describe("grammar 0.2 named groups", () => {
       "arithmetic_failure",
     );
   });
-  it("preserves plain dice result shape and deterministic draw order", () => {
+  it("records a graph for unnamed pools and preserves deterministic draw order", () => {
     const compiled = compileExpression("2d6kh1 + d4", {
       ...opts,
-      languageVersion: "0.1",
     });
     expect(compiled.ok).toBe(true);
     if (!compiled.ok) return;
@@ -143,9 +138,10 @@ describe("grammar 0.2 named groups", () => {
       () => rng[calls++]!,
     );
     expect(calls).toBe(3);
-    expect(result.ok && result.roll).toEqual({
+    expect(result.ok && result.roll).toMatchObject({
       total: 8,
       expression: "2d6kh1 + d4",
+      breakdown: { groups: [{ id: "@root.0" }, { id: "@root.1" }] },
       dice: [
         { sides: 6, value: 6, kept: true },
         { sides: 6, value: 1, kept: false },
@@ -170,5 +166,33 @@ describe("grammar 0.2 named groups", () => {
       false,
       false,
     ]);
+  });
+});
+
+describe("one group name in each branch of a conditional (SRD gaps S8)", () => {
+  const env = { fields: { mod: "number" }, inputs: { advantage: "boolean", disadvantage: "boolean" } } as const;
+  const d20 = 'if(inputs.disadvantage && !inputs.advantage, keepLowest(group("d20", "d20", dice(2, 20)), 1), '
+    + 'keepHighest(group("d20", "d20", dice(if(inputs.advantage && !inputs.disadvantage, 2, 1), 20)), 1)) + fields.mod';
+  const compile = (source: string) => compileExpression(source, { env, resultType: "number", context: "roll", fallback: 0 });
+
+  it.each([
+    [{ advantage: false, disadvantage: true }, [0.3, 0.9], 2, 7],
+    [{ advantage: true, disadvantage: false }, [0.3, 0.9], 2, 19],
+    [{ advantage: false, disadvantage: false }, [0.3], 1, 7],
+  ])("rolls and keeps the d20 for %o without a zero-weighted term", (inputs, draws, count, total) => {
+    const compiled = compile(d20);
+    if (!compiled.ok) throw Error(JSON.stringify(compiled.diagnostics));
+    let call = 0;
+    const result = evaluate({ id: "check", ...compiled.value }, { fields: { mod: 1 }, inputs }, () => draws[call++]!);
+    expect(result).toMatchObject({ ok: true, result: total });
+    if (!result.ok) return;
+    expect(result.roll?.breakdown.groups).toEqual([expect.objectContaining({ id: "d20", count })]);
+  });
+
+  it("makes a group named on every branch available afterwards, and only then", () => {
+    expect(compile('if(inputs.advantage, group("a", "A", d20), group("a", "A", d6)) + rolled("a")').ok).toBe(true);
+    expect(compile('if(inputs.advantage, group("a", "A", d20), d6) + rolled("a")')).toMatchObject({ ok: false });
+    expect(compile('group("a", "A", d20) + group("a", "A", d6)')).toMatchObject({ ok: false });
+    expect(compile('if(inputs.advantage, group("a", "A", d20), d6) + group("a", "A", d6)')).toMatchObject({ ok: false });
   });
 });

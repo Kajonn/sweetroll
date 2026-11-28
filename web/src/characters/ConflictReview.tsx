@@ -5,6 +5,7 @@ import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
 import { captureOpener, focusFirst, restoreOpener, trapTabKey } from "./dialogTrap.js";
 import type { CharacterSnapshot } from "./session.js";
+import { sessionErrorText } from "./sessionErrors.js";
 import type { OnlineAttempt } from "./store.js";
 import type { EditIntent } from "./types.js";
 import styles from "./characters.module.css";
@@ -35,13 +36,13 @@ function isReviewableOnlineAttempt(attempt: OnlineAttempt, now: number): boolean
 }
 
 function serverValue(snapshot: CharacterSnapshot, fieldId: string): string {
-  const values = snapshot.confirmed?.state.values as Record<string, unknown> | undefined;
+  const values = snapshot.view?.character.state.values as Record<string, unknown> | undefined;
   const value = values?.[fieldId];
   return value === undefined || value === null ? "—" : String(value);
 }
 
 function definitionLabel(snapshot: CharacterSnapshot, id: string, debug: boolean): string {
-  const projection = snapshot.confirmed?.projection;
+  const projection = snapshot.view?.character.projection;
   const elements = [
     ...(projection?.completionFields ?? []),
     ...(projection?.sheets.flatMap(sheet => sheet.sections.flatMap(section => section.elements)) ?? []),
@@ -58,6 +59,13 @@ function entryLabel(entry: CharacterSnapshot["entries"][number], snapshot: Chara
   const label = (id: string) => definitionLabel(snapshot, id, debug);
   if (entry.intent.kind === "setField") return `${label(entry.intent.fieldId)} → ${String(entry.intent.value)}`;
   if (entry.intent.kind === "bumpResource") return `${label(entry.intent.resourceId)} ${entry.intent.direction}`;
+  if (entry.intent.kind === "adjustResource") {
+    return `${label(entry.intent.resourceId)} ${entry.intent.delta > 0 ? "+" : "−"}${Math.abs(entry.intent.delta)}`;
+  }
+  if (entry.intent.kind === "setResource") {
+    const current = entry.intent.current ?? "…";
+    return `${label(entry.intent.resourceId)} → ${current} / ${entry.intent.max ?? "…"}`;
+  }
   if (entry.intent.kind === "addEntry") {
     const template = entry.intent.entry.source?.kind === "campaign"
       ? debug ? t("character.review.campaignTemplate", { revision: entry.intent.entry.source.contentRevision }) : t("character.review.campaignItem")
@@ -76,7 +84,7 @@ type ProjectedFieldConstraints = {
 };
 
 function projectedField(snapshot: CharacterSnapshot, fieldId: string): ProjectedFieldConstraints | undefined {
-  const sheets = snapshot.confirmed?.projection.sheets as
+  const sheets = snapshot.view?.character.projection.sheets as
     | Array<{ sections?: Array<{ elements?: Array<Record<string, unknown>> }> }>
     | undefined;
   const elements: Array<Record<string, unknown>> = [];
@@ -85,7 +93,7 @@ function projectedField(snapshot: CharacterSnapshot, fieldId: string): Projected
       for (const element of section.elements ?? []) elements.push(element);
     }
   }
-  const completion = snapshot.confirmed?.projection.completionFields as Array<Record<string, unknown>> | undefined;
+  const completion = snapshot.view?.character.projection.completionFields as Array<Record<string, unknown>> | undefined;
   for (const field of completion ?? []) elements.push(field);
   return elements.find((element) => element["kind"] === "field" && element["fieldId"] === fieldId) as
     | ProjectedFieldConstraints
@@ -329,7 +337,7 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
   return (
     <section className={styles.sheet} aria-labelledby={`${dialogId}-title`}>
       <h2 id={`${dialogId}-title`}>{t("character.conflict.title")}</h2>
-      <p>{snapshot.error?.message ?? t("character.conflict.message")}</p>
+      <p>{snapshot.error ? sessionErrorText(snapshot.error) : t("character.conflict.message")}</p>
       {expired ? <p role="alert">{t("character.conflict.expired")}</p> : null}
       {snapshot.error?.kind === "invalid" && invalidDetails.length > 0 ? (
         <ul>
@@ -375,7 +383,7 @@ export function ConflictReview({ snapshot, onResolve, onClose, now: nowProp, onR
           const server =
             entry.intent.kind === "setField"
               ? serverValue(snapshot, entry.intent.fieldId)
-              : entry.intent.kind === "bumpResource"
+              : entry.intent.kind === "bumpResource" || entry.intent.kind === "adjustResource" || entry.intent.kind === "setResource"
                 ? serverValue(snapshot, entry.intent.resourceId)
                 : "—";
           const correctable = entry.intent.kind === "setField" || entry.intent.kind === "bumpResource";

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/browserTest";
 
 /**
  * Production smoke test: the asset worker takes control of the page and a

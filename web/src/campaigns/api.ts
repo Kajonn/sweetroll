@@ -24,7 +24,6 @@ import type {
   DeleteImageBody,
   DeleteImageResponse,
   DisplayCredentialsResponse,
-  DisplayProjectionResponse,
   ExportCampaignBody,
   ExportCampaignResponse,
   InvitationAcceptBody,
@@ -58,6 +57,10 @@ import type {
   UploadImageBody,
   UploadImageResponse,
   MemberListResponse,
+  CampaignVersionCheckResponse,
+  CampaignVersionOptionsResponse,
+  ChangeCampaignVersionBody,
+  ChangeCampaignVersionResponse,
 } from "./types.js";
 import type { operations } from "../api/schema.js";
 
@@ -91,7 +94,7 @@ type DeclineResponse =
   operations["post_invitations_decline"]["responses"]["200"]["content"]["application/json"];
 export type ContentListQuery = { cursor?: string | null; limit?: number; status?: "active" | "deleted" };
 export type ClaimableCharactersQuery = { cursor?: string | null; limit?: number };
-export type ActivityListQuery = { cursor?: string | null; limit?: number };
+export type ActivityListQuery = { cursor?: string | null; limit?: number; watch?: string; signal?: AbortSignal };
 
 export type SceneLibraryApi = Pick<CampaignsApi, "uploadImage" | "deleteImage" | "createScene" | "updateScene"> & {
   listImages(campaignId: string, input?: { cursor?: string | null }): Promise<Omit<operations["get_campaigns_id_images"]["responses"][200]["content"]["application/json"], "requestId">>;
@@ -119,6 +122,10 @@ export type CampaignsApi = {
   updateCampaign(campaignId: string, body: UpdateCampaignBody): Promise<CampaignViewResponse>;
   archiveCampaign(campaignId: string, body: CampaignLifecycleBody): Promise<CampaignViewResponse>;
   recoverCampaign(campaignId: string, body: CampaignLifecycleBody): Promise<CampaignViewResponse>;
+  /** Design 6.7: GM rules-version choices, dry run and change (optional for test seams). */
+  campaignVersionOptions?(campaignId: string): Promise<CampaignVersionOptionsResponse>;
+  campaignVersionCheck?(campaignId: string, target: ChangeCampaignVersionBody["target"]): Promise<CampaignVersionCheckResponse>;
+  changeCampaignVersion?(campaignId: string, body: ChangeCampaignVersionBody): Promise<ChangeCampaignVersionResponse>;
   exportCampaign(campaignId: string, body: ExportCampaignBody): Promise<ExportCampaignResponse>;
   listMembers(campaignId: string, input?: CampaignListQuery): Promise<MemberListResponse>;
   changeMemberRole(campaignId: string, memberUserId: string, body: ChangeMemberRoleBody): Promise<unknown>;
@@ -146,7 +153,6 @@ export type CampaignsApi = {
   listDisplayCredentials(campaignId: string): Promise<DisplayCredentialsResponse>;
   revokeDisplay(campaignId: string, displayId: string): Promise<RevokeDisplayResponse>;
   redeemDisplay(body: RedeemDisplayBody): Promise<RedeemDisplayResponse>;
-  getDisplayProjection(displayId: string, sceneId: string, secret: string): Promise<DisplayProjectionResponse>;
 };
 
 export function createCampaignsApi(client: ApiClient): CampaignsApi {
@@ -226,7 +232,8 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       input === undefined
         ? client.fetch<CampaignActivityResponse>("GET", `/campaigns/${campaignId}/activity`)
         : client.fetch<CampaignActivityResponse>("GET", `/campaigns/${campaignId}/activity`, {
-          query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined },
+          query: { cursor: input.cursor ?? undefined, limit: input.limit ?? undefined, watch: input.watch },
+          ...(input.signal ? { signal: input.signal } : {}),
         }),
     createCampaign: (body) =>
       client.fetch<CreateCampaignResponse>("POST", "/campaigns", { body }),
@@ -236,6 +243,14 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch<CampaignViewResponse>("POST", `/campaigns/${campaignId}/archive`, { body }),
     recoverCampaign: (campaignId, body) =>
       client.fetch<CampaignViewResponse>("POST", `/campaigns/${campaignId}/recover`, { body }),
+    campaignVersionOptions: (campaignId) =>
+      client.fetch<CampaignVersionOptionsResponse>("GET", `/campaigns/${encodeURIComponent(campaignId)}/composition-options`),
+    campaignVersionCheck: (campaignId, target) =>
+      client.fetch<CampaignVersionCheckResponse>("POST", `/campaigns/${encodeURIComponent(campaignId)}/composition-check`, {
+        body: { target },
+      }),
+    changeCampaignVersion: (campaignId, body) =>
+      client.fetch<ChangeCampaignVersionResponse>("POST", `/campaigns/${encodeURIComponent(campaignId)}/composition`, { body }),
     exportCampaign: (campaignId, body) =>
       client.fetch<ExportCampaignResponse>("POST", `/campaigns/${campaignId}/exports`, { body }),
     listMembers: (campaignId, input) =>
@@ -291,9 +306,5 @@ export function createCampaignsApi(client: ApiClient): CampaignsApi {
       client.fetch<RevokeDisplayResponse>("POST", `/campaigns/${campaignId}/displays/${displayId}/revoke`, { body: {} }),
     redeemDisplay: (body) =>
       client.fetch<RedeemDisplayResponse>("POST", "/displays/redeem", { body }),
-    getDisplayProjection: (displayId, sceneId, secret) =>
-      client.fetch<DisplayProjectionResponse>("GET", `/displays/${displayId}/scenes/${sceneId}/projection`, {
-        headers: { "x-display-secret": secret },
-      }),
   };
 }

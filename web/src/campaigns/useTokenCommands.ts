@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { CampaignsApi } from "./api.js";
-import type { MoveTokenBody, PlaceTokenBody } from "./types.js";
+import type { MoveTokenBody, PlaceTokenBody, SceneView } from "./types.js";
 import { randomUUID } from "../utils/uuid.js";
 
 export type Point = { x: number; y: number };
@@ -18,6 +18,8 @@ export function useTokenCommands(props: {
   sceneRevision: number;
   online?: boolean | undefined;
   onChanged?: (() => void | number | Promise<void | number>) | undefined;
+  /** Adopt the committed scene from the command response (no extra read). */
+  onApplied?: ((scene: SceneView) => void) | undefined;
 }) {
   const latest = useRef(props); latest.current = props;
   const active = useRef(true), lock = useRef(false), stateRef = useRef<State>({ status: "idle" });
@@ -30,11 +32,16 @@ export function useTokenCommands(props: {
     lock.current = true; update({ status: "pending", operation });
     let committed = false;
     try {
-      if (operation.kind === "place") await latest.current.api.placeToken(latest.current.sceneId, operation.body);
-      else await latest.current.api.moveToken(latest.current.sceneId, operation.tokenId, operation.body);
+      const response: { scene?: SceneView } | undefined = operation.kind === "place"
+        ? await latest.current.api.placeToken(latest.current.sceneId, operation.body)
+        : await latest.current.api.moveToken(latest.current.sceneId, operation.tokenId, operation.body);
       committed = true;
       if (!active.current) return;
-      await refresh();
+      // One committed gesture = one write; the response is authoritative, so
+      // the GM view adopts it directly. Conflicts and uncertain results still
+      // reconcile through an explicit read.
+      if (response?.scene && latest.current.onApplied) latest.current.onApplied(response.scene);
+      else await refresh();
       update({ status: "applied", operation });
     } catch (cause) {
       if (!active.current) return;

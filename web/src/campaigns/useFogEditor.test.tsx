@@ -4,6 +4,14 @@ import {useFogEditor}from"./useFogEditor.js";
 const dab={x:.25,y:.5,r:.1};
 const props=()=>({api:{applyFogEdit:vi.fn().mockResolvedValue({})},sceneId:"s",sceneRevision:3,online:true,onChanged:vi.fn().mockResolvedValue(3)});
 describe("fog draft and commit ownership",()=>{
+ it("commits many strokes as one command and adopts the response without an extra read",async()=>{
+  const p={...props(),onApplied:vi.fn()};const scene={sceneId:"s",revision:4,fog:[],tokens:[]};p.api.applyFogEdit.mockResolvedValue({scene,requestId:"r"});
+  const h=renderHook(()=>useFogEditor(p));
+  act(()=>{h.result.current.addStroke(Array.from({length:40},(_,i)=>({...dab,x:i/40})));});act(()=>h.result.current.addStroke([{...dab,x:.9}]));
+  await act(async()=>{await h.result.current.commit();});
+  expect(p.api.applyFogEdit).toHaveBeenCalledTimes(1);expect(p.api.applyFogEdit.mock.calls[0]![1].op.runs).toHaveLength(41);
+  expect(p.onApplied).toHaveBeenCalledWith(scene);expect(p.onChanged).not.toHaveBeenCalled();expect(h.result.current.status).toBe("applied");expect(h.result.current.draft).toEqual([]);
+ });
  it("undoes only the latest completed stroke and never saves previews",()=>{const p=props(),h=renderHook(()=>useFogEditor(p));act(()=>h.result.current.addStroke([dab]));act(()=>h.result.current.addStroke([{...dab,x:.75}]));expect(p.api.applyFogEdit).not.toHaveBeenCalled();act(()=>h.result.current.undo());expect(h.result.current.draft).toEqual([dab]);});
  it("preserves a conflicting draft until explicit fresh-revision retry",async()=>{const p=props();p.api.applyFogEdit.mockRejectedValueOnce({status:409});const h=renderHook(v=>useFogEditor(v),{initialProps:p});act(()=>h.result.current.addStroke([dab]));await act(async()=>{await h.result.current.commit();});expect(h.result.current.status).toBe("conflict");expect(h.result.current.draft).toEqual([dab]);expect(p.api.applyFogEdit).toHaveBeenCalledTimes(1);h.rerender({...p,sceneRevision:8});await act(async()=>{await h.result.current.retry();});const a=p.api.applyFogEdit.mock.calls[0]![1],b=p.api.applyFogEdit.mock.calls[1]![1];expect(b.expectedSceneRevision).toBe(8);expect(b.idempotencyKey).not.toBe(a.idempotencyKey);expect(b.op).toEqual(a.op);expect(h.result.current.draft).toEqual([]);});
  it("keeps the revision first inspected by a draft even if another read arrives before commit",async()=>{const p=props(),h=renderHook(v=>useFogEditor(v),{initialProps:p});act(()=>h.result.current.addStroke([dab]));h.rerender({...p,sceneRevision:9});await act(async()=>{await h.result.current.commit();});expect(p.api.applyFogEdit.mock.calls[0]![1].expectedSceneRevision).toBe(3);});

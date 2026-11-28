@@ -1,18 +1,22 @@
 import { createTemplateRepository } from "../campaigns/templatePersistence.js";
 import { loadConfig, createLogger, createPool } from "../platform/index.js";
 import { loadCampaignLimits } from "../platform/config.js";
+import { pruneExpiredRows, startPruneScheduler, type PruneScheduler } from "../platform/prune.js";
 import { createIdentityModule } from "../identity/index.js";
 import { createTestOidcClient } from "../identity/adapters/test.js";
 import { createSystemAuthoringModule } from "../systems/authoring.js";
+import { createExtensionAuthoringModule } from "../systems/extensions.js";
 import { createCharactersModule } from "../characters/index.js";
 import { createCampaignPlacement } from "../characters/campaignPlacement.js";
 import { createCampaignsModule } from "../campaigns/index.js";
+import { createPhysicalDiceStreams } from "../campaigns/physical-dice-stream.js";
+import { createSceneEventHub } from "../campaigns/scene-events.js";
 import {
   createSystemPersistenceRepository,
   seedReferenceTemplates,
 } from "../systems/implementation/persistence/index.js";
 import { createSystemRuntime } from "../systems/runtime.js";
-import { createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
+import { createPostgresPublishedExtensionLoader, createPostgresPublishedPackageLoader } from "../systems/implementation/runtime/package-loader.js";
 import { buildPublicApi, publicApiPrefix } from "../transport/http/public-api/index.js";
 import { buildPersonalTokenRoutes } from "../transport/http/personal-tokens.js";
 import { buildAuthHook } from "../transport/http/auth-hook.js";
@@ -90,22 +94,31 @@ const identity = createIdentityModule({
   allowPersonalTokens: config.nodeEnv !== "production" && process.env.SWEETROLL_LOCAL_API_TOKENS === "1",
 });
 
+const systemRepository = createSystemPersistenceRepository(pool);
 const authoring = createSystemAuthoringModule({
   pool,
-  repo: createSystemPersistenceRepository(pool),
+  repo: systemRepository,
 });
+const extensionAuthoring = createExtensionAuthoringModule({ pool, repo: systemRepository });
 
 const runtime = createSystemRuntime({
   loadPackage: createPostgresPublishedPackageLoader(pool),
+  loadExtensionPackage: createPostgresPublishedExtensionLoader(pool),
   authoritativeRollSecret: config.authoritativeRollSecret,
 });
 
 const characters = createCharactersModule({
+  physicalDiceEnabled: config.physicalDiceEnabled,
     campaignTemplates:createTemplateRepository(pool),
   pool,
   runtime,
   authorizeVersionUse: authoring.authorizeVersionUse,
+  authorizeExtensionUse: extensionAuthoring.authorizeExtensionUse,
   listAuthorizedVersions: authoring.listAuthorizedVersions,
+  listUpgradeTargets: authoring.listUpgradeTargets,
+  describeVersionChoices: authoring.describeVersionChoices,
+  listExtensionUpgradeTargets: extensionAuthoring.listUpgradeTargets,
+  describeCompositionChoices: extensionAuthoring.describeCompositionChoices,
 });
 
 // I6 Task 9 (fix): one shared campaign policy/placement implementation. The
@@ -122,21 +135,37 @@ const placement = createCampaignPlacement({
   runtime,
   maxAttachedCharacters: placementLimits.maxAttachedCharacters,
 });
+// Scene streaming: one dedicated LISTEN connection per process, separate
+// from the request pool. Until it is listening, display streams answer 503
+// and displays retry; it reconnects by itself after a failure.
+const sceneEvents = createSceneEventHub({ connection: { connectionString: config.databaseUrl }, logger });
+void sceneEvents.start().catch((error: unknown) => {
+  logger.warn({ err: error }, "scene event listener not ready; retrying");
+});
 const campaigns = createCampaignsModule({
+  sceneEvents,
   pool,
   limits: placementLimits,
   charactersPlacement: placement,
     loadTemplatePackage:createPostgresPublishedPackageLoader(pool),
+    authorizeExtensionUse: extensionAuthoring.authorizeExtensionUse,
+    listUpgradeTargets: authoring.listUpgradeTargets,
+    describeVersionChoices: authoring.describeVersionChoices,
+    listExtensionUpgradeTargets: extensionAuthoring.listUpgradeTargets,
+    describeCompositionChoices: extensionAuthoring.describeCompositionChoices,
 });
 
 const app = buildHttpApp({
   logger,
   pool,
+  metricsToken: config.metricsToken,
+  hsts: config.cookieSecure || config.nodeEnv === "production",
+  trustedProxyCidrs: config.trustedProxyCidrs ?? [],
   authHook: buildAuthHook({
     identity,
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
-    maxAgeSeconds: config.sessionTtlDays * 86_400,
+    allowedOrigins: config.allowedOrigins,
   }),
 });
 
@@ -145,35 +174,53 @@ const serveStatic = process.env.SWEETROLL_SERVE_STATIC === "1";
 void app.register(registerStaticServing, {
   distDir: "web/dist",
   enabled: serveStatic,
+  physicalDiceEnabled: config.physicalDiceEnabled,
 });
 
 registerApiRoutes(app, [
   buildIdentityRoutes({
     identity,
+    physicalDiceEnabled: config.physicalDiceEnabled,
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
-    allowedOrigins: config.allowedOrigins,
   }),
-  buildPersonalTokenRoutes({ identity, allowedOrigins: config.allowedOrigins }),
-  buildSystemsRoutes({ authoring }),
+  buildPersonalTokenRoutes({ identity }),
+  buildSystemsRoutes({ authoring, extensions: extensionAuthoring }),
   buildCharactersRoutes({ characters }),
-  buildCampaignsRoutes({ campaigns, characters, runtime, identity }),
-], serveStatic);
-void app.register(buildPublicApi({ identity, authoring, characters, pool }), { prefix: publicApiPrefix });
+  buildCampaignsRoutes({
+    campaigns, characters, runtime, identity,
+    ...(config.physicalDiceEnabled && {physicalDiceStreams:createPhysicalDiceStreams({pool,hub:sceneEvents})}),
+  }),
+], serveStatic, { pool });
+void app.register(buildPublicApi({ identity, authoring, characters, pool, campaigns, runtime, extensions: extensionAuthoring }), { prefix: publicApiPrefix });
 void app.register(
   buildDevSignInRoutes({
     identity,
     nodeEnv: config.nodeEnv,
     cookieName: config.sessionCookieName,
     secure: config.cookieSecure,
-    maxAgeSeconds: config.sessionTtlDays * 86_400,
     allowInProduction: testAuthEnabled,
   }),
 );
 
+// Expired-row retention (design 12.3/13.1): every replica schedules it; the
+// advisory lock inside pruneExpiredRows lets only one prune at a time.
+let pruneScheduler: PruneScheduler | null = null;
+if (config.pruneIntervalMs > 0) {
+  pruneScheduler = startPruneScheduler({
+    intervalMs: config.pruneIntervalMs,
+    logger,
+    run: () => pruneExpiredRows(pool),
+  });
+} else {
+  logger.info({ event: "prune_disabled" }, "expired-row pruning disabled (SWEETROLL_PRUNE_INTERVAL_MS=0)");
+}
+
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "shutting down HTTP process");
+  pruneScheduler?.stop();
   await app.close();
+  await sceneEvents.close();
   await pool.end();
 };
 
@@ -184,6 +231,7 @@ try {
   await app.listen({ host: config.host, port: config.port });
 } catch (error) {
   logger.fatal({ err: error }, "HTTP process failed to start");
+  pruneScheduler?.stop();
   await pool.end();
   process.exitCode = 1;
 }

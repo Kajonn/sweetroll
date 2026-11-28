@@ -1,3 +1,4 @@
+import { defaultPreferences } from "../src/identity/repository.js";
 import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -62,8 +63,8 @@ async function emitOpenApi(): Promise<void> {
     },
     resolveSession: async () => ({ state: "anonymous" }),
     signOut: async () => ({ ok: true, value: undefined }),
-    getThemeDefault: async () => ({ ok: true, value: null }),
-    setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    getPreferences: async () => ({ ok: true, value: defaultPreferences }),
+    patchPreferences: async (_actorId, patch) => ({ ok: true, value: { ...defaultPreferences, ...patch } }),
   };
   void app.register(buildIdentityRoutes({ identity, cookieName: "session", secure: true }));
   void app.register(buildSystemsRoutes({ authoring: {} as SystemAuthoring }));
@@ -80,6 +81,7 @@ async function emitOpenApi(): Promise<void> {
   );
   await app.register(buildPublicApi({
     identity, pool: {} as Pool, authoring: {} as SystemAuthoring, characters: {} as Characters,
+    campaigns: {} as Campaigns, runtime: {} as SystemRuntime,
   }), { prefix: publicApiPrefix });
   await app.ready();
   try {

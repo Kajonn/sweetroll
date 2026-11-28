@@ -1,4 +1,7 @@
+import type { PrepareDice } from "../physicalDice/commands.js";
 import { ApiError } from "../api/client.js";
+import type { CampaignRollSelection } from "./types.js";
+import type { Composition } from "./compositionChoices.js";
 import type { CharactersApi } from "./api.js";
 import type { CharacterStore, OnlineAttempt, WriteGuard } from "./store.js";
 import { validPushResponse } from "./push-response.js";
@@ -25,9 +28,48 @@ export type BlockingErrorKind =
   | "not-found"
   | "network-unavailable";
 
+/**
+ * The kinds `snapshot.error` holds: review and pause events (V3). A storage
+ * failure is its own state (`snapshot.storage`, V1) and never takes this
+ * slot; `storage-error` remains a kind a refused command can carry.
+ */
+export type SessionErrorKind = Exclude<BlockingErrorKind, "storage-error">;
+
+/**
+ * Distinguishes situations that share a kind but need different text (V3).
+ * The UI maps kind and reason to an i18n key (`sessionErrors.ts`).
+ */
+export type BlockingErrorReason =
+  | "request-in-flight"      // conflict: state changed while a request was in flight
+  | "newer-version"          // conflict: a newer revision or package exists
+  | "roll-preparation"       // invalid: the roll could not be prepared
+  | "unknown-outcome"        // expired-attempt: an online change whose outcome is unknown
+  | "review-base-unavailable"; // network-unavailable: the latest state is not available yet
+
+/**
+ * A review or pause event, reported as a code (V3). The session writes no
+ * user-facing text: `serverMessage` is the server's own message (server data,
+ * shown as today) and `diagnostic` is English for logs and tests only; it is
+ * never rendered.
+ */
 export type BlockingError = {
-  kind: BlockingErrorKind;
-  message: string;
+  kind: SessionErrorKind;
+  reason?: BlockingErrorReason;
+  serverMessage?: string;
+  details?: unknown;
+  diagnostic: string;
+};
+
+/**
+ * A refused command's error: the diagnostic as `message`, plus its code.
+ * `blocked` marks a refusal caused by the session's open error or storage
+ * failure; the UI translates those codes (`sessionErrors.ts`).
+ */
+export type SessionCommandError = Error & {
+  blocked?: true;
+  kind?: BlockingErrorKind;
+  reason?: BlockingErrorReason;
+  serverMessage?: string;
   details?: unknown;
 };
 
@@ -75,12 +117,25 @@ export type CoordinationPort = {
   requestTakeover?(): Promise<boolean>;
 };
 
+/**
+ * What the session shows. `stored` means this browser keeps a saved copy, so
+ * the character stays available offline; in a tab without the lock the
+ * character shown may be a newer server view that was not saved (V2). `live`
+ * is an authorized server view without a saved copy, shown only while online.
+ */
+export type CharacterViewState = { source: "stored" | "live"; character: CharacterView };
+
+/** Why a tab with a view cannot edit: local storage failed, no Web Locks, or another tab holds the lock. */
+export type EditingBlockedBy = "storage" | "locks" | "other-tab";
+
 export type CharacterSnapshot = {
   phase: SessionPhase;
-  confirmed: CharacterView | null;
+  view: CharacterViewState | null;
+  /** Whether this browser can keep a local copy; "unavailable" after a local storage failure. */
+  storage: "available" | "unavailable";
   tentative: Record<string, unknown> | null;
   entries: QueueEntry[];
-  editing: { owned: boolean; owner?: string | null };
+  editing: { owned: boolean; owner?: string | null; blockedBy?: EditingBlockedBy };
   error: BlockingError | null;
   /** True while this session's actor is authenticated online. Read-only panels gate on this. */
   connected: boolean;
@@ -96,6 +151,20 @@ export type CharacterSnapshot = {
   pendingOnlineAttempts: OnlineAttempt[];
 };
 
+/**
+ * Design Section 8: a tab edits only while it holds the editing lock and
+ * shows a stored view. The session's commands and the UI use this same
+ * predicate, so a `live` view or a tab without the lock stays read-only.
+ */
+export function canEdit(snapshot: Pick<CharacterSnapshot, "editing" | "view">): boolean {
+  return snapshot.editing.owned && snapshot.view?.source === "stored";
+}
+
+/** Key of a resource's pending maximum in `snapshot.tentative`. */
+export function resourceMaxKey(resourceId: string): string {
+  return `${resourceId}.max`;
+}
+
 export type CharacterSession = {
   open(): Promise<void>;
   /** Apply a catalog access denial only to the generation it was fetched against. */
@@ -104,7 +173,11 @@ export type CharacterSession = {
   subscribe(listener: (snapshot: CharacterSnapshot) => void): () => void;
   setField(fieldId: string, value: unknown): Promise<void>;
   bumpResource(resourceId: string, direction: "up" | "down"): Promise<void>;
-  executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  /** Apply an amount (negative subtracts); the server stops at the resource's bounds. */
+  adjustResource(resourceId: string, delta: number): Promise<void>;
+  /** Direct input of the current value and/or the character's maximum. */
+  setResource(resourceId: string, values: { current?: number; max?: number }): Promise<void>;
+  executeAction(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void>;
   pushRoll(parentRollId:string):Promise<void>;
   refresh():Promise<void>;
   forgetRoll(rootRollId:string):Promise<void>;
@@ -112,7 +185,7 @@ export type CharacterSession = {
    * Task 7: template-granted roll routed through the executeAction intent
    * with its owning entry. Online-only, like entity actions.
    */
-  executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>): Promise<void>;
+  executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void>;
   /**
    * Task 7: durable entry intents. Offline-capable like field sets and
    * resource bumps: they queue durably and replay verbatim, so offline
@@ -124,6 +197,13 @@ export type CharacterSession = {
   resolveConflict(input: ResolveConflictInput): Promise<void>;
   archive(): Promise<void>;
   recover(): Promise<void>;
+  /**
+   * Design 6.7: move this standalone character to another version of its
+   * system (a checked upgrade or the recorded revert target). Online only,
+   * through the same durable attempt ordering as archive/recover.
+   */
+  /** Design 6.7/6.8: move to another composition (online only). */
+  changeVersion(target: Composition): Promise<void>;
   /**
    * Explicit unknown-outcome review for one retained expired online attempt.
    * Never retries the stored request and never mints a replacement: it
@@ -164,18 +244,34 @@ export type CreateCharacterSessionInput = {
   coordination: CoordinationPort;
   now: () => string;
   newId: () => string;
+  captureDicePreparation?: (campaignId: string | null) => PrepareDice | undefined;
+  captureRollPublisher?: () => ((response: CommandResultResponse, startedAt: string) => void) | undefined;
+  /** False when the browser has no Web Locks, so no tab can ever edit. Defaults to true. */
+  locksSupported?: boolean;
 };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+/** A store record as `CharacterStore.read` returns it. */
+type SavedRecord = Awaited<ReturnType<CharacterStore["read"]>>;
+
+/** D1: a live (unsaved) view is fetched again this often while the page is visible. */
+export const LIVE_REFRESH_MS = 30_000;
+
+/**
+ * Why the view is refreshed. "sync" (the drain) and "command" (an explicit
+ * refresh or an online operation) run the owner's guarded write path
+ * directly; the other triggers come from outside the drain.
+ */
+type RefreshTrigger = "open" | "reconnect" | "visible" | "timer" | "sync" | "command";
+
 /** Backend-declared idempotency replay-window expiry for one exact key. */
 const REPLAY_EXPIRED_RE = /replay window/i;
 
-const KIND_TO_PHASE: Record<BlockingErrorKind, SessionPhase> = {
+const KIND_TO_PHASE: Record<SessionErrorKind, SessionPhase> = {
   conflict: "conflict",
   invalid: "invalid",
   reauthenticate: "reauthenticate",
-  "storage-error": "storage-error",
   purged: "purged",
   "expired-attempt": "conflict",
   protocol: "conflict",
@@ -185,12 +281,17 @@ const KIND_TO_PHASE: Record<BlockingErrorKind, SessionPhase> = {
 
 type SendOutcome = "acked" | "retry" | "blocked";
 
-function structuredError(message: string, kind: BlockingErrorKind, details?: unknown): Error & { kind?: BlockingErrorKind } {
-  const err = new Error(message) as Error & { kind?: BlockingErrorKind };
+function structuredError(
+  message: string,
+  kind: BlockingErrorKind,
+  details?: unknown,
+  code: { reason?: BlockingErrorReason | undefined; serverMessage?: string | undefined } = {},
+): SessionCommandError {
+  const err = new Error(message) as SessionCommandError;
   err.kind = kind;
-  if (details !== undefined) {
-    (err as Error & { details?: unknown }).details = details;
-  }
+  if (details !== undefined) err.details = details;
+  if (code.reason !== undefined) err.reason = code.reason;
+  if (code.serverMessage !== undefined) err.serverMessage = code.serverMessage;
   return err;
 }
 
@@ -230,7 +331,29 @@ function entryMatchesBase(entry: QueueEntry, base: CharacterView): boolean {
 export function createCharacterSession(input: CreateCharacterSessionInput): CharacterSession {
   const { actorId, characterId, api, store, identity, coordination, now, newId } = input;
 
-  let confirmed: CharacterView | null = null;
+  /**
+   * V2: the saved copy. `saved` is exactly the store's confirmed view; with
+   * `entries`, `generation`, `accountGeneration` and `lastRoll` it is the
+   * store record this session last adopted (`adoptSaved`) or wrote itself
+   * (the owner's write path). Commands, queue entries, tentative estimates
+   * and reconciliation use only this copy.
+   */
+  let saved: CharacterView | null = null;
+  /**
+   * V2: the newest authorized server view this tab fetched and did not save.
+   * Without a saved copy it is the `live` view (shown only while online).
+   * With one, it is shown instead of the saved copy while its revision is
+   * greater, or equal and fetched after the saved copy last changed
+   * (`shownSaved`), in a tab without the lock, online or offline (E2). Purge, sign-out, an account change, a saved copy that becomes null
+   * and gaining the lock clear it.
+   */
+  let latest: CharacterView | null = null;
+  /** True once this session has shown a live view; reconnecting reopens it. */
+  let liveShown = false;
+  let viewFetch: Promise<void> | null = null;
+  let viewFetchAgain = false;
+  let liveTimer: ReturnType<typeof setInterval> | null = null;
+  let refreshAfterDrain = false;
   let entries: QueueEntry[] = [];
   let pendingOnline: OnlineAttempt[] = [];
   let generation = 0;
@@ -238,6 +361,16 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   let nextSequence = 0;
   let phase: SessionPhase = "loading";
   let error: BlockingError | null = null;
+  /**
+   * V1: storage has its own state. A failed store read or write sets it, and
+   * no other error kind replaces or clears it. Only a successful store read
+   * under the lock (requestEditing → reloadOwned) clears it; the drain's next
+   * save then retries, and a new failure sets it again. V3: it never takes the
+   * `error` slot; the phase reports it while no review or pause error is set.
+   * `storageDiagnostic` keeps the failure's diagnostic for a refused command.
+   */
+  let storageFailed = false;
+  let storageDiagnostic = "";
   let lastRoll: CommandResultResponse["result"]["roll"] = null;
   let lastNominal: CommandResultResponse["result"]["nominal"] = null;
   let editing: { owned: boolean; owner: string | null } = { owned: coordination.isOwner(), owner: null };
@@ -253,6 +386,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   const identityGeneration = identity.getGeneration();
   const listeners = new Set<(snapshot: CharacterSnapshot) => void>();
+  const diceLifetime = new AbortController();
   const freezeWaiters = new Map<string, { resolve: () => void; reject: (err: unknown) => void }>();
   const entryWrites = new Map<string, Promise<void>>();
 
@@ -274,6 +408,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   const emit = () => {
     cachedSnapshot = null;
+    syncLiveTimer();
     const snapshot = getSnapshot();
     for (const listener of [...listeners]) listener(snapshot);
   };
@@ -285,14 +420,50 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function identityIsCurrent(): Promise<boolean> {
     return identityMatches() && await identity.isCurrent() && identityMatches();
   }
-  function getSnapshot(): CharacterSnapshot {
+  /**
+   * V2: the character shown while a saved copy exists. The newest observed
+   * view wins: `latest` is shown while its revision is at least the saved
+   * copy's. An equal-revision `latest` is kept only while the saved copy has
+   * not changed since it was fetched (`adoptSaved` drops it otherwise). A tab
+   * holding the lock always shows its saved copy.
+   */
+  function shownSaved(): CharacterView | null {
+    if (saved === null) return null;
+    return latest !== null && !editing.owned &&
+      latest.reconciliation.revision >= saved.reconciliation.revision ? latest : saved;
+  }
+  /** The shown view and whether this tab reports editing, computed from current state. */
+  function deriveView(): { visible: boolean; view: CharacterViewState | null; owned: boolean } {
     const visible = identityMatches();
-    return cachedSnapshot ??= {
+    const live = visible && saved === null && isConnected() ? latest : null;
+    const shown = shownSaved();
+    const view: CharacterViewState | null = !visible ? null
+      : shown !== null ? { source: "stored", character: shown }
+      : live !== null ? { source: "live", character: live } : null;
+    return { visible, view, owned: visible && editing.owned && live === null };
+  }
+  /**
+   * The command gate: the same `canEdit` predicate the UI reads, plus the
+   * coordination port's own answer, so nothing is queued, saved or sent
+   * without a stored view and the editing lock.
+   */
+  function editAllowed(): boolean {
+    const { view, owned } = deriveView();
+    return canEdit({ editing: { owned }, view }) && coordination.isOwner() && !storageFailed;
+  }
+  function getSnapshot(): CharacterSnapshot {
+    if (cachedSnapshot !== null) return cachedSnapshot;
+    const { visible, view, owned } = deriveView();
+    const storage = visible && storageFailed ? "unavailable" : "available";
+    const blockedBy: EditingBlockedBy | undefined = owned || view === null ? undefined
+      : storage === "unavailable" ? "storage" : input.locksSupported === false ? "locks" : "other-tab";
+    return cachedSnapshot = {
       phase,
-      confirmed: visible ? confirmed : null,
+      view,
+      storage,
       tentative: visible ? computeTentative() : null,
       entries: visible ? entries.filter((e) => !entryWrites.has(e.id)).map((e) => ({ ...e })) : [],
-      editing: { ...editing, owned: visible && editing.owned },
+      editing: { ...editing, owned, ...(blockedBy !== undefined && { blockedBy }) },
       error: visible && error ? { ...error } : null,
       connected: isConnected(),
       lastRoll: visible ? lastRoll : null,
@@ -301,13 +472,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     };
   }
 
-  function resourceBounds(resourceId: string): { current: number; min: number; max: number; step: number } | null {
-    if (!confirmed) return null;
-    for (const sheet of confirmed.projection.sheets) {
+  function resourceBounds(resourceId: string): { current: number; min: number; max: number; step: number; valueMax: number } | null {
+    if (!saved) return null;
+    for (const sheet of saved.projection.sheets) {
       for (const section of sheet.sections) {
         for (const element of section.elements) {
           if (element.kind === "resource" && element.resourceId === resourceId) {
-            return { current: element.value.current, min: element.min, max: element.max, step: element.step };
+            return { current: element.value.current, min: element.min, max: element.max, step: element.step, valueMax: element.value.max };
           }
         }
       }
@@ -316,7 +487,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   function computeTentative(): Record<string, unknown> | null {
-    if (!confirmed) return null;
+    if (!saved) return null;
     const values: Record<string, unknown> = {};
     const ordered = [...entries].sort((a, b) => a.sequence - b.sequence);
     for (const entry of ordered) {
@@ -335,6 +506,24 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         const stepped = entry.intent.direction === "up" ? previous + bounds.step : previous - bounds.step;
         values[entry.intent.resourceId] = Math.max(bounds.min, Math.min(bounds.max, stepped));
       }
+      else if (entry.intent.kind === "adjustResource" || entry.intent.kind === "setResource") {
+        // Same sequential estimate as bumps. The pending maximum is kept
+        // under `<resourceId>.max`; a definition ID never contains a dot.
+        const bounds = resourceBounds(entry.intent.resourceId);
+        if (bounds === null) continue;
+        const maxKey = resourceMaxKey(entry.intent.resourceId);
+        const previousMax = typeof values[maxKey] === "number" ? (values[maxKey] as number) : bounds.valueMax;
+        const previous = typeof values[entry.intent.resourceId] === "number"
+          ? (values[entry.intent.resourceId] as number)
+          : bounds.current;
+        if (entry.intent.kind === "adjustResource") {
+          values[entry.intent.resourceId] = Math.max(bounds.min, Math.min(previousMax, previous + entry.intent.delta));
+        } else {
+          const max = entry.intent.max ?? previousMax;
+          if (entry.intent.max !== undefined) values[maxKey] = max;
+          values[entry.intent.resourceId] = entry.intent.current ?? Math.min(previous, max);
+        }
+      }
       // executeAction intentions contribute no estimate: applying a roll
       // outcome would be rule evaluation, and only the server confirms it.
     }
@@ -345,37 +534,131 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return identity.getActorId() === actorId && identity.isOnline() && identity.getGeneration() === identityGeneration;
   }
 
+  /** A review or pause error, or a storage failure, stops the drain. */
   function isBlocked(): boolean {
-    return error !== null;
+    return error !== null || storageFailed;
   }
 
-  function setBlocked(kind: BlockingErrorKind, message: string, details?: unknown) {
+  /** The error a refused command carries: the open error, else the storage failure. */
+  function blockedCommandError(): SessionCommandError {
+    const err = error !== null
+      ? structuredError(error.diagnostic, error.kind, error.details, { reason: error.reason, serverMessage: error.serverMessage })
+      : structuredError(storageDiagnostic, "storage-error");
+    err.blocked = true;
+    return err;
+  }
+
+  /**
+   * Sets a review or pause error as a code (V3). `diagnostic` is English for
+   * logs and tests and is never rendered; `serverMessage` is the server's own
+   * message, when the error carries one.
+   */
+  function setBlocked(
+    kind: SessionErrorKind,
+    diagnostic: string,
+    options: { details?: unknown; reason?: BlockingErrorReason; serverMessage?: string } = {},
+  ) {
     if (retryTimer !== null) {
       clearTimeout(retryTimer);
       retryTimer = null;
     }
-    error = { kind, message };
-    if (details !== undefined) error.details = details;
+    error = { kind, diagnostic };
+    if (options.reason !== undefined) error.reason = options.reason;
+    if (options.serverMessage !== undefined) error.serverMessage = options.serverMessage;
+    if (options.details !== undefined) error.details = options.details;
     phase = KIND_TO_PHASE[kind];
+  }
+
+  /**
+   * Records a failed store read or write (V1) and applies D3. V3: storage does
+   * not take the `error` slot, so an open review or pause error keeps its kind;
+   * the phase is `storage-error` only while no such error is set.
+   */
+  function failStorage(diagnostic: string) {
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+    storageFailed = true;
+    storageDiagnostic = diagnostic;
+    phase = error !== null ? KIND_TO_PHASE[error.kind] : "storage-error";
+    // D3: a tab that cannot save gives up the editing lock, so a tab or
+    // browser profile that can save is able to take over. This tab edits
+    // again only through requestEditing (the takeover flow).
+    if (editing.owned || coordination.isOwner()) {
+      editing = { owned: false, owner: null };
+      coordination.letGo();
+    }
+  }
+
+  /**
+   * Clears a review or pause error. A storage failure is not cleared with it:
+   * while storage has failed, the phase reports `storage-error` again.
+   */
+  function clearError() {
+    error = null;
+    if (storageFailed) phase = "storage-error";
+  }
+
+  /**
+   * V2: adopts a store record as the saved copy. Every place that copies the
+   * store into memory uses this. Each caller keeps its own guards and side
+   * effects; the options keep its existing rules: `sequence` advances the
+   * next queue sequence past the adopted entries ("advance"), recomputes it
+   * from them ("reset", on open and on gaining the lock) or leaves it
+   * ("keep"); `account: false` keeps this session's account generation.
+   *
+   * The newest fetched view (`latest`) is kept: it is shown while its
+   * revision is greater than the adopted copy's, or equal while the saved
+   * copy itself is unchanged. It is cleared when the saved copy becomes
+   * null, the account generation changes or an older revision is left. A saved roll is not
+   * shown with a newer view from another roll scope.
+   */
+  function adoptSaved(
+    record: SavedRecord,
+    options: { sequence?: "advance" | "reset" | "keep"; account?: boolean } = {},
+  ) {
+    const { sequence = "advance", account = true } = options;
+    const savedChanged = JSON.stringify(saved) !== JSON.stringify(record.confirmed);
+    if ((record.confirmed === null && saved !== null) ||
+        (account && record.accountGeneration !== accountGeneration)) latest = null;
+    saved = record.confirmed;
+    lastRoll = record.lastRoll ?? null;
+    entries = record.entries;
+    generation = record.generation;
+    if (account) accountGeneration = record.accountGeneration;
+    if (sequence !== "keep") {
+      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), sequence === "reset" ? 0 : nextSequence);
+    }
+    // Older revisions never replace newer ones. At an equal revision the
+    // newest observed view wins: a fetched view stays until the store saves a
+    // new copy (an enqueue or metadata write keeps the same saved copy).
+    if (saved !== null && latest !== null && (latest.reconciliation.revision < saved.reconciliation.revision ||
+        (latest.reconciliation.revision === saved.reconciliation.revision && savedChanged))) latest = null;
+    const shown = shownSaved();
+    if (shown !== saved && !sameRollScope(saved, shown!)) lastRoll = null;
   }
 
   function assertMutationAllowed(options?: { offlineIntent?: boolean }) {
     if (disposed) throw new Error("Session closed.");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
-    // An online protocol stop bars online commands, never offline-capable
-    // field sets and resource bumps: those stay durable, ordered intentions
-    // that still pass every send-time gate.
-    if (error && !(error.kind === "protocol" && options?.offlineIntent === true)) {
-      throw structuredError(error.message, error.kind, error.details);
+    // Connectivity and protocol pauses stop sends. Offline-capable edits
+    // can still be queued against the cached sheet and pass the send-time
+    // gates on recovery.
+    const canQueue = options?.offlineIntent === true
+      && (error?.kind === "protocol" || error?.kind === "network-unavailable");
+    if (error && !canQueue) throw blockedCommandError();
+    if (storageFailed) throw blockedCommandError();
+    if (!editAllowed()) {
+      if (editing.owned && coordination.isOwner() && !saved) throw new Error("Cannot edit until the character is loaded.");
+      throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");
     }
-    if (!editing.owned || !coordination.isOwner()) throw structuredError("Editing requires ownership of a supported browser Web Lock.", "conflict");
-    if (!confirmed) throw new Error("Cannot edit until the character is loaded.");
   }
 
   function baseForNewEntry(): number {
     const last = entries[entries.length - 1];
     if (last) return last.baseRevision;
-    return confirmed?.reconciliation.revision ?? 1;
+    return saved?.reconciliation.revision ?? 1;
   }
 
   function newEntry(intent: EditIntent): QueueEntry {
@@ -385,7 +668,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       characterId,
       sequence: nextSequence++,
       baseRevision: baseForNewEntry(),
-      packageChecksum: confirmed?.projection.packageChecksum ?? "unknown",
+      packageChecksum: saved?.projection.packageChecksum ?? "unknown",
       createdAt: now(),
       intent,
       attempt: null,
@@ -414,7 +697,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       entries = entries.filter(e => e.id !== entry.id);
       if (isStaleAck(storageErr)) {
         if (await identityIsCurrent()) await handleAckError(storageErr);
-      } else setBlocked("storage-error", "Could not save your edit because local storage is unavailable.");
+      } else failStorage("Could not save your edit because local storage is unavailable.");
       freezeWaiters.delete(entry.id);
       emit();
       throw storageErr instanceof Error ? storageErr : new Error("storage failure");
@@ -435,7 +718,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   function buildFrozenRequest(entry: QueueEntry): FrozenRequest {
-    const expectedRevision = confirmed?.reconciliation.revision ?? entry.baseRevision;
+    const expectedRevision = saved?.reconciliation.revision ?? entry.baseRevision;
     const method = "POST" as const;
     const firstAttemptAt = now();
     const key = newId();
@@ -452,6 +735,27 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         method,
         path: `/characters/${characterId}/resources/${entry.intent.resourceId}/bump`,
         body: { direction: entry.intent.direction, expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
+    if (entry.intent.kind === "adjustResource") {
+      return {
+        method,
+        path: `/characters/${characterId}/resources/${entry.intent.resourceId}/adjust`,
+        body: { delta: entry.intent.delta, expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
+    if (entry.intent.kind === "setResource") {
+      return {
+        method,
+        path: `/characters/${characterId}/resources/${entry.intent.resourceId}/set`,
+        body: {
+          ...(entry.intent.current === undefined ? {} : { current: entry.intent.current }),
+          ...(entry.intent.max === undefined ? {} : { max: entry.intent.max }),
+          expectedRevision,
+          idempotencyKey: key,
+        },
         firstAttemptAt,
       };
     }
@@ -486,6 +790,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       path: `/characters/${characterId}/actions/${entry.intent.actionId}`,
       body: {
         inputs: entry.intent.inputs ?? {},
+        ...entry.intent.campaignRoll,
         ...(entry.intent.entryId === undefined ? {} : { entryId: entry.intent.entryId }),
         expectedRevision,
         idempotencyKey: key,
@@ -508,7 +813,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       // A storage failure must still hide private data in this session.
     }
     if (!identityMatches()) return "blocked";
-    confirmed = null;
+    saved = null;
+    latest = null;
     entries = [];
     pendingOnline = [];
     lastRoll = null;
@@ -530,14 +836,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function handleAckError(err: unknown): Promise<SendOutcome> {
     if (isStaleAck(err)) {
       const fresh = await store.read(actorId, characterId);
-      confirmed = fresh.confirmed;
-      lastRoll = fresh.lastRoll ?? null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      if (confirmed === null) {
+      adoptSaved(fresh, { sequence: "keep", account: false });
+      if (saved === null) {
         setBlocked("purged", "This character is no longer available.");
       } else {
-        setBlocked("conflict", "State changed while a request was in flight. Review before continuing.");
+        setBlocked("conflict", "State changed while a request was in flight. Review before continuing.", { reason: "request-in-flight" });
       }
       return "blocked";
     }
@@ -545,20 +848,16 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // and nulls the snapshot: a "not found" write failure afterwards reports
     // that terminal state rather than a storage error. A session that never
     // confirmed anything keeps the storage-error diagnosis.
-    if (confirmed !== null) {
+    if (saved !== null) {
       const fresh = await store.read(actorId, characterId).catch(() => null);
       if (fresh !== null && identityMatches() && fresh.confirmed === null) {
-        confirmed = null;
-        lastRoll = null;
-        entries = fresh.entries;
-        generation = fresh.generation;
-        accountGeneration = fresh.accountGeneration;
+        adoptSaved(fresh, { sequence: "keep" });
         await refreshPendingOnline();
         setBlocked("purged", "This character is no longer available.");
         return "blocked";
       }
     }
-    setBlocked("storage-error", "Could not persist the confirmed state. Storage is unavailable.");
+    failStorage("Could not persist the confirmed state. Storage is unavailable.");
     return "blocked";
   }
 
@@ -570,21 +869,23 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const envelope = await api.open(characterId);
       if (!await identityIsCurrent()) return;
       const server = envelope.character;
-      const local = confirmed;
+      const local = saved;
       if (server.reconciliation.revision < Math.max(local?.reconciliation.revision ?? 0, conflictMinimumRevision)) {
         // A lagging GET is not a review base for the revision the conflict reported.
-        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
+        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.", { reason: "review-base-unavailable" });
         return;
       }
       await reconcile(server);
-      if (error === null || error.kind === "conflict") conflictRefreshPending = false;
+      if ((error === null && !storageFailed) || error?.kind === "conflict") conflictRefreshPending = false;
     } catch (err) {
       if (!await identityIsCurrent()) return;
       await handleOpenError(err);
       return;
     }
-    if (error === null || (message !== undefined && error.kind === "conflict")) {
-      setBlocked("conflict", message ?? "The character changed on the server. Review before re-sending.");
+    if ((error === null && !storageFailed) || (message !== undefined && error?.kind === "conflict")) {
+      // A 409 `conflict` carries the server's own message (server data).
+      setBlocked("conflict", message ?? "The character changed on the server. Review before re-sending.",
+        message !== undefined ? { serverMessage: message } : {});
     }
   }
 
@@ -609,7 +910,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           await fetchLatestForConflict(err.latestRevision, err.code === "conflict" ? err.message : undefined);
           return "blocked";
         case 422:
-          setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
+          setBlocked("invalid", err.message, { serverMessage: err.message, details: { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics } });
           return "blocked";
       }
       if (err.code === "expected_revision_mismatch") {
@@ -617,7 +918,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         return "blocked";
       }
       if (err.code === "invalid_value" || err.code === "bad_request") {
-        setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
+        setBlocked("invalid", err.message, { serverMessage: err.message, details: { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics } });
         return "blocked";
       }
       // command_in_progress/temporarily_unavailable are handled above; any
@@ -633,24 +934,32 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return "retry";
   }
 
+  async function maybePrepareDice(request: FrozenRequest): Promise<FrozenRequest> {
+    const prepare = saved && input.captureDicePreparation?.(saved.campaignId);
+    if (!prepare) return request;
+    phase = "sending";
+    emit();
+    return prepare(request, diceLifetime.signal);
+  }
+
   async function processEntry(entry: QueueEntry): Promise<SendOutcome> {
     const pendingWrite = entryWrites.get(entry.id);
     if (pendingWrite) {
       try {
         await pendingWrite;
       } catch {
-        setBlocked("storage-error", "Could not save this edit because local storage is unavailable.");
+        failStorage("Could not save this edit because local storage is unavailable.");
         return "blocked";
       }
     }
     let current = entry;
-    if (!isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
+    if (!isConnected() || !editAllowed() || disposed) {
       refreshPhase();
       return "blocked";
     }
-    if (confirmed !== null && !entryMatchesBase(current, confirmed)) {
+    if (saved !== null && !entryMatchesBase(current, saved)) {
       setBlocked("conflict", "The character changed on the server. Review before re-sending.", {
-        retainedIds: [current.id],
+        details: { retainedIds: [current.id] },
       });
       return "blocked";
     }
@@ -659,11 +968,27 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
         return "blocked";
       }
-      const frozen = buildFrozenRequest(current);
+      let frozen = buildFrozenRequest(current);
+      if (current.intent.kind === "executeAction") {
+        try {
+          frozen = await maybePrepareDice(frozen);
+        } catch (err) {
+          if (!await identityIsCurrent() || disposed) return "blocked";
+          // Preparation has not committed a roll. Retry the exact frozen
+          // completion only after it has been recorded below.
+          if (!(err instanceof ApiError) || err.status === 404 || err.status >= 500) {
+            if (err instanceof ApiError) setBlocked("invalid", err.message, { serverMessage: err.message });
+            else setBlocked("invalid", err instanceof Error ? err.message : "Could not prepare this roll.", { reason: "roll-preparation" });
+            return "blocked";
+          }
+          return await handleSendError(err);
+        }
+        if (!await identityIsCurrent() || disposed || !editAllowed()) return "blocked";
+      }
       try {
         await store.freeze(actorId, characterId, current.id, frozen);
       } catch {
-        setBlocked("storage-error", "Could not persist this edit as an attempt. Storage is unavailable.");
+        failStorage("Could not persist this edit as an attempt. Storage is unavailable.");
         return "blocked";
       }
       current = { ...current, attempt: frozen };
@@ -677,7 +1002,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       setBlocked("expired-attempt", "This change is older than the server's replay window. Review it manually before continuing.");
       return "blocked";
     }
-    if (!await identityIsCurrent() || !isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
+    if (!await identityIsCurrent() || !isConnected() || !editAllowed() || disposed) {
       refreshPhase();
       emit();
       return "blocked";
@@ -686,13 +1011,16 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const generationAtSend = generation;
     const attempt = current.attempt;
     if (attempt === null) return "blocked";
+    const publishRoll = input.captureRollPublisher?.();
     let response: CommandResultResponse;
     try {
       response = await api.send(attempt);
     } catch (err) {
       if (!await identityIsCurrent()) return "blocked";
       if (err instanceof ApiError && err.status === 404) {
-        await handleNotFound(err);
+        if (attempt.physical && err.cacheDisposition !== "purge") {
+          setBlocked("invalid", err.message, { serverMessage: err.message });
+        } else await handleNotFound(err);
         return "blocked";
       }
       return await handleSendError(err);
@@ -713,11 +1041,12 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) return "blocked";
     coordination.invalidate?.();
-    if (!sameRollScope(confirmed, character)) lastRoll = null;
-    confirmed = character;
+    if (!sameRollScope(saved, character)) lastRoll = null;
+    saved = character;
     if (current.intent.kind === "executeAction") {
       lastRoll = response.result.roll;
       lastNominal = response.result.nominal;
+      publishRoll?.(response, current.createdAt);
     }
     generation += 1;
     transientFailures = 0;
@@ -784,7 +1113,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       const front = entries[0];
       // Replay uncertain attempts first; check drift before freezing any unsent work.
       if (needsFresh && isConnected() && !front?.attempt) {
-        await reconcileFresh();
+        await refreshView("sync");
         if (isBlocked()) return "blocked";
         needsFresh = false;
         continue;
@@ -807,7 +1136,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     draining = true;
     runDrainPass()
       .catch(() => {
-        setBlocked("storage-error", "An unexpected local error interrupted synchronization.");
+        failStorage("An unexpected local error interrupted synchronization.");
         return "blocked" as const;
       })
       .then((outcome: "idle" | "retry" | "blocked") => {
@@ -815,10 +1144,16 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (outcome !== "retry") refreshPhase();
         resolveIdle();
         emit();
+        // A refresh requested while this pass was finishing runs in a new pass.
+        if (refreshAfterDrain) {
+          refreshAfterDrain = false;
+          if (needsFresh && outcome === "idle") scheduleDrain();
+        }
       });
   }
 
-  async function reconcileFresh() {
+  /** The owner's write path: fetch and persist the server view under the cache guard. */
+  async function storeFresh() {
     if (!await identityIsCurrent() || !isConnected() || isBlocked() || disposed || !coordination.isOwner()) return;
     let server: CharacterView;
     try {
@@ -831,6 +1166,102 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       return;
     }
     await reconcile(server);
+  }
+
+  function pageVisible(): boolean {
+    return typeof document === "undefined" || document.visibilityState !== "hidden";
+  }
+
+  /** D1: poll only a shown live view, and only while the page is visible. */
+  function syncLiveTimer() {
+    const live = !disposed && saved === null && latest !== null && identityMatches() && isConnected();
+    if (live && pageVisible()) {
+      liveTimer ??= setInterval(() => { void refreshView("timer"); }, LIVE_REFRESH_MS);
+    } else if (liveTimer !== null) {
+      clearInterval(liveTimer);
+      liveTimer = null;
+    }
+  }
+
+  /**
+   * The single read path (design Section 8). An owner tab with a healthy
+   * write path refreshes through the serialized drain, which persists the
+   * view. Every other tab (no lock, no Lock API, or blocked, for example by
+   * a storage failure) fetches the server view and shows it without writing
+   * the store. A 404 with `cacheDisposition: "purge"` purges either way.
+   */
+  function refreshView(trigger: RefreshTrigger): Promise<void> {
+    if (trigger === "sync" || trigger === "command") return storeFresh();
+    if (disposed || !identityMatches() || !isConnected() || error?.kind === "purged" || error?.kind === "not-found") {
+      return Promise.resolve();
+    }
+    if (editing.owned && coordination.isOwner() && !isBlocked()) {
+      needsFresh = true;
+      if (draining) refreshAfterDrain = true;
+      else scheduleDrain();
+      return Promise.resolve();
+    }
+    if (viewFetch !== null) {
+      viewFetchAgain = true;
+      return viewFetch;
+    }
+    return viewFetch = (async () => {
+      try {
+        do {
+          viewFetchAgain = false;
+          await fetchView(trigger);
+        } while (viewFetchAgain && !disposed);
+      } finally {
+        viewFetch = null;
+      }
+    })();
+  }
+
+  async function fetchView(trigger: RefreshTrigger) {
+    if (!isConnected() || !await identityIsCurrent()) return;
+    const guard = { generation, accountGeneration };
+    let character: CharacterView;
+    try {
+      character = (await api.open(characterId)).character;
+    } catch (err) {
+      if (!await identityIsCurrent() || disposed) return;
+      if (err instanceof ApiError && err.status === 404 && err.cacheDisposition === "purge") {
+        await purgeAccess();
+        return;
+      }
+      // A live view reports failures on open and reconnect as before, and a
+      // lost or expired access at any refresh. A transient failure of a timer
+      // or visibility refresh keeps the current view. A stored view keeps its
+      // own state: only a purge changes it here.
+      const denied = err instanceof ApiError && (err.status === 404 || err.status === 401);
+      if (saved === null && (trigger === "open" || trigger === "reconnect" || denied)) {
+        if (err instanceof ApiError && err.status === 404) latest = null;
+        await handleOpenError(err);
+      }
+      emit();
+      return;
+    }
+    if (!await identityIsCurrent() || !isConnected() || disposed || error?.kind === "purged" ||
+        generation !== guard.generation || accountGeneration !== guard.accountGeneration) return;
+    if (saved === null) {
+      latest = character;
+      liveShown = true;
+    } else if (!editing.owned && character.reconciliation.revision >= saved.reconciliation.revision) {
+      // D2/V2: a tab without the lock keeps the newest observed server view
+      // next to its saved copy and shows it (`shownSaved`), also at an equal
+      // revision when the projection or roll scope differs. Only the owner
+      // persists views, so the store, the saved copy and its queue stay
+      // untouched. An older revision is a lagging fetch.
+      const shown = shownSaved()!;
+      if (character.reconciliation.revision < shown.reconciliation.revision ||
+          (character.reconciliation.revision === shown.reconciliation.revision &&
+           sameRollScope(shown, character) && projectionsEqual(character.projection, shown.projection))) return;
+      if (!sameRollScope(shown, character)) lastRoll = null;
+      latest = character;
+    } else {
+      return;
+    }
+    emit();
   }
 
   /**
@@ -860,7 +1291,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         return;
       }
       if (server.reconciliation.revision < minimumRevision) {
-        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
+        setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.", { reason: "review-base-unavailable" });
         return;
       }
       minimumRevision = server.reconciliation.revision;
@@ -877,41 +1308,31 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // a stale in-flight GET to confirm over it afterwards.
     const fresh = await store.read(actorId, characterId).catch(() => null);
     if (!identityMatches() || fresh === null) return;
-    if (fresh.confirmed === null && (confirmed !== null || error?.kind === "purged")) {
-      confirmed = null;
-      lastRoll = null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      accountGeneration = fresh.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    if (fresh.confirmed === null && (saved !== null || error?.kind === "purged")) {
+      adoptSaved(fresh);
       await refreshPendingOnline();
       setBlocked("purged", "This character is no longer available.");
       emit();
       return;
     }
     if (fresh.generation !== generation || fresh.accountGeneration !== accountGeneration) {
-      confirmed = fresh.confirmed;
-      lastRoll = fresh.lastRoll ?? null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      accountGeneration = fresh.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      adoptSaved(fresh);
       await refreshPendingOnline();
-      if (confirmed === null) {
+      if (saved === null) {
         setBlocked("purged", "This character is no longer available.");
       }
       emit();
       // A local metadata write (for example clearing an inaccessible roll)
       // can win the generation race while retaining an older sheet. Re-read
       // under the adopted guard before enabling actions on that cached view.
-      if (confirmed !== null && server.reconciliation.revision >= confirmed.reconciliation.revision &&
-          (server.reconciliation.revision !== confirmed.reconciliation.revision ||
-           !sameRollScope(confirmed, server) || !projectionsEqual(server.projection, confirmed.projection))) return "retry";
+      if (saved !== null && server.reconciliation.revision >= saved.reconciliation.revision &&
+          (server.reconciliation.revision !== saved.reconciliation.revision ||
+           !sameRollScope(saved, server) || !projectionsEqual(server.projection, saved.projection))) return "retry";
       return;
     }
-    const local = confirmed;
+    const local = saved;
     if (local && server.reconciliation.revision < local.reconciliation.revision) {
-      setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.");
+      setBlocked("network-unavailable", "The latest character state is not available yet. Retry before reviewing.", { reason: "review-base-unavailable" });
       return;
     }
     const drifted = local
@@ -922,8 +1343,9 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await store.confirmSnapshot(actorId, characterId, server, generation);
         if (!identityMatches()) return;
         coordination.invalidate?.();
-        if (!sameRollScope(confirmed, server)) lastRoll = null;
-        confirmed = server;
+        if (!sameRollScope(saved, server)) lastRoll = null;
+        saved = server;
+        latest = null;
         generation += 1;
       } catch (err) {
         if (!await identityIsCurrent()) return;
@@ -931,19 +1353,30 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         // metadata changes can finish reconciling and purges stay terminal.
         if (isStaleAck(err)) return reconcileSnapshot(server);
         await handleAckError(err);
+        // A successful GET is enough to display the sheet online. Editing
+        // still needs a snapshot persisted against the current cache guard.
+        if (local === null && saved === null && storageFailed &&
+            identityMatches() && isConnected()) {
+          latest = server;
+          liveShown = true;
+        }
         return;
       }
     }
     const unresolved = entries.some(e => e.attempt === null &&
       (e.baseRevision !== server.reconciliation.revision || e.packageChecksum !== server.projection.packageChecksum));
     if ((drifted || unresolved) && entries.length > 0) {
-      setBlocked("conflict", "A newer revision or package of this character exists. Review before continuing.");
+      setBlocked("conflict", "A newer revision or package of this character exists. Review before continuing.", { reason: "newer-version" });
     }
   }
 
   function refreshPhase() {
     if (error) {
       phase = KIND_TO_PHASE[error.kind];
+      return;
+    }
+    if (storageFailed) {
+      phase = "storage-error";
       return;
     }
     if (identity.getActorId() !== actorId || identity.getGeneration() !== identityGeneration) {
@@ -960,6 +1393,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function resolveConflict(input: ResolveConflictInput): Promise<void> {
     if (disposed) return;
     if (!identityMatches() || !editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
+    if (saved !== null && !editAllowed()) throw new Error("Editing ownership required.");
     // Ordinary conflict recovery never retires online attempts: an uncertain
     // online outcome blocks it until replay or explicit expired-outcome
     // review resolves the local decision.
@@ -971,7 +1405,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (draining || conflictRefreshPending || !error || !["conflict", "invalid", "expired-attempt", "protocol", "not-found"].includes(error.kind)) {
       throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
-    if (!confirmed) {
+    if (!saved) {
       throw new Error("Resolve the blocking error and refresh current state before reviewing intentions.");
     }
     const ordered = [...entries].sort((a, b) => a.sequence - b.sequence);
@@ -992,7 +1426,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // review set is the drifted entries in order; otherwise (invalid without
     // drift) every queued entry still needs its own ordered review.
     const reviewSet = (() => {
-      const drifted = ordered.filter((entry) => !entryMatchesBase(entry, confirmed!));
+      const drifted = ordered.filter((entry) => !entryMatchesBase(entry, saved!));
       return drifted.length > 0 ? drifted : ordered;
     })();
     if (reviewSet.length > 0) {
@@ -1047,8 +1481,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
             actorId,
             characterId,
             sequence: entry.sequence,
-            baseRevision: confirmed!.reconciliation.revision,
-            packageChecksum: confirmed!.projection.packageChecksum,
+            baseRevision: saved!.reconciliation.revision,
+            packageChecksum: saved!.projection.packageChecksum,
             createdAt: now(),
             intent: corrected[entry.id] ?? entry.intent,
             attempt: null,
@@ -1070,21 +1504,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (fresh.accountGeneration !== accountGeneration) {
       // Another tab cleared or replaced the account mid-review: adopt the
       // cleared state and fail instead of recreating intentions.
-      confirmed = fresh.confirmed;
-      lastRoll = fresh.lastRoll ?? null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      accountGeneration = fresh.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      adoptSaved(fresh);
       emit();
       throw new Error("stale recovery: account changed during review");
     }
-    confirmed = fresh.confirmed;
-    lastRoll = fresh.lastRoll ?? null;
-    entries = fresh.entries;
-    generation = fresh.generation;
-    accountGeneration = fresh.accountGeneration;
-    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    adoptSaved(fresh);
     for (const entry of ordered) {
       if (selected.has(entry.id)) {
         resolveFreezeWaiter(entry.id);
@@ -1095,7 +1519,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     // still mismatches the confirmed base stays paused at the send gate and
     // needs its own explicit review rather than inheriting the reviewed
     // revision. That gate is stateless, so the pause survives reopen.
-    error = null;
+    clearError();
     needsFresh = false;
     coordination.invalidate?.();
     emit();
@@ -1104,11 +1528,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
 
   type OnlineOperation =
     | {kind:"push";operation:"push";parentRollId:string}
-    | { kind: "archive" | "recover"; operation: "archive" | "recover" };
+    | { kind: "archive" | "recover"; operation: "archive" | "recover" }
+    | { kind: "version"; operation: "version"; target: Composition };
 
   function onlineAttemptMatches(attempt: OnlineAttempt, op: OnlineOperation): boolean {
     if (attempt.characterId !== characterId) return false;
     if(op.operation==="push")return attempt.kind==="push"&&attempt.request.path===`/characters/${characterId}/rolls/${op.parentRollId}/push`;
+    // One version change at a time: a retained attempt replays verbatim, whatever its target.
     return attempt.kind === op.operation;
   }
 
@@ -1130,7 +1556,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       return;
     }
     const stored = await store.readOnlineAttempts(actorId);
-    if(stored.some(a=>a.characterId===characterId&&!["archive","recover","push"].includes(a.kind)))throw new Error("Update Sweetroll to recover this pending operation.");
+    if(stored.some(a=>a.characterId===characterId&&!["archive","recover","push","version"].includes(a.kind)))throw new Error("Update Sweetroll to recover this pending operation.");
     if (!identityMatches()) return;
     pendingOnline = stored
       .filter((attempt) => attempt.characterId === characterId)
@@ -1173,7 +1599,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (!await identityIsCurrent()) return;
         await handleOpenError(err);
         if (!identityMatches()) return;
-        if (error !== null && error.kind !== "conflict" && error.kind !== "network-unavailable") {
+        if (error !== null ? error.kind !== "conflict" && error.kind !== "network-unavailable" : storageFailed) {
           return;
         }
       }
@@ -1181,7 +1607,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     setBlocked(
       "expired-attempt",
       "This change is older than the server's replay window. Its outcome is unknown: review the current state and explicitly acknowledge the unknown outcome before continuing.",
-      { attemptId: attempt.id },
+      { reason: "unknown-outcome", details: { attemptId: attempt.id } },
     );
   }
 
@@ -1199,6 +1625,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     const firstAttemptAt = now();
     const key = newId();
     if(op.operation==="push")return {method:"POST",path:`/characters/${characterId}/rolls/${op.parentRollId}/push`,body:{expectedRevision,idempotencyKey:key},firstAttemptAt};
+    if (op.operation === "version") {
+      return {
+        method: "POST",
+        path: `/characters/${characterId}/composition`,
+        body: { target: op.target, expectedRevision, idempotencyKey: key },
+        firstAttemptAt,
+      };
+    }
     if (op.operation === "archive" || op.operation === "recover") {
       return {
         method: "PATCH",
@@ -1214,7 +1648,8 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (disposed) throw new Error("Session closed.");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     if (!editing.owned || !coordination.isOwner()) throw new Error("Editing ownership required.");
-    if (!confirmed) throw new Error("Cannot manage until the character is loaded.");
+    if (!saved) throw new Error("Cannot manage until the character is loaded.");
+    if (!editAllowed()) throw new Error("Editing ownership required.");
     if (!isConnected()) {
       throw structuredError(
         "Lifecycle and export operations require connectivity and cannot be initiated offline.",
@@ -1256,16 +1691,11 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (attempts.some((a) => a.id === attempt.id && a.characterId === characterId)) return false;
     const fresh = await store.read(actorId, characterId).catch(() => null);
     if (fresh === null || !identityMatches() || fresh.confirmed === null) return false;
-    confirmed = fresh.confirmed;
-    lastRoll = fresh.lastRoll ?? null;
-    entries = fresh.entries;
-    generation = fresh.generation;
-    accountGeneration = fresh.accountGeneration;
-    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    adoptSaved(fresh);
     await refreshPendingOnline();
     const blockedAttempt = (error?.details as { attemptId?: string } | undefined)?.attemptId;
     if (error?.kind === "expired-attempt" && blockedAttempt === attempt.id) {
-      error = null;
+      clearError();
     }
     emit();
     return true;
@@ -1297,8 +1727,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   }
 
   async function sendOnlineAttemptInner(attempt: OnlineAttempt): Promise<void> {
+    if (!editAllowed() || !isConnected()) throw new Error("Editing ownership required.");
     const generationAtSend = generation;
     const guard = { generation: generationAtSend, accountGeneration };
+    const publishRoll = input.captureRollPublisher?.();
     let response: CommandResultResponse;
     try {
       response = await api.send(attempt.request);
@@ -1371,7 +1803,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         }
         if (err.status === 422 || err.code === "invalid_value" || err.code === "bad_request") {
           await retireRejectedOnlineAttempt(attempt);
-          setBlocked("invalid", err.message, { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics });
+          setBlocked("invalid", err.message, { serverMessage: err.message, details: { diagnostics: err.diagnostics, actionDiagnostics: err.actionDiagnostics } });
           emit();
           throw err;
         }
@@ -1427,11 +1859,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     }
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
     coordination.invalidate?.();
-    if (!sameRollScope(confirmed, character)) lastRoll = null;
-    confirmed = character;
+    if (!sameRollScope(saved, character)) lastRoll = null;
+    saved = character;
     // Authoritative action results survive later online acknowledgments: only
     // a non-null roll replaces the retained one (online ops return null).
-    if (response.result.roll !== null && response.result.roll !== undefined) lastRoll = response.result.roll;
+    if (response.result.roll !== null && response.result.roll !== undefined) {
+      lastRoll = response.result.roll;
+      publishRoll?.(response, attempt.createdAt);
+    }
     generation += 1;
     transientFailures = 0;
     needsFresh = false;
@@ -1494,13 +1929,25 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (entries.length > 0 || phase !== "ready") {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
     }
-    await reconcileFresh();
+    await refreshView("command");
     if (!identityMatches()) throw new Error("Account changed. Reopen this character.");
-    if (isBlocked()) throw structuredError(error!.message, error!.kind, error!.details);
-    if (entries.length > 0 || !confirmed) {
+    if (isBlocked()) throw blockedCommandError();
+    if (entries.length > 0 || !saved) {
       throw new Error("Resolve pending edits and wait for the character to be ready before managing it.");
     }
-    const request = buildOnlineRequest(op, confirmed.reconciliation.revision);
+    // The refresh awaited the server: the lock or the stored view may be gone.
+    assertOnlineOperationAllowed();
+    let request = buildOnlineRequest(op, saved.reconciliation.revision);
+    if (op.operation === "push") {
+      try {
+        request = await maybePrepareDice(request);
+        assertOnlineOperationAllowed();
+      } catch (err) {
+        refreshPhase();
+        emit();
+        throw err;
+      }
+    }
     const attempt: OnlineAttempt = {
       id: newId(),
       actorId,
@@ -1513,7 +1960,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
       await store.saveOnlineAttempt(attempt, { generation, accountGeneration });
     } catch (saveErr) {
       if (!await identityIsCurrent()) throw saveErr instanceof Error ? saveErr : new Error("Account changed.");
-      setBlocked("storage-error", "Could not save this change because local storage is unavailable.");
+      failStorage("Could not save this change because local storage is unavailable.");
       emit();
       throw saveErr instanceof Error ? saveErr : new Error("storage failure");
     }
@@ -1564,7 +2011,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (input.acknowledgeUnknownOutcome !== true) {
       throw new Error("Acknowledge the unknown outcome before retiring this attempt.");
     }
-    if (!await identityIsCurrent() || !isConnected() || !editing.owned || !coordination.isOwner() || disposed) {
+    if (!await identityIsCurrent() || !isConnected() || !editAllowed() || disposed) {
       throw new Error("Account changed. Reopen this character.");
     }
     // Fetch current authorized state first. A failed refresh never retires:
@@ -1616,29 +2063,19 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     if (fresh.accountGeneration !== accountGeneration) {
       // Another tab cleared or replaced the account mid-review: adopt the
       // cleared state and fail instead of recreating anything.
-      confirmed = fresh.confirmed;
-      lastRoll = fresh.lastRoll ?? null;
-      entries = fresh.entries;
-      generation = fresh.generation;
-      accountGeneration = fresh.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+      adoptSaved(fresh);
       await refreshPendingOnline();
       emit();
       throw new Error("stale recovery: account changed during review");
     }
-    confirmed = fresh.confirmed;
-    lastRoll = fresh.lastRoll ?? null;
-    entries = fresh.entries;
-    generation = fresh.generation;
-    accountGeneration = fresh.accountGeneration;
-    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), nextSequence);
+    adoptSaved(fresh);
     await refreshPendingOnline();
     // Clearing the expired pause authorizes nothing by itself: any other
     // retained attempt still blocks newer sends at the ordering boundary,
     // and any deliberate new mutation needs its own fresh key.
     const blockedAttempt = (error?.details as { attemptId?: string } | undefined)?.attemptId;
     if (error?.kind === "expired-attempt" && blockedAttempt === stored.id) {
-      error = null;
+      clearError();
     }
     needsFresh = false;
     coordination.invalidate?.();
@@ -1649,7 +2086,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   function open(): Promise<void> {
     opening ??= initialize().catch(() => {
       if (!identityMatches()) return;
-      setBlocked("storage-error", "Could not load local character state.");
+      failStorage("Could not load local character state.");
       emit();
     });
     return opening;
@@ -1726,12 +2163,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   async function initialize(): Promise<void> {
     const loaded = await store.read(actorId, characterId);
     if (!identityMatches()) return;
-    confirmed = loaded.confirmed;
-    lastRoll = loaded.lastRoll ?? null;
-    entries = loaded.entries;
-    generation = loaded.generation;
-    accountGeneration = loaded.accountGeneration;
-    nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
+    adoptSaved(loaded, { sequence: "reset" });
     // Load unresolved per-character online attempts before any drain pass so
     // an uncertain outcome replays verbatim before fresh-state decisions.
     await refreshPendingOnline();
@@ -1751,6 +2183,7 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         await requestEditing();
       }
     }
+    if (!editing.owned) await refreshView("open");
     initialized = true;
     scheduleDrain();
     if (draining) await new Promise<void>(resolve => idleWaiters.push(resolve));
@@ -1771,20 +2204,22 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     return reloading ??= (async () => {
       const loaded = await store.read(actorId, characterId);
       if (!identityMatches() || !coordination.isOwner()) return;
-      confirmed = loaded.confirmed;
-      lastRoll = loaded.lastRoll ?? null;
-      entries = loaded.entries; generation = loaded.generation;
-      accountGeneration = loaded.accountGeneration;
-      nextSequence = entries.reduce((m, e) => Math.max(m, e.sequence + 1), 0);
+      // Gaining the lock drops the newest unsaved view: the owner shows and
+      // edits its saved copy, and its drain saves the newest server view.
+      latest = null;
+      adoptSaved(loaded, { sequence: "reset" });
       // A new owner resolves any inherited uncertain outcome first.
       await refreshPendingOnline();
       if (!identityMatches() || !coordination.isOwner()) return;
       editing = { owned: true, owner: null }; needsFresh = true;
+      // D3: the lock is granted again only through requestEditing. The store
+      // read succeeded, so try saving again; a new failure releases the lock.
+      if (storageFailed) { storageFailed = false; refreshPhase(); }
       emit(); scheduleDrain();
     })().catch(() => {
       if (!identityMatches()) return;
       editing = { owned: false, owner: null };
-      setBlocked("storage-error", "Could not load local character state.");
+      failStorage("Could not load local character state.");
       coordination.letGo(); emit();
     }).finally(() => { reloading = null; });
   }
@@ -1798,12 +2233,14 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
   function dispose() {
     if (disposed) return;
     disposed = true;
+    diceLifetime.abort();
     if (retryTimer !== null) {
       clearTimeout(retryTimer);
       retryTimer = null;
     }
     unsubscribeIdentity?.();
     unsubscribeCoordination?.();
+    if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisibility);
     // Release the lock but never dispose the coordination handle: its
     // lifetime belongs to the route, which outlives StrictMode session
     // turnover. Disposing here would poison the handle for the remount's
@@ -1815,23 +2252,45 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     emit();
   }
 
+  let wasConnected = isConnected();
   const unsubscribeIdentity = identity.subscribe(() => {
     if (disposed) return;
+    const reconnected = isConnected() && !wasConnected;
+    wasConnected = isConnected();
     if (!identityMatches()) {
-      confirmed = null; lastRoll = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
+      saved = null; latest = null; lastRoll = null; entries = []; pendingOnline = []; error = null; editing = { owned: false, owner: null };
       coordination.letGo();
     }
-    if (!isConnected()) needsFresh = true;
+    if (!isConnected()) {
+      // A live view is hidden offline. A newer view over a saved copy stays
+      // shown offline (V2, E2): it is the same authorized projection.
+      if (saved === null) latest = null;
+      needsFresh = true;
+    }
     if (isConnected() && (error?.kind === "reauthenticate" || error?.kind === "network-unavailable")) {
-      error = null;
+      clearError();
     }
     if (isConnected() && !isBlocked()) {
       scheduleDrain();
     } else {
       refreshPhase();
     }
+    // A live view is not stored, so a reconnect must fetch it again.
+    // Neither a blocked session nor a tab without the editing lock drains,
+    // so both refresh through the read path.
+    if (initialized && identityMatches() && isConnected() &&
+        (reconnected || (liveShown && saved === null && latest === null))) {
+      void refreshView("reconnect");
+    }
     emit();
   });
+
+  const onVisibility = () => {
+    if (disposed) return;
+    syncLiveTimer();
+    if (pageVisible()) void refreshView("visible");
+  };
+  if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisibility);
 
   const unsubscribeCoordination = coordination.subscribe((event) => {
     if (disposed) return;
@@ -1849,18 +2308,17 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         if (!identityMatches()) return;
         if (loaded.accountGeneration === accountGeneration &&
             (loaded.generation < generation || (editing.owned && loaded.generation === generation))) return;
-        confirmed = loaded.confirmed;
-        lastRoll = loaded.lastRoll ?? null;
-        entries = loaded.entries;
-        generation = loaded.generation;
-        accountGeneration = loaded.accountGeneration;
+        // V2: a newer fetched view stays shown over an older saved copy (an
+        // enqueue in the owner tab broadcasts without a new generation).
+        if (loaded.confirmed === null) latest = null;
+        adoptSaved(loaded, { sequence: "keep" });
         await refreshPendingOnline();
         if (!identityMatches()) return;
-        if (confirmed === null) setBlocked("purged", "This character is no longer available.");
+        if (saved === null) setBlocked("purged", "This character is no longer available.");
         emit();
       }).catch(() => {
         if (!identityMatches()) return;
-        setBlocked("storage-error", "Could not reload local character state."); emit();
+        failStorage("Could not reload local character state."); emit();
       });
     }
   });
@@ -1880,14 +2338,10 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
         // read is in flight. Clearing a roll must never restore its old sheet.
         if (fresh.accountGeneration < accountGeneration ||
             (fresh.accountGeneration === accountGeneration && fresh.generation < generation)) return;
-        confirmed = fresh.confirmed;
-        lastRoll = fresh.lastRoll ?? null;
-        entries = fresh.entries;
-        generation = fresh.generation;
-        accountGeneration = fresh.accountGeneration;
+        adoptSaved(fresh, { sequence: "keep" });
         coordination.invalidate?.();
       } catch {
-        if (identityMatches()) setBlocked("storage-error", "Could not clear the saved roll. Reconnect before reopening it.");
+        if (identityMatches()) failStorage("Could not clear the saved roll. Reconnect before reopening it.");
       }
       emit();
     },
@@ -1903,17 +2357,32 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
     },
     async setField(fieldId: string, value: unknown): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "setField", fieldId, value }));
     },
     async bumpResource(resourceId: string, direction: "up" | "down"): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "bumpResource", resourceId, direction }));
     },
-    async executeAction(actionId: string, inputs?: Record<string, unknown>): Promise<void> {
+    async adjustResource(resourceId: string, delta: number): Promise<void> {
+      assertMutationAllowed({ offlineIntent: true });
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      await persistEntry(newEntry({ kind: "adjustResource", resourceId, delta }));
+    },
+    async setResource(resourceId: string, values: { current?: number; max?: number }): Promise<void> {
+      assertMutationAllowed({ offlineIntent: true });
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      await persistEntry(newEntry({
+        kind: "setResource",
+        resourceId,
+        ...(values.current === undefined ? {} : { current: values.current }),
+        ...(values.max === undefined ? {} : { max: values.max }),
+      }));
+    },
+    async executeAction(actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void> {
       assertMutationAllowed();
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
         throw structuredError(
           "Actions require connectivity and cannot be initiated offline.",
@@ -1925,12 +2394,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           kind: "executeAction",
           actionId,
           ...(inputs !== undefined ? { inputs } : {}),
+          ...(campaignRoll === undefined ? {} : { campaignRoll }),
         }),
       );
     },
-    async executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>): Promise<void> {
+    async executeGrantedAction(entryId: string, actionId: string, inputs?: Record<string, unknown>, campaignRoll?: CampaignRollSelection): Promise<void> {
       assertMutationAllowed();
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       if (!isConnected()) {
         throw structuredError(
           "Actions require connectivity and cannot be initiated offline.",
@@ -1943,12 +2413,13 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           actionId,
           entryId,
           ...(inputs !== undefined ? { inputs } : {}),
+          ...(campaignRoll === undefined ? {} : { campaignRoll }),
         }),
       );
     },
     async addEntry(slotId: string, templateId: string | null, values?: Record<string, unknown>, quantity?: number, source?: import("./types.js").EntrySource): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({
         kind: "addEntry",
         entry: {
@@ -1957,28 +2428,33 @@ export function createCharacterSession(input: CreateCharacterSessionInput): Char
           templateId,
           values: values ?? {},
           ...(source === undefined ? {} : {source:structuredClone(source)}),
+          // Design 6.8: an extension template's entry names its extension.
+          ...(source?.kind === "system" && source.extensionId !== undefined ? { extensionId: source.extensionId } : {}),
           ...(quantity === undefined ? {} : { quantity }),
         },
       }));
     },
     async removeEntry(entryId: string): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "removeEntry", entryId }));
     },
     async updateEntryValues(entryId: string, values: Record<string, unknown>, quantity?: number): Promise<void> {
       assertMutationAllowed({ offlineIntent: true });
-      if (confirmed?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
+      if (saved?.lifecycle === "archived") throw new Error("This character is archived and read-only until recovered.");
       await persistEntry(newEntry({ kind: "updateEntryValues", entryId, values,
         ...(quantity === undefined ? {} : { quantity }) }));
     },
-    async refresh():Promise<void>{assertOnlineOperationAllowed();if(entries.length||pendingOnline.length||isBlocked())throw new Error("Resolve pending changes before refreshing.");await reconcileFresh();emit();},
+    async refresh():Promise<void>{assertOnlineOperationAllowed();if(entries.length||pendingOnline.length||isBlocked())throw new Error("Resolve pending changes before refreshing.");await refreshView("command");emit();},
     async pushRoll(parentRollId:string):Promise<void>{await runOnlineOperation({kind:"push",operation:"push",parentRollId});},
     async archive(): Promise<void> {
       await runOnlineOperation({ kind: "archive", operation: "archive" });
     },
     async recover(): Promise<void> {
       await runOnlineOperation({ kind: "recover", operation: "recover" });
+    },
+    async changeVersion(target: Composition): Promise<void> {
+      await runOnlineOperation({ kind: "version", operation: "version", target });
     },
     reviewExpiredAttempt(input) {
       return trackOnline(reviewExpiredAttemptInner(input));

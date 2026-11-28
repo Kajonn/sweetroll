@@ -1,6 +1,8 @@
+import { createPhysicalRolls, type PhysicalEvidence, type PhysicalRolls } from "./physical-rolls.js";
 import { createCharacterImages, type CharacterImages } from "./images.js";
 import { createCharacterEntryImages, type CharacterEntryImages } from "./entry-images.js";
 import {canPlaceTemplate} from "../campaigns/templatePolicy.js";
+import { campaignRollRequirements, findProjectedAction, targetEntityIds } from "../systems/implementation/runtime/roll-context.js";
 import { materializeDefaults, slotsForEntity, templateApplicable, validDefaults } from "../systems/implementation/runtime/effective-entry.js";
 import {readPushRoll,mayReadPush,narrowerAudience,type StoredPushRoll} from "./push.js";
 import {pushEligibility} from "../systems/implementation/rules/push.js";
@@ -20,14 +22,33 @@ import type {
   TemplateKind,
 } from "../systems/implementation/package/schema/index.js";
 import type { SystemAuthoring } from "../systems/authoring.js";
-import { hashInput } from "../systems/implementation/authoring/assess.js";
-import { validateEntryForSlot } from "../systems/implementation/runtime/entries.js";
+import type { ExtensionAuthoring } from "../systems/extensions.js";
+import type { ExtensionRef } from "../systems/runtime.js";
+import { sortExtensionRefs } from "./persistence.js";
+import type { VersionChoice } from "../systems/implementation/persistence/index.js";
+import type { Composition, VersionChangeDirection, VersionChangeReport } from "../systems/runtime.js";
 import {
+  authorizeCompositionChange,
+  classifyCompositionChange,
+  compositionActivityKind,
+  compositionActivitySummary,
+  parseComposition,
+  type CompositionChange,
+  type CompositionError,
+  type CompositionOptions,
+} from "../systems/composition-change.js";
+import { hashInput } from "../systems/implementation/authoring/assess.js";
+import { templateKey, validateEntryForSlot } from "../systems/implementation/runtime/entries.js";
+import { createEffectivePackageLoader } from "../systems/implementation/runtime/composition-loader.js";
+import { unqualifiedId } from "../systems/implementation/rules/compose.js";
+import {
+  createPostgresPublishedExtensionLoader,
   createPostgresPublishedPackageLoader,
-  PublishedPackageCorruptError,
 } from "../systems/implementation/runtime/package-loader.js";
 import type {
+  CampaignRollContext,
   CharacterProjectionV1,
+  RuntimeResolution,
   DefinitionId,
   NominalActionResult,
   NormalizedRoll,
@@ -42,6 +63,10 @@ import type {
 import {
   createCharacterPersistenceRepository,
   type ApplyCommandOutcome,
+  type ApplyCommandInput,
+  type DeferredDeckAction,
+  type CampaignRollSelection,
+  type CampaignRollOptions,
   type AttachedAuthorization,
   type CampaignMembershipSnapshot,
   type CharacterPageCursor,
@@ -52,6 +77,7 @@ import {
   type StoredResultScope,
 } from "./persistence.js";
 import { canReadRoll, isActiveMember, isGameMaster, type MembershipRecord } from "../campaigns/policy.js";
+import { ROLL_VISIBILITY_PREDICATE } from "../campaigns/persistence.js";
 import { claimExecution } from "./idempotency.js";
 import { buildAttachedCharacterExportDocument, buildCharacterExportDocument } from "./export.js";
 
@@ -67,6 +93,9 @@ const DUPLICATE_COMMAND_KIND = "character_duplicate";
 const COMMAND_KIND: Record<CharacterCommand["kind"], string> = {
   setField: "character_set_field",
   bumpResource: "character_bump_resource",
+  adjustResource: "character_adjust_resource",
+  applyRoll: "character_apply_roll",
+  setResource: "character_set_resource",
   executeAction: "character_execute_action",
   pushRoll: "character_push_roll",
   addEntry: "character_add_entry",
@@ -78,24 +107,28 @@ const MANAGEMENT_COMMAND_KIND: Record<CharacterManagementCommand["kind"], string
   transferOwnership: "character_transfer_ownership",
   archive: "character_archive",
   recover: "character_recover",
+  changeVersion: "character_change_version",
 };
 const MANAGEMENT_ACTIVITY_KIND: Record<CharacterManagementCommand["kind"], string> = {
   rename: "character_renamed",
   transferOwnership: "character_ownership_transferred",
   archive: "character_archived",
   recover: "character_recovered",
+  changeVersion: "system_version_upgraded",
 };
 const MANAGEMENT_AUDIT_KIND: Record<CharacterManagementCommand["kind"], string> = {
   rename: "character_renamed",
   transferOwnership: "character_ownership_transferred",
   archive: "character_archived",
   recover: "character_recovered",
+  changeVersion: "system_version_upgraded",
 };
 const MANAGEMENT_AUDIT_SUMMARY: Record<CharacterManagementCommand["kind"], string> = {
   rename: "Character renamed",
   transferOwnership: "Character ownership transferred",
   archive: "Character archived",
   recover: "Character recovered",
+  changeVersion: "System version upgraded",
 };
 const LEASE_MS = 60 * 1000;
 const REPLAY_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -169,6 +202,8 @@ export type CharacterView = {
   returnOwnerId: UserId | null;
   name: string;
   systemVersionId: VersionId;
+  /** Design 6.8: extension versions the character is built on. */
+  extensions: ExtensionRef[];
   entityDefinitionId: DefinitionId;
   revision: number;
   lifecycle: "active" | "archived";
@@ -199,13 +234,23 @@ export type CharacterPage = {
 
 export type CreateCharacter = {
   systemVersionId: VersionId;
+  /** Design 6.8: extension versions to build the character on (one per extension). */
+  extensions?: ExtensionRef[];
   entityDefinitionId: DefinitionId;
   name: string;
   initialValues?: Record<DefinitionId, unknown>;
+  /** Design 6.1: a row of the entity's preset dataset to copy values from. */
+  presetId?: DefinitionId;
   idempotencyKey: string;
 };
 
-export type CharacterCreationOptions = VersionDescription;
+export type CharacterCreationOptions = VersionDescription & {
+  /**
+   * Design 6.8 (E6): the system's owned and public extensions at their latest
+   * version that fit this base version, for the optional creation picker.
+   */
+  extensions?: Array<{ extensionId: string; name: string; versionId: VersionId; semanticVersion: string }>;
+};
 
 export type CreationOptionsInput = {
   systemVersionId: VersionId;
@@ -264,7 +309,7 @@ export type CharacterResourceBumpCommand = {
   idempotencyKey: string;
 };
 
-export type CharacterActionCommand = {
+export type CharacterActionCommand = CampaignRollSelection & {
   kind: "executeAction";
   characterId: CharacterId;
   actionId: DefinitionId;
@@ -294,8 +339,49 @@ export type CharacterActionCommand = {
 export type CharacterPushCommand={kind:"pushRoll";characterId:CharacterId;parentRollId:string;expectedRevision:number;idempotencyKey:string};
 export type PushOptions={canPush:boolean;reason:string|null;eligibleDiceIds:string[];revision:number;nextAttempt:number;maxAttempts:number};
 
+/** Design 6.3: apply an amount (damage, healing, spending) in one atomic command. */
+export type CharacterResourceAdjustCommand = {
+  kind: "adjustResource";
+  characterId: CharacterId;
+  resourceId: DefinitionId;
+  delta: number;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+/**
+ * Design 6.3 (SRD gaps S6, owner decision 2026-11-21, G5): apply a saved
+ * roll's total to a resource, such as damage to hit points. Rolls still never
+ * change characters on their own; a person who may edit this character
+ * chooses to apply a roll they can see, from the same campaign (or, for a
+ * standalone character, one of its own rolls).
+ */
+export type CharacterApplyRollCommand = {
+  kind: "applyRoll";
+  characterId: CharacterId;
+  resourceId: DefinitionId;
+  rollId: string;
+  direction: "subtract" | "add";
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+/** Design 6.3: direct input of a resource's current value and/or maximum. */
+export type CharacterResourceSetCommand = {
+  kind: "setResource";
+  characterId: CharacterId;
+  resourceId: DefinitionId;
+  current?: number;
+  max?: number;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
 export type CharacterCommand =
   | CharacterPushCommand
+  | CharacterResourceAdjustCommand
+  | CharacterApplyRollCommand
+  | CharacterResourceSetCommand
   | CharacterFieldSetCommand
   | CharacterResourceBumpCommand
   | CharacterActionCommand
@@ -313,6 +399,8 @@ export type CharacterEntryInput = {
   entryId: string;
   slotId: DefinitionId;
   templateId: DefinitionId | null;
+  /** Design 6.8: extension of `templateId`; absent for base templates. */
+  extensionId?: string;
   values: Record<string, unknown>;
   quantity?: number;
 };
@@ -350,6 +438,10 @@ export type CharacterUpdateEntryValuesCommand = {
  */
 export type EntryTemplateSummary = {
   source?: EntrySource;
+  /** Design 6.8: extension of a system template; absent for base templates. */
+  extensionId?: string;
+  /** Design 6.8 (E6): the extension's name, so pickers can group by origin. */
+  extensionName?: string;
   defaultQuantity?: number;
   id: DefinitionId;
   label: string;
@@ -359,6 +451,8 @@ export type EntryTemplateSummary = {
     id: DefinitionId;
     label: string;
     actionKind: "roll" | "resourceBump";
+    target?: { entityId: DefinitionId };
+    respondsTo?: true;
     inputs: Array<{
       id: DefinitionId;
       label: string;
@@ -399,15 +493,44 @@ export type CharacterRecoverCommand = {
   idempotencyKey: string;
 };
 
+export type CharacterDeck = { deckId: DefinitionId; label: string; total: number; remaining: number };
+
 export type CharacterManagementCommand =
   | CharacterRenameCommand
   | CharacterTransferCommand
   | CharacterArchiveCommand
-  | CharacterRecoverCommand;
+  | CharacterRecoverCommand
+  | CharacterVersionChangeCommand;
+
+/**
+ * Design 6.7/6.8 (extensions plan E5): move a standalone character to another
+ * composition of its system — one base upgrade, or one extension added,
+ * removed or upgraded — or back to the composition recorded before its most
+ * recent change.
+ */
+export type CharacterVersionChangeCommand = {
+  kind: "changeVersion";
+  characterId: CharacterId;
+  target: Composition;
+  expectedRevision: number;
+  idempotencyKey: string;
+};
+
+export type { VersionChoice } from "../systems/implementation/persistence/index.js";
+
+export type CharacterVersionOptions = CompositionOptions;
+
+export type CharacterVersionCheck = {
+  revision: number;
+  direction: VersionChangeDirection;
+  change: CompositionChange;
+  report: Omit<VersionChangeReport, "nextState">;
+};
 
 export type CharacterCommandResult = {
   character: CharacterView;
   roll: NormalizedRoll | null;
+  rollId?: string | null;
   /**
    * Task 5: activity-only outcome of a nominal granted action (display
    * text). Set by executeAction when the runtime returns one; omitted
@@ -452,6 +575,8 @@ export type CharacterExportV1 = {
   createdAt: string;
   updatedAt: string;
   systemVersionId: VersionId;
+  /** Design 6.8: extension versions the state is built on; omitted when none. Identity only, no content. */
+  extensions?: ExtensionRef[];
   packageChecksum: string;
   revision: number;
   state: RuntimeStateV1;
@@ -462,8 +587,15 @@ export type CharacterExportV1 = {
 // ---------------------------------------------------------------------------
 
 type CharacterAccess = { standaloneOnly?: boolean };
+type CommandAccess = CharacterAccess & { physical?: PhysicalEvidence };
+
+export type ReferenceDataRead =
+  | { datasets: Array<{ datasetId: string; label: string; records: number }> }
+  | { dataset: { datasetId: string; label: string; records: Array<{ id: string; label: string; values: Record<string, string | number | boolean | null> }> } };
 
 export interface Characters extends CharacterImages, CharacterEntryImages {
+  physicalRolls?: PhysicalRolls;
+  rollOptions(ctx: RequestContext, request: { characterId: string; actionId: string; entryId?: string }): Promise<CharacterResult<CampaignRollOptions>>;
   readRoll(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<NormalizedRoll>>;
   pushOptions(ctx:RequestContext,input:{characterId:CharacterId;rollId:string}):Promise<CharacterResult<PushOptions>>;
   create(ctx: RequestContext, input: CreateCharacter): Promise<CharacterResult<CharacterView>>;
@@ -479,7 +611,7 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
   duplicate(ctx: RequestContext, input: DuplicateCharacter): Promise<CharacterResult<CharacterView>>;
   open(ctx: RequestContext, characterId: CharacterId, access?: CharacterAccess): Promise<CharacterResult<CharacterView>>;
 
-  apply(ctx: RequestContext, input: CharacterCommand, access?: CharacterAccess): Promise<CharacterResult<CharacterCommandResult>>;
+  apply(ctx: RequestContext, input: CharacterCommand, access?: CommandAccess): Promise<CharacterResult<CharacterCommandResult>>;
   /**
    * Task 7: template catalog for one character's sheet add flow, authorized
    * exactly like `open` (standalone owner, attached campaign-authorized).
@@ -488,10 +620,35 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
     ctx: RequestContext,
     input: { characterId: CharacterId },
   ): Promise<CharacterResult<EntryTemplateSummary[]>>;
+  /**
+   * Design 6.4 (C13): card counts of the decks this sheet's system defines.
+   * An attached sheet reads the campaign's shared decks, a standalone sheet
+   * its own. Authorized like `open`.
+   */
+  listDecks(ctx: RequestContext, input: { characterId: CharacterId }): Promise<CharacterResult<CharacterDeck[]>>;
+  /**
+   * Design 6.1 (SRD gaps S2): the reference tables of a system, for anyone
+   * who may use the version or read a character pinned to it. Without
+   * `datasetId` the tables are listed; with it, one table and its records.
+   */
+  /** Design 6.3 (S6): recent saved rolls with a positive total that this character's editor may apply to it. */
+  listApplicableRolls(ctx: RequestContext, input: { characterId: CharacterId }): Promise<CharacterResult<Array<{ rollId: string; output: string; total: number }>>>;
+  readReferenceData(
+    ctx: RequestContext,
+    input: ({ characterId: CharacterId } | { versionId: string }) & { datasetId?: string },
+  ): Promise<CharacterResult<ReferenceDataRead>>;
   manage(
     ctx: RequestContext,
     input: CharacterManagementCommand,
   ): Promise<CharacterResult<CharacterCommandResult>>;
+  listVersionOptions(
+    ctx: RequestContext,
+    input: { characterId: CharacterId },
+  ): Promise<CharacterResult<CharacterVersionOptions>>;
+  checkVersionChange(
+    ctx: RequestContext,
+    input: { characterId: CharacterId; target: unknown },
+  ): Promise<CharacterResult<CharacterVersionCheck>>;
 
   listActivity(
     ctx: RequestContext,
@@ -501,11 +658,20 @@ export interface Characters extends CharacterImages, CharacterEntryImages {
 }
 
 export type CreateCharactersModuleInput = {
+  physicalDiceEnabled?: boolean;
   scanImage?: import("../platform/image-processing.js").ImageScanner;
   pool: Pool;
   runtime: SystemRuntime;
   authorizeVersionUse: SystemAuthoring["authorizeVersionUse"];
+  /** Design 6.8; characters cannot be created with extensions without it. */
+  authorizeExtensionUse?: ExtensionAuthoring["authorizeExtensionUse"];
   listAuthorizedVersions: SystemAuthoring["listAuthorizedVersions"];
+  /** Design 6.7 version choices; version-change operations are unavailable without them. */
+  listUpgradeTargets?: SystemAuthoring["listUpgradeTargets"];
+  describeVersionChoices?: SystemAuthoring["describeVersionChoices"];
+  /** Design 6.8 (E5): extension upgrades and names for composition changes. */
+  listExtensionUpgradeTargets?: ExtensionAuthoring["listUpgradeTargets"];
+  describeCompositionChoices?: ExtensionAuthoring["describeCompositionChoices"];
   campaignTemplates?: ReturnType<typeof createTemplateRepository>;
   now?: () => Date;
   newId?: () => string;
@@ -524,6 +690,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
   // loads it directly here (precedent: the direct hashInput import above) so
   // no SystemRuntime surface changes are required.
   const loadPackage = createPostgresPublishedPackageLoader(input.pool);
+  // Design 6.8: entries are validated against the character's composition.
+  const loadEffective = createEffectivePackageLoader({
+    loadPackage,
+    loadExtensionPackage: createPostgresPublishedExtensionLoader(input.pool),
+  });
 
   const errors = {
     bad_request: (message: string): CharacterError => ({ code: "bad_request", message }),
@@ -577,6 +748,32 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     };
   }
 
+  /**
+   * Design 6.8 (decision X2/X6): every requested extension version must be a
+   * published version of an active extension of this system that the actor may
+   * use, one version per extension, at most 16. Whether the composition fits
+   * the base version is checked by the runtime when it resolves.
+   */
+  async function authorizeExtensions(
+    ctx: RequestContext,
+    systemId: string,
+    extensions: readonly ExtensionRef[],
+  ): Promise<CharacterError | null> {
+    if (extensions.length === 0) return null;
+    if (extensions.length > 16) return errors.bad_request("A character may use at most 16 extensions.");
+    if (new Set(extensions.map((ref) => ref.extensionId)).size !== extensions.length) {
+      return errors.bad_request("Use one version of each extension.");
+    }
+    if (input.authorizeExtensionUse === undefined) return errors.not_found();
+    for (const ref of extensions) {
+      const use = await input.authorizeExtensionUse(ctx, ref.versionId);
+      if (!use.ok || use.value.extensionId !== ref.extensionId || use.value.baseSystemId !== systemId) {
+        return errors.not_found();
+      }
+    }
+    return null;
+  }
+
   function toView(
     record: CharacterRecord,
     resolved: {
@@ -603,6 +800,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       returnOwnerId: record.returnOwnerId,
       name: record.name,
       systemVersionId: record.systemVersionId,
+      extensions: record.extensions,
       entityDefinitionId: record.entityDefinitionId,
       revision: record.revision,
       lifecycle: record.lifecycle,
@@ -669,6 +867,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           scope: StoredResultScope;
           character: unknown;
           roll: NormalizedRoll | null;
+          rollId?: string | null;
           nominal?: NominalActionResult | null;
         };
       }
@@ -873,6 +1072,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       value: {
         character: { ...view, reconciliation: { ...view.reconciliation, replayed: true } },
         roll: stored.value.roll,
+        rollId: stored.value.rollId ?? null,
         nominal: stored.value.nominal ?? null,
       },
     };
@@ -922,7 +1122,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       return { ok: false, error };
     }
     if (outcome.kind === "precondition_failed") {
-      await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(outcome.error, resultScope), expiresAt: replayExpiresAt });
+      if (!outcome.retryable) await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(outcome.error, resultScope), expiresAt: replayExpiresAt });
       return {ok:false,error:outcome.error};
     }
     if (outcome.kind === "archived") {
@@ -967,7 +1167,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const stored = outcome.resultJson as StoredCommandOutcome;
     if (!stored.ok) return { ok: false, error: stored.error };
     const view = deserializeView(stored.value.character);
-    return { ok: true, value: { character: view, roll: stored.value.roll, nominal: stored.value.nominal ?? null } };
+    return { ok: true, value: { character: view, roll: stored.value.roll, rollId: stored.value.rollId ?? null, nominal: stored.value.nominal ?? null } };
   }
 
   /**
@@ -976,30 +1176,26 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
    * validation (slots/templates) happens before any runtime intent runs.
    */
   async function loadEntryPackage(
-    versionId: string,
+    source: Pick<CharacterRecord, "systemVersionId" | "extensions">,
     executionId: string,
     replayExpiresAt: Date,
     resultScope: StoredResultScope,
   ): Promise<{ ok: true; value: SystemPackageV1 } | { ok: false; error: CharacterError }> {
-    try {
-      const loaded = await loadPackage(versionId);
-      if (loaded === null) return { ok: false, error: errors.internal() };
-      return { ok: true, value: loaded };
-    } catch (error) {
-      if (error instanceof PublishedPackageCorruptError) {
-        const mapped = mapRuntimeError({
-          code: "invalid_package",
-          message: "Published package runtime references are invalid.",
-        });
-        await repo.finalizeExecutionError({
-          executionId,
-          resultJson: serializeCommandError(mapped, resultScope),
-          expiresAt: replayExpiresAt,
-        });
-        return { ok: false, error: mapped };
-      }
-      return { ok: false, error: errors.internal() };
+    const loaded = await loadEffective(source.systemVersionId, source.extensions);
+    if (loaded.ok) return loaded;
+    if (loaded.error.code === "invalid_package") {
+      const mapped = mapRuntimeError({
+        code: "invalid_package",
+        message: "Published package runtime references are invalid.",
+      });
+      await repo.finalizeExecutionError({
+        executionId,
+        resultJson: serializeCommandError(mapped, resultScope),
+        expiresAt: replayExpiresAt,
+      });
+      return { ok: false, error: mapped };
     }
+    return { ok: false, error: errors.internal() };
   }
 
   /**
@@ -1038,17 +1234,18 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       return { ok: false, error };
     };
 
-    const packaged = await loadEntryPackage(resolveSource.systemVersionId, executionId, replayExpiresAt, resultScope);
+    const packaged = await loadEntryPackage(resolveSource, executionId, replayExpiresAt, resultScope);
     if (!packaged.ok) return packaged;
     const packageValue=packaged.value;
-    const slots: SlotDefinitionV1[] = packaged.value.slots ?? [];
+    const slots: SlotDefinitionV1[] = packaged.value.slots;
     const allowedSlots = standaloneOnly ? slotsForEntity(packageValue, resolveSource.entityDefinitionId) : slots;
-    const templates: ObjectTemplateV1[] = packaged.value.templates ?? [];
+    const templates: ObjectTemplateV1[] = packaged.value.templates;
     // RuntimeStateV1.entries is optional: legacy rows decode without it.
-    const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries ?? {};
+    const storedEntries: Record<string, CharacterEntryV1> = resolveSource.state.entries;
 
     let nextEntries: Record<string, CharacterEntryV1>;
     let selectedSource: Extract<EntrySource, {kind:"campaign"}> | undefined;
+    let addedExtensionId: string | undefined;
     let activityKind: "entry_added" | "entry_removed" | "entry_updated";
     let activityFields: Record<string, unknown>;
     let changedDefinitionIds: DefinitionId[];
@@ -1079,11 +1276,29 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       if (storedEntries[entryInput.entryId] !== undefined) {
         return fail(errors.bad_request("Character entry already exists."));
       }
-      if (Object.keys(entryInput).some(key => !["entryId","slotId","templateId","source","values","quantity"].includes(key))) return fail(errors.bad_request("Unknown entry input field."));
+      if (Object.keys(entryInput).some(key => !["entryId","slotId","templateId","extensionId","source","values","quantity"].includes(key))) return fail(errors.bad_request("Unknown entry input field."));
+      // Design 6.8: an extension template is named by its plain ID plus the
+      // extension, which must be part of this character's composition.
+      if (entryInput.extensionId !== undefined && (
+        typeof entryInput.extensionId !== "string"
+        || entryInput.templateId === null
+        || !resolveSource.extensions.some((ref) => ref.extensionId === entryInput.extensionId)
+      )) {
+        // Issue #60: a command prepared against an older revision (for example
+        // before a campaign removed the extension) reports the revision
+        // conflict, so the client refreshes the changed rules.
+        if (typeof entryInput.extensionId === "string" && entryInput.templateId !== null && command.expectedRevision !== resolveSource.revision) {
+          return finishCommandTx({
+            ctx, outcome: { kind: "conflict", latestRevision: resolveSource.revision }, characterId: command.characterId,
+            expectedRevision: command.expectedRevision, attachedCampaignId, resultScope, standaloneOnly, executionId, replayExpiresAt,
+          });
+        }
+        return fail(errors.invalid_value("The extension is not part of this character's rules."));
+      }
       if (entryInput.source !== undefined) {
         const source = entryInput.source;
         if (!isRecord(source) || !["personal", "system", "campaign"].includes(source.kind as string)) return fail(errors.bad_request("Invalid entry source."));
-        const keys = source.kind === "campaign" ? ["kind", "campaignId", "templateId", "templateRevision", "contentRevision"] : source.kind === "system" ? ["kind", "templateId"] : ["kind"];
+        const keys = source.kind === "campaign" ? ["kind", "campaignId", "templateId", "templateRevision", "contentRevision"] : source.kind === "system" ? ["kind", "templateId", "extensionId"] : ["kind"];
         if (Object.keys(source).some(key => !keys.includes(key))) return fail(errors.bad_request("Unknown entry source field."));
         if (source.kind === "campaign" && (typeof source.campaignId !== "string" || !ENTRY_ID_PATTERN.test(source.campaignId) || typeof source.templateId !== "string" || !ENTRY_ID_PATTERN.test(source.templateId))) return fail(errors.bad_request("Invalid campaign template reference."));
       }
@@ -1116,6 +1331,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         entryId: entryInput.entryId,
         slotId: entryInput.slotId,
         templateId: entryInput.templateId,
+        ...(typeof entryInput.extensionId === "string" ? { extensionId: entryInput.extensionId } : {}),
         values: structuredClone(values),
         ...(pinnedImage ? { image: structuredClone(pinnedImage) } : {}),
         ...(entryInput.source === undefined ? {} : {source:structuredClone(entryInput.source)}),
@@ -1126,7 +1342,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       const validation = validateEntryForSlot(candidate, allowedSlots, templates, siblingCount);
       if (!validation.ok) return fail(errors.invalid_value(validation.message));
       if (candidate.templateId !== null) {
-        const template = templates.find((candidateTemplate) => candidateTemplate.id === candidate.templateId);
+        const key = templateKey(candidate);
+        const template = templates.find((candidateTemplate) => candidateTemplate.id === key);
         if (template === undefined) return fail(errors.invalid_value("Entry template is unknown."));
         if (template.image) candidate.image = structuredClone(template.image);
         for (const field of template.fields) {
@@ -1137,9 +1354,13 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           candidate.values[field.id] = structuredClone(field.default);
         }
       }
+      addedExtensionId = candidate.extensionId;
       nextEntries = { ...storedEntries, [candidate.entryId]: candidate };
       activityKind = "entry_added";
-      activityFields = { entryId: candidate.entryId, slotId: candidate.slotId, templateId: candidate.templateId };
+      activityFields = {
+        entryId: candidate.entryId, slotId: candidate.slotId, templateId: candidate.templateId,
+        ...(candidate.extensionId === undefined ? {} : { extensionId: candidate.extensionId }),
+      };
       changedDefinitionIds = [candidate.slotId];
       stateChanged = true;
     } else if (command.kind === "removeEntry") {
@@ -1191,6 +1412,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     const nextState: RuntimeStateV1 = { ...resolveSource.state, entries: nextEntries };
     const resolved = await input.runtime.resolve({
       versionId: resolveSource.systemVersionId,
+      extensions: resolveSource.extensions,
       entityId: resolveSource.entityDefinitionId,
       state: nextState,
       intent: { kind: "observe" },
@@ -1207,6 +1429,8 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       return { ok: false, error };
     }
 
+    const placementSource = selectedSource;
+    const entryExtensionId = addedExtensionId;
     const outcome = await repo.applyCommandTx({
       executionId,
       characterId: command.characterId,
@@ -1214,10 +1438,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       expectedRevision: command.expectedRevision,
       nextState: resolved.value.state,
       stateChanged,
-      ...(selectedSource === undefined ? {} : { precondition: async (client: import("pg").PoolClient): Promise<CharacterError | null> => {
-        const current = await input.campaignTemplates!.read(client, selectedSource!);
+      ...(placementSource === undefined && entryExtensionId === undefined ? {} : { precondition: async (client: import("pg").PoolClient): Promise<CharacterError | null> => {
+        // Design 6.8 (X9), defence in depth for issue #60: the entry's
+        // extension must still be in the locked character's composition.
+        if (entryExtensionId !== undefined) {
+          const present = await client.query(
+            "SELECT 1 FROM character_extensions WHERE character_id = $1 AND extension_id = $2",
+            [command.characterId, entryExtensionId],
+          );
+          if (present.rowCount === 0) return {code:"conflict",message:"The character's rules have changed. Refresh and try again.",cacheDisposition:"replace"};
+        }
+        if (placementSource === undefined) return null;
+        const current = await input.campaignTemplates!.read(client, placementSource);
         if (current === null || current.audience !== "all_players") return errors.not_found();
-        return canPlaceTemplate(current) && current.revision === selectedSource!.templateRevision && current.contentRevision === selectedSource!.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
+        return canPlaceTemplate(current) && current.revision === placementSource.templateRevision && current.contentRevision === placementSource.contentRevision ? null : {code:"conflict",message:"The campaign template has changed. Refresh and explicitly review the selected revision.",cacheDisposition:"replace"};
       } }),
       roll: null,
       activity: {
@@ -1261,15 +1495,256 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
     });
   }
 
-  return {
+  /**
+   * Design 6.7/6.8: classify the change, authorize it and run the dry run for
+   * a standalone record. The revert target is only the recorded previous
+   * composition; any other target makes exactly one authorized change.
+   */
+  async function planVersionChange(
+    ctx: RequestContext,
+    record: CharacterRecord,
+    target: Composition,
+  ): Promise<CharacterResult<{ direction: VersionChangeDirection; change: CompositionChange; report: VersionChangeReport }>> {
+    if (input.listUpgradeTargets === undefined || input.describeVersionChoices === undefined) {
+      return { ok: false, error: errors.internal() };
+    }
+    const current: Composition = { systemVersionId: record.systemVersionId, extensions: record.extensions };
+    const previous = await repo.loadPreviousComposition(record.characterId);
+    const classified = classifyCompositionChange(current, target, previous);
+    if (!classified.ok) return { ok: false, error: compositionError(classified.error) };
+    const change = classified.value;
+    const [described] = await describeOrEmpty(record.systemVersionId);
+    if (described === undefined) return { ok: false, error: errors.internal() };
+    const listSystemUpgrades = input.listUpgradeTargets;
+    const listExtensionUpgrades = input.listExtensionUpgradeTargets;
+    const authorizeUse = input.authorizeExtensionUse;
+    const allowed = await authorizeCompositionChange(ctx, change, described.systemId, {
+      listSystemUpgrades,
+      listExtensionUpgrades: listExtensionUpgrades ?? (async () => ({ ok: true, value: [] })),
+      authorizeExtensionUse: authorizeUse ?? (async () => ({ ok: false, error: { code: "not_found", message: "" } })),
+    });
+    if (!allowed.ok) return { ok: false, error: compositionError(allowed.error) };
+    const direction: VersionChangeDirection = change.kind === "revert" ? "revert" : "upgrade";
+    const checked = await input.runtime.checkVersionChange({
+      fromVersionId: record.systemVersionId,
+      fromExtensions: record.extensions,
+      toVersionId: target.systemVersionId,
+      toExtensions: target.extensions,
+      entityId: record.entityDefinitionId,
+      state: record.state,
+      direction,
+    });
+    if (!checked.ok) return { ok: false, error: mapRuntimeError(checked.error) };
+    return { ok: true, value: { direction, change, report: checked.value } };
+  }
+
+  async function describeOrEmpty(versionId: VersionId): Promise<VersionChoice[]> {
+    const described = await input.describeVersionChoices!([versionId]);
+    return described.ok ? described.value : [];
+  }
+
+  function compositionError(error: CompositionError): CharacterError {
+    switch (error.code) {
+      case "invalid_value": return errors.invalid_value(error.message);
+      case "bad_request": return errors.bad_request(error.message);
+      case "not_found": return errors.not_found(error.message);
+      case "internal": return errors.internal();
+    }
+  }
+
+  function withoutNextState(report: VersionChangeReport): Omit<VersionChangeReport, "nextState"> {
+    const { nextState: _nextState, ...rest } = report;
+    return rest;
+  }
+
+  async function changeVersion(
+    ctx: RequestContext,
+    command: CharacterVersionChangeCommand,
+  ): Promise<CharacterResult<CharacterCommandResult>> {
+    if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
+      return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
+    }
+    const target = parseComposition(command.target);
+    if (typeof target === "string") return { ok: false, error: errors.bad_request(target) };
+    const commandKind = MANAGEMENT_COMMAND_KIND.changeVersion;
+    const inputHash = hashInput({
+      commandKind,
+      characterId: command.characterId,
+      expectedRevision: command.expectedRevision,
+      target,
+    });
+    const claimStartedAt = now();
+    const claimed = await claimExecution(input.pool, {
+      actorId: ctx.actorId,
+      commandKind,
+      idempotencyKey: command.idempotencyKey,
+      inputHash,
+      newExecutionId,
+      now: claimStartedAt,
+      leaseMs: LEASE_MS,
+      replayTtlMs: REPLAY_TTL_MS,
+    });
+    if (claimed.status === "mismatch") return { ok: false, error: errors.mismatch() };
+    if (claimed.status === "in_progress") return { ok: false, error: errors.inProgress() };
+    if (claimed.status === "expired") return { ok: false, error: errors.replayExpired() };
+    if (claimed.status === "replay") {
+      const denial = await authorizeStoredOutcome(ctx, command.characterId, claimed.resultJson, () => errors.notFoundPurge(), true);
+      if (denial !== null) return denial;
+      return replayStoredOutcome(claimed.resultJson);
+    }
+    const executionId = claimed.executionId;
+    const replayExpiresAt = new Date(claimStartedAt.getTime() + REPLAY_TTL_MS);
+    const finish = async (error: CharacterError): Promise<CharacterResult<never>> => {
+      await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error), expiresAt: replayExpiresAt });
+      return { ok: false, error };
+    };
+
+    // Stage 2 is standalone only; attached sheets move with their campaign (stage 3).
+    const record = await repo.openOwnedCharacter(command.characterId, ctx.actorId);
+    if (record === null) return finish(errors.notFoundPurge());
+    if (record.revision !== command.expectedRevision) {
+      // The dry run must verify exactly the state the transaction will replace.
+      const changed = await repo.changedDefinitionIdsSinceRevision(command.characterId, command.expectedRevision, { scopeCampaignId: null });
+      const cursor = changed.latestActivity === null ? null : encodeActivityCursor(changed.latestActivity);
+      return finish(errors.conflict(record.revision, changed.changedDefinitionIds, cursor));
+    }
+    const planned = await planVersionChange(ctx, record, target);
+    if (!planned.ok) {
+      if (planned.error.code === "internal") return planned;
+      // A command must not read as "character not found" to the client
+      // session; an unavailable target is a conflict with current state.
+      if (planned.error.code === "not_found") {
+        return finish({ code: "conflict", message: planned.error.message, latestRevision: record.revision, cacheDisposition: "retain" });
+      }
+      return finish(planned.error);
+    }
+    const { direction, change, report } = planned.value;
+    if (!report.ok || report.nextState === null) {
+      const first = report.blockers[0];
+      return finish({
+        code: "conflict",
+        message: `This character cannot move to these rules${first === undefined ? "." : `: ${first.message}`} Check the version first for every blocker.`,
+        latestRevision: record.revision,
+        cacheDisposition: "retain",
+      });
+    }
+    const nextState = report.nextState;
+    const resolved = await input.runtime.resolve({
+      versionId: target.systemVersionId,
+      extensions: target.extensions,
+      entityId: record.entityDefinitionId,
+      state: nextState,
+      intent: { kind: "observe" },
+    });
+    if (!resolved.ok) {
+      const error = mapRuntimeError(resolved.error);
+      if (isFinalizableRuntimeError(resolved.error.code)) return finish(error);
+      return { ok: false, error };
+    }
+    const activityKind = compositionActivityKind(change);
+    const from: Composition = { systemVersionId: record.systemVersionId, extensions: sortExtensionRefs(record.extensions) };
+    const payload = {
+      fromVersionId: record.systemVersionId,
+      toVersionId: target.systemVersionId,
+      from,
+      to: target,
+      change,
+      direction,
+      updatedEntries: report.changedEntries.length,
+      addedFields: report.addedFields,
+      droppedFields: report.droppedFields,
+    };
+    const outcome = await repo.applyManagementCommandTx({
+      executionId,
+      characterId: command.characterId,
+      actorId: ctx.actorId,
+      expectedRevision: command.expectedRevision,
+      mutation: {
+        kind: "changeVersion",
+        from,
+        to: target,
+        previous: direction === "upgrade" ? from : null,
+        nextState,
+        repinEntryIds: report.changedEntries.filter((entry) => entry.imageUpdated).map((entry) => entry.entryId),
+      },
+      activity: { kind: activityKind, payloadJson: payload, requestId: ctx.requestId },
+      audit: {
+        kind: activityKind,
+        summary: compositionActivitySummary(change),
+        requestId: ctx.requestId,
+      },
+      resultExpiresAt: replayExpiresAt,
+      buildResult: ({ record: updated, controllers, scope }) => {
+        const view = toView(
+          updated,
+          {
+            derivedValues: resolved.value.derivedValues,
+            validations: resolved.value.validations,
+            projection: resolved.value.projection,
+            packageChecksum: resolved.value.packageChecksum,
+            changedDefinitionIds: [],
+          },
+          { baseRevision: command.expectedRevision, commandExecutionId: executionId, replayExpiresAt: replayExpiresAt.toISOString(), replayed: false },
+        );
+        const replaced = { ...view, reconciliation: { ...view.reconciliation, cacheDisposition: "replace" as const } };
+        return { ok: true, value: { scope, character: serializeView(withControllers(replaced, controllers)), roll: null } };
+      },
+    });
+    if (outcome.kind === "already_completed") {
+      const denial = await authorizeStoredOutcome(ctx, command.characterId, outcome.resultJson, () => errors.notFoundPurge(), true);
+      if (denial !== null) return denial;
+      return replayStoredOutcome(outcome.resultJson);
+    }
+    if (outcome.kind === "not_found" || outcome.kind === "invalid_target") return finish(errors.notFoundPurge());
+    if (outcome.kind === "conflict") {
+      if (!(await recheckWriteAccess(ctx, command.characterId, null))) return finish(errors.notFoundPurge());
+      const changed = await repo.changedDefinitionIdsSinceRevision(command.characterId, command.expectedRevision, { scopeCampaignId: null });
+      const cursor = changed.latestActivity === null ? null : encodeActivityCursor(changed.latestActivity);
+      return finish(errors.conflict(outcome.latestRevision, changed.changedDefinitionIds, cursor));
+    }
+    const stored = outcome.resultJson as StoredCommandOutcome;
+    if (!stored.ok) return { ok: false, error: stored.error };
+    return { ok: true, value: { character: deserializeView(stored.value.character), roll: null, nominal: null } };
+  }
+
+  /**
+   * Design 6.3 (S6): the total of a saved roll the actor can see and may apply
+   * to this character, or null. A campaign roll must belong to the character's
+   * campaign; a standalone character applies only its own rolls.
+   */
+  async function loadApplicableRollTotal(
+    rollId: string,
+    record: CharacterRecord,
+    actorId: string,
+    membership: MembershipRecord | null,
+  ): Promise<number | null> {
+    if (!/^[0-9a-f-]{36}$/i.test(rollId)) return null;
+    const { rows: [roll] } = await input.pool.query<{ total: number; audience: RollAudience; scope_campaign_id: string | null; character_id: string; principal_id: string }>(
+      `SELECT total, audience, scope_campaign_id, character_id, COALESCE(audience_actor_id, actor_id) AS principal_id
+         FROM character_rolls WHERE id = $1`,
+      [rollId],
+    );
+    if (roll === undefined) return null;
+    if (record.campaignId === null) {
+      return roll.character_id === record.characterId && roll.scope_campaign_id === null && record.ownerId === actorId ? Number(roll.total) : null;
+    }
+    if (roll.scope_campaign_id !== record.campaignId) return null;
+    return canReadRoll({ roll: { campaignId: record.campaignId, actorId: roll.principal_id, audience: roll.audience }, membership })
+      ? Number(roll.total) : null;
+  }
+
+  const characters: Characters = {
     ...createCharacterImages({ pool: input.pool, now, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     ...createCharacterEntryImages({ pool: input.pool, ...(input.scanImage ? { scanImage: input.scanImage } : {}) }),
     async create(ctx, createInput) {
+      const extensions = sortExtensionRefs(createInput.extensions ?? []);
       const inputHash = hashInput({
         systemVersionId: createInput.systemVersionId,
         entityDefinitionId: createInput.entityDefinitionId,
         name: createInput.name,
         initialValues: createInput.initialValues ?? {},
+        ...(createInput.presetId === undefined ? {} : { presetId: createInput.presetId }),
+        ...(extensions.length === 0 ? {} : { extensions }),
       });
 
       async function replayCreate(): Promise<CharacterResult<CharacterView> | null> {
@@ -1295,14 +1770,19 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         const authorized = await input.authorizeVersionUse(ctx, createInput.systemVersionId);
         if (!authorized.ok) return { ok: false, error: errors.not_found() };
+        const extensionCheck = await authorizeExtensions(ctx, authorized.value.systemId, extensions);
+        if (extensionCheck !== null) return { ok: false, error: extensionCheck };
 
         const resolved = await input.runtime.resolve({
           versionId: authorized.value.versionId,
+          extensions,
           entityId: createInput.entityDefinitionId,
           intent:
-            createInput.initialValues === undefined
-              ? { kind: "initialize" }
-              : { kind: "initialize", values: createInput.initialValues },
+            {
+              kind: "initialize", standalone: true,
+              ...(createInput.initialValues === undefined ? {} : { values: createInput.initialValues }),
+              ...(createInput.presetId === undefined ? {} : { preset: createInput.presetId }),
+            },
         });
         if (!resolved.ok) return { ok: false, error: mapRuntimeError(resolved.error) };
 
@@ -1318,6 +1798,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           placementGeneration: 1,
           returnOwnerId: null,
           systemVersionId: resolved.value.versionId,
+          extensions,
           entityDefinitionId: createInput.entityDefinitionId,
           name: createInput.name,
           revision: 1,
@@ -1351,6 +1832,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             characterId,
             ownerId: ctx.actorId,
             systemVersionId: resolved.value.versionId,
+            extensions,
             entityDefinitionId: createInput.entityDefinitionId,
             name: createInput.name,
             state: resolved.value.state,
@@ -1405,8 +1887,17 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           ...(creationInput.includeFields ? { includeFields: true } : {}),
         });
         if (!described.ok) return { ok: false, error: mapRuntimeError(described.error) };
-
-        return { ok: true, value: described.value };
+        if (input.describeCompositionChoices === undefined) return { ok: true, value: described.value };
+        const choices = await input.describeCompositionChoices(ctx, { systemId: authorized.value.systemId, pinned: [] });
+        if (!choices.ok) return { ok: false, error: errors.internal() };
+        const extensions: NonNullable<CharacterCreationOptions["extensions"]> = [];
+        for (const choice of choices.value.available) {
+          const ref = { extensionId: choice.extensionId, versionId: choice.version.versionId };
+          // Only extensions that validate against this base version are offered.
+          if (!(await loadEffective(authorized.value.versionId, [ref])).ok) continue;
+          extensions.push({ ...ref, name: choice.name, semanticVersion: choice.version.semanticVersion });
+        }
+        return { ok: true, value: { ...described.value, extensions } };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -1526,6 +2017,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
 
         const resolved = await input.runtime.resolve({
           versionId: source.systemVersionId,
+          extensions: source.extensions,
           entityId: source.entityDefinitionId,
           state: source.state,
           intent: { kind: "observe" },
@@ -1648,6 +2140,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (record !== null) {
           const resolved = await input.runtime.resolve({
             versionId: record.systemVersionId,
+            extensions: record.extensions,
             entityId: record.entityDefinitionId,
             state: record.state,
             intent: { kind: "observe" },
@@ -1694,6 +2187,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const attachedRecord = attached.auth.record;
         const resolved = await input.runtime.resolve({
           versionId: attachedRecord.systemVersionId,
+          extensions: attachedRecord.extensions,
           entityId: attachedRecord.entityDefinitionId,
           state: attachedRecord.state,
           intent: { kind: "observe" },
@@ -1723,6 +2217,31 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
 
+    async rollOptions(ctx, request) {
+      try {
+        const snapshot = await loadAttachedSnapshot(ctx, request.characterId);
+        if (!snapshot || snapshot.auth.record.lifecycle !== "active" || snapshot.auth.campaign?.status !== "active") {
+          return { ok: false, error: errors.not_found() };
+        }
+        const source = snapshot.auth.record;
+        const observed = await input.runtime.resolve({
+          versionId: source.systemVersionId, extensions: source.extensions, entityId: source.entityDefinitionId,
+          state: source.state, intent: { kind: "observe" },
+        });
+        if (!observed.ok) return { ok: false, error: mapRuntimeError(observed.error) };
+        const action = findProjectedAction(observed.value.projection, request.actionId, request.entryId);
+        if (action?.kind !== "action" || (!action.target && !action.respondsTo)) {
+          return { ok: false, error: errors.not_found() };
+        }
+        const options = await repo.loadCampaignRollOptions({
+          source, member: toMembershipRecord(snapshot.auth.membership!), includeRolls: action.respondsTo === true,
+          ...(action.target ? { targetEntityIds: targetEntityIds(action.target) } : {}),
+        });
+        return options ? { ok: true, value: options } : { ok: false, error: errors.not_found() };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
     async readRoll(ctx,rollInput){
       try{
         const owned=await repo.openOwnedCharacter(rollInput.characterId,ctx.actorId);
@@ -1750,7 +2269,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const child=await input.pool.query("SELECT id FROM character_rolls WHERE parent_roll_id=$1 LIMIT 1",[optionsInput.rollId]);
         if(child.rows.length)reason="parent_consumed";
         if(!reason){
-          const validated=await input.runtime.resolve({versionId:record.systemVersionId,entityId:record.entityDefinitionId,state:record.state,intent:{kind:"push",parent:parent.roll,context:parent.context,executionId:optionsInput.rollId,optionsOnly:true}});
+          const validated=await input.runtime.resolve({versionId:record.systemVersionId,extensions:record.extensions,entityId:record.entityDefinitionId,state:record.state,intent:{kind:"push",parent:parent.roll,context:parent.context,executionId:optionsInput.rollId,optionsOnly:true}});
           if(!validated.ok){if(validated.error.code!=="push_unavailable")return {ok:false,error:mapRuntimeError(validated.error)};reason=validated.error.pushReason??"invalid_snapshot";}
         }
         const eligible=pushEligibility(parent.context.policy,parent.roll,parent.roll.push!.attempt);
@@ -1780,12 +2299,20 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             ? { fieldId: command.fieldId, value: command.value }
             : command.kind === "bumpResource"
               ? { resourceId: command.resourceId, direction: command.direction }
+            : command.kind === "adjustResource"
+              ? { resourceId: command.resourceId, delta: command.delta }
+            : command.kind === "applyRoll"
+              ? { resourceId: command.resourceId, rollId: command.rollId, direction: command.direction }
+            : command.kind === "setResource"
+              ? resourceSetPayload(command)
               : command.kind === "pushRoll"
                 ? {parentRollId:command.parentRollId}
               : command.kind === "executeAction"
                 ? {
                     actionId: command.actionId,
                     inputs: command.inputs,
+                    ...(command.targetCharacterId === undefined ? {} : { targetCharacterId: command.targetCharacterId }),
+                    ...(command.respondsTo === undefined ? {} : { respondsTo: command.respondsTo }),
                     ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
                   }
                 : command.kind === "addEntry"
@@ -1807,6 +2334,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           characterId: command.characterId,
           expectedRevision: command.expectedRevision,
           ...payload,
+          ...(access?.physical && { physicalSettlement: access.physical.identity }),
           ...(command.kind === "executeAction"
             ? { audience: command.audience ?? null, entryId: command.entryId ?? null }
             : {}),
@@ -1916,8 +2444,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         // (resolved to the effective audience inside the transaction).
         if (attachedCampaignId === null && command.kind === "executeAction") {
           const requested = command.audience ?? null;
-          if (requested !== null && requested !== "owner_only") {
-            const error = errors.bad_request("Standalone actions accept only the owner_only audience.");
+          const needsCampaign = command.targetCharacterId !== undefined || command.respondsTo !== undefined;
+          if (needsCampaign || (requested !== null && requested !== "owner_only")) {
+            const error = errors.bad_request(needsCampaign
+              ? "Targeted and opposed rolls require a campaign character."
+              : "Standalone actions accept only the owner_only audience.");
             await repo.finalizeExecutionError({
               executionId,
               resultJson: serializeCommandError(error),
@@ -1951,97 +2482,197 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
             const error=errors.not_found();await repo.finalizeExecutionError({executionId,resultJson:serializeCommandError(error,resultScope),expiresAt:replayExpiresAt});return {ok:false,error};
           }
         }
+        let appliedDelta = 0;
+        if (command.kind === "applyRoll") {
+          const applied = await loadApplicableRollTotal(command.rollId, resolveSource, ctx.actorId, pushMembership);
+          const error = applied === null ? errors.not_found()
+            : applied <= 0 ? errors.invalid_value("Only a roll with a positive total can be applied.") : null;
+          if (error !== null) {
+            await repo.finalizeExecutionError({ executionId, resultJson: serializeCommandError(error, resultScope), expiresAt: replayExpiresAt });
+            return { ok: false, error };
+          }
+          appliedDelta = command.direction === "subtract" ? -applied! : applied!;
+        }
         const intent =
           command.kind === "pushRoll"
-            ? ({kind:"push",parent:pushParent!.roll,context:pushParent!.context,executionId} as const)
+            ? ({kind:"push",parent:pushParent!.roll,context:pushParent!.context,executionId,physical:access?.physical?.draws} as const)
           : command.kind === "setField"
             ? ({ kind: "set", fieldId: command.fieldId, value: command.value } as const)
             : command.kind === "bumpResource"
               ? ({ kind: "bump", resourceId: command.resourceId, direction: command.direction } as const)
+            : command.kind === "adjustResource"
+              ? ({ kind: "adjust", resourceId: command.resourceId, delta: command.delta } as const)
+            : command.kind === "applyRoll"
+              ? ({ kind: "adjust", resourceId: command.resourceId, delta: appliedDelta } as const)
+            : command.kind === "setResource"
+              ? ({ kind: "setResource", ...resourceSetPayload(command) } as const)
               : ({
                   kind: "action",
+                  physical: access?.physical?.draws,
                   actionId: command.actionId,
                   inputs: command.inputs,
                   executionId,
                   ...(command.entryId !== undefined ? { entryId: command.entryId } : {}),
                 } as const);
 
-        const resolved = await input.runtime.resolve({
-          versionId: resolveSource.systemVersionId,
-          entityId: resolveSource.entityDefinitionId,
-          state: resolveSource.state,
-          intent,
-        });
-        if (!resolved.ok) {
-          const error = mapRuntimeError(resolved.error);
-          if (isFinalizableRuntimeError(resolved.error.code)) {
-            await repo.finalizeExecutionError({
-              executionId,
-              resultJson: serializeCommandError(error, resultScope),
-              expiresAt: replayExpiresAt,
-            });
+        const selection = command.kind === "executeAction" && (command.targetCharacterId !== undefined || command.respondsTo !== undefined)
+          ? {
+              ...(command.targetCharacterId === undefined ? {} : { targetCharacterId: command.targetCharacterId }),
+              ...(command.respondsTo === undefined ? {} : { respondsTo: command.respondsTo }),
+            }
+          : null;
+        const contextual = selection !== null;
+        const makeCommit = (resolved: RuntimeResolution, context?: CampaignRollContext): ApplyCommandInput => {
+          const activityKind =
+            command.kind === "setField"
+              ? "character_field_set"
+              : command.kind === "bumpResource"
+                ? "character_resource_bumped"
+              : command.kind === "adjustResource"
+                ? "character_resource_adjusted"
+              : command.kind === "applyRoll"
+                ? "character_roll_applied"
+              : command.kind === "setResource"
+                ? "character_resource_set"
+                : command.kind==="pushRoll"?"character_roll_pushed":"character_action_executed";
+          const changedDefinitionIds = contextual ? [] : resolved.changedDefinitionIds;
+          const roll = resolved.roll;
+          if(roll&&resolved.pushContext&&!roll.push){
+            const policy=resolved.pushContext.policy;
+            roll.push={version:"1.0",rollId:executionId,rootRollId:executionId,parentRollId:null,attempt:0,maxAttempts:policy.maxAttempts,rerolledDiceIds:[],faceOutcomes:policy.groups.flatMap(g=>g.reportedFaces.map(face=>({groupId:g.groupId,face,combinedCount:roll.dice.filter(d=>d.kept&&d.groupId===g.groupId&&d.value===face).length,rerolledCount:0})))};
           }
-          return { ok: false, error };
-        }
+          const nominal = resolved.nominal;
 
-        const activityKind =
-          command.kind === "setField"
-            ? "character_field_set"
-            : command.kind === "bumpResource"
-              ? "character_resource_bumped"
-              : command.kind==="pushRoll"?"character_roll_pushed":"character_action_executed";
-        const changedDefinitionIds = resolved.value.changedDefinitionIds;
-        const roll = resolved.value.roll;
-        if(roll&&resolved.value.pushContext&&!roll.push){
-          const policy=resolved.value.pushContext.policy;
-          roll.push={version:"1.0",rollId:executionId,rootRollId:executionId,parentRollId:null,attempt:0,maxAttempts:policy.maxAttempts,rerolledDiceIds:[],faceOutcomes:policy.groups.flatMap(g=>g.reportedFaces.map(face=>({groupId:g.groupId,face,combinedCount:roll.dice.filter(d=>d.groupId===g.groupId&&d.value===face).length,rerolledCount:0})))};
-        }
-        const nominal = resolved.value.nominal;
+          return {
+            executionId,
+            characterId: command.characterId,
+            actorId: ctx.actorId,
+            expectedRevision: command.expectedRevision,
+            ...(access?.physical && { precondition: (client: import("pg").PoolClient) =>
+              access.physical!.checkCommit(client, executionId, context) }),
+            nextState: resolved.state,
+            stateChanged: changedDefinitionIds.length > 0,
+            roll,
+            ...(resolved.pushContext?{pushContext:resolved.pushContext,pushResolutionRevision:resolveSource.revision}:{}),
+            activity: {
+              kind: activityKind,
+              payloadJson: { ...payload, ...(command.kind === "applyRoll" ? { delta: appliedDelta } : {}), changedDefinitionIds },
+              requestId: ctx.requestId,
+            },
+            resultExpiresAt: replayExpiresAt,
+            ...(attachedCampaignId === null ? {} : { campaign: { campaignId: attachedCampaignId } }),
+            ...(command.kind === "executeAction" ? { rollAudience: { requested: command.audience ?? null } } : {}),
+            buildResult: ({ record, controllers, scope, rollAudience, rollId }) => {
+              const view = toView(
+                record,
+                {
+                  derivedValues: resolved.derivedValues,
+                  validations: resolved.validations,
+                  projection: resolved.projection,
+                  packageChecksum: resolved.packageChecksum,
+                  changedDefinitionIds,
+                },
+                {
+                  baseRevision: command.expectedRevision,
+                  commandExecutionId: executionId,
+                  replayExpiresAt: replayExpiresAt.toISOString(),
+                  replayed: false,
+                },
+              );
+              // I6 Task 8: compose the authorized audience onto the normalized
+              // runtime output. The Runtime stamp (`owner_only`) is never
+              // authoritative for attached rolls; the transaction-fixed
+              // effective audience is. The Runtime itself never queries
+              // membership.
+              const composedRoll =
+                roll === null ? null : { ...roll, audience: rollAudience ?? ("owner_only" as const) };
+              return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll, rollId: rollId ?? null, nominal } };
+            },
+          };
+        };
+        const rulesScope = {
+          versionId: resolveSource.systemVersionId,
+          extensions: resolveSource.extensions,
+          entityId: resolveSource.entityDefinitionId,
+        };
 
-        const outcome = await repo.applyCommandTx({
-          executionId,
-          characterId: command.characterId,
-          actorId: ctx.actorId,
-          expectedRevision: command.expectedRevision,
-          nextState: resolved.value.state,
-          stateChanged: changedDefinitionIds.length > 0,
-          roll,
-          ...(resolved.value.pushContext?{pushContext:resolved.value.pushContext,pushResolutionRevision:resolveSource.revision}:{}),
-          activity: {
-            kind: activityKind,
-            payloadJson: { ...payload, changedDefinitionIds },
-            requestId: ctx.requestId,
-          },
-          resultExpiresAt: replayExpiresAt,
-          ...(attachedCampaignId === null ? {} : { campaign: { campaignId: attachedCampaignId } }),
-          ...(command.kind === "executeAction" ? { rollAudience: { requested: command.audience ?? null } } : {}),
-          buildResult: ({ record, controllers, scope, rollAudience }) => {
-            const view = toView(
-              record,
-              {
-                derivedValues: resolved.value.derivedValues,
-                validations: resolved.value.validations,
-                projection: resolved.value.projection,
-                packageChecksum: resolved.value.packageChecksum,
-                changedDefinitionIds,
-              },
-              {
-                baseRevision: command.expectedRevision,
-                commandExecutionId: executionId,
-                replayExpiresAt: replayExpiresAt.toISOString(),
-                replayed: false,
-              },
-            );
-            // I6 Task 8: compose the authorized audience onto the normalized
-            // runtime output. The Runtime stamp (`owner_only`) is never
-            // authoritative for attached rolls; the transaction-fixed
-            // effective audience is. The Runtime itself never queries
-            // membership.
-            const composedRoll =
-              roll === null ? null : { ...roll, audience: rollAudience ?? ("owner_only" as const) };
-            return { ok: true, value: { scope, character: serializeView(withControllers(view, controllers)), roll: composedRoll, nominal } };
-          },
-        });
+        let outcome: ApplyCommandOutcome;
+        // Design 6.4 (C13): a draw or shuffle resolves under the deck's lock.
+        const deckPrepared = !selection && intent.kind === "action" && intent.entryId === undefined
+          ? await input.runtime.prepareResolve(rulesScope)
+          : null;
+        const deckId = deckPrepared?.ok ? deckPrepared.value.deckIdFor(intent.kind === "action" ? intent.actionId : "") : null;
+        if (deckPrepared?.ok && deckId !== null && intent.kind === "action") {
+          const resolveDeck: DeferredDeckAction["resolve"] = (deck) => {
+            const resolved = deckPrepared.value({ state: resolveSource.state, intent: { ...intent, deck } });
+            return resolved.ok
+              ? { ok: true, value: { ...makeCommit(resolved.value), ...(resolved.value.deck ? { deckState: resolved.value.deck } : {}) } }
+              : { ok: false, error: mapRuntimeError(resolved.error), retryable: !isFinalizableRuntimeError(resolved.error.code) };
+          };
+          outcome = await repo.applyCommandTx({
+            executionId,
+            characterId: command.characterId,
+            actorId: ctx.actorId,
+            expectedRevision: command.expectedRevision,
+            deck: { deckId },
+            source: resolveSource,
+            resolve: resolveDeck,
+            ...(attachedCampaignId && resultScope
+              ? { campaign: { campaignId: attachedCampaignId }, membershipGeneration: resultScope.membershipGeneration }
+              : {}),
+          });
+        } else if (selection && attachedCampaignId && resultScope && intent.kind === "action") {
+          // Package loading can use the pool. Complete it before holding a
+          // campaign transaction so contention cannot exhaust connections.
+          const prepared = await input.runtime.prepareResolve(rulesScope);
+          if (!prepared.ok) return { ok: false, error: mapRuntimeError(prepared.error) };
+          const observed = prepared.value({ state: resolveSource.state, intent: { kind: "observe" } });
+          if (!observed.ok) return { ok: false, error: mapRuntimeError(observed.error) };
+          const action = findProjectedAction(observed.value.projection, intent.actionId, intent.entryId);
+          // An optional target may be left out; a required one may not, and an action without one takes none.
+          if (!action || (action.target === undefined ? Boolean(selection.targetCharacterId) : !action.target.optional && !selection.targetCharacterId)
+            || Boolean(action.respondsTo) !== Boolean(selection.respondsTo)) {
+            const error = mapRuntimeError({ code: "bad_request", definitionId: intent.actionId, message: "Roll context does not match the action." });
+            await repo.finalizeExecutionError({
+              executionId, resultJson: serializeCommandError(error, resultScope), expiresAt: replayExpiresAt,
+            });
+            return { ok: false, error };
+          }
+          outcome = await repo.applyCommandTx({
+            executionId,
+            characterId: command.characterId,
+            actorId: ctx.actorId,
+            expectedRevision: command.expectedRevision,
+            campaign: { campaignId: attachedCampaignId },
+            selection: { ...selection, ...(action.target ? { targetEntityIds: targetEntityIds(action.target) } : {}) },
+            source: resolveSource,
+            membershipGeneration: resultScope.membershipGeneration,
+            resolve: (campaignRoll: CampaignRollContext) => {
+              const resolved = prepared.value({ state: resolveSource.state, intent: { ...intent, campaignRoll } });
+              return resolved.ok
+                ? { ok: true as const, value: makeCommit(resolved.value, campaignRoll) }
+                : {
+                    ok: false as const,
+                    error: mapRuntimeError(resolved.error),
+                    retryable: !isFinalizableRuntimeError(resolved.error.code),
+                  };
+            },
+          });
+        } else {
+          const resolved = deckPrepared?.ok
+            ? deckPrepared.value({ state: resolveSource.state, intent })
+            : await input.runtime.resolve({ ...rulesScope, state: resolveSource.state, intent });
+          if (!resolved.ok) {
+            const error = mapRuntimeError(resolved.error);
+            if (isFinalizableRuntimeError(resolved.error.code)) {
+              await repo.finalizeExecutionError({
+                executionId, resultJson: serializeCommandError(error, resultScope), expiresAt: replayExpiresAt,
+              });
+            }
+            return { ok: false, error };
+          }
+          outcome = await repo.applyCommandTx(makeCommit(resolved.value));
+        }
 
         return finishCommandTx({
           ctx,
@@ -2054,6 +2685,108 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           executionId,
           replayExpiresAt,
         });
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+    async listApplicableRolls(ctx, request) {
+      try {
+        let record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        let membership: MembershipRecord | null = null;
+        if (record === null) {
+          const attached = await loadAttachedSnapshot(ctx, request.characterId);
+          if (attached === null) return { ok: false, error: errors.not_found() };
+          record = attached.auth.record;
+          membership = toMembershipRecord(attached.auth.membership!);
+        }
+        const { rows } = record.campaignId === null
+          ? await input.pool.query<{ id: string; rendered_output: string; total: number }>(
+            `SELECT id, rendered_output, total FROM character_rolls
+              WHERE character_id = $1 AND scope_campaign_id IS NULL AND total > 0 AND COALESCE(push_attempt, 0) = 0
+              ORDER BY occurred_at DESC, id DESC LIMIT 20`, [record.characterId])
+          : await input.pool.query<{ id: string; rendered_output: string; total: number }>(
+            `SELECT r.id, r.rendered_output, r.total FROM character_rolls r
+              WHERE r.scope_campaign_id = $3 AND r.total > 0 AND ${ROLL_VISIBILITY_PREDICATE}
+              ORDER BY r.occurred_at DESC, r.id DESC LIMIT 20`,
+            [ctx.actorId, membership !== null && isGameMaster(membership), record.campaignId]);
+        return { ok: true, value: rows.map((row) => ({ rollId: row.id, output: row.rendered_output, total: Number(row.total) })) };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+    async readReferenceData(ctx, request) {
+      try {
+        let versionId: string;
+        let extensions: ExtensionRef[] = [];
+        if ("versionId" in request) {
+          const authorized = await input.authorizeVersionUse(ctx, request.versionId);
+          if (!authorized.ok) return { ok: false, error: errors.not_found() };
+          versionId = authorized.value.versionId;
+        } else {
+          let record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+          if (record === null) {
+            const scope = await repo.loadCharacterScope(request.characterId);
+            if (scope === null || scope.campaignId === null) return { ok: false, error: errors.not_found() };
+            const attached = await loadAttachedSnapshot(ctx, request.characterId);
+            if (attached === null) return { ok: false, error: errors.not_found() };
+            record = attached.auth.record;
+          }
+          versionId = record.systemVersionId;
+          extensions = record.extensions;
+        }
+        const loaded = await loadEffective(versionId, extensions);
+        if (!loaded.ok) {
+          return loaded.error.code === "invalid_package"
+            ? { ok: false, error: mapRuntimeError({ code: "invalid_package", message: "Published package runtime references are invalid." }) }
+            : { ok: false, error: errors.internal() };
+        }
+        const datasets = loaded.value.referenceData;
+        if (request.datasetId === undefined) {
+          return { ok: true, value: { datasets: datasets.map((dataset) => ({ datasetId: dataset.id, label: dataset.label, records: dataset.records.length })) } };
+        }
+        const dataset = datasets.find((candidate) => candidate.id === request.datasetId);
+        if (dataset === undefined) return { ok: false, error: errors.not_found() };
+        return { ok: true, value: { dataset: {
+          datasetId: dataset.id, label: dataset.label,
+          records: dataset.records.map(({ id, label, values }) => ({ id, label, values: structuredClone(values) })),
+        } } };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+    async listDecks(ctx, request) {
+      try {
+        let record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        if (record === null) {
+          const scope = await repo.loadCharacterScope(request.characterId);
+          if (scope === null || scope.campaignId === null) return { ok: false, error: errors.not_found() };
+          const attached = await loadAttachedSnapshot(ctx, request.characterId);
+          if (attached === null) return { ok: false, error: errors.not_found() };
+          record = attached.auth.record;
+        }
+        const loaded = await loadEffective(record.systemVersionId, record.extensions);
+        if (!loaded.ok) {
+          return loaded.error.code === "invalid_package"
+            ? { ok: false, error: mapRuntimeError({ code: "invalid_package", message: "Published package runtime references are invalid." }) }
+            : { ok: false, error: errors.internal() };
+        }
+        const decks = loaded.value.decks ?? [];
+        const stored = decks.length === 0
+          ? new Map<string, string[]>()
+          : await repo.loadDeckCounts({ campaignId: record.campaignId, characterId: record.characterId });
+        return {
+          ok: true,
+          value: decks.map((deck) => {
+            const cards = new Set(loaded.value.referenceData.find(dataset => dataset.id === deck.datasetId)?.records.map(card => card.id));
+            const remaining = stored.get(deck.id);
+            return {
+              deckId: deck.id,
+              label: deck.label,
+              total: cards.size,
+              remaining: remaining === undefined ? cards.size : remaining.filter(id => cards.has(id)).length,
+            };
+          }),
+        };
       } catch {
         return { ok: false, error: errors.internal() };
       }
@@ -2072,26 +2805,33 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
           if (attached === null) return { ok: false, error: errors.not_found() };
           record = attached.auth.record;
         }
-        let packageValue: SystemPackageV1;
-        try {
-          const loaded = await loadPackage(record.systemVersionId);
-          if (loaded === null) return { ok: false, error: errors.internal() };
-          packageValue = loaded;
-        } catch (error) {
-          // Read path: no execution was claimed, so nothing is finalized.
-          if (error instanceof PublishedPackageCorruptError) {
-            return {
-              ok: false,
-              error: mapRuntimeError({
-                code: "invalid_package",
-                message: "Published package runtime references are invalid.",
-              }),
-            };
-          }
-          return { ok: false, error: errors.internal() };
+        // Read path: no execution was claimed, so nothing is finalized.
+        const loaded = await loadEffective(record.systemVersionId, record.extensions);
+        if (!loaded.ok) {
+          return loaded.error.code === "invalid_package"
+            ? { ok: false, error: mapRuntimeError({ code: "invalid_package", message: "Published package runtime references are invalid." }) }
+            : { ok: false, error: errors.internal() };
         }
-        const systemChoices: EntryTemplateSummary[] = (packageValue.templates ?? []).map((template) => ({
-            id: template.id,
+        const packageValue: SystemPackageV1 = loaded.value;
+        const extensionNames = new Map<string, string>();
+        if (record.extensions.length > 0) {
+          const names = await modulePool.query<{ id: string; name: string }>(
+            "SELECT id, name FROM systems WHERE id = ANY($1::uuid[])",
+            [record.extensions.map((ref) => ref.extensionId)],
+          );
+          for (const row of names.rows) extensionNames.set(row.id, row.name);
+        }
+        // Design 6.8: extension templates are listed by plain ID with their extension.
+        const systemChoices: EntryTemplateSummary[] = packageValue.templates.map((template) => {
+          const key = unqualifiedId(template.id);
+          const extensionName = key.origin === null ? undefined : extensionNames.get(key.origin);
+          return {
+            id: key.id,
+            ...(key.origin === null ? {} : {
+              extensionId: key.origin,
+              ...(extensionName === undefined ? {} : { extensionName }),
+              source: { kind: "system" as const, templateId: key.id, extensionId: key.origin },
+            }),
             label: template.label,
             kind: template.kind,
             fields: template.fields.map((field) => structuredClone(field)),
@@ -2099,9 +2839,11 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               id: action.id,
               label: action.label,
               actionKind: action.kind,
+              ...campaignRollRequirements(action),
               inputs: action.kind === "roll" ? action.inputs.map((actionInput) => ({ ...actionInput })) : [],
             })),
-          }));
+          };
+        });
         const campaignChoices: EntryTemplateSummary[] = [];
         if (record.campaignId !== null && inputCampaignTemplates !== undefined) {
           let cursor: string | null = null;
@@ -2112,12 +2854,12 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
               if(template.content.base){
                 const entity=packageValue.entities.find(e=>e.id===record!.entityDefinitionId);
                 const baseRef=template.content.base;
-                base=(packageValue.templates ?? []).find(t=>t.id===baseRef.templateId);
+                base=packageValue.templates.find(t=>t.id===baseRef.templateId);
                 if(!base || !entity || !validDefaults(base,template.content.defaultValues ?? {}) || baseRef.versionId!==record.systemVersionId || baseRef.packageChecksum!==packageValue.integrity.checksum || !templateApplicable(packageValue,entity,base)) continue;
               }
               campaignChoices.push({id:template.templateId,label:template.content.name,kind:template.kind,
                 fields:base?.fields.map(f=>structuredClone(f)) ?? [],
-                grantedActions:base?.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]})) ?? [],
+                grantedActions:base?.grantedActions.map(a=>({id:a.id,label:a.label,actionKind:a.kind,...campaignRollRequirements(a),inputs:a.kind==="roll"?a.inputs.map(i=>({...i})):[]})) ?? [],
                 source:{kind:"campaign",campaignId:template.campaignId,templateId:template.templateId,templateRevision:template.revision,contentRevision:template.contentRevision},...(template.kind === "item" ? {defaultQuantity:template.content.defaultQuantity ?? 1}: {})});
             }
             cursor=page.nextCursor;
@@ -2131,7 +2873,80 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         return { ok: false, error: errors.internal() };
       }
     },
+    async listVersionOptions(ctx, request) {
+      try {
+        if (input.listUpgradeTargets === undefined || input.describeVersionChoices === undefined) {
+          return { ok: false, error: errors.internal() };
+        }
+        const record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        if (record === null) return { ok: false, error: errors.not_found() };
+        const previous = await repo.loadPreviousComposition(record.characterId);
+        const described = await input.describeVersionChoices(
+          previous === null ? [record.systemVersionId] : [record.systemVersionId, previous.systemVersionId],
+        );
+        const upgrades = await input.listUpgradeTargets(ctx, record.systemVersionId);
+        if (!described.ok || !upgrades.ok) return { ok: false, error: errors.internal() };
+        const currentVersion = described.value.find((choice) => choice.versionId === record.systemVersionId);
+        if (currentVersion === undefined) return { ok: false, error: errors.internal() };
+        const pinned = [...record.extensions, ...(previous?.extensions ?? [])]
+          .filter((ref, index, all) => all.findIndex((other) => other.versionId === ref.versionId) === index);
+        const choices = input.describeCompositionChoices === undefined
+          ? { ok: true as const, value: { pinned: [], available: [] } }
+          : await input.describeCompositionChoices(ctx, { systemId: currentVersion.systemId, pinned });
+        if (!choices.ok) return { ok: false, error: errors.internal() };
+        const extensionsOf = (refs: readonly ExtensionRef[]) => refs.flatMap((ref) => {
+          const choice = choices.value.pinned.find((candidate) => candidate.version.versionId === ref.versionId);
+          return choice === undefined ? [] : [choice];
+        });
+        const previousVersion = previous === null
+          ? undefined
+          : described.value.find((choice) => choice.versionId === previous.systemVersionId);
+        return {
+          ok: true,
+          value: {
+            current: { systemVersion: currentVersion, extensions: extensionsOf(sortExtensionRefs(record.extensions)) },
+            revertTo: previous === null || previousVersion === undefined
+              ? null
+              : { systemVersion: previousVersion, extensions: extensionsOf(previous.extensions).map((choice) => ({ ...choice, upgrades: [] })) },
+            systemUpgrades: upgrades.value,
+            available: choices.value.available.filter((choice) => !record.extensions.some((ref) => ref.extensionId === choice.extensionId)),
+          },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
+    async checkVersionChange(ctx, request) {
+      try {
+        const target = parseComposition(request.target);
+        if (typeof target === "string") return { ok: false, error: errors.bad_request(target) };
+        const record = await repo.openOwnedCharacter(request.characterId, ctx.actorId);
+        if (record === null) return { ok: false, error: errors.not_found() };
+        const planned = await planVersionChange(ctx, record, target);
+        if (!planned.ok) return planned;
+        return {
+          ok: true,
+          value: {
+            revision: record.revision,
+            direction: planned.value.direction,
+            change: planned.value.change,
+            report: withoutNextState(planned.value.report),
+          },
+        };
+      } catch {
+        return { ok: false, error: errors.internal() };
+      }
+    },
+
     async manage(ctx, command) {
+      if (command.kind === "changeVersion") {
+        try {
+          return await changeVersion(ctx, command);
+        } catch {
+          return { ok: false, error: errors.internal() };
+        }
+      }
       try {
         if (!Number.isInteger(command.expectedRevision) || command.expectedRevision < 1) {
           return { ok: false, error: errors.bad_request("expectedRevision must be a positive integer.") };
@@ -2245,6 +3060,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         // projection from the pre-mutation snapshot (immutable pinned version/package).
         const resolved = await input.runtime.resolve({
           versionId: resolveSource!.systemVersionId,
+          extensions: resolveSource!.extensions,
           entityId: resolveSource!.entityDefinitionId,
           state: resolveSource!.state,
           intent: { kind: "observe" },
@@ -2446,6 +3262,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         if (record !== null) {
           const resolved = await input.runtime.resolve({
             versionId: record.systemVersionId,
+            extensions: record.extensions,
             entityId: record.entityDefinitionId,
             state: record.state,
             intent: { kind: "observe" },
@@ -2479,6 +3296,7 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
         const attachedRecord = attached.auth.record;
         const resolved = await input.runtime.resolve({
           versionId: attachedRecord.systemVersionId,
+          extensions: attachedRecord.extensions,
           entityId: attachedRecord.entityDefinitionId,
           state: attachedRecord.state,
           intent: { kind: "observe" },
@@ -2501,6 +3319,21 @@ export function createCharactersModule(input: CreateCharactersModuleInput): Char
       }
     },
   };
+  if (input.physicalDiceEnabled) characters.physicalRolls = createPhysicalRolls({
+    pool: input.pool, runtime: input.runtime, now,
+    scope: async (ctx, characterId) => {
+      const owned = await repo.openOwnedCharacter(characterId, ctx.actorId);
+      if (owned) return { record: owned, member: null, defaultAudience: "owner_only", active: owned.lifecycle === "active" };
+      const snapshot = await loadAttachedSnapshot(ctx, characterId);
+      if (!snapshot) return null;
+      const { record, membership, campaign } = snapshot.auth;
+      return {record, member:toMembershipRecord(membership!), defaultAudience:campaign!.rollAudienceDefault,
+        active:record.lifecycle === "active" && campaign!.status === "active"};
+    },
+    pushOptions: (ctx, options) => characters.pushOptions(ctx, options),
+    apply: (ctx, command, physical) => characters.apply(ctx, command, {physical}),
+  });
+  return characters;
 }
 
 function encodeActivityCursor(cursor: { occurredAtText: string; id: string }): string {
@@ -2554,6 +3387,16 @@ function redactRollIdForReader(
 // inputs), email, external identity, session, or idempotency keys. Only structural identifiers
 // needed to interpret "what happened" are retained; the underlying write-side payload (in
 // persistence.ts) may include more, but the read-side projection here minimizes it.
+
+
+function resourceSetPayload(command: CharacterResourceSetCommand): { resourceId: string; current?: number; max?: number } {
+  return {
+    resourceId: command.resourceId,
+    ...(command.current === undefined ? {} : { current: command.current }),
+    ...(command.max === undefined ? {} : { max: command.max }),
+  };
+}
+
 function minimizeActivityPayload(kind: string, payload: unknown): unknown {
   const record = payload as Record<string, unknown> | null | undefined;
   if (record === null || record === undefined || typeof record !== "object") return {};
@@ -2568,6 +3411,27 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
         direction: record.direction,
         changedDefinitionIds: record.changedDefinitionIds ?? [],
       };
+    case "character_resource_adjusted":
+      return {
+        resourceId: record.resourceId,
+        delta: record.delta,
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
+    case "character_roll_applied":
+      return {
+        resourceId: record.resourceId,
+        rollId: record.rollId,
+        direction: record.direction,
+        delta: record.delta,
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
+    case "character_resource_set":
+      return {
+        resourceId: record.resourceId,
+        ...(record.current === undefined ? {} : { current: record.current }),
+        ...(record.max === undefined ? {} : { max: record.max }),
+        changedDefinitionIds: record.changedDefinitionIds ?? [],
+      };
     case "character_action_executed":
       return { actionId: record.actionId, changedDefinitionIds: record.changedDefinitionIds ?? [] };
     case "character_renamed":
@@ -2577,9 +3441,41 @@ function minimizeActivityPayload(kind: string, payload: unknown): unknown {
     case "character_archived":
     case "character_recovered":
       return {};
+    case "system_version_upgraded":
+    case "system_version_reverted":
+    case "extension_added":
+    case "extension_removed":
+    case "extension_upgraded":
+      // Version, extension and definition identifiers only; no stored values.
+      return {
+        fromVersionId: record.fromVersionId,
+        toVersionId: record.toVersionId,
+        ...(record.from === undefined ? {} : { from: compositionRefsOnly(record.from) }),
+        ...(record.to === undefined ? {} : { to: compositionRefsOnly(record.to) }),
+        ...(record.change === undefined ? {} : { change: record.change }),
+        direction: record.direction,
+        updatedEntries: record.updatedEntries,
+        addedFields: record.addedFields ?? [],
+        droppedFields: record.droppedFields ?? [],
+      };
+    case "extensions_changed":
+      // Issue #60: extension and version identifiers only.
+      return { added: extensionRefsOnly(record.added), removed: extensionRefsOnly(record.removed) };
     default:
       return {};
   }
+}
+
+function compositionRefsOnly(value: unknown): { systemVersionId: unknown; extensions: Array<{ extensionId: unknown; versionId: unknown }> } {
+  const composition = (typeof value === "object" && value !== null ? value : {}) as Record<string, unknown>;
+  return { systemVersionId: composition.systemVersionId, extensions: extensionRefsOnly(composition.extensions) };
+}
+
+function extensionRefsOnly(value: unknown): Array<{ extensionId: unknown; versionId: unknown }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((ref): ref is Record<string, unknown> => typeof ref === "object" && ref !== null)
+    .map((ref) => ({ extensionId: ref.extensionId, versionId: ref.versionId }));
 }
 
 function encodeCursor(cursor: CharacterPageCursor): string {

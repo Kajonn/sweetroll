@@ -1,3 +1,5 @@
+import { useMe } from "./api/hooks.js";
+import { canSimulateDice, preparePhysicalRequest, type PrepareDice } from "./physicalDice/commands.js";
 import {createCharacterSession} from "./characters/session.js";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { createRootRoute, createRoute, createRouter, Outlet, useNavigate, useParams, useRouter } from "@tanstack/react-router";
@@ -10,7 +12,7 @@ import { CampaignSceneView } from "./campaigns/SceneViewport.js";
 import { CampaignCreate, campaignCreateViewKey } from "./campaigns/CampaignCreate.js";
 import { CampaignLibrary, campaignLibraryViewKey } from "./campaigns/CampaignLibrary.js";
 import { InvitationReviewView } from "./campaigns/InvitationReview.js";
-import { createCoordination } from "./characters/coordination.js";
+import { browserSupportsLocks, createCoordination } from "./characters/coordination.js";
 import type { BrowserChannel } from "./characters/identity.js";
 import type { IdentityGate } from "./characters/identity.js";
 import { storePostSigninPath, takePostSigninPath } from "./characters/identity.js";
@@ -25,8 +27,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "./ui/index.js";
 import { t } from "./i18n/index.js";
 import { DocumentEditor } from "./editor/DocumentEditor.js";
+import { ExtensionEditor } from "./extensions/ExtensionEditor.js";
 import { CloneFromTemplate } from "./library/CloneFromTemplate.js";
 import { SystemLibrary } from "./library/SystemLibrary.js";
+import type { PublishCommand } from "./playEvents/PlayEvents.js";
 import { AppShell, useIdentity } from "./shell/AppShell.js";
 import { registerAppRouter } from "./shell/appNavigation.js";
 
@@ -113,6 +117,8 @@ const indexRoute = createRoute({
   component: () => <LibraryRoute client={apiClient} />,
 });
 const systemRoute = createRoute({ getParentRoute: () => rootRoute, path: "/systems/$systemId", component: SystemEditorRoute });
+// Design 6.8 (E6): the creator in extension mode.
+const extensionRoute = createRoute({ getParentRoute: () => rootRoute, path: "/extensions/$extensionId", component: ExtensionEditorRoute });
 const charactersNewRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/characters/new",
@@ -226,6 +232,17 @@ function SystemEditorRoute() {
       generation={generation}
     />
   );
+}
+
+function ExtensionEditorRoute() {
+  const params = useParams({ strict: false });
+  const extensionId = params["extensionId"] ?? "";
+  const identity = useIdentity();
+  useIdentityTick(identity);
+  if (identity === null) return <p role="status">{t("editor.loading")}</p>;
+  const actorId = identity.getActorId();
+  if (actorId === null) return <p role="status">{t("character.detail.signIn")}</p>;
+  return <ExtensionEditor key={`${actorId}:${identity.getGeneration?.() ?? 0}:${extensionId}`} client={apiClient} extensionId={extensionId} />;
 }
 
 function LibraryRoute({ client }: { client: ApiClient }) {
@@ -525,15 +542,37 @@ function CampaignDetailRouteView() {
   const identity = useIdentity();
   useIdentityTick(identity);
   const api = useCampaignsApi();
-  const charactersApi = useCharactersApi();
+  const baseCharactersApi = useCharactersApi();
+  const me = useMe(apiClient).data;
+  const enabled = me?.state === "authenticated" && me.userId === identity?.getActorId() && me.physicalDiceEnabled;
+  const prepare = useMemo<PrepareDice | undefined>(()=>enabled && canSimulateDice()
+    ? (request,signal)=>preparePhysicalRequest(apiClient,request,signal)
+    : undefined,[enabled]);
+  const diceLifetime = useRef<AbortController>();
+  useEffect(()=>{
+    const life = new AbortController();
+    diceLifetime.current=life;
+    return ()=>life.abort();
+  },[campaignId,identity,prepare]);
+  const charactersApi = useMemo(()=>prepare ? {
+    ...baseCharactersApi,
+    executeCharacterAction: async (characterId,actionId,body) => {
+      const signal=diceLifetime.current?.signal;
+      if(!signal) throw Error("The campaign route is closed.");
+      const frozen = await prepare({method:"POST",path:`/characters/${characterId}/actions/${encodeURIComponent(actionId)}`,
+        body,firstAttemptAt:new Date().toISOString()},signal);
+      signal.throwIfAborted();
+      return baseCharactersApi.send(frozen);
+    },
+  } satisfies ReturnType<typeof useCharactersApi> : baseCharactersApi,[baseCharactersApi,prepare]);
   const navigate = useNavigate();
   const store=useSharedCharacterStore();
-  const createSession=useMemo(()=>identity&&store?((characterId:string)=>{
+  const createSession=useMemo(()=>identity&&store?((characterId:string, publishRoll?: PublishCommand)=>{
     const actorId=identity.getActorId();if(!actorId)throw new Error("Sign in to manage this character.");
     const coordination=createCoordination({actorId,characterId});
-    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID()});
+    const session=createCharacterSession({actorId,characterId,api:charactersApi,store,identity,coordination,now:()=>new Date().toISOString(),newId:()=>crypto.randomUUID(),captureRollPublisher:()=>publishRoll,captureDicePreparation:()=>prepare,locksSupported:browserSupportsLocks()});
     return {...session,dispose(){session.dispose();coordination.dispose();}};
-  }):undefined,[identity,store,charactersApi]);
+  }):undefined,[identity,store,charactersApi,prepare]);
   if (identity === null) {
     return <p role="status">{t("character.loading")}</p>;
   }
@@ -564,6 +603,7 @@ function CampaignDetailRouteView() {
           void navigate({ to: "/characters/$characterId", params: { characterId } });
         },
       }}
+      physicalDiceClient={enabled ? apiClient : undefined}
       metadataApi={charactersApi}
       charactersApi={charactersApi}
       createSession={createSession}
@@ -612,10 +652,10 @@ function CampaignSceneRouteView() {
 }
 
 /**
- * Restricted display entry: code form → credential-scoped projection. There
- * is deliberately no identity gate, no sign-in stash, and no campaign API
- * use here — the shell must not retain or fetch GM state, and the entry
- * purge inside DisplayView runs before the first projection fetch.
+ * Restricted display entry: code form → credential-scoped scene stream.
+ * There is deliberately no identity gate, no sign-in stash, and no campaign
+ * API use here — the shell must not retain or fetch GM state, and the entry
+ * purge inside DisplayView runs before the stream opens.
  */
 function DisplayRouteView() {
   const search = displayRoute.useSearch();
@@ -650,8 +690,11 @@ function CharacterDetailRouteView() {
   useIdentityTick(identity);
   const store = useSharedCharacterStore();
   const api = useCharactersApi();
+  const campaignEventsApi = useCampaignsApi();
   const navigate = useNavigate();
   const actorId = identity?.getActorId() ?? null;
+  const me = useMe(apiClient).data;
+  const enabled = me?.state === "authenticated" && me.userId === actorId && me.physicalDiceEnabled;
   // Coordination ownership: each effect setup owns a fresh handle (see
   // useCharacterCoordination); cleanup releases it. A disposed handle is
   // never reused, so StrictMode setup/cleanup/setup cannot wedge the lock.
@@ -672,6 +715,8 @@ function CharacterDetailRouteView() {
   }
   return (
     <CharacterDetail
+      campaignEventsApi={campaignEventsApi}
+      physicalDiceClient={enabled ? apiClient : undefined}
       characterId={characterId}
       api={api}
       store={store}
@@ -692,7 +737,7 @@ function CharacterDetailRouteView() {
   );
 }
 
-const routeTree = rootRoute.addChildren([indexRoute, systemRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, campaignSceneRoute, displayRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
+const routeTree = rootRoute.addChildren([indexRoute, systemRoute, extensionRoute, charactersRoute, charactersNewRoute, characterDetailRoute, campaignsRoute, campaignCreateRoute, campaignDetailRoute, campaignSceneRoute, displayRoute, invitationsRoute, welcomeRoute, activityRoute, accountRoute, signInCallbackRoute]);
 
 export function createAppRouter() {
   const router = createRouter({ routeTree });

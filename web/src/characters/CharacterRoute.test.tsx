@@ -108,6 +108,81 @@ describe("CharacterRoute", () => {
     vi.restoreAllMocks();
   });
 
+  it.each(["no editing lock", "snapshot write failure"])(
+    "opens a fresh online sheet read-only after %s and reopens it after reconnecting",
+    async (failure) => {
+      const store = await openStore();
+      const api = makeApi();
+      const canAcquire = failure === "snapshot write failure";
+      if (canAcquire) {
+        vi.spyOn(store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+      }
+      let online = true;
+      let notify = () => {};
+      const identity = makeIdentity({
+        isOnline: () => online,
+        subscribe: (listener) => { notify = listener; return () => {}; },
+      });
+      const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+        identity={identity} coordination={makeCoordination(canAcquire)} locksSupported={canAcquire} />);
+      try {
+        expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
+        expect(screen.getByText(canAcquire ? "Can't save this character in this browser, so it is read-only."
+          : "Read-only in this browser.")).toBeVisible();
+        expect(screen.queryByText("Saved", { exact: true })).not.toBeInTheDocument();
+        expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
+        act(() => { online = false; notify(); });
+        expect(screen.queryByRole("heading", { name: "Briar" })).not.toBeInTheDocument();
+        act(() => { online = true; notify(); });
+        expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
+        expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
+        expect(api.send).not.toHaveBeenCalled();
+      } finally { ui.unmount(); await store.close(); }
+    },
+  );
+
+  it.each(["no editing lock", "snapshot write failure"])(
+    "shows another device's edit in an open online sheet after %s without a reload",
+    async (failure) => {
+      const store = await openStore();
+      const api = makeApi();
+      const canAcquire = failure === "snapshot write failure";
+      if (canAcquire) {
+        vi.spyOn(store, "confirmSnapshot").mockRejectedValue(new DOMException("Write failed", "QuotaExceededError"));
+      }
+      const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+        identity={makeIdentity()} coordination={makeCoordination(canAcquire)} locksSupported={canAcquire} />);
+      try {
+        expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+        const edited = completionView();
+        api.open.mockImplementation(async () => makeOpenEnvelope({ ...edited, name: "Briar Thorn",
+          revision: 2, reconciliation: { ...edited.reconciliation, revision: 2 } }));
+        act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+        expect(await screen.findByRole("heading", { name: "Briar Thorn" }, { timeout: 3000 })).toBeVisible();
+        expect(screen.getByRole("textbox", { name: "Name" })).toBeDisabled();
+        expect((await store.read(ACTOR, CHARACTER_ID)).confirmed).toBeNull();
+        expect(api.send).not.toHaveBeenCalled();
+      } finally { ui.unmount(); await store.close(); }
+    },
+  );
+
+  it("hides an open online sheet when a refresh reports the access was revoked", async () => {
+    const store = await openStore();
+    const api = makeApi();
+    const ui = render(<CharacterDetail characterId={CHARACTER_ID} api={api} store={store}
+      identity={makeIdentity()} coordination={makeCoordination(false)} locksSupported={false} />);
+    try {
+      expect(await screen.findByRole("heading", { name: "Briar" }, { timeout: 3000 })).toBeVisible();
+      api.open.mockRejectedValue(new ApiError({ status: 404, code: "not_found", message: "Not found",
+        cacheDisposition: "purge", requestId: "r", latestRevision: null, diagnostics: [] }));
+      act(() => { document.dispatchEvent(new Event("visibilitychange")); });
+      await waitFor(() => expect(screen.queryByRole("heading", { name: "Briar" })).not.toBeInTheDocument());
+      expect(api.send).not.toHaveBeenCalled();
+    } finally { ui.unmount(); await store.close(); }
+  });
+
   it("purges the active sheet and releases editing when template discovery denies access", async () => {
     const store = await openStore();
     const view = completionView();
@@ -412,7 +487,7 @@ function actionView(revision: number, name = "Briar"): CharacterView {
     characterId: CHARACTER_ID,
     revision,
     name,
-    state: { schemaVersion: "1.0", values: { name } },
+    state: { schemaVersion: "1.0", entries: {}, values: { name } },
     projection: {
       projectionVersion: "1.0",
       systemId: "22222222-2222-4000-8000-000000000000",
@@ -444,7 +519,8 @@ function actionView(revision: number, name = "Briar"): CharacterView {
 const ROLL_RESULT: NonNullable<CommandResultResponse["result"]["roll"]> = {
   actionId: "roll-check",
   expression: "d20 + 2",
-  dice: [{ sides: 20, value: 14, kept: true }],
+  dice: [{ sides: 20, value: 14, kept: true, id: "@root.0:0", groupId: "@root.0" }],
+  breakdown: { version: "1.0", rootId: "root", groups: [{ id: "@root.0", label: "Dice", count: 1, sides: 20, operation: "sum", diceIds: ["@root.0:0"], total: 14 }], terms: [] },
   bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }],
   total: 16,
   output: "Success",
@@ -538,7 +614,7 @@ describe("CharacterRoute workflows", () => {
       systemVersionId: "11111111-1111-4000-8000-000000000000",
       packageChecksum: "abc",
       revision: 1,
-      state: { schemaVersion: "1.0", values: { name: "Briar" } },
+      state: { schemaVersion: "1.0", entries: {}, values: { name: "Briar" } },
     } as unknown as CharacterExport;
     const api = makeWorkflowApi({ openView: () => actionView(1) });
     api.activity.mockResolvedValue({

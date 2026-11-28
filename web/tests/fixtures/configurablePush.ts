@@ -46,7 +46,7 @@ export async function signIn(page: Page, code = "code-test-a") {
 }
 export function pushDocument(): SystemDocumentV1 {
   const document = namedDicePoolDocument();
-  document.schemaVersion = "1.2";
+
   const action = document.actions.find((a) => a.kind === "roll")!;
   if (action.kind !== "roll") throw Error("fixture");
   action.pushPolicy = {

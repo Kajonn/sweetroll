@@ -16,6 +16,7 @@ export const PushPolicySchema = Type.Object(
           groupId: DefinitionIdSchema,
           lockedFaces: Faces,
           reportedFaces: Faces,
+          modifiers: Type.Optional(Type.Array(Type.Union([Type.Literal("rerollOnce"), Type.Literal("explode")]), { maxItems: 2, uniqueItems: true })),
         },
         { additionalProperties: false },
       ),

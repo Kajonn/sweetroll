@@ -27,7 +27,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
     ],
   };
   return {
-    phase: "ready", confirmed: makeView({ characterId: "character", revision: 1, projection }), tentative: null,
+    phase: "ready", storage: "available", view: { source: "stored" as const, character: makeView({ characterId: "character", revision: 1, projection }) }, tentative: null,
     entries: [], editing: { owned: true }, error: null, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: true, ...overrides,
   };
 }
@@ -39,7 +39,7 @@ describe("CharacterSheet", () => {
   });
   it("shows a section title once when its first element repeats the title", () => {
     const current = snapshot();
-    const basics = current.confirmed!.projection.sheets[0]!.sections[0]!;
+    const basics = current.view!.character.projection.sheets[0]!.sections[0]!;
     basics.elements.unshift({ kind: "heading", id: "repeated", text: "Basics", level: 2 });
     render(<CharacterSheet snapshot={current} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getAllByRole("heading", { name: "Basics" })).toHaveLength(1);
@@ -81,14 +81,14 @@ describe("CharacterSheet", () => {
   });
 
   it("renders the server-returned roll result without predicting action effects", () => {
-    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true, id: "@root.0:0", groupId: "@root.0" }], breakdown: { version: "1.0", rootId: "root", groups: [{ id: "@root.0", label: "Dice", count: 1, sides: 20, operation: "sum", diceIds: ["@root.0:0"], total: 14 }], terms: [] }, bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
 
     expect(screen.getByRole("heading", { name: "Roll result" })).toBeVisible();
     expect(screen.getByText("d20 + 2")).toBeVisible();
     expect(screen.getByText("16")).toBeVisible();
     expect(screen.getByText("Success")).toBeVisible();
     expect(screen.getByText("Owner only")).toBeVisible();
-    expect(screen.queryByText("d20=14")).not.toBeInTheDocument();
+    expect(screen.getByText(/^d20=14/)).not.toBeVisible();
   });
 
   it("confirms a nominal granted action without displaying its unused roll template", () => {
@@ -100,12 +100,25 @@ describe("CharacterSheet", () => {
     expect(screen.queryByRole("heading", { name: "Roll result" })).not.toBeInTheDocument();
   });
 
+  it("labels a nominal action by its entry when templates share the action ID", () => {
+    const current = snapshot({ lastNominal: { actionId: "activate", entryId: "torch-1", output: "Result: {total}" } });
+    current.view!.character.projection.sheets[1]!.sections[0]!.elements.push({
+      kind: "action", id: "torch-1__activate", actionId: "activate", entryId: "torch-1",
+      label: "Raise Torch", actionKind: "roll", inputs: [], validations: [],
+    });
+    render(<CharacterSheet snapshot={current} templates={[
+      { id: "horn", label: "Horn", kind: "item", grantedActions: [{ id: "activate", label: "Sound Horn", actionKind: "roll", inputs: [] }] },
+      { id: "torch", label: "Torch", kind: "item", grantedActions: [{ id: "activate", label: "Raise Torch", actionKind: "roll", inputs: [] }] },
+    ]} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByText("Raise Torch recorded")).toBeVisible();
+  });
+
   it.each([
     ["gm_only", "GM only"],
     ["campaign", "Campaign"],
   ] as const)("renders a readable %s roll audience", (audience, label) => {
     render(<CharacterSheet snapshot={snapshot({ lastRoll: {
-      actionId: "roll-check", expression: "d20", dice: [], bindings: [], total: 12, output: "12", audience,
+      actionId: "roll-check", expression: "d20", dice: [], breakdown: { version: "1.0", rootId: "root", groups: [], terms: [] }, bindings: [], total: 12, output: "12", audience,
     } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByText(label)).toBeVisible();
     expect(screen.queryByText(`character.rollResult.audience.${audience}`)).not.toBeInTheDocument();
@@ -113,28 +126,28 @@ describe("CharacterSheet", () => {
 
   it("shows roll dice and bindings only when details are requested", async () => {
     const user = userEvent.setup();
-    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true }], bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
-    await user.click(screen.getByRole("button", { name: "Show roll details" }));
-    expect(screen.getByText("d20=14")).toBeVisible();
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: { actionId: "roll-check", expression: "d20 + 2", dice: [{ sides: 20, value: 14, kept: true, id: "@root.0:0", groupId: "@root.0" }], breakdown: { version: "1.0", rootId: "root", groups: [{ id: "@root.0", label: "Dice", count: 1, sides: 20, operation: "sum", diceIds: ["@root.0:0"], total: 14 }], terms: [] }, bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }], total: 16, output: "Success", audience: "owner_only" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    await user.click(screen.getByText("Show roll details", { exact: true }));
+    expect(screen.getByText(/^d20=14/)).toBeVisible();
     expect(screen.getByText("inputs.bonus: 2")).toBeVisible();
   });
 
   it("uses projected attribute names in roll expressions and binding details", async () => {
     const user = userEvent.setup();
     const base = snapshot();
-    const projection = base.confirmed!.projection;
+    const projection = base.view!.character.projection;
     const sheets = projection.sheets.map(sheet => ({ ...sheet, sections: sheet.sections.map(section => ({
       ...section,
       elements: [...section.elements, { kind: "field" as const, id: "might-control", fieldId: "might", label: "Might", fieldKind: "integer" as const, value: 3, editable: true, constraints: {}, validations: [] }],
     })) }));
-    render(<CharacterSheet snapshot={{ ...base, confirmed: { ...base.confirmed!, projection: { ...projection, sheets } }, lastRoll: {
-      actionId: "hit", expression: "d20 + fields.might + fields.unknown", dice: [{ sides: 20, value: 12, kept: true }],
+    render(<CharacterSheet snapshot={{ ...base, view: { source: "stored" as const, character: { ...base.view!.character, projection: { ...projection, sheets } } }, lastRoll: {
+      actionId: "hit", expression: "d20 + fields.might + fields.unknown", dice: [{ sides: 20, value: 12, kept: true }], breakdown: { version: "1.0", rootId: "root", groups: [], terms: [] },
       bindings: [{ scope: "fields", definitionId: "might", value: 3 }, { scope: "fields", definitionId: "unknown", value: 1 }],
       total: 16, output: "Hit: 16", audience: "owner_only",
     } }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
 
     expect(screen.getByText("d20 + Might + fields.unknown")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Show roll details" }));
+    await user.click(screen.getByText("Show roll details", { exact: true }));
     expect(screen.getByText("Might: 3")).toBeVisible();
     expect(screen.getByText("fields.unknown: 1")).toBeVisible();
   });
@@ -163,13 +176,13 @@ describe("CharacterSheet", () => {
     expect(screen.getByText("Actions are unavailable while this character is read-only.")).toBeVisible();
     expect(readOnlyAction).toHaveAttribute("aria-describedby", "character-action-unavailable");
 
-    rerender(<CharacterSheet snapshot={snapshot({ confirmed: { ...snapshot().confirmed!, lifecycle: "archived" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    rerender(<CharacterSheet snapshot={snapshot({ view: { source: "stored" as const, character: { ...snapshot().view!.character, lifecycle: "archived" } } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByText("Actions are unavailable while this character is archived.")).toBeVisible();
   });
 
   it("labels unavailable completion metadata instead of treating it as an empty list", () => {
     const state = snapshot();
-    delete state.confirmed!.projection.completionFields;
+    delete state.view!.character.projection.completionFields;
     render(<CharacterSheet snapshot={state} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByText("Completion fields are unavailable until this character refreshes.")).toBeVisible();
   });
@@ -183,12 +196,76 @@ describe("CharacterSheet", () => {
     expect(screen.getByText("Estimates use the last saved values and limits; the server confirms the final result.")).toBeVisible();
   });
 
+  it("disables increase at the character's own maximum, below the field's upper bound", () => {
+    const base = snapshot();
+    const resource = base.view!.character.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;
+    resource.value = { current: 4, max: 4 };
+    render(<CharacterSheet snapshot={base} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByText("4 / 4")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Increase Health" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Decrease Health" })).toBeEnabled();
+  });
+
+  it("applies an amount in one command and hides the controls without a handler", async () => {
+    const user = userEvent.setup();
+    const onAdjustResource = vi.fn();
+    const { rerender } = render(<CharacterSheet snapshot={snapshot()} onSetField={vi.fn()} onBump={vi.fn()} onAdjustResource={onAdjustResource} />);
+    const amount = screen.getByRole("spinbutton", { name: "Amount for Health" });
+    expect(screen.getByRole("button", { name: "Subtract from Health" })).toBeDisabled();
+    await user.type(amount, "3");
+    await user.click(screen.getByRole("button", { name: "Subtract from Health" }));
+    expect(onAdjustResource).toHaveBeenLastCalledWith("health", -3);
+    expect(amount).toHaveValue(null);
+    await user.type(amount, "2");
+    await user.click(screen.getByRole("button", { name: "Add to Health" }));
+    expect(onAdjustResource).toHaveBeenLastCalledWith("health", 2);
+
+    rerender(<CharacterSheet snapshot={snapshot()} onSetField={vi.fn()} onBump={vi.fn()} />);
+    expect(screen.queryByRole("spinbutton", { name: "Amount for Health" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Set Health" })).toBeNull();
+  });
+
+  it("sets current and maximum directly, sending only what changed", async () => {
+    const user = userEvent.setup();
+    const onSetResource = vi.fn();
+    render(<CharacterSheet snapshot={snapshot()} onSetField={vi.fn()} onBump={vi.fn()} onSetResource={onSetResource} />);
+    await user.click(screen.getByRole("button", { name: "Set Health" }));
+    const max = screen.getByRole("spinbutton", { name: "Maximum Health" });
+    expect(screen.getByRole("spinbutton", { name: "Current Health" })).toHaveValue(4);
+    await user.clear(max);
+    await user.type(max, "3");
+    expect(screen.getByRole("alert")).toHaveTextContent("Enter a current value from 0 up to the maximum");
+    expect(screen.getByRole("button", { name: "Save Health" })).toBeDisabled();
+    await user.clear(max);
+    await user.type(max, "5");
+    await user.click(screen.getByRole("button", { name: "Save Health" }));
+    expect(onSetResource).toHaveBeenCalledWith("health", { max: 5 });
+    expect(screen.queryByRole("spinbutton", { name: "Maximum Health" })).toBeNull();
+  });
+
+  it("shows a pending maximum from the offline queue", () => {
+    render(<CharacterSheet snapshot={snapshot({ tentative: { health: 6, "health.max": 8 } })} onSetField={vi.fn()} onBump={vi.fn()} />);
+    expect(screen.getByText("6 / 8")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Increase Health" })).toBeEnabled();
+  });
+
+  it("shows a roll's outcome and details next to its result", () => {
+    render(<CharacterSheet snapshot={snapshot({ lastRoll: {
+      actionId: "roll-check", expression: "d100", dice: [], breakdown: { version: "1.0", rootId: "root", groups: [], terms: [] }, bindings: [],
+      total: 33, outcome: { id: "critical", label: "Critical" }, details: [{ id: "levels", label: "Success levels", value: 3 }],
+      output: "33 against 60: Critical", audience: "owner_only",
+    } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    expect(screen.getByTestId("roll-outcome")).toHaveTextContent("Critical");
+    expect(screen.getByText("Success levels")).toBeVisible();
+    expect(screen.getByText("3")).toBeVisible();
+  });
+
   it("shows the same estimate in every duplicate resource control", () => {
     const base = snapshot({ tentative: { health: 5 } });
-    const resource = base.confirmed!.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;
+    const resource = base.view!.character.projection.sheets[1]!.sections[0]!.elements.find((element): element is Extract<typeof element, { kind: "resource" }> => element.kind === "resource")!;
     const duplicated = {
-      ...base.confirmed!.projection,
-      sheets: base.confirmed!.projection.sheets.map(sheet => ({
+      ...base.view!.character.projection,
+      sheets: base.view!.character.projection.sheets.map(sheet => ({
         ...sheet,
         sections: sheet.sections.map(section => ({
           ...section,
@@ -196,7 +273,7 @@ describe("CharacterSheet", () => {
         })),
       })),
     };
-    render(<CharacterSheet snapshot={{ ...base, confirmed: { ...base.confirmed!, projection: duplicated } }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={{ ...base, view: { source: "stored" as const, character: { ...base.view!.character, projection: duplicated } } }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getAllByText("5 / 6")).toHaveLength(2);
   });
 
@@ -209,24 +286,26 @@ describe("CharacterSheet", () => {
     expect(screen.getAllByRole("status")[0]).toHaveTextContent("Saved");
     expect(screen.getByText("Available offline")).toBeVisible();
 
-    rerender(<CharacterSheet snapshot={snapshot({ confirmed: { ...snapshot().confirmed!, lifecycle: "archived" } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} offlineAvailable={false} />);
+    rerender(<CharacterSheet snapshot={snapshot({ view: { source: "stored" as const, character: { ...snapshot().view!.character, lifecycle: "archived" } } })} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} offlineAvailable={false} />);
     expect(screen.getByRole("region", { name: "Aria" })).toHaveTextContent("Archived");
     expect(screen.getByText("Offline copy not ready yet")).toBeVisible();
   });
 
   it.each([
-    { phase: "storage-error" as const, kind: "storage-error" as const, status: "Local storage unavailable", disabled: true },
+    // V3: a storage failure is `storage: "unavailable"`, not an error.
+    { phase: "storage-error" as const, kind: null, storage: "unavailable" as const, status: "Local storage unavailable", disabled: true },
     { phase: "invalid" as const, kind: "invalid" as const, status: "A value needs correction", disabled: true },
     { phase: "conflict" as const, kind: "conflict" as const, status: "Needs review before continuing", disabled: true },
     { phase: "reauthenticate" as const, kind: "reauthenticate" as const, status: "Sign in again to continue", disabled: true },
     { phase: "uncertain" as const, kind: null, status: "Confirming the last change", disabled: false },
     { phase: "sending" as const, kind: null, status: "Saving", disabled: false },
-  ])("reports a truthful $phase status instead of Saved", ({ phase, kind, status, disabled }) => {
+  ])("reports a truthful $phase status instead of Saved", ({ phase, kind, status, disabled, ...rest }) => {
     const queued = snapshot().entries;
     const blocked = snapshot({
       phase,
       entries: [{ id: "pending", actorId: "a", characterId: "character", sequence: 0, baseRevision: 1, packageChecksum: "checksum", createdAt: "2026-09-06T00:00:00Z", intent: { kind: "setField", fieldId: "name", value: "Briar" }, attempt: null }],
-      error: kind === null ? null : { kind, message: "blocked for review" },
+      error: kind === null ? null : { kind, diagnostic: "blocked for review" },
+      storage: "storage" in rest ? rest.storage : "available",
     });
     expect(queued).toEqual([]);
     render(<CharacterSheet snapshot={blocked} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
@@ -250,7 +329,7 @@ describe("CharacterSheet", () => {
   });
 
   it("exposes no private detail once purged", () => {
-    render(<CharacterSheet snapshot={{ phase: "purged", confirmed: null, tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", message: "This character is no longer available." }, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
+    render(<CharacterSheet snapshot={{ phase: "purged", view: null, storage: "available", tentative: null, entries: [], editing: { owned: false }, error: { kind: "purged", diagnostic: "This character is no longer available." }, lastRoll: null, lastNominal: null, pendingOnlineAttempts: [], connected: false }} onSetField={vi.fn()} onBump={vi.fn()} onExecuteAction={vi.fn()} />);
     expect(screen.getByRole("status")).toHaveTextContent("This character is no longer available.");
     expect(screen.queryByText("Aria")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
@@ -290,7 +369,7 @@ describe("CharacterSheet", () => {
   it("renders slot elements through SlotListControl and skips synthetic granted actions", async () => {
     const user = userEvent.setup();
     const state = snapshot();
-    const moves = state.confirmed!.projection.sheets[1]!.sections[0]!;
+    const moves = state.view!.character.projection.sheets[1]!.sections[0]!;
     moves.elements.push(
       { kind: "slot", id: "inv-element", slotId: "inventory", label: "Inventory", accepts: ["item"], entries: [
         { entryId: "aaaaaaaa-1111-4111-8111-111111111111", templateId: "longsword", label: "Longsword", values: { weapon_bonus: 1 } },

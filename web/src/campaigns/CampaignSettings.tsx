@@ -9,6 +9,7 @@ import { Button, Dialog, FormField, Panel } from "../ui/index.js";
 import type { CampaignsApi } from "./api.js";
 import type { CampaignView } from "./types.js";
 import { randomUUID } from "../utils/uuid";
+import { CampaignVersionSection } from "./CampaignVersion.js";
 
 function isConflict(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -168,6 +169,9 @@ export function CampaignSettingsView(props: {
     | "pairDisplay"
     | "listDisplayCredentials"
     | "revokeDisplay"
+    | "campaignVersionOptions"
+    | "campaignVersionCheck"
+    | "changeCampaignVersion"
   >;
   campaign: CampaignView;
   actorId?: string | null;
@@ -339,6 +343,21 @@ export function CampaignSettingsView(props: {
         {exportDone ? <p role="status">{t("campaign.manage.settings.export.done")}</p> : null}
         {exportError !== null ? <p role="alert">{exportError}</p> : null}
       </Panel>
+      {props.isGm === true
+        && props.api.campaignVersionOptions !== undefined
+        && props.api.campaignVersionCheck !== undefined
+        && props.api.changeCampaignVersion !== undefined ? (
+        <CampaignVersionSection
+          api={{
+            campaignVersionOptions: props.api.campaignVersionOptions,
+            campaignVersionCheck: props.api.campaignVersionCheck,
+            changeCampaignVersion: props.api.changeCampaignVersion,
+          }}
+          campaign={props.campaign}
+          online={online}
+          onChanged={props.onChanged}
+        />
+      ) : null}
       {showDisplayPairing ? (
         <DisplayPairingSection
           api={props.api}

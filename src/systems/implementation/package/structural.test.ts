@@ -98,7 +98,7 @@ describe("template/slot structural validation", () => {
     );
   });
 
-  it("flags a template field id colliding with the global set", () => {
+  it("allows a template field ID shared with an entity", () => {
     const diagnostics = validateDocumentStructure(
       documentWith([
         itemTemplate("torch", {
@@ -117,12 +117,7 @@ describe("template/slot structural validation", () => {
         }),
       ]),
     );
-    expect(diagnostics).toContainEqual(
-      expect.objectContaining({
-        code: "duplicate_definition_id",
-        path: "/templates/0/fields/0/id",
-      }),
-    );
+    expect(diagnostics).toEqual([]);
   });
 
   it("flags a granted roll action with a missing expression", () => {
@@ -276,6 +271,42 @@ describe("template/slot compatibility", () => {
     expect(report.compatible).toBe(false);
     expect(report.findings).toContainEqual(
       expect.objectContaining({ code: "slot_kind_narrowed", path: "/slots/inventory/accepts" }),
+    );
+  });
+
+  const bonusField = (overrides: Record<string, unknown> = {}) => ({
+    kind: "integer", id: "bonus", label: "Bonus", default: 1, required: false, min: 0, max: 10, step: 1, ...overrides,
+  });
+
+  it("flags template field removal, kind change and new requirement", () => {
+    const prev = packageWith([itemTemplate("torch", { fields: [bonusField()] })]);
+    expect(comparePackages(prev, packageWith([itemTemplate("torch")])).findings).toContainEqual(
+      expect.objectContaining({ code: "template_field_removed", path: "/templates/torch/fields/bonus" }),
+    );
+    const asText = { kind: "text", id: "bonus", label: "Bonus", default: "", required: false, minLength: 0, maxLength: 10 };
+    expect(comparePackages(prev, packageWith([itemTemplate("torch", { fields: [asText] })])).findings).toContainEqual(
+      expect.objectContaining({ code: "template_field_kind_changed" }),
+    );
+    expect(comparePackages(prev, packageWith([itemTemplate("torch", { fields: [bonusField({ required: true })] })])).findings).toContainEqual(
+      expect.objectContaining({ code: "template_field_required_added" }),
+    );
+  });
+
+  it("treats template stat and default changes as non-breaking", () => {
+    const report = comparePackages(
+      packageWith([itemTemplate("torch", { fields: [bonusField()] })]),
+      packageWith([itemTemplate("torch", { label: "Lantern", fields: [bonusField({ default: 3, max: 20 }), bonusField({ id: "weight" })] })]),
+    );
+    expect(report).toEqual({ compatible: true, findings: [] });
+  });
+
+  it("flags slot_capacity_reduced, including against the implicit default", () => {
+    const report = comparePackages(
+      packageWith([], [inventory()]),
+      packageWith([], [{ ...inventory(), maxEntries: 10 }]),
+    );
+    expect(report.findings).toContainEqual(
+      expect.objectContaining({ code: "slot_capacity_reduced", path: "/slots/inventory/maxEntries" }),
     );
   });
 

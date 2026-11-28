@@ -1,5 +1,7 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
+  "templates": [],
+  "slots": [],
   "metadata": {
     "name": "D20 System",
     "description": "Classic d20-based fantasy system",
@@ -225,6 +227,7 @@
       "expressionId": "ability_valid_expr",
       "severity": "error",
       "message": "Ability score must be between 3 and 18",
+      "targetEntityId": "character",
       "targetId": "ability"
     }
   ]

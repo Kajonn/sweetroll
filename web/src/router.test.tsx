@@ -201,7 +201,7 @@ function routerActionView(characterId: string, revision: number, name = "Briar")
     characterId,
     revision,
     name,
-    state: { schemaVersion: "1.0", values: { name } },
+    state: { schemaVersion: "1.0", entries: {}, values: { name } },
     projection: {
       projectionVersion: "1.0",
       systemId: "22222222-2222-4000-8000-000000000000",
@@ -235,7 +235,7 @@ function routerCompletionView(characterId: string, name: string): CharacterView 
     characterId,
     revision: 1,
     name,
-    state: { schemaVersion: "1.0", values: { name } },
+    state: { schemaVersion: "1.0", entries: {}, values: { name } },
     projection: {
       projectionVersion: "1.0",
       systemId: "22222222-2222-4000-8000-000000000000",
@@ -359,7 +359,8 @@ describe("character routes", () => {
     const roll: NonNullable<CommandResultResponse["result"]["roll"]> = {
       actionId: "roll-check",
       expression: "d20 + 2",
-      dice: [{ sides: 20, value: 14, kept: true }],
+      dice: [{ sides: 20, value: 14, kept: true, id: "@root.0:0", groupId: "@root.0" }],
+  breakdown: { version: "1.0", rootId: "root", groups: [{ id: "@root.0", label: "Dice", count: 1, sides: 20, operation: "sum", diceIds: ["@root.0:0"], total: 14 }], terms: [] },
       bindings: [{ scope: "inputs", definitionId: "bonus", value: 2 }],
       total: 16,
       output: "Success",

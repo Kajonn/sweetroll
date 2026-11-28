@@ -12,7 +12,7 @@ import type { CharacterExport } from "./types.js";
 function readySnapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot {
   return {
     phase: "ready",
-    confirmed: makeView({ characterId: "char-1", revision: 3 }),
+    storage: "available", view: { source: "stored" as const, character: makeView({ characterId: "char-1", revision: 3 }) },
     tentative: null,
     entries: [],
     editing: { owned: true },
@@ -72,14 +72,14 @@ function makeApi(overrides: Partial<CharactersApi> = {}): CharactersApi {
       systemVersionId: "11111111-1111-4000-8000-000000000000",
       packageChecksum: "abc",
       revision: 3,
-      state: { schemaVersion: "1.0", values: {} },
+      state: { schemaVersion: "1.0", entries: {}, values: {} },
     })),
     ...overrides,
   } as unknown as CharactersApi;
 }
 
 describe("CharacterTools", () => {
-  it("does not offer character version migration or rollback", () => {
+  it("hides the rules-version tool when the API does not provide version checks", () => {
     render(<CharacterTools characterId="char-1" api={makeApi()} session={makeSession(readySnapshot())} />);
     expect(screen.queryByRole("button", { name: /migration|rollback|upgrade/i })).not.toBeInTheDocument();
   });
@@ -142,7 +142,7 @@ describe("CharacterTools", () => {
       systemVersionId: "11111111-1111-4000-8000-000000000000",
       packageChecksum: "abc",
       revision: 3,
-      state: { schemaVersion: "1.0", values: { name: "Aria" } },
+      state: { schemaVersion: "1.0", entries: {}, values: { name: "Aria" } },
     } as unknown as CharacterExport;
     const api = makeApi({ export: vi.fn(async () => document) });
     const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {});
@@ -158,7 +158,7 @@ describe("CharacterTools", () => {
   it("marks an archived character read-only until recovered", async () => {
     const user = userEvent.setup();
     const archived = readySnapshot({
-      confirmed: makeView({ characterId: "char-1", revision: 4, lifecycle: "archived" }),
+      view: { source: "stored" as const, character: makeView({ characterId: "char-1", revision: 4, lifecycle: "archived" }) },
     });
     const session = makeSession(archived);
     render(<CharacterTools characterId="char-1" api={makeApi()} session={session} />);
@@ -490,7 +490,7 @@ describe("CharacterTools", () => {
       systemVersionId: "11111111-1111-4000-8000-000000000000",
       packageChecksum: "abc",
       revision: 3,
-      state: { schemaVersion: "1.0", values: { name: "Aria" } },
+      state: { schemaVersion: "1.0", entries: {}, values: { name: "Aria" } },
     } as unknown as CharacterExport;
     const api = makeApi({ export: vi.fn(async () => serverDocument) });
     let capturedParts: BlobPart[] | null = null;

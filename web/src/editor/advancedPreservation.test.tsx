@@ -23,7 +23,7 @@ type PutBody = { expectedRevision: number | null; document: any };
 
 function fixtureDocument() {
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "2.0", templates: [], slots: [],
     metadata: { name: "R1", description: "d", language: "en", defaultDice: "d20" },
     entities: [],
     referenceData: [],

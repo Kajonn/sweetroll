@@ -13,13 +13,39 @@ import type {
   SlotSheetElementV1,
 } from "./sheetTypes.js";
 
+export type VisibilityCondition = { id: string; label: string };
+
+/** "Show only when" picker shared by sections and elements (design 6.3). */
+export function VisibleWhenSelect({ id, value, conditions, onChange }: {
+  id: string;
+  value: string | undefined;
+  conditions: ReadonlyArray<VisibilityCondition>;
+  onChange: (next: string | undefined) => void;
+}) {
+  if (conditions.length === 0 && value === undefined) return null;
+  return (
+    <Select
+      label={t("editor.sheet.visibleWhen")}
+      id={`visible-when-${id}`}
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value === "" ? undefined : e.target.value)}
+      data-testid={`visible-when-${id}`}
+      options={[
+        { value: "", label: t("editor.sheet.visibleAlways") },
+        ...conditions.map((condition) => ({ value: condition.id, label: condition.label })),
+      ]}
+    />
+  );
+}
+
 export type ElementEditorProps = {
   element: SheetElementV1;
   onChange: (next: SheetElementV1) => void;
-  definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string}>;
+  definitions?: ReadonlyArray<{kind: "field" | "resource" | "action" | "slot"; id: string; label: string; ownerId?: string}>;
+  conditions?: ReadonlyArray<VisibilityCondition>;
 };
 
-export function ElementEditor({ element, onChange, definitions = [] }: ElementEditorProps) {
+export function ElementEditor({ element, onChange, definitions = [], conditions = [] }: ElementEditorProps) {
   const update = (patch: Partial<SheetElementV1>) => {
     onChange({ ...element, ...patch } as SheetElementV1);
   };
@@ -46,6 +72,17 @@ export function ElementEditor({ element, onChange, definitions = [] }: ElementEd
         />
       </div>
       <ElementBodyRouter element={element} onChange={update} definitions={definitions} />
+      <div className={styles.elementRow2}>
+        <VisibleWhenSelect
+          id={element.id}
+          value={element.visibleWhen}
+          conditions={conditions}
+          onChange={(visibleWhen) => {
+            const { visibleWhen: _old, ...rest } = element;
+            onChange((visibleWhen === undefined ? rest : { ...rest, visibleWhen }) as SheetElementV1);
+          }}
+        />
+      </div>
     </div>
   );
 }

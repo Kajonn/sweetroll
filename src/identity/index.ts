@@ -7,13 +7,13 @@ import {
   createIdentityRepository,
   type IdentityRepository,
   type SessionId,
-  type ThemeDefault,
+  type AccountPreferences,
   type UserId,
 } from "./repository.js";
 import { hashToken, newSessionToken } from "./util.js";
 
 export type { AppError } from "./errors.js";
-export type { ThemeDefault } from "./repository.js";
+export type { ThemeDefault, AccountPreferences } from "./repository.js";
 export type Result<T> = { ok: true; value: T } | { ok: false; error: AppError };
 
 export type SessionHandle = {
@@ -28,6 +28,9 @@ export type AuthContext =
   | { state: "anonymous" }
   | { state: "session_expired" };
 
+/** A session lookup result. `unavailable` means storage failed: the cookie may still be valid. */
+export type SessionResolution = AuthContext | { state: "unavailable" };
+
 export interface Identity {
   personalTokens: ReturnType<typeof createPersonalTokens>;
   completeSignIn(input: {
@@ -35,12 +38,12 @@ export interface Identity {
     redirectUri: string;
     previousToken: string | undefined;
   }): Promise<Result<SessionHandle>>;
-  resolveSession(token: string): Promise<AuthContext>;
+  resolveSession(token: string): Promise<SessionResolution>;
   signOut(token: string): Promise<Result<void>>;
   /** Internal bounded projection. Callers must authorize the resource roster first. */
   getDisplayNames(userIds: readonly UserId[]): Promise<Result<Array<{ userId: UserId; displayName: string | null }>>>;
-  getThemeDefault(actorId: UserId): Promise<Result<ThemeDefault | null>>;
-  setThemeDefault(actorId: UserId, value: ThemeDefault | null): Promise<Result<ThemeDefault | null>>;
+  getPreferences(actorId: UserId): Promise<Result<AccountPreferences>>;
+  patchPreferences(actorId: UserId, patch: Partial<AccountPreferences>): Promise<Result<AccountPreferences>>;
 }
 
 export type CreateIdentityModuleInput = {
@@ -75,16 +78,13 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
           displayName: claims.displayName,
         });
 
-        if (previousToken !== undefined) {
-          await repo.revokeSessionByTokenHash(hashToken(previousToken));
-        }
-
         const token = newSessionToken();
         const expiresAt = new Date(Date.now() + input.sessionTtlMs);
         const { sessionId } = await repo.createSession({
           userId,
           tokenHash: hashToken(token),
           expiresAt,
+          previousTokenHash: previousToken === undefined ? undefined : hashToken(previousToken),
         });
 
         return { ok: true, value: { token, userId, sessionId, expiresAt } };
@@ -105,7 +105,7 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
         if (session === null || session.revokedAt !== null) {
           return { state: "anonymous" as const };
         }
-        if (session.expiresAt.getTime() < Date.now()) {
+        if (session.expiresAt.getTime() <= Date.now()) {
           return { state: "session_expired" as const };
         }
         return {
@@ -114,7 +114,9 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
           sessionId: session.sessionId,
         };
       } catch {
-        return { state: "anonymous" as const };
+        // A failed lookup (for example a busy connection pool) says nothing
+        // about the token. Reporting it as anonymous would sign the user out.
+        return { state: "unavailable" as const };
       }
     },
 
@@ -136,17 +138,17 @@ export function createIdentityModule(input: CreateIdentityModuleInput): Identity
       }
     },
 
-    async getThemeDefault(actorId) {
+    async getPreferences(actorId) {
       try {
-        return { ok: true, value: await repo.getThemeDefault(actorId) };
+        return { ok: true, value: await repo.getPreferences(actorId) };
       } catch {
         return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
       }
     },
 
-    async setThemeDefault(actorId, value) {
+    async patchPreferences(actorId, patch) {
       try {
-        return { ok: true, value: await repo.setThemeDefault(actorId, value) };
+        return { ok: true, value: await repo.patchPreferences(actorId, patch) };
       } catch {
         return { ok: false, error: { code: "internal", message: "An internal error occurred." } };
       }

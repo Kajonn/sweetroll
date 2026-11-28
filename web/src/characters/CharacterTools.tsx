@@ -6,9 +6,10 @@ import { t } from "../i18n/index.js";
 import { Button } from "../ui/Button.js";
 import type { CharactersApi } from "./api.js";
 import { captureOpener, focusFirst, restoreOpener, trapTabKey } from "./dialogTrap.js";
-import type { CharacterSession } from "./session.js";
+import { canEdit, type CharacterSession } from "./session.js";
 import type { ActivityEvent } from "./types.js";
 import styles from "./characters.module.css";
+import { VersionDialog } from "./VersionDialog.js";
 
 export type CharacterToolsProps = {
   characterId: string;
@@ -16,7 +17,7 @@ export type CharacterToolsProps = {
   session: CharacterSession;
 };
 
-type DialogKind = "activity" | "archive" | "recover" | "export" | null;
+type DialogKind = "activity" | "archive" | "recover" | "export" | "version" | null;
 
 function useSnapshot(session: CharacterSession) {
   const [snapshot, setSnapshot] = useState(() => session.getSnapshot());
@@ -37,11 +38,17 @@ export function CharacterTools({ characterId, api, session }: CharacterToolsProp
   const snapshot = useSnapshot(session);
   const blocked = snapshot.entries.length > 0 || snapshot.phase !== "ready";
   const uncertain = snapshot.pendingOnlineAttempts.length > 0;
-  const readOnly = !snapshot.editing.owned;
+  const readOnly = !canEdit(snapshot);
   const offline = !snapshot.connected;
   const manageBlocked = blocked || uncertain || readOnly || offline;
-  const lifecycle = snapshot.confirmed?.lifecycle ?? "active";
+  const lifecycle = snapshot.view?.character.lifecycle ?? "active";
   const [dialog, setDialog] = useState<DialogKind>(null);
+  // Design 6.7: standalone characters change rules version here; attached
+  // characters move with their campaign.
+  const versionApi = api.versionOptions !== undefined && api.versionCheck !== undefined
+    ? { versionOptions: api.versionOptions, versionCheck: api.versionCheck }
+    : null;
+  const standalone = (snapshot.view?.character.campaignId ?? null) === null;
   const openerRef = useRef<Element | null>(null);
 
   const openDialog = (kind: Exclude<DialogKind, null>) => {
@@ -67,6 +74,11 @@ export function CharacterTools({ characterId, api, session }: CharacterToolsProp
       <Button type="button" variant="primary" disabled={blocked} onClick={() => openDialog("export")}>
         {t("character.tools.export")}
       </Button>
+      {versionApi !== null && standalone && !readOnly ? (
+        <Button type="button" variant="primary" disabled={manageBlocked || lifecycle === "archived"} onClick={() => openDialog("version")}>
+          {t("version.open")}
+        </Button>
+      ) : null}
       {lifecycle === "archived" ? <p>{t("character.tools.archivedReadOnly")}</p> : null}
       {dialog === "activity" ? (
         <ActivityDialog characterId={characterId} api={api} session={session} onClose={closeDialog} />
@@ -96,6 +108,15 @@ export function CharacterTools({ characterId, api, session }: CharacterToolsProp
             // Refresh and freeze before initiating the online-only operation.
             await session.recover();
           }}
+          onClose={closeDialog}
+        />
+      ) : null}
+      {dialog === "version" && versionApi !== null ? (
+        <VersionDialog
+          characterId={characterId}
+          api={versionApi}
+          session={session}
+          blocked={manageBlocked || lifecycle === "archived"}
           onClose={closeDialog}
         />
       ) : null}
@@ -162,10 +183,13 @@ function ConfirmDialog({ title, confirmLabel, onConfirm, onClose }: { title: str
 function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:PushApi;session:CharacterSession;snapshot:ReturnType<CharacterSession["getSnapshot"]> }) {
   const knownKinds = new Set([
     "character_created", "character_duplicated", "character_field_set", "character_resource_bumped",
+    "character_resource_adjusted", "character_roll_applied", "character_resource_set",
     "character_action_executed", "character_renamed", "character_archived", "character_recovered",
     "character_exported", "character_campaign_created", "character_adopted",
     "character_controllers_assigned", "character_claimed", "character_ownership_transferred",
     "entry_added", "entry_removed", "entry_updated",
+    "system_version_upgraded", "system_version_reverted", "extensions_changed",
+    "extension_added", "extension_removed", "extension_upgraded",
   ]);
   const label = knownKinds.has(event.kind)
     ? t(`character.activity.${event.kind}`)
@@ -176,7 +200,7 @@ function ActivityRow({ event,api,session,snapshot }: { event: ActivityEvent;api:
     <li>
       <span>{label}</span>{" · "}
       <time dateTime={event.occurredAt}>{formattedDate}</time>
-      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.confirmed?.characterId??""} api={api} online={snapshot.connected} revision={snapshot.confirmed?.revision} disabled={!snapshot.editing.owned||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.confirmed?.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:<RollBreakdown roll={event.roll}/>}
+      {event.roll===undefined?null:event.roll.push?<PushPanel roll={event.roll} characterId={snapshot.view?.character.characterId??""} api={api} online={snapshot.connected} revision={snapshot.view?.character.revision} disabled={!canEdit(snapshot)||snapshot.phase!=="ready"||snapshot.entries.length>0||snapshot.pendingOnlineAttempts.length>0||snapshot.view?.character.lifecycle!=="active"} onPush={session.pushRoll} onRefresh={session.refresh} onDenied={session.forgetRoll}/>:<RollBreakdown roll={event.roll}/>}
     </li>
   );
 }
@@ -284,7 +308,7 @@ function ExportDialog({ characterId, api, session, onClose }: { characterId: str
   const queued = snapshot.entries.length > 0 || snapshot.phase !== "ready";
   const uncertain = snapshot.pendingOnlineAttempts.length > 0;
   const offline = !snapshot.connected;
-  const readOnly = !snapshot.editing.owned;
+  const readOnly = !canEdit(snapshot);
   const blocked = queued || uncertain || offline || readOnly;
   const blockReason = uncertain
     ? t("character.tools.exportBlockedAttempts")

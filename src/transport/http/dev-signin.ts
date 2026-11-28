@@ -19,7 +19,6 @@ export type BuildDevSignInRoutesInput = {
   nodeEnv: "development" | "production" | "test";
   cookieName?: string;
   secure?: boolean;
-  maxAgeSeconds?: number;
   /**
    * Test-only escape hatch for production-browser offline acceptance: when
    * true, the `/dev/signin` endpoint is registered even with
@@ -58,7 +57,7 @@ export function resolveAuthMode(
 }
 
 export const buildDevSignInRoutes: (input: BuildDevSignInRoutesInput) => FastifyPluginCallback =
-  ({ identity, nodeEnv, cookieName = "session", secure = false, maxAgeSeconds = 30 * 86_400, allowInProduction = false }) =>
+  ({ identity, nodeEnv, cookieName = "session", secure = false, allowInProduction = false }) =>
   fp(async (app) => {
     // `/dev/*` registers ONLY when nodeEnv !== "production" OR explicit
     // SWEETROLL_TEST_AUTH=1 (see resolveAuthMode).
@@ -73,7 +72,7 @@ export const buildDevSignInRoutes: (input: BuildDevSignInRoutesInput) => Fastify
         const result = await identity.completeSignIn({
           code: body.code,
           redirectUri: body.redirectUri,
-          previousToken: undefined,
+          previousToken: request.cookies[cookieName] || undefined,
         });
         if (!result.ok)
           return reply.code(400).send({
@@ -85,7 +84,7 @@ export const buildDevSignInRoutes: (input: BuildDevSignInRoutesInput) => Fastify
           sameSite: "lax",
           path: "/",
           secure,
-          maxAge: maxAgeSeconds,
+          expires: result.value.expiresAt,
         });
         return {
           userId: result.value.userId,

@@ -117,7 +117,7 @@ describe("derived fixture and runtime parity", () => {
       expect(rolled.ok).toBe(true);
       if (rolled.ok)
         expect(rolled.value.roll?.bindings).toContainEqual({
-          scope: "fields",
+          scope: "item",
           definitionId: "damage_bonus",
           value: 4,
         });

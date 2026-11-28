@@ -203,9 +203,11 @@
   background: var(--surface-page);
 }
 
+/* A discarded die stays readable: struck through and dashed, never faded. */
 .diceChip[data-kept="false"] {
   text-decoration: line-through;
-  opacity: 0.6;
+  color: var(--text-muted);
+  border-style: dashed;
 }
 
 .diagnosticList {

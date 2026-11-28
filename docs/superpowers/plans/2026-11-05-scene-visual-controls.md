@@ -1,6 +1,7 @@
 # Complete the I7b/G8 visual scene controls
 
 Status: V1 accepted in PR #34; V2 accepted in PR #36 on application `84c23fd` with local and hosted mouse/touch acceptance passed. V3 accepted in PR #37 on application `637a60f` with local and hosted mouse/touch verification passed. V4 combined ordered local/hosted acceptance passed in PR #38; the I7b/G8 visual-controls feature gate is complete. G9 release gates remain separate.
+**Follow-up (2026-11-07):** the [scene streaming plan](2026-11-07-scene-streaming.md) replaces the display's five-second projection polling with a server-sent-event stream and removes the polled projection route. V2 drags and V3 committed brush strokes keep their behavior (one command per completed gesture, explicit fog commit, local undo); the GM view now adopts each command's response. Token art display URLs use `?file=` instead of `?rev=`. Acceptance evidence above predates this change.
 Evidence: [V1 hosted/redeploy acceptance](../../acceptance/scene-image-tokens-2026-11-05.md).
 Updated 2026-11-06 after the owner's review of campaign scenes.
 Baseline inspected: `5e3d81f` on PR #33.

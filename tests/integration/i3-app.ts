@@ -2,15 +2,17 @@ import { readFile } from "node:fs/promises";
 import { createTemplateRepository } from "../../src/campaigns/templatePersistence.js";
 import { Client, Pool } from "pg";
 import pino from "pino";
+import fp from "fastify-plugin";
 import type { FastifyInstance, FastifyPluginCallback } from "fastify";
 
 import { createTestOidcClient } from "../../src/identity/adapters/test.js";
 import { createIdentityModule, type Identity } from "../../src/identity/index.js";
 import { createSystemAuthoringModule, type SystemAuthoring } from "../../src/systems/authoring.js";
+import { createExtensionAuthoringModule, type ExtensionAuthoring } from "../../src/systems/extensions.js";
 import {
   createSystemPersistenceRepository,
 } from "../../src/systems/implementation/persistence/index.js";
-import { createPostgresPublishedPackageLoader } from "../../src/systems/implementation/runtime/package-loader.js";
+import { createPostgresPublishedExtensionLoader, createPostgresPublishedPackageLoader } from "../../src/systems/implementation/runtime/package-loader.js";
 import {
   createSystemRuntime,
   type SystemRuntime,
@@ -61,6 +63,7 @@ export type I3AppHandle = {
   app: FastifyInstance;
   identity: Identity;
   authoring: SystemAuthoring;
+  extensions: ExtensionAuthoring;
   characters: Characters;
   runtime: SystemRuntime;
   pool: Pool;
@@ -68,6 +71,7 @@ export type I3AppHandle = {
 };
 
 export type BuildI3AppInput = {
+  physicalDiceEnabled?: boolean;
   allowPersonalTokens?: boolean;
   scanImage?: import("../../src/platform/image-processing.js").ImageScanner;
   pool: Pool;
@@ -82,6 +86,7 @@ export type BuildI3AppInput = {
   extraRoutes?: (modules: {
     identity: Identity;
     authoring: SystemAuthoring;
+    extensions: ExtensionAuthoring;
     characters: Characters;
     runtime: SystemRuntime;
   }) => FastifyPluginCallback | FastifyPluginCallback[];
@@ -96,6 +101,8 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
         ["code-bob", { provider: "test", subject: "subBob", email: "bob@example.com", displayName: "Bob" }],
         ["code-cara", { provider: "test", subject: "subCara", email: "cara@example.com", displayName: "Cara" }],
         ["code-dan", { provider: "test", subject: "subDan", email: "dan@example.com", displayName: "Dan" }],
+        ["code-eve", { provider: "test", subject: "subEve", email: "eve@example.com", displayName: "Eve" }],
+        ["code-finn", { provider: "test", subject: "subFinn", email: "finn@example.com", displayName: "Finn" }],
       ]),
     ),
     pool: input.pool,
@@ -103,33 +110,46 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     allowPersonalTokens: input.allowPersonalTokens ?? false,
   });
 
+  const systemRepository = createSystemPersistenceRepository(input.pool);
   const authoring = createSystemAuthoringModule({
     pool: input.pool,
     scanImage: input.scanImage ?? (async () => "clean" as const),
-    repo: createSystemPersistenceRepository(input.pool),
+    repo: systemRepository,
   });
+  const extensions = createExtensionAuthoringModule({ pool: input.pool, repo: systemRepository });
 
   const runtime = createSystemRuntime({
     loadPackage: createPostgresPublishedPackageLoader(input.pool),
+  loadExtensionPackage: createPostgresPublishedExtensionLoader(input.pool),
     authoritativeRollSecret: rollSecret,
   });
 
   const effectiveRuntime = input.wrapRuntime === undefined ? runtime : input.wrapRuntime(runtime);
 
   const characters = createCharactersModule({
+    physicalDiceEnabled: input.physicalDiceEnabled ?? false,
     scanImage: input.scanImage ?? (async () => "clean" as const),
     campaignTemplates:createTemplateRepository(input.pool),
     pool: input.pool,
     runtime: effectiveRuntime,
     authorizeVersionUse: authoring.authorizeVersionUse,
+  authorizeExtensionUse: extensions.authorizeExtensionUse,
     listAuthorizedVersions: authoring.listAuthorizedVersions,
+    listUpgradeTargets: authoring.listUpgradeTargets,
+    describeVersionChoices: authoring.describeVersionChoices,
+    listExtensionUpgradeTargets: extensions.listUpgradeTargets,
+    describeCompositionChoices: extensions.describeCompositionChoices,
   });
 
-  const authHook = buildAuthHook({
-    identity,
-    cookieName: "session",
-    secure: false,
-    maxAgeSeconds: 3600,
+  const authHook = fp(async (app) => {
+    // Injected requests model same-origin browser traffic unless a test
+    // supplies its own Origin or Fetch Metadata header.
+    app.addHook("onRequest", async (request) => {
+      if (request.headers.origin === undefined && request.headers["sec-fetch-site"] === undefined) {
+        request.headers = { "sec-fetch-site": "same-origin" };
+      }
+    });
+    await app.register(buildAuthHook({ identity, cookieName: "session", secure: false }));
   });
 
   const app = buildHttpApp({
@@ -138,8 +158,8 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     authHook,
   });
 
-  void app.register(buildIdentityRoutes({ identity, cookieName: "session", secure: false }));
-  void app.register(buildSystemsRoutes({ authoring }));
+  void app.register(buildIdentityRoutes({ identity, physicalDiceEnabled: input.physicalDiceEnabled ?? false, cookieName: "session", secure: false }));
+  void app.register(buildSystemsRoutes({ authoring, extensions }));
   void app.register(buildCharactersRoutes({ characters }));
   void app.register(
     buildDevSignInRoutes({
@@ -147,12 +167,11 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
       nodeEnv: "test",
       cookieName: "session",
       secure: false,
-      maxAgeSeconds: 3600,
     }),
   );
 
   if (input.extraRoutes !== undefined) {
-    const routes = input.extraRoutes({ authoring, characters, runtime, identity });
+    const routes = input.extraRoutes({ authoring, extensions, characters, runtime, identity });
     for (const plugin of Array.isArray(routes) ? routes : [routes]) {
       void app.register(plugin);
     }
@@ -177,7 +196,7 @@ export async function buildI3App(input: BuildI3AppInput): Promise<I3AppHandle> {
     users[key] = { actorId: body.userId, cookie: idkCookieFromSetCookieResponse(response) };
   }
 
-  return { app, identity, authoring, characters, runtime, pool: input.pool, users };
+  return { app, identity, authoring, extensions, characters, runtime, pool: input.pool, users };
 }
 
 function idkCookieFromSetCookieResponse(response: {

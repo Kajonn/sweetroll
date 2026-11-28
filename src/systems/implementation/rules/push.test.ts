@@ -1,14 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { compileExpression } from "./compile.js";
 import { evaluate } from "./evaluate.js";
-import { evaluatePush, type PushEvaluationInput } from "./push.js";
+import { evaluatePush, pushEligibility, type PushEvaluationInput } from "./push.js";
 const expression = compileExpression(
   'countSuccesses(group("attribute","Attribute",dice(fields.attribute,6)),6) + countSuccesses(group("skill","Skill",dice(fields.skill,8)),7) + group("gear","Gear",dice(fields.gear,6)) + inputs.modifier',
   {
     context: "roll",
     resultType: "number",
     fallback: 0,
-    languageVersion: "0.2",
     env: {
       fields: { attribute: "number", skill: "number", gear: "number" },
       inputs: { modifier: "number" },
@@ -121,4 +120,30 @@ describe("immutable original-pool pushes", () => {
     expect(next.ok).toBe(true);
     expect(f.rng).toHaveBeenCalledTimes(6);
   });
+  it("only redraws an exploding chain after the policy explicitly permits it", () => {
+    const source = 'group("trait", "Trait", explode(d6)) + group("wild", "Wild", explode(d6))';
+    const compiled = compileExpression(source, {
+      env: { fields: {}, inputs: {} }, context: "roll", resultType: "number", fallback: 0,
+    });
+    if (!compiled.ok) throw Error("fixture compile");
+    const expression = { ...compiled.value, id: "roll" };
+    const bindings = { fields: {}, inputs: {} };
+    const originalDraws = [1, 0.4, 1, 0.6];
+    const original = evaluate(expression, bindings, () => originalDraws.shift()!);
+    if (!original.ok || !original.roll) throw Error("fixture evaluate");
+    const policy = fixture().policy;
+    policy.groups = [{ groupId: "trait", lockedFaces: [], reportedFaces: [1] }];
+    expect(pushEligibility(policy, original.roll, 0).canPush).toBe(false);
+    policy.groups[0]!.modifiers = ["explode"];
+    const child = evaluatePush({
+      expression, bindings, parent: original.roll, policy, attempt: 0, rng: () => 0.1,
+      limits: { dicePerRoll: 100, sidesPerDie: 1000 },
+    });
+    expect(child).toMatchObject({ ok: true, roll: { total: 11 }, rerolledDiceIds: ["trait:0"],
+      faceOutcomes: [{ groupId: "trait", face: 1, combinedCount: 1, rerolledCount: 1 }] });
+    if (!child.ok) throw Error(child.reason);
+    expect(child.roll.dice.filter((die) => die.groupId === "wild")).toEqual(original.roll.dice.filter((die) => die.groupId === "wild"));
+    expect(child.roll.dice.filter((die) => die.groupId === "trait")).toHaveLength(1);
+  });
+
 });

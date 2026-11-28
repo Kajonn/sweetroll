@@ -1,3 +1,4 @@
+import { defaultPreferences } from "../../identity/repository.js";
 import { describe, expect, it } from "vitest";
 import Fastify from "fastify";
 
@@ -20,8 +21,8 @@ const testIdentity: Identity = {
   resolveSession: async () => ({ state: "anonymous" }),
   signOut: async () => ({ ok: true, value: undefined }),
   getDisplayNames: async () => ({ ok: true, value: [] }),
-    getThemeDefault: async () => ({ ok: true, value: null }),
-  setThemeDefault: async (_actorId, value) => ({ ok: true, value }),
+    getPreferences: async () => ({ ok: true, value: defaultPreferences }),
+  patchPreferences: async (_actorId, patch) => ({ ok: true, value: { ...defaultPreferences, ...patch } }),
 };
 
 describe("buildOpenApiDocument", () => {
@@ -51,12 +52,17 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/characters/{characterId}/assign",
       "/campaigns/{id}/characters/{characterId}/claim",
       "/campaigns/{id}/claimable-characters",
+      "/campaigns/{id}/composition",
+      "/campaigns/{id}/composition-check",
+      "/campaigns/{id}/composition-options",
       "/campaigns/{id}/content",
       "/campaigns/{id}/content-preview",
       "/campaigns/{id}/display-codes",
       "/campaigns/{id}/display-credentials",
       "/campaigns/{id}/displays/{displayId}/revoke",
       "/campaigns/{id}/exports",
+      "/campaigns/{id}/extensions",
+      "/campaigns/{id}/extensions/{extensionId}",
       "/campaigns/{id}/images",
       "/campaigns/{id}/images/{fileId}",
       "/campaigns/{id}/images/{fileId}/original",
@@ -83,6 +89,7 @@ describe("buildOpenApiDocument", () => {
       "/campaigns/{id}/item-templates/{templateId}/sharing",
       "/campaigns/{id}/members",
       "/campaigns/{id}/members/{userId}",
+      "/campaigns/{id}/physical-rolls/events",
       "/campaigns/{id}/recover",
       "/campaigns/{id}/scenes",
       "/characters",
@@ -90,7 +97,13 @@ describe("buildOpenApiDocument", () => {
       "/characters/creation-versions",
       "/characters/{characterId}",
       "/characters/{characterId}/actions/{actionId}",
+      "/characters/{characterId}/actions/{actionId}/roll-options",
       "/characters/{characterId}/activity",
+      "/characters/{characterId}/applicable-rolls",
+      "/characters/{characterId}/composition",
+      "/characters/{characterId}/composition-check",
+      "/characters/{characterId}/composition-options",
+      "/characters/{characterId}/decks",
       "/characters/{characterId}/duplicate",
       "/characters/{characterId}/entries",
       "/characters/{characterId}/entries/{entryId}",
@@ -101,11 +114,18 @@ describe("buildOpenApiDocument", () => {
       "/characters/{characterId}/exports",
       "/characters/{characterId}/fields/{fieldId}/set",
       "/characters/{characterId}/ownership-transfer",
+      "/characters/{characterId}/physical-rolls",
+      "/characters/{characterId}/physical-rolls/{attemptId}/complete",
       "/characters/{characterId}/portrait",
       "/characters/{characterId}/portrait/thumbnail",
       "/characters/{characterId}/portrait/{fileId}",
       "/characters/{characterId}/portrait/{fileId}/thumbnail",
+      "/characters/{characterId}/reference-data",
+      "/characters/{characterId}/reference-data/{datasetId}",
+      "/characters/{characterId}/resources/{resourceId}/adjust",
+      "/characters/{characterId}/resources/{resourceId}/apply-roll",
       "/characters/{characterId}/resources/{resourceId}/bump",
+      "/characters/{characterId}/resources/{resourceId}/set",
       "/characters/{characterId}/rolls/{rollId}",
       "/characters/{characterId}/rolls/{rollId}/push",
       "/characters/{characterId}/rolls/{rollId}/push-options",
@@ -114,9 +134,13 @@ describe("buildOpenApiDocument", () => {
       "/content/{id}/grants",
       "/content/{id}/recover",
       "/displays/redeem",
+      "/displays/{id}/scenes/{sceneId}/events",
       "/displays/{id}/scenes/{sceneId}/image",
-      "/displays/{id}/scenes/{sceneId}/projection",
       "/displays/{id}/scenes/{sceneId}/tokens/{tokenId}/image",
+      "/extensions/{extensionId}",
+      "/extensions/{extensionId}/draft",
+      "/extensions/{extensionId}/preview",
+      "/extensions/{extensionId}/publish",
       "/invitations/accept",
       "/invitations/decline",
       "/invitations/review",
@@ -134,6 +158,7 @@ describe("buildOpenApiDocument", () => {
       "/systems",
       "/systems/{systemId}",
       "/systems/{systemId}/draft",
+      "/systems/{systemId}/extensions",
       "/systems/{systemId}/preview",
       "/systems/{systemId}/publish",
       "/systems/{systemId}/templates/{templateId}/image",
@@ -282,9 +307,10 @@ describe("buildOpenApiDocument", () => {
       "get_campaigns_id_display_credentials",
     );
     expect(paths["/displays/redeem"]?.post?.operationId).toBe("post_displays_redeem");
-    expect(paths["/displays/{id}/scenes/{sceneId}/projection"]?.get?.operationId).toBe(
-      "get_displays_id_scenes_sceneId_projection",
+    expect(paths["/displays/{id}/scenes/{sceneId}/events"]?.get?.operationId).toBe(
+      "get_displays_id_scenes_sceneId_events",
     );
+    expect(paths["/displays/{id}/scenes/{sceneId}/projection"]).toBeUndefined();
     expect(paths["/displays/{id}/scenes/{sceneId}/image"]?.get?.operationId).toBe(
       "get_displays_id_scenes_sceneId_image",
     );

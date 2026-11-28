@@ -17,7 +17,7 @@ const sheet = (overrides = {}) => ({
   returnOwnerId: null, name: "Bram", systemVersionId: "v1", entityDefinitionId: "hero",
   revision: 7, lifecycle: "active", archivedAt: null,
   createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z",
-  state: { schemaVersion: "1.0", values: {} }, derivedValues: {},
+  state: { schemaVersion: "1.0", entries: {}, values: {} }, derivedValues: {},
   validations: [],
   projection: {
     projectionVersion: "1.0", systemId: "s", versionId: "v1", packageChecksum: "p",
@@ -90,6 +90,54 @@ describe("SessionBoard", () => {
     expect(screen.queryByRole("button", { name: /mira/i })).toBeNull();
     expect(screen.getByRole("button", { name: /bram/i })).toBeVisible();
     expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledTimes(1);
+  });
+
+  it("lists every campaign character across pages and filters beyond the first page", async () => {
+    const row = (index: number) => ({
+      characterId: `s${index}`, campaignId: "c1", name: `Hero ${String(index).padStart(2, "0")}`,
+      entityDefinitionId: "hero", systemVersionId: "v1", revision: 1, lifecycle: "active",
+      placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z",
+    });
+    const all = Array.from({ length: 30 }, (_, index) => row(index + 1));
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn((_campaignId: string, input?: { cursor?: string | null }) =>
+        Promise.resolve(input?.cursor === "page-2"
+          ? { characters: all.slice(25), nextCursor: null, requestId: "r3" }
+          : { characters: all.slice(0, 25), nextCursor: "page-2", requestId: "r2" })),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={{ open: vi.fn() } as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+    { wrapper: wrapper() });
+    expect(await screen.findByRole("button", { name: /hero 30/i })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /^open hero/i })).toHaveLength(30);
+    expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledTimes(2);
+    expect(campaignsApi.listCampaignCharacters).toHaveBeenLastCalledWith("c1", expect.objectContaining({ cursor: "page-2" }));
+    fireEvent.change(screen.getByLabelText(/filter characters/i), { target: { value: "hero 28" } });
+    expect(screen.getByRole("button", { name: /hero 28/i })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /hero 01/i })).toBeNull();
+    expect(screen.queryByText(/more characters than/i)).toBeNull();
+  });
+
+  it("stops at the page safety cap and says the list is incomplete", async () => {
+    let next = 0;
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn(() => {
+        next += 1;
+        return Promise.resolve({ characters: [
+          { characterId: `s${next}`, campaignId: "c1", name: `Hero ${next}`, entityDefinitionId: "hero", systemVersionId: "v1", revision: 1, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+        ], nextCursor: `page-${next + 1}`, requestId: `r${next}` });
+      }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={{ open: vi.fn() } as never}
+      campaignId="c1" actorId="u1" generation={0} online={false} onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+    { wrapper: wrapper() });
+    expect(await screen.findByText(/first 20 characters; this campaign has more characters than/i)).toBeVisible();
+    expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledTimes(20);
+    expect(campaignsApi.listCampaignCharacters).toHaveBeenCalledWith("c1", { cursor: null, limit: 100 });
   });
 
   it("disables Increase at the value bound even when the element max is higher", async () => {
@@ -202,6 +250,27 @@ describe("SessionBoard", () => {
     expect(screen.queryByText(/roll may have applied/i)).not.toBeInTheDocument();
   });
 
+  it("shows the outcome label with the total on the session board", async () => {
+    const campaignsApi = {
+      listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
+      listActivity: vi.fn().mockResolvedValue({ events: [], nextCursor: null, requestId: "r1" }),
+      listCampaignCharacters: vi.fn().mockResolvedValue({ characters: [
+        { characterId: "s1", campaignId: "c1", name: "Bram", entityDefinitionId: "hero", systemVersionId: "v1", revision: 7, lifecycle: "active", placementGeneration: 1, controllers: [], updatedAt: "2026-09-01T00:00:00Z" },
+      ], nextCursor: null, requestId: "r2" }),
+    };
+    const charactersApi = {
+      open: vi.fn().mockResolvedValue({ character: sheet(), requestId: "r3" }),
+      executeCharacterAction: vi.fn().mockResolvedValue({ result: { roll: { total: 13, outcome: { id: "hit", label: "Hit" }, output: "Hit (13)", dice: [] } }, requestId: "r4" }),
+    };
+    render(<SessionBoard campaignsApi={campaignsApi as never} charactersApi={charactersApi as never}
+      campaignId="c1" actorId="u1" generation={0} online onOpenCharacter={() => {}} onAccessRevoked={() => {}} />,
+      { wrapper: wrapper() });
+    fireEvent.click(await screen.findByRole("button", { name: /bram/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /roll strike/i }));
+    expect(await screen.findByRole("status", { name: "" })).toHaveTextContent("13 — Hit");
+    expect(screen.queryByText(/roll may have applied/i)).not.toBeInTheDocument();
+  });
+
   it("disables same-character controls until the refreshed revision lands", async () => {
     const campaignsApi = {
       listContent: vi.fn().mockResolvedValue({ content: [], nextCursor: null, requestId: "r0" }),
@@ -311,7 +380,7 @@ describe("SessionBoard", () => {
 
 it("routes GM pushes through the shared durable character session",async()=>{
  const roll={actionId:"a1",expression:"2d6",dice:[],bindings:[],total:4,output:"GM saved pool",audience:"campaign",breakdown:{version:"1.0",rootId:"root",groups:[],terms:[]},push:{version:"1.0",rollId:"root",rootRollId:"root",parentRollId:null,attempt:0,maxAttempts:2,rerolledDiceIds:[],faceOutcomes:[]}};
- const snapshot={phase:"ready",confirmed:sheet(),tentative:null,entries:[],editing:{owned:true},error:null,lastRoll:roll,lastNominal:null,lastMigration:null,pendingOnlineAttempts:[],connected:true};
+ const snapshot={phase:"ready",view:{source:"stored",character:sheet()},storage:"available",tentative:null,entries:[],editing:{owned:true},error:null,lastRoll:roll,lastNominal:null,lastMigration:null,pendingOnlineAttempts:[],connected:true};
  const push=vi.fn(async()=>{});const factory=vi.fn(()=>({open:vi.fn(async()=>{}),subscribe:()=>()=>{},getSnapshot:()=>snapshot,pushRoll:push,refresh:vi.fn(async()=>{}),dispose:vi.fn()}));
  const chars={open:vi.fn().mockResolvedValue({character:sheet()}),executeCharacterAction:vi.fn(),bumpCharacterResource:vi.fn(),pushOptions:vi.fn().mockResolvedValue({options:{canPush:true,reason:null,eligibleDiceIds:[],revision:7,nextAttempt:1,maxAttempts:2}}),readRoll:vi.fn()};
  const campaigns={listContent:vi.fn().mockResolvedValue({content:[],nextCursor:null}),listActivity:vi.fn().mockResolvedValue({events:[],nextCursor:null}),listCampaignCharacters:vi.fn().mockResolvedValue({characters:[{characterId:"s1",name:"Bram",controllers:[]}],nextCursor:null})};

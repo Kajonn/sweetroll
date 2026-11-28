@@ -11,11 +11,11 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
   const confirmed = makeView({
     characterId: "char-1",
     revision: 7,
-    state: { schemaVersion: "1.0", values: { name: "ServerName", health: 4 } },
+    state: { schemaVersion: "1.0", entries: {}, values: { name: "ServerName", health: 4 } },
   });
   return {
     phase: "conflict",
-    confirmed,
+    storage: "available", view: { source: "stored", character: confirmed },
     tentative: { name: "LocalName" },
     entries: [
       makeEntry({
@@ -32,7 +32,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
       }),
     ],
     editing: { owned: true },
-    error: { kind: "conflict", message: "The character changed on the server. Review before re-sending." },
+    error: { kind: "conflict", diagnostic: "The character changed on the server. Review before re-sending." },
     lastRoll: null, lastNominal: null,
     pendingOnlineAttempts: [],
     connected: true,
@@ -43,7 +43,7 @@ function snapshot(overrides: Partial<CharacterSnapshot> = {}): CharacterSnapshot
 describe("ConflictReview", () => {
   it("uses projected labels for conflict choices while preserving exact intents", () => {
     const snap = snapshot();
-    (snap.confirmed!.projection as any).completionFields = [{ kind: "field", fieldId: "name", label: "Character name" }];
+    (snap.view!.character.projection as any).completionFields = [{ kind: "field", fieldId: "name", label: "Character name" }];
     render(<ConflictReview snapshot={snap} onResolve={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByRole("checkbox", { name: /Character name → LocalName/ })).toBeVisible();
   });
@@ -57,10 +57,10 @@ describe("ConflictReview", () => {
     const confirmed = makeView({
       characterId: "char-1",
       revision: 7,
-      state: { schemaVersion: "1.0", values: { health: 4 } },
+      state: { schemaVersion: "1.0", entries: {}, values: { health: 4 } },
     });
     const snap = snapshot({
-      confirmed,
+      view: { source: "stored", character: confirmed },
       tentative: { health: { up: 1, down: 0 } },
       entries: [
         makeEntry({
@@ -101,11 +101,11 @@ describe("ConflictReview", () => {
   it("keeps showing a repeated conflict after reapply", () => {
     const { rerender } = render(<ConflictReview snapshot={snapshot()} onResolve={vi.fn()} onClose={vi.fn()} />);
     const again = snapshot({
-      confirmed: makeView({
+      view: { source: "stored" as const, character: makeView({
         characterId: "char-1",
         revision: 9,
-        state: { schemaVersion: "1.0", values: { name: "ServerAgain" } },
-      }),
+        state: { schemaVersion: "1.0", entries: {}, values: { name: "ServerAgain" } },
+      }) },
     });
     rerender(<ConflictReview snapshot={again} onResolve={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getByText(/ServerAgain/)).toBeVisible();
@@ -128,7 +128,7 @@ describe("ConflictReview", () => {
           },
         }),
       ],
-      error: { kind: "expired-attempt", message: "older than the server's replay window" },
+      error: { kind: "expired-attempt", diagnostic: "older than the server's replay window" },
     });
     render(<ConflictReview snapshot={snap} onResolve={vi.fn()} onClose={vi.fn()} />);
     expect(screen.getAllByText(/replay window|expired|uncertain/i).length).toBeGreaterThan(0);
@@ -139,7 +139,8 @@ describe("ConflictReview", () => {
       phase: "invalid",
       error: {
         kind: "invalid",
-        message: "Health must be positive",
+        diagnostic: "Health must be positive",
+        serverMessage: "Health must be positive",
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Health must be positive", targetDefinitionId: "health" }] },
       },
     });
@@ -170,7 +171,8 @@ describe("ConflictReview", () => {
       phase: "invalid",
       error: {
         kind: "invalid",
-        message: "Health must be positive",
+        diagnostic: "Health must be positive",
+        serverMessage: "Health must be positive",
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Health must be positive", targetDefinitionId: "health" }] },
       },
     });
@@ -250,7 +252,8 @@ describe("ConflictReview", () => {
       phase: "invalid",
       error: {
         kind: "invalid",
-        message: "Name is too short",
+        diagnostic: "Name is too short",
+        serverMessage: "Name is too short",
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Name is too short", targetDefinitionId: "name" }] },
       },
     });
@@ -274,7 +277,7 @@ describe("ConflictReview", () => {
     const confirmed = makeView({
       characterId: "char-1",
       revision: 7,
-      state: { schemaVersion: "1.0", values: { level: 1 } },
+      state: { schemaVersion: "1.0", entries: {}, values: { level: 1 } },
       projection: {
         projectionVersion: "1.0",
         systemId: "22222222-2222-4000-8000-000000000000",
@@ -312,7 +315,7 @@ describe("ConflictReview", () => {
     } as unknown as Parameters<typeof makeView>[0]);
     const snap = snapshot({
       phase: "invalid",
-      confirmed,
+      view: { source: "stored", character: confirmed },
       entries: [
         makeEntry({
           id: "e-level",
@@ -323,7 +326,8 @@ describe("ConflictReview", () => {
       ],
       error: {
         kind: "invalid",
-        message: "Level must be between 1 and 10",
+        diagnostic: "Level must be between 1 and 10",
+        serverMessage: "Level must be between 1 and 10",
         details: { diagnostics: [{ validationId: "v", severity: "error", message: "Level must be between 1 and 10", targetDefinitionId: "level" }] },
       },
     });
@@ -409,7 +413,7 @@ describe("ConflictReview", () => {
       entries: [],
       error: {
         kind: "expired-attempt",
-        message: "older than the server's replay window",
+        diagnostic: "older than the server's replay window",
         details: { attemptId: "online-1" },
       },
       pendingOnlineAttempts: [onlineAttempt({ replayExpired: true })],
